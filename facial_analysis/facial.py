@@ -1,20 +1,58 @@
+import os
 import cv2
 import numpy as np
 from PIL import Image
 import dlib
 from matplotlib import pyplot as plt
-from image_analysis.image import load_image
+from facial_analysis.image import load_image, ImageAnalysis
+from spiga.inference.config import ModelConfig
+from spiga.inference.framework import SPIGAFramework
+from spiga.demo.visualize.plotter import Plotter
   
-  def load_face_image(filename, crop=True):
-    img = load_image(filename)
-    face = AnalyzeFace()
-    face.load_image(image)
-    if crop: face.crop_stylegan()
-    return face
+def load_face_image(filename, crop=True):
+  img = load_image(filename)
+  face = AnalyzeFace()
+  face.load_image(image)
+  if crop: face.crop_stylegan()
+  return face
+
+def find_facial_path():
+    home_directory = os.path.expanduser( '~' )
+    path = os.path.join( home_directory, '.facial_analysis' )
+    try:
+        os.makedirs(path)
+    except FileExistsError:
+       # directory already exists
+       pass
+    return path
+
+def download_weights(target_dir):
+    url = "http://dlib.net/files/shape_predictor_5_face_landmarks.dat.bz2"
+    filename = "shape_predictor_5_face_landmarks.dat"
+    bz2_file_path = os.path.join(target_dir, filename + ".bz2")
+    final_file_path = os.path.join(target_dir, filename)
+
+    # Check if the file already exists
+    if not os.path.exists(final_file_path):
+        # Download the file from `url` and save it locally under `file_name`:
+        urllib.request.urlretrieve(url, bz2_file_path)
+
+        # Open the bz2 file
+        with bz2.open(bz2_file_path, 'rb') as f:
+            data = f.read()
+
+        # Write the decompressed data
+        with open(final_file_path, 'wb') as f:
+            f.write(data)
+
+        # Remove the bz2 file
+        os.remove(bz2_file_path)
 
 class StyleGANCrop:
+  facial_path = find_facial_path()
+  download_weights(facial_path)
   detector = dlib.get_frontal_face_detector()
-  predictor = dlib.shape_predictor('/content/shape_predictor_5_face_landmarks.dat')
+  predictor = dlib.shape_predictor(os.path.join(facial_path,'shape_predictor_5_face_landmarks.dat'))
 
   def find_eyes(self, img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
