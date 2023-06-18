@@ -1,5 +1,6 @@
 import os
 import cv2
+import math
 import numpy as np
 from PIL import Image
 import dlib
@@ -10,6 +11,7 @@ from facial_analysis.image import load_image, ImageAnalysis
 from spiga.inference.config import ModelConfig
 from spiga.inference.framework import SPIGAFramework
 from spiga.demo.visualize.plotter import Plotter
+from facial_analysis.util import PolyArea
   
 def load_face_image(filename, crop=True):
   img = load_image(filename)
@@ -361,7 +363,7 @@ class AnalyzeFace (ImageAnalysis):
       self.landmarks[64],
       self.landmarks[65],
       self.landmarks[66],
-      self.landmarks[67]])
+      self.landmarks[67]], self.pix2mm)
 
     left_eye_area = self.measure_polygon(
       [self.landmarks[68],
@@ -371,7 +373,7 @@ class AnalyzeFace (ImageAnalysis):
       self.landmarks[72],
       self.landmarks[73],
       self.landmarks[74],
-      self.landmarks[75]])
+      self.landmarks[75]], self.pix2mm)
 
     eye_area_diff = abs(right_eye_area-left_eye_area)
     #66,74
