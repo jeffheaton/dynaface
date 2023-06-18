@@ -4,6 +4,8 @@ import numpy as np
 from PIL import Image
 import dlib
 from matplotlib import pyplot as plt
+import urllib
+import bz2
 from facial_analysis.image import load_image, ImageAnalysis
 from spiga.inference.config import ModelConfig
 from spiga.inference.framework import SPIGAFramework
@@ -12,7 +14,7 @@ from spiga.demo.visualize.plotter import Plotter
 def load_face_image(filename, crop=True):
   img = load_image(filename)
   face = AnalyzeFace()
-  face.load_image(image)
+  face.load_image(img)
   if crop: face.crop_stylegan()
   return face
 

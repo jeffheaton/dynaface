@@ -13,3 +13,9 @@ cd SPIGA
 pip install -e .
 cd ..
 rm -rf ./SPIGA
+
+https://www.geeksforgeeks.org/using-jupyter-notebook-in-virtual-environment/
+
+ipython kernel install --user --name=venv
+
+cp -R /content/drive/MyDrive/facial_analysis/ /content

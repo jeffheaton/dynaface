@@ -7,10 +7,7 @@ from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans
 import math
 import json
-from spiga.inference.config import ModelConfig
-from spiga.inference.framework import SPIGAFramework
 import copy
-from spiga.demo.visualize.plotter import Plotter
 
 # oral commissure
 # medial canthus
