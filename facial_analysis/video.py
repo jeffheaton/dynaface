@@ -14,15 +14,16 @@ class ProcessVideo:
   def __init__(self):
     # Create a temporary directory
     self.temp_path = tempfile.mkdtemp()
+    self.temp_output = os.path.join(self.temp_path, "output.txt")
     self.input_images = os.path.join(self.temp_path,'input-%d.jpg')
-    self.output_images = os.path.join(self.temp_path,'output-%d.jpg')
+    self.output_images = os.path.join(self.temp_path,'output-%d.jpg') 
 
 
   def execute_command(self, cmd):
-    with open("temp.txt", 'w') as fp:
+    with open(self.temp_output, 'w') as fp:
       subprocess.call(cmd, shell=True, stdout=fp)
 
-    with open("temp.txt", 'r') as fp:
+    with open(self.temp_output, 'r') as fp:
       result = fp.read()
 
     print(f"Executed command: {cmd}, result:")
