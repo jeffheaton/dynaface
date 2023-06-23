@@ -12,6 +12,7 @@ from spiga.inference.config import ModelConfig
 from spiga.inference.framework import SPIGAFramework
 from spiga.demo.visualize.plotter import Plotter
 from facial_analysis.util import PolyArea
+from facial_analysis.calc import *
   
 def load_face_image(filename, crop=True):
   img = load_image(filename)
@@ -51,7 +52,7 @@ def download_weights(target_dir):
 
         # Remove the bz2 file
         os.remove(bz2_file_path)
-
+  
 class StyleGANCrop:
   facial_path = find_facial_path()
   download_weights(facial_path)
@@ -137,6 +138,8 @@ class StyleGANCrop:
     crop0 = left_eye2[1] - 490
     return img3[crop0:crop0+1024,crop1:crop1+1024]
 
+
+
 class AnalyzeFace (ImageAnalysis):
   crop = StyleGANCrop()
   processor = SPIGAFramework(ModelConfig('wflw'))
@@ -145,6 +148,10 @@ class AnalyzeFace (ImageAnalysis):
     self.left_eye = None
     self.right_eye = None
     self.nose = None
+    self.analyze_fai = AnalyzeFAI()
+    self.analyze_brows = AnalyzeBrows()
+    self.analyze_dental = AnalyzeDentalArea()
+    self.analyze_eyes = AnalyzeEyeArea()
 
   def _find_landmarks(self, img):
 
@@ -212,18 +219,11 @@ class AnalyzeFace (ImageAnalysis):
     teeth_pred = np.sqrt(((white_line - scan_line_color)**2).sum(axis=1)).astype(int)
     return scan_line_color #, teeth_pred
 
-  def mark_teeth(self, y, teeth_pred):
-    x1 = self.nose[0] - (self.mouth_width//2)
-    y+=self.nose[1]
-    for i in range(len(teeth_pred)):
-      if teeth_pred[i]<150:
-        self.render_img[y,x1+i] = (0,0,255)
-
   def draw_landmarks(self, size=0.25, color=[0,255,255],numbers=False):
     for i,landmark in enumerate(self.landmarks):
-      self.circle(landmark,radius=2,color=color)
+      self.circle(landmark,radius=3,color=color)
       if numbers:
-        self.write_text(landmark,str(i))
+        self.write_text([landmark[0]+3,landmark[1]],str(i),size=0.5)
     self.circle(self.left_eye, color=color)
     self.circle(self.right_eye, color=color)
 
@@ -314,134 +314,10 @@ class AnalyzeFace (ImageAnalysis):
     self.write_text(mp,f"{d:.2f}mm")
     return d
 
-  def dental_area_initial(self):
-      # Mark inner mouth area as found by neural network
-      z = np.zeros( self.original_img.shape, dtype=np.uint8)
-      contours = [self.landmarks[88],
-                  self.landmarks[89],
-                  self.landmarks[90],
-                  self.landmarks[91],
-                  self.landmarks[92],
-                  self.landmarks[93],
-                  self.landmarks[94],
-                  self.landmarks[95]]
-
-      contours = np.array(contours)
-      cv2.fillPoly(z, pts = [contours], color =(255,255,255))
-
-      # Extract vertical mouth scan lines
-      dental = []
-      for x in range(self.original_img.shape[0]):
-        s = z[:,x].sum()
-        if s:
-          s = np.where(z[:,x,0])
-          dental.append( {'x':x, 'y1': min(s[0]), 'y2':max(s[0])} )
-      return dental
-
-  def measure_dental_area(self):
-    contours = [self.landmarks[88],
-              self.landmarks[89],
-              self.landmarks[90],
-              self.landmarks[91],
-              self.landmarks[92],
-              self.landmarks[93],
-              self.landmarks[94],
-              self.landmarks[95]]
-
-    contours = np.array(contours)
-    contours = contours*self.pix2mm
-    x = contours[:,0]
-    y = contours[:,1]
-    return PolyArea(x,y)
-
-  def measure_eye_area(self):
-    right_eye_area = self.measure_polygon(
-      [self.landmarks[60],
-      self.landmarks[61],
-      self.landmarks[62],
-      self.landmarks[63],
-      self.landmarks[64],
-      self.landmarks[65],
-      self.landmarks[66],
-      self.landmarks[67]], self.pix2mm)
-
-    left_eye_area = self.measure_polygon(
-      [self.landmarks[68],
-      self.landmarks[69],
-      self.landmarks[70],
-      self.landmarks[71],
-      self.landmarks[72],
-      self.landmarks[73],
-      self.landmarks[74],
-      self.landmarks[75]], self.pix2mm)
-
-    eye_area_diff = abs(right_eye_area-left_eye_area)
-    #66,74
-
-    self.write_text_sq((self.landmarks[66][0]-50,self.landmarks[66][1]+20),f"R={round(right_eye_area,2)}mm")
-    self.write_text_sq((self.landmarks[74][0]-50,self.landmarks[74][1]+20),f"L={round(left_eye_area,2)}mm")
-    self.write_text_sq((self.stats_right,self.landmarks[74][1]+50),f"d.eyes={round(eye_area_diff,2)}mm")
-    return left_eye_area, right_eye_area, eye_area_diff
-
-    #self.write_text((10, 950),f"L={round(left_eye_area,2)}mm^2, R={round(right_eye_area,2)}mm^2, dif={round(eye_area_diff)}")
-    #self.write_text((10, 950),f"Eyes: L={round(left_eye_area,2)}mm^2, R={round(right_eye_area,2)}mm^2, dif={round(eye_area_diff)}")
-    #self.write_text((10, 950),f"Eyes: L={round(left_eye_area,2)}mm^2, R={round(right_eye_area,2)}mm^2, dif={round(eye_area_diff)}")
-
-  def measure_brows(self):
-    # left brow
-    contours = [self.landmarks[34],
-              self.landmarks[35],
-              self.landmarks[36],
-              self.landmarks[37]]
-
-    contours = np.array(contours)
-    x = contours[:,0]
-    y = contours[:,1]
-    left_brow_idx = np.argmin(y)
-    left_brow_y = y[left_brow_idx]
-    left_brow_x = x[left_brow_idx]
-    self.arrow((left_brow_x, left_brow_y), (1024,left_brow_y),apt2=False)
-
-    # right brow
-    contours = [self.landmarks[42],
-              self.landmarks[43],
-              self.landmarks[44],
-              self.landmarks[45]]
-
-    contours = np.array(contours)
-    x = contours[:,0]
-    y = contours[:,1]
-    right_brow_idx = np.argmin(y)
-    right_brow_y = y[right_brow_idx]
-    right_brow_x = x[right_brow_idx]
-    self.arrow((right_brow_x, right_brow_y), (1024,right_brow_y),apt2=False)
-
-    diff = abs(left_brow_y-right_brow_y)*self.pix2mm
-    self.write_text((self.stats_right, min(left_brow_y,right_brow_y)-10),f"d.brow={diff:.2f} mm")
-    return diff
-
-
   def analyze(self):
-    d1 = self.measure(self.landmarks[64],self.landmarks[76])
-    d2 = self.measure(self.landmarks[68],self.landmarks[82])
-    if d1>d2:
-      fai = d1 - d2
-    else:
-      fai = d2 - d1
-
-    dental_sqmm = self.measure_dental_area()
-
-    fai_pt = (self.stats_right,self.landmarks[82][1])
-    self.write_text(fai_pt, f"FAI={fai:.2f} mm")
-    dental_pt = (self.stats_right,self.landmarks[85][1]+20)
-    self.write_text_sq(dental_pt,f"dental={round(dental_sqmm,2)}mm")
-    dental_area = self.dental_area_initial()
-
-    for scan in dental_area:
-      x, y1, y2 = scan['x'], scan['y1'], scan['y2']
-      for y in range(y1,y2):
-        self.render_img[y][x][2] = 255
-
-    left_eye_area, right_eye_area, eye_area_diff = self.measure_eye_area()
-    brow_diff = self.measure_brows()
-    return {'fai': fai, 'left_eye_area':left_eye_area, 'right_eye_area':right_eye_area, 'eye_area_diff':eye_area_diff, 'brow_diff':brow_diff}
+    result = {}
+    result.update(self.analyze_fai.calc(self))
+    result.update(self.analyze_brows.calc(self))
+    result.update(self.analyze_dental.calc(self))
+    result.update(self.analyze_eyes.calc(self))
+    return result
