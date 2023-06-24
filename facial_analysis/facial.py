@@ -144,11 +144,11 @@ class AnalyzeFace (ImageAnalysis):
   crop = StyleGANCrop()
   processor = SPIGAFramework(ModelConfig('wflw'))
 
-  def __init__(self):
+  def __init__(self, stats):
     self.left_eye = None
     self.right_eye = None
     self.nose = None
-    self.calcs = [AnalyzeFAI(),AnalyzeBrows(),AnalyzeDentalArea(),AnalyzeEyeArea()]
+    self.calcs = stats
 
   def get_all_stats(self):
     return [stat for obj in self.calcs for stat in obj.stats()]

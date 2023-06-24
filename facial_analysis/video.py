@@ -73,7 +73,7 @@ class VideoToVideo:
     self.rate = 1/30 # 240
     self.data = {}
 
-  def process(self, input_video, output_video):
+  def process(self, input_video, output_video, stats=[]):
     p = ProcessVideo()
     p.extract(input_video)
 
@@ -83,8 +83,9 @@ class VideoToVideo:
     crop = StyleGANCrop()
     image = cv2.imread(filename)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    face = AnalyzeFace()
+    face = AnalyzeFace(stats)
     face.load_image(image)
+
     self.stats = face.get_all_stats()    
     self.data = {stat: [] for stat in self.stats}
 
@@ -103,7 +104,7 @@ class VideoToVideo:
       # Load frame and crop/size
       image = cv2.imread(filename)
       image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-      face = AnalyzeFace()
+      face = AnalyzeFace(stats)
       face.load_image(image)
       face.load_image(crop.size_crop(face.original_img, sz, crop0, crop1))
 

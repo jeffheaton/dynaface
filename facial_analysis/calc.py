@@ -16,6 +16,32 @@ class AnalyzeFAI:
       face.write_text(fai_pt, f"FAI={fai:.2f} mm")
     return {'fai': fai}
 
+class AnalyzeFAI:
+  def stats(self):
+    return ['fai']
+  def calc(self, face, render=True):
+    d1 = face.measure(face.landmarks[64],face.landmarks[76])
+    d2 = face.measure(face.landmarks[68],face.landmarks[82])
+    if d1>d2:
+      fai = d1 - d2
+    else:
+      fai = d2 - d1
+
+    fai_pt = (face.stats_right,face.landmarks[82][1])
+    if render:
+      face.write_text(fai_pt, f"FAI={fai:.2f} mm")
+    return {'fai': fai}
+
+class OralCommissureExcursion:
+  def stats(self):
+    return ['oce.a','oce.b']
+  def calc(self, face, render=True):
+    oce_a = face.measure(face.landmarks[76],face.landmarks[85])
+    oce_b = face.measure(face.landmarks[82],face.landmarks[85])
+    return {'oce.a': oce_a, 'oce.b': oce_b}
+
+    
+
 class AnalyzeBrows:
   def stats(self):
     return ['brow_diff']
@@ -79,7 +105,7 @@ class AnalyzeDentalArea():
 
 class AnalyzeEyeArea():
   def stats(self):
-    return ['left_eye_area','right_eye_area','eye_area_diff']
+    return ['eye.l','eye.r','eye.diff']
   def calc(self, face, render=True):
     right_eye_area = face.measure_polygon(
       [face.landmarks[60],
@@ -107,4 +133,4 @@ class AnalyzeEyeArea():
     face.write_text_sq((face.landmarks[74][0]-50,face.landmarks[74][1]+20),f"L={round(left_eye_area,2)}mm")
     face.write_text_sq((face.stats_right,face.landmarks[74][1]+50),f"d.eyes={round(eye_area_diff,2)}mm")
 
-    return {'left_eye_area':left_eye_area, 'right_eye_area':right_eye_area, 'eye_area_diff':eye_area_diff}
+    return {'eye.l':left_eye_area, 'eye.r':right_eye_area, 'eye.diff':eye_area_diff}

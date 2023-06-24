@@ -1,6 +1,7 @@
 import os
 import sys
 from facial_analysis.video import VideoToVideo
+from facial_analysis.calc import OralCommissureExcursion, AnalyzeEyeArea
 
 if len(sys.argv) != 2:
   print("Please call with: process_vide [video file]")
@@ -14,7 +15,11 @@ graph_filename = os.path.join(os.path.dirname(filename), base_filename + "-graph
 analyze_filename = os.path.join(os.path.dirname(filename), base_filename + "-analyze.mp4")
 
 v = VideoToVideo()
+STATS = [OralCommissureExcursion(),AnalyzeEyeArea()]
 v.process(
   filename,
-  analyze_filename)
-v.plot_chart(graph_filename,['fai','dental_area'])
+  analyze_filename,
+  STATS
+  )
+v.plot_chart(graph_filename,['oce.a','oce.b', 'eye.l', 'eye.r', 'eye.diff'])
+
