@@ -18,7 +18,6 @@ class ProcessVideo:
     self.input_images = os.path.join(self.temp_path,'input-%d.jpg')
     self.output_images = os.path.join(self.temp_path,'output-%d.jpg') 
 
-
   def execute_command(self, cmd):
     with open(self.temp_output, 'w') as fp:
       subprocess.call(cmd, shell=True, stdout=fp)
@@ -68,24 +67,15 @@ class ProcessVideo:
 
 class VideoToVideo:
   def __init__(self):
+    self.stats = []
     self.left_area = []
     self.right_area = []
     self.rate = 1/30 # 240
+    self.data = {}
 
   def process(self, input_video, output_video):
     p = ProcessVideo()
     p.extract(input_video)
-
-    min_fai = 1000
-    min_left_eye_area = 1000
-    min_right_eye_area = 1000
-    min_eye_area_diff = 1000
-    min_brow_diff = 1000
-    max_fai = 0
-    max_left_eye_area = 0
-    max_right_eye_area = 0
-    max_eye_area_diff = 0
-    max_brow_diff = 0
 
     # sample 1st
     filename = os.path.join(p.temp_path,f"input-1.jpg")
@@ -95,14 +85,15 @@ class VideoToVideo:
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     face = AnalyzeFace()
     face.load_image(image)
-    sz, crop0, crop1 = crop.measure_stylegan(face.original_img)
-    print("---")
-    print(sz)
-    print(crop0)
-    print(crop1)
+    self.stats = face.get_all_stats()    
+    self.data = {stat: [] for stat in self.stats}
 
+    print(self.stats)
+    sz, crop0, crop1 = crop.measure_stylegan(face.original_img)
+   
     out_idx = 1
 
+    print("---")
     idx = 0
     while True:
       idx+=1
@@ -118,39 +109,23 @@ class VideoToVideo:
 
       # Analyze blink frame
       rec = face.analyze()
-      fai = rec['fai']
-      left_eye_area = rec['left_eye_area']
-      right_eye_area = rec['right_eye_area']
-      eye_area_diff = rec['eye_area_diff']
-      brow_diff = rec['brow_diff']
-
-      self.left_area.append(float(left_eye_area))
-      self.right_area.append(float(right_eye_area))
-
-      min_fai = min(min_fai,fai)
-      min_left_eye_area = min(min_left_eye_area,left_eye_area)
-      min_right_eye_area = min(min_right_eye_area,right_eye_area)
-      min_eye_area_diff = min(min_eye_area_diff,eye_area_diff)
-      min_brow_diff = min(min_brow_diff,brow_diff)
-      max_fai = max(max_fai,fai)
-      max_left_eye_area = max(max_left_eye_area,left_eye_area)
-      max_right_eye_area = max(max_right_eye_area,right_eye_area)
-      max_eye_area_diff = max(max_eye_area_diff,eye_area_diff)
-      max_brow_diff = max(max_brow_diff,brow_diff)
-
+      for stat in rec.keys():
+        self.data[stat].append(rec[stat])
+      
       face.write_text((10,50), f"Frame {idx+1}, {round(idx*self.rate*1000)} ms")
-      face.write_text((10,80), f"(min/max) left eye: {round(min_left_eye_area)}/{round(max_left_eye_area)} right eye: {round(min_right_eye_area)}/{round(max_right_eye_area)} diff eye:{round(min_eye_area_diff)}/{round(max_eye_area_diff)}")
-      #face.draw_landmarks(numbers=True)
       face.save(os.path.join(p.temp_path,f"output-{out_idx}.jpg"))
       out_idx += 1
-      #display_image(face.render_img, scale=1)
 
     p.build(output_video,p.frame_rate)
     p.cleanup()
     print(p.temp_path)
 
-  def plot_chart(self, filename):
-    lst_time = [x*self.rate for x in range(len(self.left_area))]
+  def plot_chart(self, filename, plot_stats=None):
+    if plot_stats is None:
+      plot_stats = self.data.keys()
+    # create time axis
+    l = len(self.data[self.stats[0]])
+    lst_time = [x*self.rate for x in range(l)]
 
     layout = go.Layout(
         title=f"Blink Efficency",
@@ -164,7 +139,10 @@ class VideoToVideo:
 
     fig = go.Figure(layout=layout)
 
-    fig.add_trace(go.Scatter(x=lst_time, y=self.left_area, name="Left Area", line=dict(color='red')))
-    fig.add_trace(go.Scatter(x=lst_time, y=self.right_area, name="Right Area", line=dict(color='blue')))
+    for stat in self.data.keys():
+      if stat in plot_stats:
+        fig.add_trace(go.Scatter(x=lst_time, y=self.data[stat], name=stat, )) # line=dict(color='red'))
+
+    #fig.add_trace(go.Scatter(x=lst_time, y=self.right_area, name="Right Area", line=dict(color='blue')))
     fig.write_image(filename)
 

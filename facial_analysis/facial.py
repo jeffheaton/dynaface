@@ -148,10 +148,10 @@ class AnalyzeFace (ImageAnalysis):
     self.left_eye = None
     self.right_eye = None
     self.nose = None
-    self.analyze_fai = AnalyzeFAI()
-    self.analyze_brows = AnalyzeBrows()
-    self.analyze_dental = AnalyzeDentalArea()
-    self.analyze_eyes = AnalyzeEyeArea()
+    self.calcs = [AnalyzeFAI(),AnalyzeBrows(),AnalyzeDentalArea(),AnalyzeEyeArea()]
+
+  def get_all_stats(self):
+    return [stat for obj in self.calcs for stat in obj.stats()]
 
   def _find_landmarks(self, img):
 
@@ -162,11 +162,6 @@ class AnalyzeFace (ImageAnalysis):
     x0,y0,w,h = bbox
     landmarks2 = [(int(x[0]),int(x[1])) for x in np.array(features['landmarks'][0])]
     return landmarks2
-
-    #landmarks = []
-    #for i in range(68):
-    #  landmarks.append([int(shape.part(i).x),int(shape.part(i).y)])
-    #return landmarks
 
   def load_image(self, img):
     super().load_image(img)
@@ -316,8 +311,6 @@ class AnalyzeFace (ImageAnalysis):
 
   def analyze(self):
     result = {}
-    result.update(self.analyze_fai.calc(self))
-    result.update(self.analyze_brows.calc(self))
-    result.update(self.analyze_dental.calc(self))
-    result.update(self.analyze_eyes.calc(self))
+    for calc in self.calcs:
+      result.update(calc.calc(self))
     return result

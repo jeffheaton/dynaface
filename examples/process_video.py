@@ -17,4 +17,4 @@ v = VideoToVideo()
 v.process(
   filename,
   analyze_filename)
-v.plot_chart(graph_filename)
+v.plot_chart(graph_filename,['fai','dental_area'])

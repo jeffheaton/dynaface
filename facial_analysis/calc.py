@@ -1,6 +1,8 @@
 import numpy as np
 
 class AnalyzeFAI:
+  def stats(self):
+    return ['fai']
   def calc(self, face, render=True):
     d1 = face.measure(face.landmarks[64],face.landmarks[76])
     d2 = face.measure(face.landmarks[68],face.landmarks[82])
@@ -15,6 +17,9 @@ class AnalyzeFAI:
     return {'fai': fai}
 
 class AnalyzeBrows:
+  def stats(self):
+    return ['brow_diff']
+
   def calc(self, face, render=True):
     # left brow
     contours = [face.landmarks[34],
@@ -54,6 +59,8 @@ class AnalyzeBrows:
     return {'brow_diff':diff}
 
 class AnalyzeDentalArea():
+  def stats(self):
+    return ['dental_area']
   def calc(self, face, render=True):
     contours = [face.landmarks[88],
               face.landmarks[89],
@@ -71,6 +78,8 @@ class AnalyzeDentalArea():
     return {'dental_area': dental_area}
 
 class AnalyzeEyeArea():
+  def stats(self):
+    return ['left_eye_area','right_eye_area','eye_area_diff']
   def calc(self, face, render=True):
     right_eye_area = face.measure_polygon(
       [face.landmarks[60],
