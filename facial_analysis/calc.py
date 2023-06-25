@@ -16,22 +16,6 @@ class AnalyzeFAI:
       face.write_text(fai_pt, f"FAI={fai:.2f} mm")
     return {'fai': fai}
 
-class AnalyzeFAI:
-  def stats(self):
-    return ['fai']
-  def calc(self, face, render=True):
-    d1 = face.measure(face.landmarks[64],face.landmarks[76])
-    d2 = face.measure(face.landmarks[68],face.landmarks[82])
-    if d1>d2:
-      fai = d1 - d2
-    else:
-      fai = d2 - d1
-
-    fai_pt = (face.stats_right,face.landmarks[82][1])
-    if render:
-      face.write_text(fai_pt, f"FAI={fai:.2f} mm")
-    return {'fai': fai}
-
 class OralCommissureExcursion:
   def stats(self):
     return ['oce.a','oce.b']
@@ -40,11 +24,9 @@ class OralCommissureExcursion:
     oce_b = face.measure(face.landmarks[82],face.landmarks[85])
     return {'oce.a': oce_a, 'oce.b': oce_b}
 
-    
-
 class AnalyzeBrows:
   def stats(self):
-    return ['brow_diff']
+    return ['d.brow']
 
   def calc(self, face, render=True):
     # left brow
@@ -80,7 +62,6 @@ class AnalyzeBrows:
     if render:
       face.arrow((right_brow_x, right_brow_y), (1024,right_brow_y),apt2=False)
       face.write_text((face.stats_right, min(left_brow_y,right_brow_y)-10),f"d.brow={diff:.2f} mm")
-
     
     return {'brow_diff':diff}
 
@@ -105,7 +86,7 @@ class AnalyzeDentalArea():
 
 class AnalyzeEyeArea():
   def stats(self):
-    return ['eye.l','eye.r','eye.diff']
+    return ['eye.l', 'eye.r', 'd.eye', 'rlr.eye=', 'rrl.eye']
   def calc(self, face, render=True):
     right_eye_area = face.measure_polygon(
       [face.landmarks[60],
@@ -127,10 +108,14 @@ class AnalyzeEyeArea():
       face.landmarks[74],
       face.landmarks[75]], face.pix2mm)
 
-    eye_area_diff = abs(right_eye_area-left_eye_area)
+    eye_area_diff = round(abs(right_eye_area-left_eye_area),2)
+    eye_ratio_lr = round(left_eye_area/right_eye_area,2)
+    eye_ratio_rl = round(right_eye_area/left_eye_area,2)
 
     face.write_text_sq((face.landmarks[66][0]-50,face.landmarks[66][1]+20),f"R={round(right_eye_area,2)}mm")
     face.write_text_sq((face.landmarks[74][0]-50,face.landmarks[74][1]+20),f"L={round(left_eye_area,2)}mm")
-    face.write_text_sq((face.stats_right,face.landmarks[74][1]+50),f"d.eyes={round(eye_area_diff,2)}mm")
+    face.write_text_sq((face.stats_right,face.landmarks[74][1]+50),f"d.eye={round(eye_area_diff,2)}mm")
+    face.write_text_sq((face.stats_right,face.landmarks[74][1]+80),f"rlr.eye={round(eye_ratio_lr,2)}mm")
+    face.write_text_sq((face.stats_right,face.landmarks[74][1]+110),f"rrl.eye={round(eye_ratio_rl,2)}mm")
 
-    return {'eye.l':left_eye_area, 'eye.r':right_eye_area, 'eye.diff':eye_area_diff}
+    return {'eye.l':left_eye_area, 'eye.r':right_eye_area, 'd.eye':eye_area_diff, 'rlr.eye=':eye_ratio_lr, 'rrl.eye':eye_ratio_rl}
