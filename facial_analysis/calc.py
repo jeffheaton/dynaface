@@ -26,7 +26,7 @@ class OralCommissureExcursion:
 
 class AnalyzeBrows:
   def stats(self):
-    return ['d.brow']
+    return ['brow.d']
 
   def calc(self, face, render=True):
     # left brow
@@ -63,7 +63,7 @@ class AnalyzeBrows:
       face.arrow((right_brow_x, right_brow_y), (1024,right_brow_y),apt2=False)
       face.write_text((face.stats_right, min(left_brow_y,right_brow_y)-10),f"d.brow={diff:.2f} mm")
     
-    return {'brow_diff':diff}
+    return {'brow.d':diff}
 
 class AnalyzeDentalArea():
   def stats(self):
@@ -86,7 +86,7 @@ class AnalyzeDentalArea():
 
 class AnalyzeEyeArea():
   def stats(self):
-    return ['eye.l', 'eye.r', 'd.eye', 'rlr.eye=', 'rrl.eye']
+    return ['eye.l', 'eye.r', 'eye.d', 'eye.rlr', 'eye.rrl']
   def calc(self, face, render=True):
     right_eye_area = face.measure_polygon(
       [face.landmarks[60],
@@ -118,4 +118,4 @@ class AnalyzeEyeArea():
     face.write_text_sq((face.stats_right,face.landmarks[74][1]+80),f"rlr.eye={round(eye_ratio_lr,2)}mm")
     face.write_text_sq((face.stats_right,face.landmarks[74][1]+110),f"rrl.eye={round(eye_ratio_rl,2)}mm")
 
-    return {'eye.l':left_eye_area, 'eye.r':right_eye_area, 'd.eye':eye_area_diff, 'rlr.eye=':eye_ratio_lr, 'rrl.eye':eye_ratio_rl}
+    return {'eye.l':left_eye_area, 'eye.r':right_eye_area, 'eye.d':eye_area_diff, 'eye.rlr':eye_ratio_lr, 'eye.rrl':eye_ratio_rl}

@@ -149,6 +149,7 @@ class AnalyzeFace (ImageAnalysis):
     self.right_eye = None
     self.nose = None
     self.calcs = stats
+    self.headpose = [0,0,0]
 
   def get_all_stats(self):
     return [stat for obj in self.calcs for stat in obj.stats()]
@@ -161,11 +162,12 @@ class AnalyzeFace (ImageAnalysis):
     # Prepare variables
     x0,y0,w,h = bbox
     landmarks2 = [(int(x[0]),int(x[1])) for x in np.array(features['landmarks'][0])]
-    return landmarks2
+    headpose = np.array(features['headpose'][0])
+    return landmarks2, headpose
 
   def load_image(self, img):
     super().load_image(img)
-    self.landmarks = self._find_landmarks(img)
+    self.landmarks, self.headpose = self._find_landmarks(img)
 
     # 45 = left edge of left eye
     # 42 = right edge of left eye

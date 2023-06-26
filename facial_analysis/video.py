@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import plotly.io as pio
 from facial_analysis.facial import StyleGANCrop, AnalyzeFace
 import cv2
+import csv
 
 SAMPLE_RATE = 44100
 
@@ -70,8 +71,9 @@ class VideoToVideo:
     self.stats = []
     self.left_area = []
     self.right_area = []
-    self.rate = 1/30 # 240
+    self.rate = 1/240 # 240
     self.data = {}
+    self.auto_sync = True
 
   def process(self, input_video, output_video, stats=[]):
     p = ProcessVideo()
@@ -106,14 +108,20 @@ class VideoToVideo:
       image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
       face = AnalyzeFace(stats)
       face.load_image(image)
-      face.load_image(crop.size_crop(face.original_img, sz, crop0, crop1))
+      if self.auto_sync:
+        try:
+          sz, crop0, crop1 = crop.measure_stylegan(face.original_img)
+        except:
+          pass
 
-      # Analyze blink frame
+      face.load_image(crop.size_crop(face.original_img, sz, crop0, crop1))
+      #print(face.headpose)
+
       rec = face.analyze()
       for stat in rec.keys():
         self.data[stat].append(rec[stat])
       
-      face.write_text((10,50), f"Frame {idx+1}, {round(idx*self.rate*1000)} ms")
+      face.write_text((10,30), f"Frame {idx+1}, {round(idx*self.rate*1000)} ms")
       face.save(os.path.join(p.temp_path,f"output-{out_idx}.jpg"))
       out_idx += 1
 
@@ -135,7 +143,8 @@ class VideoToVideo:
         height=540,
         xaxis_title="Time (s)",
         xaxis_showticklabels = True,
-        yaxis_title="Area (mm^2)",
+        #yaxis_title="Area (mm^2)",
+        yaxis_title="Value (multiple units)",
         yaxis_showticklabels = True)
 
     fig = go.Figure(layout=layout)
@@ -146,4 +155,19 @@ class VideoToVideo:
 
     #fig.add_trace(go.Scatter(x=lst_time, y=self.right_area, name="Right Area", line=dict(color='blue')))
     fig.write_image(filename)
+
+  def dump_data(self, filename):
+    with open(filename, 'w') as f:
+      writer = csv.writer(f)
+      cols = list(self.data.keys())
+      writer.writerow(["frame","time"]+cols)
+      l = len(self.data[self.stats[0]])
+      lst_time = [x*self.rate for x in range(l)]
+
+      for i in range(l):
+        row = [str(i),lst_time[i]]
+        for col in cols:
+          row.append(self.data[col][i])
+        writer.writerow(row)
+
 
