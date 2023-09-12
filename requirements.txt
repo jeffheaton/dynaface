@@ -5,4 +5,3 @@ matplotlib>=3.7.1
 scikit-learn>=1.2.2
 plotly>=5.9.0
 kaleido>=0.2.1
-

@@ -13,10 +13,12 @@ from spiga.inference.framework import SPIGAFramework
 from spiga.demo.visualize.plotter import Plotter
 from facial_analysis.util import PolyArea
 from facial_analysis.calc import *
-  
-def load_face_image(filename, crop=True):
+
+STATS = [AnalyzeFAI(), AnalyzeOralCommissureExcursion(), AnalyzeBrows(), AnalyzeDentalArea(), AnalyzeEyeArea()]
+
+def load_face_image(filename, crop=True, stats=STATS):
   img = load_image(filename)
-  face = AnalyzeFace()
+  face = AnalyzeFace(stats)
   face.load_image(img)
   if crop: face.crop_stylegan()
   return face

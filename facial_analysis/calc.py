@@ -16,7 +16,7 @@ class AnalyzeFAI:
       face.write_text(fai_pt, f"FAI={fai:.2f} mm")
     return {'fai': fai}
 
-class OralCommissureExcursion:
+class AnalyzeOralCommissureExcursion:
   def stats(self):
     return ['oce.a','oce.b']
   def calc(self, face, render=True):

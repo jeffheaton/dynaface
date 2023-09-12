@@ -1,10 +1,10 @@
 import os
 import sys
 from facial_analysis.video import VideoToVideo
-from facial_analysis.calc import AnalyzeFAI, OralCommissureExcursion, AnalyzeBrows, AnalyzeDentalArea, AnalyzeEyeArea
+from facial_analysis.calc import AnalyzeFAI, AnalyzeOralCommissureExcursion, AnalyzeBrows, AnalyzeDentalArea, AnalyzeEyeArea
 
 if len(sys.argv) != 2:
-  print("Please call with: process_vide [video file]")
+  print("Please call with: process_video [video file]")
   sys.exit(1)
 
 
@@ -16,7 +16,7 @@ analyze_filename = os.path.join(os.path.dirname(filename), base_filename + "-ana
 data_filename = os.path.join(os.path.dirname(filename), base_filename + "-data.csv")
 
 v = VideoToVideo()
-STATS = [AnalyzeFAI(), OralCommissureExcursion(), AnalyzeBrows(), AnalyzeDentalArea(), AnalyzeEyeArea()]
+STATS = [AnalyzeFAI(), AnalyzeOralCommissureExcursion(), AnalyzeBrows(), AnalyzeDentalArea(), AnalyzeEyeArea()]
 v.process(
   filename,
   analyze_filename,

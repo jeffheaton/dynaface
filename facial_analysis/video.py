@@ -11,7 +11,7 @@ import csv
 
 SAMPLE_RATE = 44100
 
-class ProcessVideo:
+class ProcessVideoFFMPEG:
   def __init__(self):
     # Create a temporary directory
     self.temp_path = tempfile.mkdtemp()
@@ -21,7 +21,10 @@ class ProcessVideo:
 
   def execute_command(self, cmd):
     with open(self.temp_output, 'w') as fp:
-      subprocess.call(cmd, shell=True, stdout=fp)
+      result = subprocess.call(cmd, shell=True, stdout=fp)
+
+    if result!=0:
+      return None
 
     with open(self.temp_output, 'r') as fp:
       result = fp.read()
@@ -43,7 +46,9 @@ class ProcessVideo:
       os.remove(self.audio_file)
 
     # First call to ffmpeg extracts the video image frames
-    self.execute_command(f"ffmpeg -i {input_file} -qscale:v {quality} {self.input_images} -hide_banner 2>&1")
+    results = self.execute_command(f"ffmpeg -i {input_file} -qscale:v {quality} {self.input_images} -hide_banner 2>&1")
+    if results is None:
+      return False
 
     # Second call to ffmpeg extracts the audio.  We also attempt to get the FPS from
     # this call.
@@ -60,11 +65,82 @@ class ProcessVideo:
     # Report on the frame rate and attempt to obtain audio sample rate.
     print(f"Frame rate used: {self.frame_rate}")
     print(self.temp_path)
+    return True
 
   def build(self, output_path, frame_rate):
     if os.path.exists(output_path):
       os.remove(output_path)
     self.execute_command(f"ffmpeg -framerate {frame_rate} -i {self.output_images} -i {self.audio_file} -strict -2 {output_path} 2>&1")
+
+class ProcessVideoOpenCV:
+  def __init__(self):
+    # Create a temporary directory
+    self.temp_path = tempfile.mkdtemp()
+
+  def cleanup(self):
+    # Delete the temporary directory when you're done
+    shutil.rmtree(self.temp_path)
+    
+  def extract(self, input_file, quality=2):
+    
+    # Open the video file
+    cap = cv2.VideoCapture(input_file)
+
+    # Check if video file opened successfully
+    if not cap.isOpened():
+      print("Error: Couldn't open the video file.")
+      exit()
+
+    # Get the frame rate of the video
+    self.frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
+    print(f"Frame rate: {self.frame_rate} FPS")
+
+    frame_num = 0
+
+    while True:
+      ret, frame = cap.read()
+
+      # Break the loop if video has ended
+      if not ret:
+        break
+
+      frame_num += 1
+      output_filename = os.path.join(self.temp_path, f"input-{frame_num}.jpg")
+      print(output_filename)
+      # Save the frame as an image
+      cv2.imwrite(output_filename, frame)
+
+    # Release the video file
+    cap.release()
+    return True
+  
+  def build(self, output_path, frame_rate):
+    if os.path.exists(output_path):
+      os.remove(output_path)
+
+    # Filter out the files that start with 'output' and end with '.jpg'
+    files = [f for f in os.listdir(self.temp_path) if f.startswith('output') and f.endswith('.jpg')]
+
+    # Sort the files based on the numeric part in their names
+    files = sorted(files, key=lambda x: int(x.split('-')[1].split('.jpg')[0]))
+
+    # Read the first image to get the dimensions
+    img = cv2.imread(os.path.join(self.temp_path, files[0]))
+    height, width, layers = img.shape
+
+    # Create the video writer
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # or use 'XVID'
+    out = cv2.VideoWriter(output_path, fourcc, frame_rate, (width, height))
+
+    # Add images to the video
+    for file in files:
+        img = cv2.imread(os.path.join(self.temp_path, file))
+        out.write(img)
+
+    out.release()
+    return True
+  
+
 
 class VideoToVideo:
   def __init__(self):
@@ -76,8 +152,11 @@ class VideoToVideo:
     self.auto_sync = True
 
   def process(self, input_video, output_video, stats=[]):
-    p = ProcessVideo()
-    p.extract(input_video)
+    #p = ProcessVideoFFMPEG()
+    p = ProcessVideoOpenCV()
+    if not p.extract(input_video):
+      print("Failed to execute ffmpeg")
+      return False
 
     # sample 1st
     filename = os.path.join(p.temp_path,f"input-1.jpg")
@@ -115,7 +194,6 @@ class VideoToVideo:
           pass
 
       face.load_image(crop.size_crop(face.original_img, sz, crop0, crop1))
-      #print(face.headpose)
 
       rec = face.analyze()
       for stat in rec.keys():
@@ -128,6 +206,7 @@ class VideoToVideo:
     p.build(output_video,p.frame_rate)
     p.cleanup()
     print(p.temp_path)
+    return True
 
   def plot_chart(self, filename, plot_stats=None):
     if plot_stats is None:
