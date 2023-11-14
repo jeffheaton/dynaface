@@ -62,5 +62,5 @@ else:
     process_image(input_file=input_file,output_file=output_file,points=args.points)
 
 
-
+# python ./examples/process_media.py /Users/jeff/data/facial/samples/jeff-blink.mp4
 # python ./examples/process_media.py /Users/jeff/data/facial/samples/2021-8-19.png

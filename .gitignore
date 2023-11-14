@@ -1,6 +1,6 @@
+*.pt
 *.code-workspace
 .DS_STORE
-SPIGA/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

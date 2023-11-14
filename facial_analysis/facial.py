@@ -8,9 +8,8 @@ from matplotlib import pyplot as plt
 import urllib
 import bz2
 from facial_analysis.image import load_image, ImageAnalysis
-from spiga.inference.config import ModelConfig
-from spiga.inference.framework import SPIGAFramework
-from spiga.demo.visualize.plotter import Plotter
+from facial_analysis.spiga.inference.config import ModelConfig
+from facial_analysis.spiga.inference.framework import SPIGAFramework
 from facial_analysis.util import PolyArea
 from facial_analysis.calc import *
 
