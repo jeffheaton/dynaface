@@ -12,8 +12,21 @@ from facial_analysis.spiga.inference.config import ModelConfig
 from facial_analysis.spiga.inference.framework import SPIGAFramework
 from facial_analysis.util import PolyArea
 from facial_analysis.calc import *
+import torch
 
 STATS = [AnalyzeFAI(), AnalyzeOralCommissureExcursion(), AnalyzeBrows(), AnalyzeDentalArea(), AnalyzeEyeArea()]
+_processor = None
+
+
+def init_processor(device=None):
+  global _processor
+
+  if not device:
+    has_mps = torch.backends.mps.is_built()
+    device = "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
+
+  _processor = SPIGAFramework(ModelConfig('wflw'), device=device)
+
 
 def load_face_image(filename, crop=True, stats=STATS):
   img = load_image(filename)
@@ -143,14 +156,19 @@ class StyleGANCrop:
 
 class AnalyzeFace (ImageAnalysis):
   crop = StyleGANCrop()
-  processor = SPIGAFramework(ModelConfig('wflw'))
-
+  
   def __init__(self, stats):
+    global _processor
+
+    if not _processor:
+      init_processor()
+
     self.left_eye = None
     self.right_eye = None
     self.nose = None
     self.calcs = stats
     self.headpose = [0,0,0]
+    self.processor = _processor
 
   def get_all_stats(self):
     return [stat for obj in self.calcs for stat in obj.stats()]
@@ -158,7 +176,7 @@ class AnalyzeFace (ImageAnalysis):
   def _find_landmarks(self, img):
 
     bbox = [0,0,img.shape[1],img.shape[0]]
-    features = AnalyzeFace.processor.inference(img, [bbox])
+    features = self.processor.inference(img, [bbox])
 
     # Prepare variables
     x0,y0,w,h = bbox

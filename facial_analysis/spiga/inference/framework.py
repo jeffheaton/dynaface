@@ -14,11 +14,11 @@ from facial_analysis.spiga.inference.config import ModelConfig
 
 class SPIGAFramework:
 
-    def __init__(self, model_cfg: ModelConfig(), gpus=[0], load3DM=True):
+    def __init__(self, model_cfg: ModelConfig(), device, load3DM=True):
 
         # Parameters
         self.model_cfg = model_cfg
-        self.gpus = gpus
+        self.device = device
 
         # Pretreatment initialization
         self.transforms = pretreat.get_transformers(self.model_cfg)
@@ -44,7 +44,7 @@ class SPIGAFramework:
         self.model.load_state_dict(model_state_dict)
         
         # JTH: device support
-        self.model = self.model
+        self.model = self.model.to(self.device)
         
         self.model.eval()
         print('SPIGA model loaded!')
@@ -138,5 +138,5 @@ class SPIGAFramework:
             with torch.no_grad():
                 # JTH: device support
                 # data_var = data.cuda(device=self.gpus[0], non_blocking=True)
-                data_var = data
+                data_var = data.to(device=self.device, non_blocking=True)
         return data_var

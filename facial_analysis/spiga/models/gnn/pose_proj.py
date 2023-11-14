@@ -20,9 +20,13 @@ def euler_to_rotation_matrix(euler):
     sr = torch.sin(rad[:, 2])
 
     # Init R matrix tensors
-    working_device = None
-    if euler.is_cuda:
-        working_device = euler.device
+    #working_device = None
+    #if euler.is_cuda:
+    #    working_device = euler.device
+    
+    # JTH
+    working_device = euler.device
+    
     Ry = torch.zeros((euler.shape[0], 3, 3), device=working_device)
     Rp = torch.zeros((euler.shape[0], 3, 3), device=working_device)
     Rr = torch.zeros((euler.shape[0], 3, 3), device=working_device)
@@ -54,9 +58,10 @@ def euler_to_rotation_matrix(euler):
 def projectPoints(pts, rot, trl, cam_matrix):
 
     # Get working device
-    working_device = None
-    if pts.is_cuda:
-        working_device = pts.device
+    #working_device = None
+    #if pts.is_cuda:
+    #    working_device = pts.device
+    working_device = pts.device # JTH
 
     # Perspective projection model
     trl = trl.unsqueeze(2)
