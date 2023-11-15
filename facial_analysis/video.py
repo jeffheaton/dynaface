@@ -5,7 +5,7 @@ import os
 import re
 import plotly.graph_objects as go
 import plotly.io as pio
-from facial_analysis.facial import StyleGANCrop, AnalyzeFace
+from facial_analysis.facial import AnalyzeFace, CropImage
 import cv2
 import csv
 
@@ -134,8 +134,14 @@ class ProcessVideoOpenCV:
 
     # Add images to the video
     for file in files:
-        img = cv2.imread(os.path.join(self.temp_path, file))
-        out.write(img)
+        path = os.path.join(self.temp_path, file)
+        print(f"Output: {path}")
+        img = cv2.imread(path)
+
+        # Resize image to match the frame size
+        resized_img = cv2.resize(img, (width, height))
+
+        out.write(resized_img)
 
     out.release()
     return True
@@ -161,7 +167,6 @@ class VideoToVideo:
     # sample 1st
     filename = os.path.join(p.temp_path,f"input-1.jpg")
     print(filename)
-    crop = StyleGANCrop()
     image = cv2.imread(filename)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     face = AnalyzeFace(stats)
@@ -169,13 +174,9 @@ class VideoToVideo:
 
     self.stats = face.get_all_stats()    
     self.data = {stat: [] for stat in self.stats}
-
-    print(self.stats)
-    sz, crop0, crop1 = crop.measure_stylegan(face.original_img)
    
     out_idx = 1
 
-    print("---")
     idx = 0
     while True:
       idx+=1
@@ -185,16 +186,10 @@ class VideoToVideo:
       # Load frame and crop/size
       image = cv2.imread(filename)
       image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+      image = CropImage.crop(image)
       face = AnalyzeFace(stats)
       face.load_image(image)
-      if self.auto_sync:
-        try:
-          sz, crop0, crop1 = crop.measure_stylegan(face.original_img)
-        except:
-          pass
-
-      face.load_image(crop.size_crop(face.original_img, sz, crop0, crop1))
-
+      
       rec = face.analyze()
       for stat in rec.keys():
         self.data[stat].append(rec[stat])

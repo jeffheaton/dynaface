@@ -1,7 +1,7 @@
 from facial_analysis.facial import load_face_image
 from facial_analysis.calc import AnalyzeFAI, AnalyzeOralCommissureExcursion, AnalyzeBrows, AnalyzeDentalArea, AnalyzeEyeArea
 from facial_analysis.video import VideoToVideo
-import torch
+import time
 import argparse
 import os
 
@@ -43,7 +43,6 @@ parser.add_argument("input_file", type=str, help="Path to the input image file."
 parser.add_argument("output_file", type=str, nargs='?', default=None, help="Path to the output image file.")
 
 args = parser.parse_args()
-print(args)
 
 input_file = args.input_file
 if args.output_file:
@@ -54,12 +53,23 @@ else:
 
 print(f"Input file: {input_file}")
 print(f"Media extension: {media_ext}")
+
+start_time = time.time()
 if media_ext.lower()=='.mp4':
     print("Video analysis")
     process_video(input_file, output_base)
 else:
     print("Image analysis")
     process_image(input_file=input_file,output_file=output_file,points=args.points)
+
+end_time = time.time()
+
+elapsed_time = end_time - start_time
+hours, rem = divmod(elapsed_time, 3600)
+minutes, seconds = divmod(rem, 60)
+
+print(f"Elapsed Time: {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}")
+
 
 
 # python ./examples/process_media.py /Users/jeff/data/facial/samples/jeff-blink.mp4

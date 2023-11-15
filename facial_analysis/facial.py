@@ -3,10 +3,10 @@ import cv2
 import math
 import numpy as np
 from PIL import Image
-import dlib
 from matplotlib import pyplot as plt
 import urllib
 import bz2
+from facenet_pytorch import MTCNN
 from facial_analysis.image import load_image, ImageAnalysis
 from facial_analysis.spiga.inference.config import ModelConfig
 from facial_analysis.spiga.inference.framework import SPIGAFramework
@@ -24,7 +24,7 @@ def init_processor(device=None):
   if not device:
     has_mps = torch.backends.mps.is_built()
     device = "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
-
+    device = "cpu"
   _processor = SPIGAFramework(ModelConfig('wflw'), device=device)
 
 
@@ -45,117 +45,24 @@ def find_facial_path():
        pass
     return path
 
-def download_weights(target_dir):
-    url = "http://dlib.net/files/shape_predictor_5_face_landmarks.dat.bz2"
-    filename = "shape_predictor_5_face_landmarks.dat"
-    bz2_file_path = os.path.join(target_dir, filename + ".bz2")
-    final_file_path = os.path.join(target_dir, filename)
+class CropImage():
+  mtcnn = MTCNN(keep_all=True, device="cpu")
 
-    # Check if the file already exists
-    if not os.path.exists(final_file_path):
-        # Download the file from `url` and save it locally under `file_name`:
-        urllib.request.urlretrieve(url, bz2_file_path)
-
-        # Open the bz2 file
-        with bz2.open(bz2_file_path, 'rb') as f:
-            data = f.read()
-
-        # Write the decompressed data
-        with open(final_file_path, 'wb') as f:
-            f.write(data)
-
-        # Remove the bz2 file
-        os.remove(bz2_file_path)
+  def detect_face(img):
+    boxes, _ = CropImage.mtcnn.detect(img)
+    return boxes[0]
   
-class StyleGANCrop:
-  facial_path = find_facial_path()
-  download_weights(facial_path)
-  detector = dlib.get_frontal_face_detector()
-  predictor = dlib.shape_predictor(os.path.join(facial_path,'shape_predictor_5_face_landmarks.dat'))
-
-  def find_eyes(self, img):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    rects = StyleGANCrop.detector(gray, 0)
-
-    if len(rects) == 0:
-      raise ValueError("No faces detected")
-    elif len(rects) > 1:
-      raise ValueError("Multiple faces detected")
-
-    shape = StyleGANCrop.predictor(gray, rects[0])
-    features = []
-
-    for i in range(0, 5):
-      features.append((i, (shape.part(i).x, shape.part(i).y)))
-
-    return (int(features[3][1][0] + features[2][1][0]) // 2, \
-      int(features[3][1][1] + features[2][1][1]) // 2), \
-      (int(features[1][1][0] + features[0][1][0]) // 2, \
-      int(features[1][1][1] + features[0][1][1]) // 2)
-
-
-  def measure_stylegan(self, img):
-    left_eye, right_eye = self.find_eyes(img)
-    d = abs(right_eye[0] - left_eye[0])
-    z = 255/d
-    ar = img.shape[0]/img.shape[1]
-    w = img.shape[1] * z
-    img2 = cv2.resize(img, (int(w), int(w*ar)))
-    bordersize = 1024
-    img3 = cv2.copyMakeBorder(
-        img2,
-        top=bordersize,
-        bottom=bordersize,
-        left=bordersize,
-        right=bordersize,
-        borderType=cv2.BORDER_CONSTANT,value=(0,0,0))
-
-    left_eye2, right_eye2 = self.find_eyes(img3)
-
-    crop1 = left_eye2[0] - 385
-    crop0 = left_eye2[1] - 490
-
-    return [(int(w), int(w*ar)), crop0, crop1]
-
-  def size_crop(self, img, sz, crop0, crop1):
-    img2 = cv2.resize(img, sz)
-    bordersize = 1024
-    img3 = cv2.copyMakeBorder(
-        img2,
-        top=bordersize,
-        bottom=bordersize,
-        left=bordersize,
-        right=bordersize,
-        borderType=cv2.BORDER_CONSTANT,value=(0,0,0))
-    return img3[crop0:crop0+1024,crop1:crop1+1024]
-
-
-  def crop_stylegan(self, img):
-    left_eye, right_eye = self.find_eyes(img)
-    d = abs(right_eye[0] - left_eye[0])
-    z = 255/d
-    ar = img.shape[0]/img.shape[1]
-    w = img.shape[1] * z
-    img2 = cv2.resize(img, (int(w), int(w*ar)))
-    bordersize = 1024
-    img3 = cv2.copyMakeBorder(
-        img2,
-        top=bordersize,
-        bottom=bordersize,
-        left=bordersize,
-        right=bordersize,
-        borderType=cv2.BORDER_CONSTANT,value=(0,0,0))
-
-    left_eye2, right_eye2 = self.find_eyes(img3)
-
-    crop1 = left_eye2[0] - 385
-    crop0 = left_eye2[1] - 490
-    return img3[crop0:crop0+1024,crop1:crop1+1024]
-
-
+  def crop(img):
+    boxes, _ = CropImage.mtcnn.detect(img)
+    if boxes is not None:
+        # Assuming the first face detected
+        box = boxes[0]
+        x1, y1, x2, y2 = int(box[0]), int(box[1]), int(box[2]), int(box[3])
+        return img[y1:y2, x1:x2]
+    
+    return None
 
 class AnalyzeFace (ImageAnalysis):
-  crop = StyleGANCrop()
   
   def __init__(self, stats):
     global _processor
@@ -205,7 +112,7 @@ class AnalyzeFace (ImageAnalysis):
     self.pix2mm = 63/self.pupillary_distance
 
   def crop_stylegan(self):
-    img = self.crop.crop_stylegan(self.original_img)
+    img = CropImage.crop(self.original_img)
     self.load_image(img)
 
   def _estimate_mouth(self):
