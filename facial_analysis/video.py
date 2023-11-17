@@ -5,7 +5,7 @@ import os
 import re
 import plotly.graph_objects as go
 import plotly.io as pio
-from facial_analysis.facial import AnalyzeFace, CropImage
+from facial_analysis.facial import AnalyzeFace, FindFace
 import cv2
 import csv
 
@@ -149,13 +149,15 @@ class ProcessVideoOpenCV:
 
 
 class VideoToVideo:
-  def __init__(self):
+  def __init__(self, points, crop):
     self.stats = []
     self.left_area = []
     self.right_area = []
     self.rate = 1/240 # 240
     self.data = {}
     self.auto_sync = True
+    self._points = points
+    self._crop = crop
 
   def process(self, input_video, output_video, stats=[]):
     #p = ProcessVideoFFMPEG()
@@ -186,7 +188,7 @@ class VideoToVideo:
       # Load frame and crop/size
       image = cv2.imread(filename)
       image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-      image = CropImage.crop(image)
+
       face = AnalyzeFace(stats)
       face.load_image(image)
       
@@ -195,6 +197,10 @@ class VideoToVideo:
         self.data[stat].append(rec[stat])
       
       face.write_text((10,30), f"Frame {idx+1}, {round(idx*self.rate*1000)} ms")
+      
+      if self._points:
+        face.draw_landmarks(numbers=True)
+      
       face.save(os.path.join(p.temp_path,f"output-{out_idx}.jpg"))
       out_idx += 1
 

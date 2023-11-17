@@ -5,8 +5,8 @@ import time
 import argparse
 import os
 
-def process_image(input_file, output_file, points):
-    face = load_face_image(input_file)
+def process_image(input_file, output_file, points, crop):
+    face = load_face_image(input_file,crop=crop)
     face.analyze()
 
     if points:
@@ -14,12 +14,12 @@ def process_image(input_file, output_file, points):
     face.save(output_file)
     print(f"Output file: {output_file}")
 
-def process_video(input_file, output_base):
+def process_video(input_file, output_base, points, crop):
     graph_filename = os.path.join(output_base + "-graph.png")
     analyze_filename = os.path.join(output_base + "-analyze.mp4")
     data_filename = os.path.join(output_base + "-data.csv")
 
-    v = VideoToVideo()
+    v = VideoToVideo(points, crop)
     STATS = [AnalyzeFAI(), AnalyzeOralCommissureExcursion(), AnalyzeBrows(), AnalyzeDentalArea(), AnalyzeEyeArea()]
     result = v.process(
         input_file,
@@ -39,6 +39,7 @@ def process_video(input_file, output_base):
 
 parser = argparse.ArgumentParser(description="Process an image.")
 parser.add_argument("--points", default=False, action="store_true", help="Display face landmarks points.")
+parser.add_argument("--crop", default=False, action="store_true", help="Crop/zoom to face.")
 parser.add_argument("input_file", type=str, help="Path to the input image file.")
 parser.add_argument("output_file", type=str, nargs='?', default=None, help="Path to the output image file.")
 
@@ -53,14 +54,15 @@ else:
 
 print(f"Input file: {input_file}")
 print(f"Media extension: {media_ext}")
+print(f"Crop: {args.crop}")
 
 start_time = time.time()
 if media_ext.lower()=='.mp4':
     print("Video analysis")
-    process_video(input_file, output_base)
+    process_video(input_file, output_base,points=args.points,crop=args.crop)
 else:
     print("Image analysis")
-    process_image(input_file=input_file,output_file=output_file,points=args.points)
+    process_image(input_file=input_file,output_file=output_file,points=args.points,crop=args.crop)
 
 end_time = time.time()
 
@@ -69,8 +71,3 @@ hours, rem = divmod(elapsed_time, 3600)
 minutes, seconds = divmod(rem, 60)
 
 print(f"Elapsed Time: {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}")
-
-
-
-# python ./examples/process_media.py /Users/jeff/data/facial/samples/jeff-blink.mp4
-# python ./examples/process_media.py /Users/jeff/data/facial/samples/2021-8-19.png

@@ -31,8 +31,8 @@ def init_processor(device=None):
 def load_face_image(filename, crop=True, stats=STATS):
   img = load_image(filename)
   face = AnalyzeFace(stats)
+  if crop: img = FindFace.crop(img)
   face.load_image(img)
-  if crop: face.crop_stylegan()
   return face
 
 def find_facial_path():
@@ -45,15 +45,16 @@ def find_facial_path():
        pass
     return path
 
-class CropImage():
+class FindFace():
   mtcnn = MTCNN(keep_all=True, device="cpu")
 
   def detect_face(img):
-    boxes, _ = CropImage.mtcnn.detect(img)
+    boxes, _ = FindFace.mtcnn.detect(img)
+    if boxes is None: return None
     return boxes[0]
-  
+    
   def crop(img):
-    boxes, _ = CropImage.mtcnn.detect(img)
+    boxes, _ = FindFace.mtcnn.detect(img)
     if boxes is not None:
         # Assuming the first face detected
         box = boxes[0]
@@ -82,7 +83,11 @@ class AnalyzeFace (ImageAnalysis):
 
   def _find_landmarks(self, img):
 
-    bbox = [0,0,img.shape[1],img.shape[0]]
+    bbox = FindFace.detect_face(img)
+    if bbox is None: bbox = [0,0,img.shape[1],img.shape[0]]
+    # bbox to spiga is x,y,w,h; however, facenet_pytorch deals in x1,y1,x2,y2. annoying
+    bbox = [bbox[0],bbox[1],bbox[2]-bbox[0],bbox[3]-bbox[1]]
+    img_tmp = FindFace.crop(img)
     features = self.processor.inference(img, [bbox])
 
     # Prepare variables
@@ -110,10 +115,6 @@ class AnalyzeFace (ImageAnalysis):
     self._estimate_mouth()
     self.pupillary_distance = abs(self.right_eye[0] - self.left_eye[0])
     self.pix2mm = 63/self.pupillary_distance
-
-  def crop_stylegan(self):
-    img = CropImage.crop(self.original_img)
-    self.load_image(img)
 
   def _estimate_mouth(self):
     x1 = int(1e50)
