@@ -172,7 +172,7 @@ class VideoToVideo:
     image = cv2.imread(filename)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     face = AnalyzeFace(stats)
-    face.load_image(image)
+    face.load_image(image,self._crop)
 
     self.stats = face.get_all_stats()    
     self.data = {stat: [] for stat in self.stats}
@@ -190,7 +190,7 @@ class VideoToVideo:
       image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
       face = AnalyzeFace(stats)
-      face.load_image(image)
+      face.load_image(image,self._crop)
       
       rec = face.analyze()
       for stat in rec.keys():

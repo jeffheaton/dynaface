@@ -14,6 +14,16 @@ from facial_analysis.util import PolyArea
 from facial_analysis.calc import *
 import torch
 
+STD_PUPIL_DIST = 63
+
+LM_LEFT_PUPIL = 97
+LM_RIGHT_PUPIL = 96
+
+STYLEGAN_WIDTH = 1024
+STYLEGAN_LEFT_PUPIL = (640,480)
+STYLEGAN_RIGHT_PUPIL = (380,480)
+STYLEGAN_PUPIL_DIST = STYLEGAN_LEFT_PUPIL[0] - STYLEGAN_RIGHT_PUPIL[0]
+
 STATS = [AnalyzeFAI(), AnalyzeOralCommissureExcursion(), AnalyzeBrows(), AnalyzeDentalArea(), AnalyzeEyeArea()]
 _processor = None
 
@@ -31,8 +41,7 @@ def init_processor(device=None):
 def load_face_image(filename, crop=True, stats=STATS):
   img = load_image(filename)
   face = AnalyzeFace(stats)
-  if crop: img = FindFace.crop(img)
-  face.load_image(img)
+  face.load_image(img, crop)
   return face
 
 def find_facial_path():
@@ -85,9 +94,8 @@ class AnalyzeFace (ImageAnalysis):
 
     bbox = FindFace.detect_face(img)
     if bbox is None: bbox = [0,0,img.shape[1],img.shape[0]]
-    # bbox to spiga is x,y,w,h; however, facenet_pytorch deals in x1,y1,x2,y2. annoying
+    # bbox to spiga is x,y,w,h; however, facenet_pytorch deals in x1,y1,x2,y2. 
     bbox = [bbox[0],bbox[1],bbox[2]-bbox[0],bbox[3]-bbox[1]]
-    img_tmp = FindFace.crop(img)
     features = self.processor.inference(img, [bbox])
 
     # Prepare variables
@@ -96,52 +104,11 @@ class AnalyzeFace (ImageAnalysis):
     headpose = np.array(features['headpose'][0])
     return landmarks2, headpose
 
-  def load_image(self, img):
+  def load_image(self, img, crop):
     super().load_image(img)
-    self.landmarks, self.headpose = self._find_landmarks(img)
-
-    # 45 = left edge of left eye
-    # 42 = right edge of left eye
-    # 36 = right edge of right eye
-    # 39 = left edge of right eye
-    # 33 = nose (bottom center)
-
-    self.right_eye = (int(self.landmarks[60][0] + self.landmarks[64][0]) // 2, \
-      int(self.landmarks[60][1] + self.landmarks[64][1]) // 2)
-    self.left_eye = (int(self.landmarks[68][0] + self.landmarks[72][0]) // 2, \
-      int(self.landmarks[68][1] + self.landmarks[72][1]) // 2)
-
-    self.nose = self.landmarks[57]
-    self._estimate_mouth()
-    self.pupillary_distance = abs(self.right_eye[0] - self.left_eye[0])
-    self.pix2mm = 63/self.pupillary_distance
-
-  def _estimate_mouth(self):
-    x1 = int(1e50)
-    y1 = int(1e50)
-    x2 = 0
-    y2 = 0
-    for i in range(48,68):
-      landmark = self.landmarks[i]
-      x1 = min(x1,landmark[0])
-      y1 = min(y1,landmark[1]-25)
-      x2 = max(x2,landmark[0])
-      y2 = max(y2,landmark[1]+25)
-
-    self.mouth_p1 = (x1,y1)
-    self.mouth_p2 = (x2,y2)
-
-  def scan_vert(self, y):
-    y+=self.nose[1]
-    x1 = self.nose[0] - (self.mouth_width//2)
-    x2 = self.nose[0] + (self.mouth_width//2)
-    scan_line_color = self.original_hsv[y,x1:x2]
-    scan_line = scan_line_color.mean(axis=1).astype(int)
-    scan_line2 = np.append(scan_line[0] , scan_line[:-1])
-    scan_diff = np.absolute(scan_line - scan_line2)
-    white_line = np.repeat(255,self.mouth_width*3).reshape((self.mouth_width,3))
-    teeth_pred = np.sqrt(((white_line - scan_line_color)**2).sum(axis=1)).astype(int)
-    return scan_line_color #, teeth_pred
+    self.landmarks, self._headpose = self._find_landmarks(img)
+    self.pupillary_distance = abs(self.landmarks[LM_LEFT_PUPIL][0] - self.landmarks[LM_RIGHT_PUPIL][0])
+    self.pix2mm = STD_PUPIL_DIST/self.pupillary_distance
 
   def draw_landmarks(self, size=0.25, color=[0,255,255],numbers=False):
     for i,landmark in enumerate(self.landmarks):
@@ -150,86 +117,6 @@ class AnalyzeFace (ImageAnalysis):
         self.write_text([landmark[0]+3,landmark[1]],str(i),size=0.5)
     self.circle(self.left_eye, color=color)
     self.circle(self.right_eye, color=color)
-
-
-  def cluster_mouth_rect(self):
-    x1, y1 = self.mouth_p1
-    x2, y2 = self.mouth_p2
-
-    if USE_HSV:
-      mouth_img = self.original_hsv[y1:y2,x1:x2]
-    else:
-      mouth_img = self.original_img[y1:y2,x1:x2]
-
-    mouth_pixels = mouth_img.reshape(mouth_img.shape[0]*mouth_img.shape[1],3)
-    return KMeans(n_clusters=CLUST_NUM, random_state=42, n_init=1, init='k-means++').fit(mouth_pixels)
-
-
-  def segment_line(self, kmeans, y):
-    x1, y1 = self.mouth_p1
-    x2, y2 = self.mouth_p2
-    lst = []
-
-    if USE_HSV:
-      l = self.extract_horiz_hsv(y)
-    else:
-      l = self.extract_horiz(y)
-    return kmeans.predict(l[x1:x2])
-
-  def segment_display_line(self, kmeans, y):
-    labels = self.segment_line(kmeans, y)
-
-    lst = []
-    for v in labels:
-      lst.append(COLORS[v])
-    l2 = np.array(lst)
-    l2 = l2.reshape((1,l2.shape[0],l2.shape[1]))
-
-    x1, y1 = self.mouth_p1
-    x2, y2 = self.mouth_p2
-
-    lfill = np.repeat(COLORS[-1].reshape((1,3)),x1,axis=0)
-    lfill = lfill.reshape([1,lfill.shape[0],lfill.shape[1]])
-    l2 = np.concatenate([lfill,l2],axis=1)
-
-    l2 = np.repeat(l2,50,axis=0)
-    return l2
-
-
-  def stretch_scan_line(self, l):
-    x1, y1 = self.mouth_p1
-    x2, y2 = self.mouth_p2
-    lst = []
-
-    l2 = l.copy()
-    l2[:x1,:] = 0
-    l2[x2:,:] = 0
-    l2 = l2.reshape((1,l2.shape[0],l2.shape[1]))
-    l2 = np.repeat(l2,50,axis=0)
-    return l2
-
-  def scan_mouth(self, kmeans):
-    x1, y1 = self.mouth_p1
-    x2, y2 = self.mouth_p2
-
-    if USE_HSV:
-      mouth_img = self.original_hsv[y1:y2,x1:x2]
-    else:
-      mouth_img = self.original_img[y1:y2,x1:x2]
-
-    for y in range(len(mouth_img)):
-      labels = kmeans.predict(mouth_img[y])
-      lst = []
-      for v in labels:
-        lst.append(COLORS[v])
-      l2 = np.array(lst)
-      l2 = l2.reshape((1,l2.shape[0],l2.shape[1]))
-      mouth_img[y] = l2
-
-    return mouth_img
-
-  def mark_mouth(self, color=(255,0,0), thickness=3):
-    cv2.rectangle(self.render_img, self.mouth_p1, self.mouth_p2, color, thickness)
 
   def measure(self, pt1, pt2, color=(255,0,0), thickness=3):
     self.arrow(pt1, pt2, color, thickness)
@@ -243,3 +130,4 @@ class AnalyzeFace (ImageAnalysis):
     for calc in self.calcs:
       result.update(calc.calc(self))
     return result
+  
