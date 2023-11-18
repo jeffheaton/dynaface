@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 from PIL import Image
-import dlib
 import os
 from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans
