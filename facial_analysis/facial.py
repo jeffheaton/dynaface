@@ -135,13 +135,13 @@ class AnalyzeFace (ImageAnalysis):
     headpose = np.array(features['headpose'][0])
     return landmarks2, headpose
 
-  def load_image(self, img, crop):
+  def load_image(self, img, crop, eyes=None):
     super().load_image(img)
     self.landmarks, self._headpose = self._find_landmarks(img)
     self.pupillary_distance = abs(self.landmarks[LM_LEFT_PUPIL][0] - self.landmarks[LM_RIGHT_PUPIL][0])
     self.pix2mm = STD_PUPIL_DIST/self.pupillary_distance
     if crop:
-      self.crop_stylegan()
+      self.crop_stylegan(eyes)
 
   def draw_landmarks(self, size=0.25, color=[0,255,255],numbers=False):
     for i,landmark in enumerate(self.landmarks):
@@ -164,8 +164,12 @@ class AnalyzeFace (ImageAnalysis):
       result.update(calc.calc(self))
     return result
   
-  def crop_stylegan(self):
-    left_eye, right_eye = self.landmarks[LM_LEFT_PUPIL], self.landmarks[LM_RIGHT_PUPIL] 
+  def crop_stylegan(self, pupils=None):
+    if pupils:
+      left_eye, right_eye = pupils
+    else:
+      left_eye, right_eye = self.get_pupils()
+
     d = abs(right_eye[0] - left_eye[0])
     ar = self.width/self.height
     new_width = int(self.width * (STYLEGAN_PUPIL_DIST/d))
@@ -178,6 +182,8 @@ class AnalyzeFace (ImageAnalysis):
     self.landmarks = scale_crop_points(self.landmarks,crop_x,crop_y,scale)
     img = img[crop_y:crop_y+STYLEGAN_WIDTH,crop_x:crop_x+STYLEGAN_WIDTH]
     super().load_image(img)
-    
+
+  def get_pupils(self):
+    return self.landmarks[LM_LEFT_PUPIL], self.landmarks[LM_RIGHT_PUPIL]
 
   

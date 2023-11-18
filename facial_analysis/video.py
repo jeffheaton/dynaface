@@ -178,7 +178,8 @@ class VideoToVideo:
     self.data = {stat: [] for stat in self.stats}
    
     out_idx = 1
-
+    pupils = None
+    
     idx = 0
     while True:
       idx+=1
@@ -190,7 +191,7 @@ class VideoToVideo:
       image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
       face = AnalyzeFace(stats)
-      face.load_image(image,self._crop)
+      face.load_image(image,self._crop,pupils)
       
       rec = face.analyze()
       for stat in rec.keys():
@@ -202,6 +203,8 @@ class VideoToVideo:
         face.draw_landmarks(numbers=True)
       
       face.save(os.path.join(p.temp_path,f"output-{out_idx}.jpg"))
+      if pupils is None:
+        pupils = face.get_pupils()
       out_idx += 1
 
     p.build(output_video,p.frame_rate)
