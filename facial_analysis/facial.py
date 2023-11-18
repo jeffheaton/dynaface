@@ -165,45 +165,19 @@ class AnalyzeFace (ImageAnalysis):
     return result
   
   def crop_stylegan(self):
-    print("crop style")
     left_eye, right_eye = self.landmarks[LM_LEFT_PUPIL], self.landmarks[LM_RIGHT_PUPIL] 
     d = abs(right_eye[0] - left_eye[0])
     ar = self.width/self.height
     new_width = int(self.width * (STYLEGAN_PUPIL_DIST/d))
     new_height = int(new_width / ar)
-
-    scale_width = new_width / self.width
-    scale_height = new_height / self.height
-    img2 = cv2.resize(self.original_img, (new_width, new_height))
-
-    img3 = add_gray_border_to_min_dimension(img2,STYLEGAN_WIDTH)
-
-
-    crop_x = int((self.landmarks[96][0]*scale_width)-STYLEGAN_RIGHT_PUPIL[0])
-    crop_y = int((self.landmarks[96][1]*scale_height)-STYLEGAN_RIGHT_PUPIL[1])
-    print(self.landmarks[96][0]*scale_width)
-    print(self.landmarks[97][0]*scale_width)
-    print(STYLEGAN_LEFT_PUPIL[0])
-    print("**",crop_x,crop_y)
-    print(f"Orig Width: {self.width}")
-    print(f"Orig Height: {self.height}")
-    print(f"Aspect ratio: {ar}")
-    print(f"Scaled Width: {new_width}")
-    print(f"Scaled Height: {new_height}")
-    print(f"Scale width: {scale_width}")
-    print(f"Scale height: {scale_height}")
-    print(f"Crop-x: {crop_x}")
-    print(f"Crop-y: {crop_y}")
-    print(self.landmarks[96])
-    print(self.landmarks[97])
-    #print(self.landmarks)
-    self.landmarks = scale_crop_points(self.landmarks,crop_x,crop_y,scale_width)
-    print(crop_y,crop_y+STYLEGAN_WIDTH,crop_x,crop_x+STYLEGAN_WIDTH)
-    img4 = img3[crop_y:crop_y+STYLEGAN_WIDTH,crop_x:crop_x+STYLEGAN_WIDTH]
-    print(img4.shape)
-    print(crop_y,crop_y+STYLEGAN_WIDTH)
-    super().load_image(img4)
-    #super().load_image(img3)
+    scale = new_width / self.width
+    img = cv2.resize(self.original_img, (new_width, new_height))
+    img = add_gray_border_to_min_dimension(img,STYLEGAN_WIDTH)
+    crop_x = int((self.landmarks[96][0]*scale)-STYLEGAN_RIGHT_PUPIL[0])
+    crop_y = int((self.landmarks[96][1]*scale)-STYLEGAN_RIGHT_PUPIL[1])
+    self.landmarks = scale_crop_points(self.landmarks,crop_x,crop_y,scale)
+    img = img[crop_y:crop_y+STYLEGAN_WIDTH,crop_x:crop_x+STYLEGAN_WIDTH]
+    super().load_image(img)
     
 
   

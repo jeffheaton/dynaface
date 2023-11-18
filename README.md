@@ -26,4 +26,8 @@ cp -R /content/drive/MyDrive/facial_analysis/ /content
 
 python ./examples/process_media.py /Users/jeff/data/facial/samples/tracy-ref-blink.mp4
 
-python ./examples/process_media.py /Users/jeff/data/facial/samples/2021-8-19.png
+python ./examples/process_media.py --crop /Users/jeff/data/facial/samples/2021-8-19.png
+
+python ./examples/process_media.py --crop /Users/jeff/data/facial/samples/tracy_frame.png
+
+python ./examples/process_media.py --crop /Users/jeff/data/facial/samples/tracy-blink-single.mp4
