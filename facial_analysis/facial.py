@@ -54,6 +54,37 @@ def find_facial_path():
        pass
     return path
 
+def add_gray_border_to_min_dimension(img, min_dimension):
+    # Get current dimensions of the image
+    height, width = img.shape[:2]
+
+    # Calculate padding needed for width and height
+    if width < min_dimension:
+        left_padding = (min_dimension - width) // 2
+        right_padding = min_dimension - width - left_padding
+    else:
+        left_padding = right_padding = 0
+
+    if height < min_dimension:
+        top_padding = (min_dimension - height) // 2
+        bottom_padding = min_dimension - height - top_padding
+    else:
+        top_padding = bottom_padding = 0
+
+    # Add gray border around the image
+    gray_color = [128, 128, 128]  # RGB value for gray
+    bordered_img = cv2.copyMakeBorder(img, top_padding, bottom_padding, left_padding, right_padding, cv2.BORDER_CONSTANT, value=gray_color)
+
+    return bordered_img
+
+def scale_crop_points(lst,crop_x,crop_y,scale):
+  lst2 = []
+  for pt in lst:
+      lst2.append(
+         (int(((pt[0]*scale)-crop_x)),
+         int((pt[1]*scale)-crop_y)))
+  return lst2
+
 class FindFace():
   mtcnn = MTCNN(keep_all=True, device="cpu")
 
@@ -109,6 +140,8 @@ class AnalyzeFace (ImageAnalysis):
     self.landmarks, self._headpose = self._find_landmarks(img)
     self.pupillary_distance = abs(self.landmarks[LM_LEFT_PUPIL][0] - self.landmarks[LM_RIGHT_PUPIL][0])
     self.pix2mm = STD_PUPIL_DIST/self.pupillary_distance
+    if crop:
+      self.crop_stylegan()
 
   def draw_landmarks(self, size=0.25, color=[0,255,255],numbers=False):
     for i,landmark in enumerate(self.landmarks):
@@ -130,4 +163,47 @@ class AnalyzeFace (ImageAnalysis):
     for calc in self.calcs:
       result.update(calc.calc(self))
     return result
+  
+  def crop_stylegan(self):
+    print("crop style")
+    left_eye, right_eye = self.landmarks[LM_LEFT_PUPIL], self.landmarks[LM_RIGHT_PUPIL] 
+    d = abs(right_eye[0] - left_eye[0])
+    ar = self.width/self.height
+    new_width = int(self.width * (STYLEGAN_PUPIL_DIST/d))
+    new_height = int(new_width / ar)
+
+    scale_width = new_width / self.width
+    scale_height = new_height / self.height
+    img2 = cv2.resize(self.original_img, (new_width, new_height))
+
+    img3 = add_gray_border_to_min_dimension(img2,STYLEGAN_WIDTH)
+
+
+    crop_x = int((self.landmarks[96][0]*scale_width)-STYLEGAN_RIGHT_PUPIL[0])
+    crop_y = int((self.landmarks[96][1]*scale_height)-STYLEGAN_RIGHT_PUPIL[1])
+    print(self.landmarks[96][0]*scale_width)
+    print(self.landmarks[97][0]*scale_width)
+    print(STYLEGAN_LEFT_PUPIL[0])
+    print("**",crop_x,crop_y)
+    print(f"Orig Width: {self.width}")
+    print(f"Orig Height: {self.height}")
+    print(f"Aspect ratio: {ar}")
+    print(f"Scaled Width: {new_width}")
+    print(f"Scaled Height: {new_height}")
+    print(f"Scale width: {scale_width}")
+    print(f"Scale height: {scale_height}")
+    print(f"Crop-x: {crop_x}")
+    print(f"Crop-y: {crop_y}")
+    print(self.landmarks[96])
+    print(self.landmarks[97])
+    #print(self.landmarks)
+    self.landmarks = scale_crop_points(self.landmarks,crop_x,crop_y,scale_width)
+    print(crop_y,crop_y+STYLEGAN_WIDTH,crop_x,crop_x+STYLEGAN_WIDTH)
+    img4 = img3[crop_y:crop_y+STYLEGAN_WIDTH,crop_x:crop_x+STYLEGAN_WIDTH]
+    print(img4.shape)
+    print(crop_y,crop_y+STYLEGAN_WIDTH)
+    super().load_image(img4)
+    #super().load_image(img3)
+    
+
   

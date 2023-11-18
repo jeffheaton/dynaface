@@ -52,6 +52,8 @@ class ImageAnalysis:
     self.text_thick=1
     self.text_back=5
 
+    self.height, self.width = self.original_img.shape[:2]
+
     self.stats_right = 750
 
   def write_text(self, pos, txt,color=None, size = 1, thick = 1):
