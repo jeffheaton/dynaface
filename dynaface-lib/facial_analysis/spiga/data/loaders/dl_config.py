@@ -4,8 +4,11 @@ import pkg_resources
 from collections import OrderedDict
 
 # Default data paths
-db_img_path = pkg_resources.resource_filename('facial_analysis.spiga', 'data/databases')
-db_anns_path = pkg_resources.resource_filename('facial_analysis.spiga', 'data/annotations') + "/{database}/{file_name}.json"
+#db_img_path = pkg_resources.resource_filename('facial_analysis.spiga', 'data/databases')
+#db_anns_path = pkg_resources.resource_filename('facial_analysis.spiga', 'data/annotations') + "/{database}/{file_name}.json"
+db_img_path = pkg_resources.resource_filename('facial_analysis', 'spiga/data/databases')
+db_anns_path = pkg_resources.resource_filename('facial_analysis', 'spiga/data/annotations') + "/{database}/{file_name}.json"
+
 
 class AlignConfig:
 
@@ -146,6 +149,8 @@ class DatabaseStruct:
                 ldm_edges_matrix = db_info['ldm_edges_matrix']
 
         else:
+            print(db_anns_path)
+            print(db_info_file)
             raise ValueError('Database ' + database_name + 'specifics not defined. Missing db_info.json')
 
         return ldm_ids, ldm_flip_order, ldm_edges_matrix

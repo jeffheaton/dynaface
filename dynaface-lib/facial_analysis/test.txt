@@ -1,0 +1,3 @@
+/Users/jeff/projects/facial-analysis/dynaface-app/deploy/macos/working/dist/Dynaface.app/Contents/Frameworks/facial_analysis/spiga/data/annotations/{database}/{file_name}.json
+/Users/jeff/projects/facial-analysis/dynaface-app/deploy/macos/working/dist/Dynaface.app/Contents/Frameworks/facial_analysis/spiga/data/annotations/wflw/db_info.json
+/Users/jeff/projects/facial-analysis/dynaface-app/deploy/macos/working/dist/Dynaface.app/Contents/Frameworks/data

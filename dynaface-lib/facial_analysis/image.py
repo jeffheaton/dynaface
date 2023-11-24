@@ -102,7 +102,8 @@ class ImageAnalysis:
     cv2.circle(self.render_img, pt, radius, color, -1)
 
   def render_reset(self):
-    self.render_img = self.original_img.copy()
+    # self.render_img = self.original_img.copy()
+    self.render_img[:, :] = self.original_img
 
   def extract_horiz(self, y, x1=None, x2=None):
     if not x1: x1 = 0
@@ -122,7 +123,7 @@ class ImageAnalysis:
     contours = np.array(contours)
     overlay = self.render_img.copy()
     cv2.fillPoly(overlay, pts = [contours], color =color)
-    self.render_img = cv2.addWeighted(overlay, alpha, self.render_img, 1 - alpha, 0)
+    self.render_img[:,:] = cv2.addWeighted(overlay, alpha, self.render_img, 1 - alpha, 0)
     contours = contours*pix2mm
     x = contours[:,0]
     y = contours[:,1]

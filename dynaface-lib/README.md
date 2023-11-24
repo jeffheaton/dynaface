@@ -5,6 +5,7 @@ python3 -m venv venv
 source venv/bin/activate
 #python setup.py install
 pip install -e .
+python setup.py bdist_wheel
 
 pip install -r requirements.txt
 

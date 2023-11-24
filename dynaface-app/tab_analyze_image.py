@@ -1,3 +1,4 @@
+import os
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QVBoxLayout, QWidget, QLabel
 from PyQt6.QtCore import Qt, QEvent
 import const_values
@@ -6,7 +7,7 @@ from facial_analysis.facial import load_face_image
 from facial_analysis.calc import AnalyzeFAI, AnalyzeOralCommissureExcursion, AnalyzeBrows, AnalyzeDentalArea, AnalyzeEyeArea
 from facial_analysis.video import VideoToVideo
 from PyQt6.QtWidgets import QComboBox, QPushButton, QToolBar, QCheckBox, QSpinBox, QGestureEvent, QPinchGesture
-
+import jth_ui.utl_env as utl_env
 
 class AnalyzeImageTab(TabGraphic):
     def __init__(self, window, path):

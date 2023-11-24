@@ -7,7 +7,7 @@ import jth_ui.utl_env as utl_env
 import const_values
 
 IMAGE_FILENAME = utl_env.get_resource_path(
-    'data/heaton_ca_title.png',
+    'data/dynaface-title.png',
     base_path=os.path.abspath(__file__))
 
 class SplashTab(QWidget):

@@ -4,11 +4,13 @@ import logging.handlers
 import sys
 import webbrowser
 import os
+import torch
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenu, QMenuBar, QTabWidget, QApplication, QFileDialog
+from facial_analysis.find_face import FindFace
 
 import const_values
 import jth_ui.utl_env as utl_env
@@ -19,8 +21,12 @@ from tab_about import AboutTab
 from tab_analyze_image import AnalyzeImageTab
 
 logger = logging.getLogger(__name__)
+device = None
+app = None
+window = None
 
-SIMULATOR_NAME = "Simulator"
+DATA_DIR = utl_env.get_resource_path(
+    'data', base_path=os.path.abspath(__file__))
 
 
 class Dynaface(MainWindowJTH):
@@ -83,17 +89,17 @@ class Dynaface(MainWindowJTH):
         app_menu.addAction(preferences_action)
         preferences_action.triggered.connect(self.show_properties)
 
-        # Add open action
-        openAction = QAction('Open', self)
-        openAction.triggered.connect(self.open_action)
-        app_menu.addAction(openAction)
-
         exit_action = QAction("Quit", self)
         exit_action.triggered.connect(self.close)
         app_menu.addAction(exit_action)
 
         # File menu
         self._file_menu = QMenu("File", self)
+
+        # Add open action
+        openAction = QAction('Open...', self)
+        openAction.triggered.connect(self.open_action)
+        self._file_menu.addAction(openAction)
 
         # Close Window action
         closeAction = QAction("Close Window", self)
@@ -254,14 +260,26 @@ class Dynaface(MainWindowJTH):
             elif fileName.lower().endswith(('.mp4', '.mov')):
                 self.displayMessageBox("Video not supported yet.")
 
+def init_dynaface():
+    global device, app, window
+    
+    app = app_startup(const_values.APP_NAME)
+    window = Dynaface(const_values.APP_NAME)
+    window.show()
+
+    has_mps = torch.backends.mps.is_built()
+    device = "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
+    logger.info(f"PyTorch Device: {device}")
+
+    FindFace.init(path=DATA_DIR,device=device)
+    return app
+
 
 if __name__ == "__main__":
     level = 1
 
     try:
-        app = app_startup(const_values.APP_NAME)
-        window = Dynaface(const_values.APP_NAME)
-        window.show()
+        init_dynaface()
     except Exception as e:
         logger.error("Error during startup", exc_info=True)
         sys.exit(level)

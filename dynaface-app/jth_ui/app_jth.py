@@ -17,6 +17,8 @@ import utl_settings as utl_settings
 import jth_ui.utl_env as utl_env
 
 logger = logging.getLogger(__name__)
+DATA_DIR = utl_env.get_resource_path(
+    'data', base_path=os.path.abspath(__file__))
 
 class MainWindowJTH(QMainWindow):
     def __init__(self):
@@ -132,7 +134,7 @@ def app_startup(app_name):
     logging.info(f"User: {z}")
     if s=="osx":
         logging.info(f"Sandbox mode: {utl_env.is_sandboxed()}")
-    
+    logging.info(f"Internal Data{DATA_DIR}")
     _app = QApplication(sys.argv)
     _app.setApplicationName(app_name)
     return _app

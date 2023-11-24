@@ -2,16 +2,13 @@ import os
 import cv2
 import math
 import numpy as np
-from PIL import Image
 from matplotlib import pyplot as plt
-import urllib
-import bz2
-from facenet_pytorch import MTCNN
 from facial_analysis.image import load_image, ImageAnalysis
 from facial_analysis.spiga.inference.config import ModelConfig
 from facial_analysis.spiga.inference.framework import SPIGAFramework
 from facial_analysis.util import PolyArea
 from facial_analysis.calc import *
+from facial_analysis.find_face import FindFace
 import torch
 
 STD_PUPIL_DIST = 63
@@ -24,6 +21,8 @@ STYLEGAN_LEFT_PUPIL = (640,480)
 STYLEGAN_RIGHT_PUPIL = (380,480)
 STYLEGAN_PUPIL_DIST = STYLEGAN_LEFT_PUPIL[0] - STYLEGAN_RIGHT_PUPIL[0]
 
+SPIGA_MODEL = 'wflw'
+
 STATS = [AnalyzeFAI(), AnalyzeOralCommissureExcursion(), AnalyzeBrows(), AnalyzeDentalArea(), AnalyzeEyeArea()]
 _processor = None
 
@@ -35,12 +34,14 @@ def init_processor(device=None):
     has_mps = torch.backends.mps.is_built()
     device = "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
     device = "cpu"
-  _processor = SPIGAFramework(ModelConfig('wflw'), device=device)
+
+  config = ModelConfig(dataset_name=SPIGA_MODEL, load_model_url=False)
+  _processor = SPIGAFramework(config, device=device)
 
 
-def load_face_image(filename, crop=True, stats=STATS):
+def load_face_image(filename, crop=True, stats=STATS, data_path=None):
   img = load_image(filename)
-  face = AnalyzeFace(stats)
+  face = AnalyzeFace(stats,data_path=data_path)
   face.load_image(img, crop)
   return face
 
@@ -85,32 +86,15 @@ def scale_crop_points(lst,crop_x,crop_y,scale):
          int((pt[1]*scale)-crop_y)))
   return lst2
 
-class FindFace():
-  mtcnn = MTCNN(keep_all=True, device="cpu")
-
-  def detect_face(img):
-    boxes, _ = FindFace.mtcnn.detect(img)
-    if boxes is None: return None
-    return boxes[0]
-    
-  def crop(img):
-    boxes, _ = FindFace.mtcnn.detect(img)
-    if boxes is not None:
-        # Assuming the first face detected
-        box = boxes[0]
-        x1, y1, x2, y2 = int(box[0]), int(box[1]), int(box[2]), int(box[3])
-        return img[y1:y2, x1:x2]
-    
-    return None
-
 class AnalyzeFace (ImageAnalysis):
   
-  def __init__(self, stats):
+  def __init__(self, stats, data_path):
     global _processor
 
     if not _processor:
       init_processor()
 
+    self.data_path = data_path
     self.left_eye = None
     self.right_eye = None
     self.nose = None
