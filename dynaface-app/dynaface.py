@@ -181,7 +181,7 @@ class Dynaface(MainWindowJTH):
             if not self.is_tab_open("Analyze Image"):
                 self.add_tab(AnalyzeImageTab(self, filename), "Analyze Image")
         except Exception as e:
-            logger.error("Error during about open", exc_info=True)
+            logger.error("Error during image open", exc_info=True)
 
     def show_evolve(self):
         try:

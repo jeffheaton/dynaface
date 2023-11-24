@@ -39,6 +39,11 @@ def load_image(filename):
 
 class ImageAnalysis:
   def load_image(self, img):
+    if img is None:
+      raise TypeError("Expected a value for img, but got None instead.")
+    
+    if img.shape[0] <5 or img.shape[1]<5:
+      raise ValueError("Image is empty")
     self.original_img = img.copy()
     self.gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     self.render_img = img.copy()

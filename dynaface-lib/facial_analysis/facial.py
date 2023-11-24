@@ -10,11 +10,14 @@ from facial_analysis.util import PolyArea
 from facial_analysis.calc import *
 from facial_analysis.find_face import FindFace
 import torch
+import logging
 
 STD_PUPIL_DIST = 63
 
 LM_LEFT_PUPIL = 97
 LM_RIGHT_PUPIL = 96
+
+FILL_COLOR = [128, 128, 128]
 
 STYLEGAN_WIDTH = 1024
 STYLEGAN_LEFT_PUPIL = (640,480)
@@ -45,38 +48,46 @@ def load_face_image(filename, crop=True, stats=STATS, data_path=None):
   face.load_image(img, crop)
   return face
 
-def find_facial_path():
-    home_directory = os.path.expanduser( '~' )
-    path = os.path.join( home_directory, '.facial_analysis' )
-    try:
-        os.makedirs(path)
-    except FileExistsError:
-       # directory already exists
-       pass
-    return path
+def safe_clip(cv2_image, x, y, width, height, background):
+    """
+    Clips a region from an OpenCV image, adjusting for boundaries and filling missing areas with a specified color.
 
-def add_gray_border_to_min_dimension(img, min_dimension):
-    # Get current dimensions of the image
-    height, width = img.shape[:2]
+    If the specified region extends beyond the image boundaries, the function adjusts the coordinates and size
+    to fit within the image. If the region is partially or completely outside the image, it fills the missing
+    areas with the specified background color.
 
-    # Calculate padding needed for width and height
-    if width < min_dimension:
-        left_padding = (min_dimension - width) // 2
-        right_padding = min_dimension - width - left_padding
-    else:
-        left_padding = right_padding = 0
+    Args:
+    cv2_image (numpy.ndarray): The source image in OpenCV format.
+    x (int): The x-coordinate of the top-left corner of the clipping region.
+    y (int): The y-coordinate of the top-left corner of the clipping region.
+    width (int): The width of the clipping region.
+    height (int): The height of the clipping region.
+    background (tuple): A tuple (R, G, B) specifying the fill color for missing areas.
 
-    if height < min_dimension:
-        top_padding = (min_dimension - height) // 2
-        bottom_padding = min_dimension - height - top_padding
-    else:
-        top_padding = bottom_padding = 0
+    Returns:
+    tuple: A tuple containing the clipped image, x offset, and y offset.
+           The x and y offsets indicate how much the origin of the clipped image has shifted
+           relative to the original image.
+    """
 
-    # Add gray border around the image
-    gray_color = [128, 128, 128]  # RGB value for gray
-    bordered_img = cv2.copyMakeBorder(img, top_padding, bottom_padding, left_padding, right_padding, cv2.BORDER_CONSTANT, value=gray_color)
+    # Ensure x and y are not negative
+    x_offset = -min(x, 0)
+    y_offset = -min(y, 0)
+    x = max(x, 0)
+    y = max(y, 0)
 
-    return bordered_img
+    # Ensure the region does not exceed the image boundaries
+    x_end = min(x + width, cv2_image.shape[1])
+    y_end = min(y + height, cv2_image.shape[0])
+    clipped_region = cv2_image[y:y_end, x:x_end]
+
+    # If the region is smaller than requested, fill the remaining area
+    if clipped_region.shape[1] < width or clipped_region.shape[0] < height:
+        new_image = np.full((height, width, 3), background, dtype=cv2_image.dtype)
+        new_image[y_offset:y_offset + clipped_region.shape[0], x_offset:x_offset + clipped_region.shape[1]] = clipped_region
+        clipped_region = new_image
+
+    return clipped_region, x_offset, y_offset
 
 def scale_crop_points(lst,crop_x,crop_y,scale):
   lst2 = []
@@ -108,7 +119,10 @@ class AnalyzeFace (ImageAnalysis):
   def _find_landmarks(self, img):
 
     bbox = FindFace.detect_face(img)
-    if bbox is None: bbox = [0,0,img.shape[1],img.shape[0]]
+
+    if bbox is None: 
+      bbox = [0,0,img.shape[1],img.shape[0]]
+      logging.info("Could not detect face area")
     # bbox to spiga is x,y,w,h; however, facenet_pytorch deals in x1,y1,x2,y2. 
     bbox = [bbox[0],bbox[1],bbox[2]-bbox[0],bbox[3]-bbox[1]]
     features = self.processor.inference(img, [bbox])
@@ -149,22 +163,30 @@ class AnalyzeFace (ImageAnalysis):
     return result
   
   def crop_stylegan(self, pupils=None):
+    logging.info(f"Pupils provided: {pupils}")
     if pupils:
       left_eye, right_eye = pupils
     else:
       left_eye, right_eye = self.get_pupils()
+      logging.info(f"Pupils calculated: l:{left_eye}, r:{right_eye}")
 
     d = abs(right_eye[0] - left_eye[0])
+    logging.info(f"Pupillary Distance: {d}px")
     ar = self.width/self.height
+    logging.info(f"Aspect Ratio: {ar}")
     new_width = int(self.width * (STYLEGAN_PUPIL_DIST/d))
     new_height = int(new_width / ar)
+    logging.info(f"Scaling from (h x w): {self.height}x{self.width} to {new_height}x{new_width}")
     scale = new_width / self.width
+    logging.info(f"Scale: {scale}x")
     img = cv2.resize(self.original_img, (new_width, new_height))
-    img = add_gray_border_to_min_dimension(img,STYLEGAN_WIDTH)
+
     crop_x = int((self.landmarks[96][0]*scale)-STYLEGAN_RIGHT_PUPIL[0])
     crop_y = int((self.landmarks[96][1]*scale)-STYLEGAN_RIGHT_PUPIL[1])
+    logging.info(f"Crop x,y: {crop_x}, {crop_y}")
+    img, _, _ = safe_clip(img, crop_x, crop_y, STYLEGAN_WIDTH, STYLEGAN_WIDTH, FILL_COLOR)
     self.landmarks = scale_crop_points(self.landmarks,crop_x,crop_y,scale)
-    img = img[crop_y:crop_y+STYLEGAN_WIDTH,crop_x:crop_x+STYLEGAN_WIDTH]
+    logging.info(f"Resulting image: {img.shape}")
     super().load_image(img)
 
   def get_pupils(self):
