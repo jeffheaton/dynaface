@@ -1,22 +1,27 @@
 import os
-from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QVBoxLayout, QWidget, QLabel
-from PyQt6.QtCore import Qt, QEvent
-import const_values
-from jth_ui.tab_graphic import TabGraphic
+
 from facial_analysis.facial import load_face_image
-from facial_analysis.calc import AnalyzeFAI, AnalyzeOralCommissureExcursion, AnalyzeBrows, AnalyzeDentalArea, AnalyzeEyeArea
-from facial_analysis.video import VideoToVideo
-from PyQt6.QtWidgets import QComboBox, QPushButton, QToolBar, QCheckBox, QSpinBox, QGestureEvent, QPinchGesture
-import jth_ui.utl_env as utl_env
+from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QGestureEvent,
+    QPinchGesture,
+    QPushButton,
+    QSpinBox,
+    QToolBar,
+)
+
+from jth_ui.tab_graphic import TabGraphic
+
 
 class AnalyzeImageTab(TabGraphic):
     def __init__(self, window, path):
         super().__init__(window)
         self.init_toolbar()
-        self._face = load_face_image(path,crop=True)
+        self._face = load_face_image(path, crop=True)
         self.create_graphic(buffer=self._face.render_img)
         self.update_face()
-        self._view.scale(1,1)
+        self._view.scale(1, 1)
         self.grabGesture(Qt.GestureType.PinchGesture)
 
     def init_toolbar(self):
@@ -43,7 +48,7 @@ class AnalyzeImageTab(TabGraphic):
         self._spin_zoom.setSingleStep(5)
         self._spin_zoom.setValue(100)  # Starting value
         self._spin_zoom.setFixedWidth(60)  # Adjust the width as needed
-        self._spin_zoom.valueChanged.connect(self.action_zoom)       
+        self._spin_zoom.valueChanged.connect(self.action_zoom)
 
     def action_landmarks(self, state):
         self.update_face()
@@ -52,9 +57,9 @@ class AnalyzeImageTab(TabGraphic):
         self.update_face()
 
     def action_zoom(self, value):
-        z = value/100
+        z = value / 100
         self._view.resetTransform()
-        self._view.scale(value/100,value/100)
+        self._view.scale(value / 100, value / 100)
 
     def update_face(self):
         self._face.render_reset()
@@ -68,9 +73,9 @@ class AnalyzeImageTab(TabGraphic):
         pinch = event.gesture(Qt.GestureType.PinchGesture)
         if isinstance(pinch, QPinchGesture):
             scaleFactor = pinch.scaleFactor()
-            if scaleFactor>1: 
+            if scaleFactor > 1:
                 new_value = self._spin_zoom.value() + 2
-            else: 
+            else:
                 new_value = self._spin_zoom.value() - 2
             self._spin_zoom.setValue(new_value)
             return True
@@ -80,7 +85,6 @@ class AnalyzeImageTab(TabGraphic):
         if event.type() == QEvent.Type.Gesture:
             return self.gestureEvent(event)
         return super().event(event)
-
 
     def on_close(self):
         pass

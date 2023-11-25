@@ -1,11 +1,17 @@
 import logging
-import utl_settings 
 from PyQt6.QtWidgets import (
-    QPushButton, QWidget, QFormLayout, QLabel, 
-    QSpinBox, QVBoxLayout, QHBoxLayout, QCheckBox
+    QPushButton,
+    QWidget,
+    QFormLayout,
+    QLabel,
+    QSpinBox,
+    QVBoxLayout,
+    QHBoxLayout,
+    QCheckBox,
 )
 
 logger = logging.getLogger(__name__)
+
 
 class SettingsTab(QWidget):
     def __init__(self, window):
@@ -28,7 +34,7 @@ class SettingsTab(QWidget):
         save_button = QPushButton("Save", self)
         save_button.clicked.connect(self.action_save)
         cancel_button = QPushButton("Cancel", self)
-        cancel_button.clicked.connect(lambda: self.action_cancel())  
+        cancel_button.clicked.connect(lambda: self.action_cancel())
         button_layout = QHBoxLayout()
         button_layout.addWidget(save_button)
         button_layout.addWidget(cancel_button)
@@ -46,9 +52,15 @@ class SettingsTab(QWidget):
         self.setLayout(layout)
 
         window.add_tab(self, "Settings")
-        self._cell_size_spinbox.setValue(utl_settings.get_int(utl_settings.CELL_SIZE_KEY))
-        self._animation_speed_spinbox.setValue(utl_settings.get_int(utl_settings.FPS_KEY))
-        self._display_fps_checkbox.setChecked(utl_settings.get_bool(utl_settings.FPS_OVERLAY))
+        self._cell_size_spinbox.setValue(
+            utl_settings.get_int(utl_settings.CELL_SIZE_KEY)
+        )
+        self._animation_speed_spinbox.setValue(
+            utl_settings.get_int(utl_settings.FPS_KEY)
+        )
+        self._display_fps_checkbox.setChecked(
+            utl_settings.get_bool(utl_settings.FPS_OVERLAY)
+        )
 
     def on_close(self):
         self._window.close_simulator_tabs()
@@ -64,7 +76,13 @@ class SettingsTab(QWidget):
         pass
 
     def save_values(self):
-        utl_settings.settings[utl_settings.CELL_SIZE_KEY] = int(self._cell_size_spinbox.value())
-        utl_settings.settings[utl_settings.FPS_KEY] = int(self._animation_speed_spinbox.value())
-        utl_settings.settings[utl_settings.FPS_OVERLAY] = bool(self._display_fps_checkbox.isChecked())
+        utl_settings.settings[utl_settings.CELL_SIZE_KEY] = int(
+            self._cell_size_spinbox.value()
+        )
+        utl_settings.settings[utl_settings.FPS_KEY] = int(
+            self._animation_speed_spinbox.value()
+        )
+        utl_settings.settings[utl_settings.FPS_OVERLAY] = bool(
+            self._display_fps_checkbox.isChecked()
+        )
         utl_settings.save_settings()
