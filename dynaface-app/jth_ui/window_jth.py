@@ -2,20 +2,18 @@ import logging
 import logging.config
 import logging.handlers
 import os
-import sys
 
-import appdirs
 from PyQt6.QtCore import Qt, QtMsgType, qInstallMessageHandler
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox
-
-import const_values
+from jth_ui import app_jth
 
 logger = logging.getLogger(__name__)
 
 
 class MainWindowJTH(QMainWindow):
-    def __init__(self):
+    def __init__(self, app):
         super().__init__()
+        self.app = app
         self.open_extensions = (
             "Images (*.jpg *.jpeg *.png *.tiff);;Videos (*.mp4 *.mov)"
         )
@@ -94,14 +92,18 @@ class MainWindowJTH(QMainWindow):
 
     def open_file(self, file_path):
         folder = os.path.dirname(file_path)
-        print(folder)
+        self.app.state[app_jth.STATE_LAST_FOLDER] = folder
 
     def open_action(self):
+        home_directory = os.path.expanduser("~")
+        documents_path = os.path.join(home_directory, "Documents")
+        path = self.app.state.get(app_jth.STATE_LAST_FOLDER, documents_path)
         fileName, _ = QFileDialog.getOpenFileName(
             self,
             "Open File",
-            "",
+            path,
             self.open_extensions,
         )
         if fileName:
             self.open_file(fileName)
+        self.app.save_state()

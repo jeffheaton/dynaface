@@ -26,8 +26,7 @@ logger = logging.getLogger(__name__)
 
 class DynafaceWindow(MainWindowJTH):
     def __init__(self, app, app_name):
-        super().__init__()
-        self.app = app
+        super().__init__(app)
         self.running = False
         self.setWindowTitle(app_name)
         self.setGeometry(100, 100, 1000, 500)
