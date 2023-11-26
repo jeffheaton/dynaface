@@ -103,6 +103,7 @@ class DynafaceWindow(MainWindowJTH):
         copyAction = QAction("Copy", self)
         copyAction.setShortcut(QKeySequence(QKeySequence.StandardKey.Copy))
         self._edit_menu.addAction(copyAction)
+        copyAction.triggered.connect(self.perform_edit_copy)
 
         pasteAction = QAction("Paste", self)
         pasteAction.setShortcut(QKeySequence(QKeySequence.StandardKey.Paste))
@@ -118,7 +119,6 @@ class DynafaceWindow(MainWindowJTH):
         self.menubar.addMenu(app_menu)
         self.menubar.addMenu(self._file_menu)
         self.menubar.addMenu(self._edit_menu)
-        # self.menubar.addMenu(self.simulator_menu)
         self.menubar.addMenu(self._help_menu)
 
     def initUI(self):
@@ -165,7 +165,7 @@ class DynafaceWindow(MainWindowJTH):
 
     def show_properties(self):
         try:
-            if not self.main_window.is_tab_open("Preferences"):
+            if not self.is_tab_open("Preferences"):
                 self.add_tab(tab_settings.SettingsTab(self), "Preferences")
         except Exception as e:
             logger.error("Error during show properties", exc_info=True)
@@ -180,3 +180,12 @@ class DynafaceWindow(MainWindowJTH):
             self.show_analyze_image(file_path)
         elif file_path.lower().endswith((".mp4", ".mov")):
             self.displayMessageBox("Video not supported yet.")
+
+    def perform_edit_copy(self):
+        current_tab = self._tab_widget.currentWidget()
+
+        # Check if there is a current tab
+        if current_tab is not None:
+            # Check if the current tab has the 'on_copy' method
+            if hasattr(current_tab, "on_copy"):
+                current_tab.on_copy()

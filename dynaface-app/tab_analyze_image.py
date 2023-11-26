@@ -1,6 +1,9 @@
+import logging
 import os
 
+import utl_gfx
 from facial_analysis.facial import load_face_image
+from jth_ui.tab_graphic import TabGraphic
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtWidgets import (
     QCheckBox,
@@ -11,7 +14,7 @@ from PyQt6.QtWidgets import (
     QToolBar,
 )
 
-from jth_ui.tab_graphic import TabGraphic
+logger = logging.getLogger(__name__)
 
 
 class AnalyzeImageTab(TabGraphic):
@@ -91,3 +94,7 @@ class AnalyzeImageTab(TabGraphic):
 
     def on_resize(self):
         pass
+
+    def on_copy(self):
+        logging.info(f"Copy image: {self._face.render_img.shape}")
+        utl_gfx.copy_image_to_clipboard(self._face.render_img)

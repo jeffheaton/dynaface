@@ -18,9 +18,6 @@ class SettingsTab(QWidget):
         super().__init__()
         self._window = window
 
-        # Close simulator, if open
-        self._window.close_simulator_tabs()
-
         # Create widgets
         cell_size_label = QLabel("Cell Size (1-25):", self)
         self._cell_size_spinbox = QSpinBox(self)

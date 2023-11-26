@@ -50,11 +50,11 @@ class SplashTab(QWidget):
         )
         # button_rule_viewer.clicked.connect(self._window.show_simulator)
 
-        button_evolve = QPushButton(f"Evolve")
-        button_evolve.setSizePolicy(
+        button_exit = QPushButton(f"Exit")
+        button_exit.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        # button_evolve.clicked.connect(self._window.show_evolve)
+        button_exit.clicked.connect(self._window.app.app.quit)
 
         button_settings = QPushButton(f"Settings")
         button_settings.setSizePolicy(
@@ -64,8 +64,8 @@ class SplashTab(QWidget):
 
         buttons_layout.addWidget(button_open, 0, 0)
         buttons_layout.addWidget(button_rule_viewer, 0, 1)
-        buttons_layout.addWidget(button_evolve, 1, 0)
-        buttons_layout.addWidget(button_settings, 1, 1)
+        buttons_layout.addWidget(button_exit, 1, 1)
+        buttons_layout.addWidget(button_settings, 1, 0)
 
         # Add buttons layout to main layout
         main_layout.addLayout(buttons_layout, 1)
