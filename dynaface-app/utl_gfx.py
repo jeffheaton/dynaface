@@ -1,7 +1,6 @@
 import sys
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtGui import QImage, QPixmap, QClipboard
-from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QImage, QClipboard
 
 
 def opencv_img_to_qimage(opencv_img):

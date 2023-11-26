@@ -1,16 +1,15 @@
-import os
-import cv2
+import logging
 import math
+
+import cv2
 import numpy as np
-from matplotlib import pyplot as plt
-from facial_analysis.image import load_image, ImageAnalysis
+import torch
+from facial_analysis.calc import *
+from facial_analysis.find_face import FindFace
+from facial_analysis.image import ImageAnalysis, load_image
 from facial_analysis.spiga.inference.config import ModelConfig
 from facial_analysis.spiga.inference.framework import SPIGAFramework
 from facial_analysis.util import PolyArea
-from facial_analysis.calc import *
-from facial_analysis.find_face import FindFace
-import torch
-import logging
 
 STD_PUPIL_DIST = 63
 
