@@ -54,14 +54,17 @@ class TabGraphic(QWidget):
         self._force_rule = False
         self._force_update = 0
         self._frame_count = 0
-
-        # Initialize central widget and layout
-        self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(0, 0, 0, 0)
-        self._layout.setSpacing(0)
-
         self._scene = None
         self._view = None
+
+    def init_graphics(self, layout):
+        if layout is None:
+            # Initialize central widget and layout
+            self._layout = QVBoxLayout(self)
+            self._layout.setContentsMargins(0, 0, 0, 0)
+            self._layout.setSpacing(0)
+        else:
+            self._layout = layout
 
     def init_fps(self):
         # FPS
@@ -75,7 +78,7 @@ class TabGraphic(QWidget):
     def init_animate(self, target_fps):
         # Animation timer
         self._target_fps = target_fps
-        self._timer_interval = int(1000/self._target_fps)
+        self._timer_interval = int(1000 / self._target_fps)
         self._last_event_time = QDateTime.currentMSecsSinceEpoch()
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._timer_proc)
