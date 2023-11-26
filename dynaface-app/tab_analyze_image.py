@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+from functools import partial
 
 import utl_gfx
 from facial_analysis.facial import load_face_image
@@ -31,6 +32,13 @@ logger = logging.getLogger(__name__)
 class AnalyzeImageTab(TabGraphic):
     def __init__(self, window, path):
         super().__init__(window)
+
+        self._auto_update = False
+
+        # Load the face
+        self._face = load_face_image(path, crop=True)
+
+        # Horiz toolbar
         tab_layout = QVBoxLayout(self)
         self.init_horizontal_toolbar(tab_layout)
 
@@ -40,12 +48,16 @@ class AnalyzeImageTab(TabGraphic):
         self.init_vertical_toolbar(content_layout)
         self.init_graphics(content_layout)
 
-        # Load the face
-        self._face = load_face_image(path, crop=True)
+        # Prepare to display face
         self.create_graphic(buffer=self._face.render_img)
         self.update_face()
+
+        # Scale the view as desired
         self._view.scale(1, 1)
+
+        # Allow touch zoom
         self.grabGesture(Qt.GestureType.PinchGesture)
+        self._auto_update = True
 
     def init_horizontal_toolbar(self, layout):
         self._toolbar = QToolBar()
@@ -109,10 +121,13 @@ class AnalyzeImageTab(TabGraphic):
         # Store checkboxes in a list for easy access
         self.checkboxes = []
 
-        # Add check boxes to the scrollable area
-        for i in range(10):
-            checkbox = QCheckBox(f"Option {chr(65+i)}")
+        for stat in self._face.calcs:
+            checkbox = QCheckBox(stat.abbrev())
+            checkbox.stateChanged.connect(
+                partial(self.checkbox_clicked, checkbox, stat)
+            )
             self.scroll_area_layout.addWidget(checkbox)
+            checkbox.setChecked(True)
             self.checkboxes.append(checkbox)
 
         # Connect buttons to slot functions
@@ -166,9 +181,20 @@ class AnalyzeImageTab(TabGraphic):
         utl_gfx.copy_image_to_clipboard(self._face.render_img)
 
     def check_all(self):
+        self._auto_update = False
         for checkbox in self.checkboxes:
             checkbox.setChecked(True)
+        self._auto_update = True
+        self.update_face()
 
     def uncheck_all(self):
+        self._auto_update = False
         for checkbox in self.checkboxes:
             checkbox.setChecked(False)
+        self._auto_update = True
+        self.update_face()
+
+    def checkbox_clicked(self, checkbox, stat):
+        stat.enabled = checkbox.isChecked()
+        if self._auto_update:
+            self.update_face()

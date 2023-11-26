@@ -179,7 +179,8 @@ class AnalyzeFace(ImageAnalysis):
     def analyze(self):
         result = {}
         for calc in self.calcs:
-            result.update(calc.calc(self))
+            if calc.enabled:
+                result.update(calc.calc(self))
         return result
 
     def crop_stylegan(self, pupils=None):
