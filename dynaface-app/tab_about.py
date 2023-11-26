@@ -1,10 +1,6 @@
-from PyQt6.QtWidgets import (
-    QVBoxLayout,
-    QWidget,
-    QLabel,
-)
-from PyQt6.QtCore import Qt
 import const_values
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 
 class AboutTab(QWidget):

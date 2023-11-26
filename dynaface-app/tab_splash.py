@@ -1,15 +1,15 @@
 import os
+
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
-    QVBoxLayout,
-    QWidget,
-    QLabel,
     QGridLayout,
+    QLabel,
     QPushButton,
     QSizePolicy,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt
-import const_values
 
 
 class SplashTab(QWidget):

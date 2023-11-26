@@ -1,26 +1,19 @@
 import logging
-import os
-import sys
 from functools import partial
 
 import utl_gfx
 from facial_analysis.facial import load_face_image
 from jth_ui.tab_graphic import TabGraphic
 from PyQt6.QtCore import QEvent, Qt
-from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
-    QApplication,
     QCheckBox,
-    QFrame,
     QGestureEvent,
     QHBoxLayout,
-    QMainWindow,
+    QLabel,
     QPinchGesture,
     QPushButton,
     QScrollArea,
     QSpinBox,
-    QTabWidget,
-    QTextEdit,
     QToolBar,
     QVBoxLayout,
     QWidget,
@@ -67,15 +60,19 @@ class AnalyzeImageTab(TabGraphic):
         self._btn_start = QPushButton("Reset")
         self._btn_start.clicked.connect(self.start_game)
         self._toolbar.addWidget(self._btn_start)
+        self._toolbar.addSeparator()
 
         self._chk_landmarks = QCheckBox("Landmarks")
         self._toolbar.addWidget(self._chk_landmarks)
         self._chk_landmarks.stateChanged.connect(self.action_landmarks)
+        self._toolbar.addSeparator()
 
         self._chk_measures = QCheckBox("Measures")
         self._toolbar.addWidget(self._chk_measures)
         self._chk_measures.stateChanged.connect(self.action_measures)
+        self._toolbar.addSeparator()
 
+        self._toolbar.addWidget(QLabel("Zoom(%): ", self._toolbar))
         self._spin_zoom = QSpinBox()
         self._toolbar.addWidget(self._spin_zoom)
         self._spin_zoom.setMinimum(1)
@@ -84,6 +81,7 @@ class AnalyzeImageTab(TabGraphic):
         self._spin_zoom.setValue(100)  # Starting value
         self._spin_zoom.setFixedWidth(60)  # Adjust the width as needed
         self._spin_zoom.valueChanged.connect(self.action_zoom)
+        self._toolbar.addSeparator()
 
     def init_vertical_toolbar(self, layout):
         # Add a vertical toolbar (left side of the tab)

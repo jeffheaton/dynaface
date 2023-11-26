@@ -1,5 +1,4 @@
 import sys
-import cv2
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QImage, QPixmap, QClipboard
 from PyQt6.QtCore import Qt

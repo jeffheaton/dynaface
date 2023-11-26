@@ -7,9 +7,9 @@ import plistlib
 import sys
 
 import torch
+from dynaface_window import DynafaceWindow
 from facial_analysis.find_face import FindFace
 from jth_ui.app_jth import AppJTH
-from dynaface_window import DynafaceWindow
 
 logger = logging.getLogger(__name__)
 

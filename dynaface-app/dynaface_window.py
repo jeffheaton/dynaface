@@ -3,13 +3,12 @@ import logging.config
 import logging.handlers
 import webbrowser
 
-from PyQt6.QtCore import QTimer
-from PyQt6.QtGui import QAction, QKeySequence
-from PyQt6.QtWidgets import QFileDialog, QMenu, QMenuBar, QTabWidget
-
 import tab_settings
 import tab_splash
 from jth_ui.window_jth import MainWindowJTH
+from PyQt6.QtCore import QTimer
+from PyQt6.QtGui import QAction, QKeySequence
+from PyQt6.QtWidgets import QMenu, QMenuBar, QTabWidget
 from tab_about import AboutTab
 from tab_analyze_image import AnalyzeImageTab
 
