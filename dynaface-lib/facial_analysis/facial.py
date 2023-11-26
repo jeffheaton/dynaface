@@ -20,33 +20,40 @@ LM_RIGHT_PUPIL = 96
 FILL_COLOR = [128, 128, 128]
 
 STYLEGAN_WIDTH = 1024
-STYLEGAN_LEFT_PUPIL = (640,480)
-STYLEGAN_RIGHT_PUPIL = (380,480)
+STYLEGAN_LEFT_PUPIL = (640, 480)
+STYLEGAN_RIGHT_PUPIL = (380, 480)
 STYLEGAN_PUPIL_DIST = STYLEGAN_LEFT_PUPIL[0] - STYLEGAN_RIGHT_PUPIL[0]
 
-SPIGA_MODEL = 'wflw'
+SPIGA_MODEL = "wflw"
 
-STATS = [AnalyzeFAI(), AnalyzeOralCommissureExcursion(), AnalyzeBrows(), AnalyzeDentalArea(), AnalyzeEyeArea()]
+STATS = [
+    AnalyzeFAI(),
+    AnalyzeOralCommissureExcursion(),
+    AnalyzeBrows(),
+    AnalyzeDentalArea(),
+    AnalyzeEyeArea(),
+]
 _processor = None
 
 
 def init_processor(device=None):
-  global _processor
+    global _processor
 
-  if not device:
-    has_mps = torch.backends.mps.is_built()
-    device = "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
-    device = "cpu"
+    if not device:
+        has_mps = torch.backends.mps.is_built()
+        device = "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
+        device = "cpu"
 
-  config = ModelConfig(dataset_name=SPIGA_MODEL, load_model_url=False)
-  _processor = SPIGAFramework(config, device=device)
+    config = ModelConfig(dataset_name=SPIGA_MODEL, load_model_url=False)
+    _processor = SPIGAFramework(config, device=device)
 
 
 def load_face_image(filename, crop=True, stats=STATS, data_path=None):
-  img = load_image(filename)
-  face = AnalyzeFace(stats,data_path=data_path)
-  face.load_image(img, crop)
-  return face
+    img = load_image(filename)
+    face = AnalyzeFace(stats, data_path=data_path)
+    face.load_image(img, crop)
+    return face
+
 
 def safe_clip(cv2_image, x, y, width, height, background):
     """
@@ -70,126 +77,141 @@ def safe_clip(cv2_image, x, y, width, height, background):
            relative to the original image.
     """
 
-    # Ensure x and y are not negative
-    x_offset = -min(x, 0)
-    y_offset = -min(y, 0)
-    x = max(x, 0)
-    y = max(y, 0)
+    # Image dimensions
+    img_height, img_width = cv2_image.shape[:2]
 
-    # Ensure the region does not exceed the image boundaries
-    x_end = min(x + width, cv2_image.shape[1])
-    y_end = min(y + height, cv2_image.shape[0])
-    clipped_region = cv2_image[y:y_end, x:x_end]
+    # Adjust start and end points to be within the image boundaries
+    x_start = max(x, 0)
+    y_start = max(y, 0)
+    x_end = min(x + width, img_width)
+    y_end = min(y + height, img_height)
 
-    # If the region is smaller than requested, fill the remaining area
-    if clipped_region.shape[1] < width or clipped_region.shape[0] < height:
-        new_image = np.full((height, width, 3), background, dtype=cv2_image.dtype)
-        new_image[y_offset:y_offset + clipped_region.shape[0], x_offset:x_offset + clipped_region.shape[1]] = clipped_region
-        clipped_region = new_image
+    # Calculate the size of the region that will be clipped from the original image
+    clipped_width = x_end - x_start
+    clipped_height = y_end - y_start
 
-    return clipped_region, x_offset, y_offset
+    # Create a new image filled with the background color
+    new_image = np.full((height, width, 3), background, dtype=cv2_image.dtype)
 
-def scale_crop_points(lst,crop_x,crop_y,scale):
-  lst2 = []
-  for pt in lst:
-      lst2.append(
-         (int(((pt[0]*scale)-crop_x)),
-         int((pt[1]*scale)-crop_y)))
-  return lst2
+    # Calculate where to place the clipped region in the new image
+    new_x_start = max(0, -x)
+    new_y_start = max(0, -y)
 
-class AnalyzeFace (ImageAnalysis):
-  
-  def __init__(self, stats, data_path):
-    global _processor
+    # Clip the region from the original image and place it in the new image
+    if clipped_width > 0 and clipped_height > 0:
+        clipped_region = cv2_image[y_start:y_end, x_start:x_end]
+        new_image[
+            new_y_start : new_y_start + clipped_height,
+            new_x_start : new_x_start + clipped_width,
+        ] = clipped_region
 
-    if not _processor:
-      init_processor()
+    return new_image, new_x_start, new_y_start
 
-    self.data_path = data_path
-    self.left_eye = None
-    self.right_eye = None
-    self.nose = None
-    self.calcs = stats
-    self.headpose = [0,0,0]
-    self.processor = _processor
 
-  def get_all_stats(self):
-    return [stat for obj in self.calcs for stat in obj.stats()]
+def scale_crop_points(lst, crop_x, crop_y, scale):
+    lst2 = []
+    for pt in lst:
+        lst2.append((int(((pt[0] * scale) - crop_x)), int((pt[1] * scale) - crop_y)))
+    return lst2
 
-  def _find_landmarks(self, img):
 
-    bbox = FindFace.detect_face(img)
+class AnalyzeFace(ImageAnalysis):
+    def __init__(self, stats, data_path):
+        global _processor
 
-    if bbox is None: 
-      bbox = [0,0,img.shape[1],img.shape[0]]
-      logging.info("Could not detect face area")
-    # bbox to spiga is x,y,w,h; however, facenet_pytorch deals in x1,y1,x2,y2. 
-    bbox = [bbox[0],bbox[1],bbox[2]-bbox[0],bbox[3]-bbox[1]]
-    features = self.processor.inference(img, [bbox])
+        if not _processor:
+            init_processor()
 
-    # Prepare variables
-    x0,y0,w,h = bbox
-    landmarks2 = [(int(x[0]),int(x[1])) for x in np.array(features['landmarks'][0])]
-    headpose = np.array(features['headpose'][0])
-    return landmarks2, headpose
+        self.data_path = data_path
+        self.left_eye = None
+        self.right_eye = None
+        self.nose = None
+        self.calcs = stats
+        self.headpose = [0, 0, 0]
+        self.processor = _processor
 
-  def load_image(self, img, crop, eyes=None):
-    super().load_image(img)
-    self.landmarks, self._headpose = self._find_landmarks(img)
-    self.pupillary_distance = abs(self.landmarks[LM_LEFT_PUPIL][0] - self.landmarks[LM_RIGHT_PUPIL][0])
-    self.pix2mm = STD_PUPIL_DIST/self.pupillary_distance
-    if crop:
-      self.crop_stylegan(eyes)
+    def get_all_stats(self):
+        return [stat for obj in self.calcs for stat in obj.stats()]
 
-  def draw_landmarks(self, size=0.25, color=[0,255,255],numbers=False):
-    for i,landmark in enumerate(self.landmarks):
-      self.circle(landmark,radius=3,color=color)
-      if numbers:
-        self.write_text([landmark[0]+3,landmark[1]],str(i),size=0.5)
-    self.circle(self.left_eye, color=color)
-    self.circle(self.right_eye, color=color)
+    def _find_landmarks(self, img):
+        bbox = FindFace.detect_face(img)
 
-  def measure(self, pt1, pt2, color=(255,0,0), thickness=3):
-    self.arrow(pt1, pt2, color, thickness)
-    d = math.dist(pt1,pt2) * self.pix2mm
-    mp = [int((pt1[0]+pt2[0])//2),int((pt1[1]+pt2[1])//2)]
-    self.write_text(mp,f"{d:.2f}mm")
-    return d
+        if bbox is None:
+            bbox = [0, 0, img.shape[1], img.shape[0]]
+            logging.info("Could not detect face area")
+        # bbox to spiga is x,y,w,h; however, facenet_pytorch deals in x1,y1,x2,y2.
+        bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
+        features = self.processor.inference(img, [bbox])
 
-  def analyze(self):
-    result = {}
-    for calc in self.calcs:
-      result.update(calc.calc(self))
-    return result
-  
-  def crop_stylegan(self, pupils=None):
-    logging.info(f"Pupils provided: {pupils}")
-    if pupils:
-      left_eye, right_eye = pupils
-    else:
-      left_eye, right_eye = self.get_pupils()
-      logging.info(f"Pupils calculated: l:{left_eye}, r:{right_eye}")
+        # Prepare variables
+        x0, y0, w, h = bbox
+        landmarks2 = [
+            (int(x[0]), int(x[1])) for x in np.array(features["landmarks"][0])
+        ]
+        headpose = np.array(features["headpose"][0])
+        return landmarks2, headpose
 
-    d = abs(right_eye[0] - left_eye[0])
-    logging.info(f"Pupillary Distance: {d}px")
-    ar = self.width/self.height
-    logging.info(f"Aspect Ratio: {ar}")
-    new_width = int(self.width * (STYLEGAN_PUPIL_DIST/d))
-    new_height = int(new_width / ar)
-    logging.info(f"Scaling from (h x w): {self.height}x{self.width} to {new_height}x{new_width}")
-    scale = new_width / self.width
-    logging.info(f"Scale: {scale}x")
-    img = cv2.resize(self.original_img, (new_width, new_height))
+    def load_image(self, img, crop, eyes=None):
+        super().load_image(img)
+        self.landmarks, self._headpose = self._find_landmarks(img)
+        self.pupillary_distance = abs(
+            self.landmarks[LM_LEFT_PUPIL][0] - self.landmarks[LM_RIGHT_PUPIL][0]
+        )
+        self.pix2mm = STD_PUPIL_DIST / self.pupillary_distance
+        if crop:
+            self.crop_stylegan(eyes)
 
-    crop_x = int((self.landmarks[96][0]*scale)-STYLEGAN_RIGHT_PUPIL[0])
-    crop_y = int((self.landmarks[96][1]*scale)-STYLEGAN_RIGHT_PUPIL[1])
-    logging.info(f"Crop x,y: {crop_x}, {crop_y}")
-    img, _, _ = safe_clip(img, crop_x, crop_y, STYLEGAN_WIDTH, STYLEGAN_WIDTH, FILL_COLOR)
-    self.landmarks = scale_crop_points(self.landmarks,crop_x,crop_y,scale)
-    logging.info(f"Resulting image: {img.shape}")
-    super().load_image(img)
+    def draw_landmarks(self, size=0.25, color=[0, 255, 255], numbers=False):
+        for i, landmark in enumerate(self.landmarks):
+            self.circle(landmark, radius=3, color=color)
+            if numbers:
+                self.write_text([landmark[0] + 3, landmark[1]], str(i), size=0.5)
+        self.circle(self.left_eye, color=color)
+        self.circle(self.right_eye, color=color)
 
-  def get_pupils(self):
-    return self.landmarks[LM_LEFT_PUPIL], self.landmarks[LM_RIGHT_PUPIL]
+    def measure(self, pt1, pt2, color=(255, 0, 0), thickness=3):
+        self.arrow(pt1, pt2, color, thickness)
+        d = math.dist(pt1, pt2) * self.pix2mm
+        mp = [int((pt1[0] + pt2[0]) // 2), int((pt1[1] + pt2[1]) // 2)]
+        self.write_text(mp, f"{d:.2f}mm")
+        return d
 
-  
+    def analyze(self):
+        result = {}
+        for calc in self.calcs:
+            result.update(calc.calc(self))
+        return result
+
+    def crop_stylegan(self, pupils=None):
+        logging.info(f"Pupils provided: {pupils}")
+        if pupils:
+            left_eye, right_eye = pupils
+        else:
+            left_eye, right_eye = self.get_pupils()
+            logging.info(f"Pupils calculated: l:{left_eye}, r:{right_eye}")
+
+        d = abs(right_eye[0] - left_eye[0])
+        logging.info(f"Pupillary Distance: {d}px")
+        ar = self.width / self.height
+        logging.info(f"Aspect Ratio: {ar}")
+        new_width = int(self.width * (STYLEGAN_PUPIL_DIST / d))
+        new_height = int(new_width / ar)
+        logging.info(
+            f"Scaling from (h x w): {self.height}x{self.width} to {new_height}x{new_width}"
+        )
+        scale = new_width / self.width
+        logging.info(f"Scale: {scale}x")
+        img = cv2.resize(self.original_img, (new_width, new_height))
+
+        crop_x = int((self.landmarks[96][0] * scale) - STYLEGAN_RIGHT_PUPIL[0])
+        crop_y = int((self.landmarks[96][1] * scale) - STYLEGAN_RIGHT_PUPIL[1])
+        logging.info(f"Crop x,y: {crop_x}, {crop_y}")
+        img, _, _ = safe_clip(
+            img, crop_x, crop_y, STYLEGAN_WIDTH, STYLEGAN_WIDTH, FILL_COLOR
+        )
+        self.landmarks = scale_crop_points(self.landmarks, crop_x, crop_y, scale)
+        logging.info(f"Resulting image: {img.shape}")
+        super().load_image(img)
+
+    def get_pupils(self):
+        return self.landmarks[LM_LEFT_PUPIL], self.landmarks[LM_RIGHT_PUPIL]
