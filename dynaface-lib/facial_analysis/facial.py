@@ -115,7 +115,7 @@ def scale_crop_points(lst, crop_x, crop_y, scale):
 
 
 class AnalyzeFace(ImageAnalysis):
-    def __init__(self, stats, data_path):
+    def __init__(self, stats, data_path=None):
         global _processor
 
         if not _processor:

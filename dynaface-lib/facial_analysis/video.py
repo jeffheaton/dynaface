@@ -104,7 +104,11 @@ class ProcessVideoOpenCV:
 
         # Get the frame rate of the video
         self.frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
+        self.frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        l = round(self.frames / self.frame_rate, 2)
         print(f"Frame rate: {self.frame_rate} FPS")
+        print(f"Frames: {self.frames}")
+        print(f"Video length (sec): {l}")
 
         frame_num = 0
 

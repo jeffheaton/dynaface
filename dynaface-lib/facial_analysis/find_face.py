@@ -66,7 +66,10 @@ class FindFace:
         if device == "mps":
             device = "cpu"  # seems to be some mps issue we need to look at
 
-        FindFace.mtcnn = MTCNN2(keep_all=True, device=device, path=path)
+        if path is None:
+            FindFace.mtcnn = MTCNN(keep_all=True, device=device)
+        else:
+            FindFace.mtcnn = MTCNN2(keep_all=True, device=device, path=path)
 
     def is_init():
         return not FindFace.mtcnn is None
