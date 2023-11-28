@@ -33,9 +33,6 @@ class DynafaceWindow(MainWindowJTH):
             self.setup_menu()
         self.initUI()
 
-        # Enable the main window to accept drops
-        self.setAcceptDrops(True)
-
     def setup_menu(self):
         # Create the File menu
         file_menu = self.menuBar().addMenu("File")
@@ -150,10 +147,23 @@ class DynafaceWindow(MainWindowJTH):
 
     def show_analyze_image(self, filename):
         try:
-            if not self.is_tab_open("Analyze Image"):
-                self.add_tab(AnalyzeImageTab(self, filename), "Analyze Image")
+            self.close_analyze_tabs()
+            self.add_tab(AnalyzeImageTab(self, filename), "Analyze Image")
         except Exception as e:
             logger.error("Error during image open", exc_info=True)
+
+    def close_analyze_tabs(self):
+        try:
+            logger.info("Closing any analyze tabs due to config change")
+            index = 0
+            while index < self._tab_widget.count():
+                if self._tab_widget.tabText(index).startswith("Analyze"):
+                    self.close_tab(index)
+                    # Since we've removed a tab, the indices shift, so we don't increase the index in this case
+                    continue
+                index += 1
+        except Exception as e:
+            logger.error("Error forcing analyze tab close", exc_info=True)
 
     def show_rule(self, rule):
         try:
@@ -174,6 +184,7 @@ class DynafaceWindow(MainWindowJTH):
 
     def open_file(self, file_path):
         super().open_file(file_path)
+        logger.info(f"Open File: {file_path}")
 
         if file_path.lower().endswith((".jpg", ".jpeg", ".png", ".tiff")):
             self.show_analyze_image(file_path)

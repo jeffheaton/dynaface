@@ -69,6 +69,7 @@ class AnalyzeImageTab(TabGraphic):
 
         self._chk_measures = QCheckBox("Measures")
         self._toolbar.addWidget(self._chk_measures)
+        self._chk_measures.setChecked(True)
         self._chk_measures.stateChanged.connect(self.action_measures)
         self._toolbar.addSeparator()
 

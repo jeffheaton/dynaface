@@ -18,6 +18,9 @@ class MainWindowJTH(QMainWindow):
             "Images (*.jpg *.jpeg *.png *.tiff);;Videos (*.mp4 *.mov)"
         )
 
+        # Enable the main window to accept drops
+        self.setAcceptDrops(True)
+
     def resizeEvent(self, event):
         """This method is called whenever the window is resized."""
         self.resize_timer.start()  # Restart the timer every time this event is triggered
