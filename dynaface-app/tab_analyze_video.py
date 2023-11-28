@@ -175,6 +175,7 @@ class AnalyzeVideoTab(TabGraphic):
             self._face.analyze()
         if self._chk_landmarks.isChecked():
             self._face.draw_landmarks(numbers=True)
+        self._render_buffer[:, :] = self._face.render_img
         self.update_graphic(resize=False)
 
     def gestureEvent(self, event: QGestureEvent):
@@ -231,6 +232,5 @@ class AnalyzeVideoTab(TabGraphic):
             print("Video done")
 
         self._face.load_image(img=frame, crop=True)
-        self._render_buffer[:, :] = self._face.render_img
         self.update_face()
         logger.info("Update face")
