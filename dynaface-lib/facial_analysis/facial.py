@@ -183,34 +183,34 @@ class AnalyzeFace(ImageAnalysis):
         return result
 
     def crop_stylegan(self, pupils=None):
-        logging.info(f"Pupils provided: {pupils}")
+        logging.debug(f"Pupils provided: {pupils}")
         if pupils:
             left_eye, right_eye = pupils
         else:
             left_eye, right_eye = self.get_pupils()
-            logging.info(f"Pupils calculated: l:{left_eye}, r:{right_eye}")
+            logging.debug(f"Pupils calculated: l:{left_eye}, r:{right_eye}")
 
         d = abs(right_eye[0] - left_eye[0])
-        logging.info(f"Pupillary Distance: {d}px")
+        logging.debug(f"Pupillary Distance: {d}px")
         ar = self.width / self.height
-        logging.info(f"Aspect Ratio: {ar}")
+        logging.debug(f"Aspect Ratio: {ar}")
         new_width = int(self.width * (STYLEGAN_PUPIL_DIST / d))
         new_height = int(new_width / ar)
-        logging.info(
+        logging.debug(
             f"Scaling from (h x w): {self.height}x{self.width} to {new_height}x{new_width}"
         )
         scale = new_width / self.width
-        logging.info(f"Scale: {scale}x")
+        logging.debug(f"Scale: {scale}x")
         img = cv2.resize(self.original_img, (new_width, new_height))
 
         crop_x = int((self.landmarks[96][0] * scale) - STYLEGAN_RIGHT_PUPIL[0])
         crop_y = int((self.landmarks[96][1] * scale) - STYLEGAN_RIGHT_PUPIL[1])
-        logging.info(f"Crop x,y: {crop_x}, {crop_y}")
+        logging.debug(f"Crop x,y: {crop_x}, {crop_y}")
         img, _, _ = safe_clip(
             img, crop_x, crop_y, STYLEGAN_WIDTH, STYLEGAN_WIDTH, FILL_COLOR
         )
         self.landmarks = scale_crop_points(self.landmarks, crop_x, crop_y, scale)
-        logging.info(f"Resulting image: {img.shape}")
+        logging.debug(f"Resulting image: {img.shape}")
         super().load_image(img)
 
     def get_pupils(self):

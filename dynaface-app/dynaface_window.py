@@ -11,6 +11,7 @@ from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenu, QMenuBar, QTabWidget
 from tab_about import AboutTab
 from tab_analyze_image import AnalyzeImageTab
+from tab_analyze_video import AnalyzeVideoTab
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +152,15 @@ class DynafaceWindow(MainWindowJTH):
             self.add_tab(AnalyzeImageTab(self, filename), "Analyze Image")
         except Exception as e:
             logger.error("Error during image open", exc_info=True)
+            self.displayMessageBox("Unable to open image.")
+
+    def show_analyze_video(self, filename):
+        try:
+            self.close_analyze_tabs()
+            self.add_tab(AnalyzeVideoTab(self, filename), "Analyze Video")
+        except Exception as e:
+            logger.error("Error during video open", exc_info=True)
+            self.displayMessageBox("Unable to open video.")
 
     def close_analyze_tabs(self):
         try:
@@ -189,7 +199,7 @@ class DynafaceWindow(MainWindowJTH):
         if file_path.lower().endswith((".jpg", ".jpeg", ".png", ".tiff")):
             self.show_analyze_image(file_path)
         elif file_path.lower().endswith((".mp4", ".mov")):
-            self.displayMessageBox("Video not supported yet.")
+            self.show_analyze_video(file_path)
 
     def perform_edit_copy(self):
         current_tab = self._tab_widget.currentWidget()
