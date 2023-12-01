@@ -56,6 +56,7 @@ class TabGraphic(QWidget):
         self._frame_count = 0
         self._scene = None
         self._view = None
+        self._render_buffer = None
 
     def init_graphics(self, layout):
         if layout is None:

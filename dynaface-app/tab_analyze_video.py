@@ -1,12 +1,16 @@
 import logging
+import sys
+import time
 from functools import partial
 
 import cv2
 import utl_gfx
+from facial_analysis import facial
 from facial_analysis.facial import load_face_image
 from jth_ui.tab_graphic import TabGraphic
-from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtCore import QEvent, Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QGestureEvent,
     QHBoxLayout,
@@ -19,9 +23,34 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from facial_analysis import facial
 
 logger = logging.getLogger(__name__)
+
+
+class VideoThread(QThread):
+    # Create a PyQt signal to send data back to the main thread
+    update_signal = pyqtSignal(str)
+
+    def __init__(self, tab, path):
+        # Open the video file
+        self.video_stream = cv2.VideoCapture(path)
+
+        # Check if video file opened successfully
+        if not self.video_stream.isOpened():
+            raise ValueError("Unknown video format")
+
+        # Get the frame rate of the video
+        self.frame_rate = int(self.video_stream.get(cv2.CAP_PROP_FPS))
+        self.frames = self.video_stream.get(cv2.CAP_PROP_FRAME_COUNT)
+        self.video_length = self.frames / self.frame_rate, 2
+
+        # Prepare facial analysis
+        self._face = facial.AnalyzeFace(facial.STATS, data_path=None)
+
+    def run(self):
+        for i in range(5):
+            time.sleep(1)  # Simulate a task taking some time
+            self.update_signal.emit(f"Task {i+1}/5 complete")
 
 
 class AnalyzeVideoTab(TabGraphic):
@@ -42,6 +71,13 @@ class AnalyzeVideoTab(TabGraphic):
         tab_layout.addLayout(content_layout)
         self.init_vertical_toolbar(content_layout)
         self.init_graphics(content_layout)
+
+        # Setup video buffer
+        self._video_frames = []
+        self._current_frame = 0
+
+        # Advance to first frame
+        self.advance_frame()
 
         # Prepare to display face
         self.create_graphic(buffer=self._face.render_img)
@@ -67,15 +103,18 @@ class AnalyzeVideoTab(TabGraphic):
         self.frames = self.video_stream.get(cv2.CAP_PROP_FRAME_COUNT)
         self.video_length = self.frames / self.frame_rate, 2
 
-        # Load first frame
+        # Prepare facial analysis
+        self._face = facial.AnalyzeFace(facial.STATS, data_path=None)
+
+    def advance_frame(self):
         ret, frame = self.video_stream.read()
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
         if not ret:
-            raise ValueError("Could not read first video frame")
+            return None
 
-        self._face = facial.AnalyzeFace(facial.STATS, data_path=None)
         self._face.load_image(img=frame, crop=True)
+        self.update_face()
 
     def init_horizontal_toolbar(self, layout):
         self._toolbar = QToolBar()
@@ -175,8 +214,10 @@ class AnalyzeVideoTab(TabGraphic):
             self._face.analyze()
         if self._chk_landmarks.isChecked():
             self._face.draw_landmarks(numbers=True)
-        self._render_buffer[:, :] = self._face.render_img
-        self.update_graphic(resize=False)
+
+        if self._face.render_img is not None and self._render_buffer is not None:
+            self._render_buffer[:, :] = self._face.render_img
+            self.update_graphic(resize=False)
 
     def gestureEvent(self, event: QGestureEvent):
         pinch = event.gesture(Qt.GestureType.PinchGesture)
@@ -223,14 +264,3 @@ class AnalyzeVideoTab(TabGraphic):
         stat.enabled = checkbox.isChecked()
         if self._auto_update:
             self.update_face()
-
-    def advance_frame(self):
-        ret, frame = self.video_stream.read()
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-
-        if not ret:
-            print("Video done")
-
-        self._face.load_image(img=frame, crop=True)
-        self.update_face()
-        logger.info("Update face")
