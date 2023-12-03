@@ -41,7 +41,7 @@ def init_processor(device=None):
     if not device:
         has_mps = torch.backends.mps.is_built()
         device = "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
-        device = "cpu"
+        # device = "cpu"
 
     config = ModelConfig(dataset_name=SPIGA_MODEL, load_model_url=False)
     _processor = SPIGAFramework(config, device=device)

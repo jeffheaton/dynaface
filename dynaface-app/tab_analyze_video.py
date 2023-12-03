@@ -10,13 +10,14 @@ from facial_analysis.facial import load_face_image
 from jth_ui.tab_graphic import TabGraphic
 from PyQt6.QtCore import QEvent, Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
-    QApplication,
+    QStyle,
     QCheckBox,
     QGestureEvent,
     QHBoxLayout,
     QLabel,
     QPinchGesture,
     QPushButton,
+    QSlider,
     QScrollArea,
     QSpinBox,
     QToolBar,
@@ -25,32 +26,6 @@ from PyQt6.QtWidgets import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-class VideoThread(QThread):
-    # Create a PyQt signal to send data back to the main thread
-    update_signal = pyqtSignal(str)
-
-    def __init__(self, tab, path):
-        # Open the video file
-        self.video_stream = cv2.VideoCapture(path)
-
-        # Check if video file opened successfully
-        if not self.video_stream.isOpened():
-            raise ValueError("Unknown video format")
-
-        # Get the frame rate of the video
-        self.frame_rate = int(self.video_stream.get(cv2.CAP_PROP_FPS))
-        self.frames = self.video_stream.get(cv2.CAP_PROP_FRAME_COUNT)
-        self.video_length = self.frames / self.frame_rate, 2
-
-        # Prepare facial analysis
-        self._face = facial.AnalyzeFace(facial.STATS, data_path=None)
-
-    def run(self):
-        for i in range(5):
-            time.sleep(1)  # Simulate a task taking some time
-            self.update_signal.emit(f"Task {i+1}/5 complete")
 
 
 class AnalyzeVideoTab(TabGraphic):
@@ -64,7 +39,7 @@ class AnalyzeVideoTab(TabGraphic):
 
         # Horiz toolbar
         tab_layout = QVBoxLayout(self)
-        self.init_horizontal_toolbar(tab_layout)
+        self.init_top_horizontal_toolbar(tab_layout)
 
         # Create a horizontal layout for the content of the tab
         content_layout = QHBoxLayout()
@@ -90,6 +65,8 @@ class AnalyzeVideoTab(TabGraphic):
         self.grabGesture(Qt.GestureType.PinchGesture)
         self._auto_update = True
 
+        self.init_bottom_horizontal_toolbar(tab_layout)
+
     def begin_load_video(self, path):
         # Open the video file
         self.video_stream = cv2.VideoCapture(path)
@@ -107,46 +84,87 @@ class AnalyzeVideoTab(TabGraphic):
         self._face = facial.AnalyzeFace(facial.STATS, data_path=None)
 
     def advance_frame(self):
+        start_time = time.time()
         ret, frame = self.video_stream.read()
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
         if not ret:
             return None
 
+        end_time = time.time()
+
+        elapsed_time = end_time - start_time
+        logger.info(elapsed_time)
+        hours, rem = divmod(elapsed_time, 3600)
+        minutes, seconds = divmod(rem, 60)
         self._face.load_image(img=frame, crop=True)
+        logger.info(
+            f"Frame load time: {int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
+        )
         self.update_face()
 
-    def init_horizontal_toolbar(self, layout):
-        self._toolbar = QToolBar()
-        layout.addWidget(self._toolbar)  # Add the toolbar to the layout first
+    def init_bottom_horizontal_toolbar(self, layout):
+        toolbar = QToolBar()
+        layout.addWidget(toolbar)  # Add the toolbar to the layout first
+
+        # Start Button
+        btn_start = QPushButton()
+        btn_start.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        # btn_start.clicked.connect(self.advance_frame)
+        toolbar.addWidget(btn_start)
+
+        btn_backward = QPushButton()
+        btn_backward.setIcon(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_MediaSeekBackward)
+        )
+        toolbar.addWidget(btn_backward)
+
+        btn_forward = QPushButton()
+        btn_forward.setIcon(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_MediaSeekForward)
+        )
+        toolbar.addWidget(btn_forward)
+        toolbar.addSeparator()
+
+        lbl_status = QLabel("0/0")
+        toolbar.addWidget(lbl_status)
+
+        video_slider = QSlider(Qt.Orientation.Horizontal)
+        video_slider.setRange(0, 10)
+        toolbar.addWidget(video_slider)
+        # self.positionSlider.sliderMoved.connect(self.setPosition)
+
+    def init_top_horizontal_toolbar(self, layout):
+        toolbar = QToolBar()
+        layout.addWidget(toolbar)  # Add the toolbar to the layout first
 
         # Start Button
         self._btn_start = QPushButton("Reset")
         self._btn_start.clicked.connect(self.advance_frame)
-        self._toolbar.addWidget(self._btn_start)
-        self._toolbar.addSeparator()
+        toolbar.addWidget(self._btn_start)
+        toolbar.addSeparator()
 
         self._chk_landmarks = QCheckBox("Landmarks")
-        self._toolbar.addWidget(self._chk_landmarks)
+        toolbar.addWidget(self._chk_landmarks)
         self._chk_landmarks.stateChanged.connect(self.action_landmarks)
-        self._toolbar.addSeparator()
+        toolbar.addSeparator()
 
         self._chk_measures = QCheckBox("Measures")
-        self._toolbar.addWidget(self._chk_measures)
+        toolbar.addWidget(self._chk_measures)
         self._chk_measures.setChecked(True)
         self._chk_measures.stateChanged.connect(self.action_measures)
-        self._toolbar.addSeparator()
+        toolbar.addSeparator()
 
-        self._toolbar.addWidget(QLabel("Zoom(%): ", self._toolbar))
+        toolbar.addWidget(QLabel("Zoom(%): ", toolbar))
         self._spin_zoom = QSpinBox()
-        self._toolbar.addWidget(self._spin_zoom)
+        toolbar.addWidget(self._spin_zoom)
         self._spin_zoom.setMinimum(1)
         self._spin_zoom.setMaximum(200)
         self._spin_zoom.setSingleStep(5)
         self._spin_zoom.setValue(100)  # Starting value
         self._spin_zoom.setFixedWidth(60)  # Adjust the width as needed
         self._spin_zoom.valueChanged.connect(self.action_zoom)
-        self._toolbar.addSeparator()
+        toolbar.addSeparator()
 
     def init_vertical_toolbar(self, layout):
         # Add a vertical toolbar (left side of the tab)

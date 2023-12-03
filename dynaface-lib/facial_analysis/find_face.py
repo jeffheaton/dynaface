@@ -59,10 +59,15 @@ class FindFace:
     mtcnn = None
 
     def init(device=None, path=None):
+        # https://github.com/pytorch/pytorch/issues/96056#issuecomment-1457633408
         if device is None:
             has_mps = torch.backends.mps.is_built()
             device = "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
 
+        # Mac M1 issue - hope to remove some day
+        # RuntimeError: Adaptive pool MPS: input sizes must be divisible by output sizes.
+        # https://github.com/pytorch/pytorch/issues/96056#issuecomment-1457633408
+        # https://github.com/pytorch/pytorch/issues/97109
         if device == "mps":
             device = "cpu"  # seems to be some mps issue we need to look at
 
