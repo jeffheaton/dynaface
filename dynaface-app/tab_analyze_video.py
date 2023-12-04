@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 from PyQt6.QtCore import QObject, pyqtSignal
 
 
-class Worker(QObject):
+class Worker(QThread):
     finished = pyqtSignal()
     progress = pyqtSignal(int)
 
@@ -45,14 +45,17 @@ class Worker(QObject):
         #    self.progress.emit(i)  # Update progress
         #    print(f"Thread: {i}")
         #    time.sleep(10)
+        logger.info("Running background thread")
         while True:
             ret, frame = self._target.video_stream.read()
             frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
             if not ret:
+                logger.info("Thread done")
                 break
 
             self._target._face.load_image(img=frame, crop=True)
+            logger.info("frame")
         self.finished.emit()
 
 
@@ -96,25 +99,8 @@ class AnalyzeVideoTab(TabGraphic):
         self.grabGesture(Qt.GestureType.PinchGesture)
         self._auto_update = True
 
-        # Background worker thread
-        self.worker_timer = QTimer(self)
-        # self.worker_timer.timeout.connect(self.worker_task)
-        self.worker_timer.start(1000)
-        self.worker_start = time.time()
-        self.worker_calls = 0
-        # self.worker_timer.start()
-
-        self.thread = QThread()
-        self.worker = Worker(self)
-        self.worker.moveToThread(self.thread)
-
-        self.thread.started.connect(self.worker.run)
-        self.worker.finished.connect(self.thread.quit)
-        self.worker.finished.connect(self.worker.deleteLater)
-        self.thread.finished.connect(self.thread.deleteLater)
-        self.worker.progress.connect(self.reportProgress)
-
-        # self.thread.start()
+        self.thread = Worker(self)
+        self.thread.start()
 
     def begin_load_video(self, path):
         # Open the video file
@@ -181,7 +167,7 @@ class AnalyzeVideoTab(TabGraphic):
         # Start Button
         self._btn_start = QPushButton("Reset")
         # self._btn_start.clicked.connect(self.advance_frame)
-        self._btn_start.clicked.connect(self.start_it)
+        # self._btn_start.clicked.connect(self.start_it)
         toolbar.addWidget(self._btn_start)
         toolbar.addSeparator()
 
@@ -323,35 +309,3 @@ class AnalyzeVideoTab(TabGraphic):
         stat.enabled = checkbox.isChecked()
         if self._auto_update:
             self.update_face()
-
-    def worker_task(self):
-        currentTime = time.time()
-        self.worker_calls += 1
-
-        # Calculate expected calls
-        expectedCalls = int((currentTime - self.worker_start) / 1)  # 1 second interval
-
-        if abs(self.worker_calls - expectedCalls) > 1:
-            # If actual and expected calls are too far apart, return early
-            print("skipping", self.worker_calls, expectedCalls)
-            self.worker_calls = expectedCalls
-            return
-
-        print("running task")
-
-        start = time.time()
-        ret, frame = self.video_stream.read()
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-
-        if not ret:
-            return False
-
-        self._face.load_image(img=frame, crop=True)
-        elapse = time.time() - start
-        print(elapse)
-
-    def reportProgress(self, n):
-        print("Progress: ", n)
-
-    def start_it(self):
-        self.thread.start()
