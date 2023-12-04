@@ -1,5 +1,6 @@
 import logging
 import time
+import os
 
 from facial_analysis.facial import load_face_image
 from PyQt6.QtCore import QThread, pyqtSignal
@@ -29,6 +30,9 @@ class Worker(QThread):
         # self.update_signal.emit("Task completed!")
 
 
+# https://github.com/numpy/numpy/issues/654
+
+
 def run_simple_test():
     for i in range(50):
         time.sleep(1)  # Simulate a task taking some time
@@ -49,13 +53,11 @@ def run_direct_test():
     img = load_image(SOURCE_IMG)
     mtcnn = MTCNN(keep_all=True, device=device)
     bbox, _ = mtcnn.detect(img)
-    logger.info(bbox)
     config = ModelConfig(dataset_name=SPIGA_MODEL, load_model_url=False)
     processor = SPIGAFramework(config, device=device)
     bbox = bbox[0]
     bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
     features = processor.inference(img, [bbox])
-    logger.info(features)
 
     logger.info("Ending direct test")
 

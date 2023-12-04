@@ -121,7 +121,6 @@ class AnalyzeFace(ImageAnalysis):
         if device is None:
             has_mps = torch.backends.mps.is_built()
             device = "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
-            # device = "cpu"
 
         if not _processor:
             init_processor(device)
