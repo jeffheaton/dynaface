@@ -11,6 +11,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+import testme
+
 
 class SplashTab(QWidget):
     def __init__(self, window):
@@ -44,11 +46,11 @@ class SplashTab(QWidget):
         )
         button_open.clicked.connect(self._window.open_action)
 
-        button_rule_viewer = QPushButton(f"Rule Viewer")
+        button_rule_viewer = QPushButton(f"Test")
         button_rule_viewer.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        # button_rule_viewer.clicked.connect(self._window.show_simulator)
+        button_rule_viewer.clicked.connect(testme.test_it)
 
         button_exit = QPushButton(f"Exit")
         button_exit.setSizePolicy(

@@ -47,9 +47,9 @@ def init_processor(device=None):
     _processor = SPIGAFramework(config, device=device)
 
 
-def load_face_image(filename, crop=True, stats=STATS, data_path=None):
+def load_face_image(filename, crop=True, stats=STATS, data_path=None, device=None):
     img = load_image(filename)
-    face = AnalyzeFace(stats, data_path=data_path)
+    face = AnalyzeFace(stats, data_path=data_path, device=device)
     face.load_image(img, crop)
     return face
 
@@ -115,11 +115,16 @@ def scale_crop_points(lst, crop_x, crop_y, scale):
 
 
 class AnalyzeFace(ImageAnalysis):
-    def __init__(self, stats, data_path=None):
+    def __init__(self, stats, data_path=None, device=None):
         global _processor
 
+        if device is None:
+            has_mps = torch.backends.mps.is_built()
+            device = "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
+            # device = "cpu"
+
         if not _processor:
-            init_processor()
+            init_processor(device)
 
         self.data_path = data_path
         self.left_eye = None
