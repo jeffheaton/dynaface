@@ -10,6 +10,7 @@ from facial_analysis.image import ImageAnalysis, load_image
 from facial_analysis.spiga.inference.config import ModelConfig
 from facial_analysis.spiga.inference.framework import SPIGAFramework
 from facial_analysis.util import PolyArea
+import copy
 
 STD_PUPIL_DIST = 63
 
@@ -132,6 +133,9 @@ class AnalyzeFace(ImageAnalysis):
         self.calcs = stats
         self.headpose = [0, 0, 0]
         self.processor = _processor
+        self.landmarks = []
+        self.pupillary_distance = 0
+        self.pix2mm = 1
 
     def get_all_stats(self):
         return [stat for obj in self.calcs for stat in obj.stats()]
@@ -219,3 +223,20 @@ class AnalyzeFace(ImageAnalysis):
 
     def get_pupils(self):
         return self.landmarks[LM_LEFT_PUPIL], self.landmarks[LM_RIGHT_PUPIL]
+
+    def dump_state(self):
+        result = [
+            self.original_img,
+            self.headpose,
+            self.landmarks,
+            self.pupillary_distance,
+            self.pix2mm,
+        ]
+        return copy.copy(result)
+
+    def load_state(self, obj):
+        self.original_img[:] = obj[0][:]
+        self.headpose = copy.copy(obj[1])
+        self.landmarks = copy.copy(obj[2])
+        self.pupillary_distance = obj[3]
+        self.pix2mm = obj[4]

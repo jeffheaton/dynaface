@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import Qt
 
 logger = logging.getLogger(__name__)
 
@@ -32,31 +33,31 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 
 class Worker(QThread):
-    finished = pyqtSignal()
-    progress = pyqtSignal(int)
+    _update_signal = pyqtSignal(str)
 
     def __init__(self, target):
         super().__init__()
         self._target = target
 
     def run(self):
-        # Long-running task
-        # for i in range(100):
-        #    self.progress.emit(i)  # Update progress
-        #    print(f"Thread: {i}")
-        #    time.sleep(10)
         logger.info("Running background thread")
-        while True:
-            ret, frame = self._target.video_stream.read()
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        self._target.loading = True
+        try:
+            i = 0
+            while True:
+                ret, frame = self._target.video_stream.read()
 
-            if not ret:
-                logger.info("Thread done")
-                break
+                if not ret:
+                    logger.info("Thread done")
+                    break
 
-            self._target._face.load_image(img=frame, crop=True)
-            logger.info("frame")
-        self.finished.emit()
+                i += 1
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                self._target._face.load_image(img=frame, crop=True)
+                self._update_signal.emit(None)
+        finally:
+            self._update_signal.emit(None)
+            self._target.loading = False
 
 
 class AnalyzeVideoTab(TabGraphic):
@@ -77,29 +78,21 @@ class AnalyzeVideoTab(TabGraphic):
         tab_layout.addLayout(content_layout)
         self.init_vertical_toolbar(content_layout)
         self.init_graphics(content_layout)
+        content_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         # Setup video buffer
         self._video_frames = []
-        self._current_frame = 0
-
-        # Advance to first frame
-        self.advance_frame()
+        self.loading = False
 
         # Video bar
         self.init_bottom_horizontal_toolbar(tab_layout)
-
-        # Prepare to display face
-        self.create_graphic(buffer=self._face.render_img)
-        self.update_face()
-
-        # Scale the view as desired
-        self._view.scale(1, 1)
 
         # Allow touch zoom
         self.grabGesture(Qt.GestureType.PinchGesture)
         self._auto_update = True
 
         self.thread = Worker(self)
+        self.thread._update_signal.connect(self.update_load_progress)
         self.thread.start()
 
     def begin_load_video(self, path):
@@ -112,8 +105,8 @@ class AnalyzeVideoTab(TabGraphic):
 
         # Get the frame rate of the video
         self.frame_rate = int(self.video_stream.get(cv2.CAP_PROP_FPS))
-        self.frames = self.video_stream.get(cv2.CAP_PROP_FRAME_COUNT)
-        self.video_length = self.frames / self.frame_rate, 2
+        self.frame_count = int(self.video_stream.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.video_length = self.frame_count / self.frame_rate, 2
 
         # Prepare facial analysis
         self._face = facial.AnalyzeFace(facial.STATS, data_path=None)
@@ -143,21 +136,24 @@ class AnalyzeVideoTab(TabGraphic):
         btn_backward.setIcon(
             self.style().standardIcon(QStyle.StandardPixmap.SP_MediaSeekBackward)
         )
+        btn_backward.clicked.connect(self.backward_action)
         toolbar.addWidget(btn_backward)
 
         btn_forward = QPushButton()
         btn_forward.setIcon(
             self.style().standardIcon(QStyle.StandardPixmap.SP_MediaSeekForward)
         )
+        btn_forward.clicked.connect(self.forward_action)
         toolbar.addWidget(btn_forward)
         toolbar.addSeparator()
 
-        lbl_status = QLabel("0/0")
-        toolbar.addWidget(lbl_status)
+        self.lbl_status = QLabel("0/0")
+        toolbar.addWidget(self.lbl_status)
 
-        video_slider = QSlider(Qt.Orientation.Horizontal)
-        video_slider.setRange(0, 10)
-        toolbar.addWidget(video_slider)
+        self._video_slider = QSlider(Qt.Orientation.Horizontal)
+        self._video_slider.setRange(0, 0)
+        toolbar.addWidget(self._video_slider)
+        self._frames = []
         # self.positionSlider.sliderMoved.connect(self.setPosition)
 
     def init_top_horizontal_toolbar(self, layout):
@@ -309,3 +305,38 @@ class AnalyzeVideoTab(TabGraphic):
         stat.enabled = checkbox.isChecked()
         if self._auto_update:
             self.update_face()
+
+    def update_load_progress(self, status):
+        # self.lbl_status.setText(status)
+        self.lbl_status.setText(self.status())
+        self.add_frame()
+
+    def add_frame(self):
+        if self._view is None:
+            self.create_graphic(buffer=self._face.render_img)
+            self.update_face()
+
+        self._frames.append(self._face.dump_state())
+        self._video_slider.setRange(0, len(self._frames))
+
+    def forward_action(self):
+        i = self._video_slider.sliderPosition()
+        if i < self._video_slider.maximum():
+            self._video_slider.setSliderPosition(i + 1)
+        self.lbl_status.setText(self.status())
+
+    def backward_action(self):
+        i = self._video_slider.sliderPosition()
+        if i >= 0:
+            self._video_slider.setSliderPosition(i - 1)
+        self.lbl_status.setText(self.status())
+
+    def status(self):
+        i = self._video_slider.sliderPosition()
+        mx = self._video_slider.maximum()
+        if self.loading == False and len(self._frames) == 0:
+            return "(0:0)"
+        elif self.loading:
+            return f"({mx:,}/{self.frame_count:,}, loading...)"
+        else:
+            return f"({i:,}/{self.frame_count:,})"
