@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 from PyQt6.QtCore import QObject, pyqtSignal
 
 
-class Worker(QThread):
+class WorkerLoad(QThread):
     _update_signal = pyqtSignal(str)
 
     def __init__(self, target):
@@ -93,7 +93,7 @@ class AnalyzeVideoTab(TabGraphic):
         self.grabGesture(Qt.GestureType.PinchGesture)
         self._auto_update = True
 
-        self.thread = Worker(self)
+        self.thread = WorkerLoad(self)
         self.thread._update_signal.connect(self.update_load_progress)
         self.thread.start()
 
@@ -116,17 +116,6 @@ class AnalyzeVideoTab(TabGraphic):
 
         # Prepare facial analysis
         self._face = facial.AnalyzeFace(facial.STATS, data_path=None)
-
-    def advance_frame(self):
-        ret, frame = self.video_stream.read()
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-
-        if not ret:
-            return False
-
-        self._face.load_image(img=frame, crop=True)
-        self.update_face()
-        return True
 
     def init_bottom_horizontal_toolbar(self, layout):
         toolbar = QToolBar()
@@ -190,6 +179,10 @@ class AnalyzeVideoTab(TabGraphic):
         self._spin_zoom.setValue(100)  # Starting value
         self._spin_zoom.setFixedWidth(60)  # Adjust the width as needed
         self._spin_zoom.valueChanged.connect(self.action_zoom)
+
+        btn_fit = QPushButton("Fit")
+        btn_fit.clicked.connect(self.fit)
+        toolbar.addWidget(btn_fit)
         toolbar.addSeparator()
 
     def init_vertical_toolbar(self, layout):
@@ -246,11 +239,6 @@ class AnalyzeVideoTab(TabGraphic):
 
     def action_measures(self, state):
         self.update_face()
-
-    def action_zoom(self, value):
-        z = value / 100
-        self._view.resetTransform()
-        self._view.scale(value / 100, value / 100)
 
     def update_face(self):
         self._face.render_reset()
@@ -367,11 +355,9 @@ class AnalyzeVideoTab(TabGraphic):
             self._btn_play.setIcon(
                 self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause)
             )
-            logger.info("play")
             self.start_game()
             self.init_animate(30)
         else:
-            print("pause")
             self._btn_play.setIcon(
                 self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay)
             )
@@ -383,3 +369,19 @@ class AnalyzeVideoTab(TabGraphic):
     def action_video_seek(self, value):
         self.open_frame()
         self.lbl_status.setText(self.status())
+
+    def action_zoom(self, value):
+        z = value / 100
+        self._view.resetTransform()
+        self._view.scale(z, z)
+
+    def fit(self):
+        view_size = self._view.size()
+        scene_rect = self._scene.sceneRect()
+        x_scale = view_size.width() / scene_rect.width()
+        y_scale = view_size.height() / scene_rect.height()
+        scale_factor = (
+            min(x_scale, y_scale) * 100
+        )  # Scale factor adjusted for action_zoom
+        self.action_zoom(int(scale_factor))
+        self._spin_zoom.setValue(int(scale_factor))

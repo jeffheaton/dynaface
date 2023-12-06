@@ -82,6 +82,10 @@ class AnalyzeImageTab(TabGraphic):
         self._spin_zoom.setValue(100)  # Starting value
         self._spin_zoom.setFixedWidth(60)  # Adjust the width as needed
         self._spin_zoom.valueChanged.connect(self.action_zoom)
+
+        btn_fit = QPushButton("Fit")
+        btn_fit.clicked.connect(self.fit)
+        self._toolbar.addWidget(btn_fit)
         self._toolbar.addSeparator()
 
     def init_vertical_toolbar(self, layout):
@@ -139,11 +143,6 @@ class AnalyzeImageTab(TabGraphic):
     def action_measures(self, state):
         self.update_face()
 
-    def action_zoom(self, value):
-        z = value / 100
-        self._view.resetTransform()
-        self._view.scale(value / 100, value / 100)
-
     def update_face(self):
         self._face.render_reset()
         if self._chk_measures.isChecked():
@@ -197,3 +196,19 @@ class AnalyzeImageTab(TabGraphic):
         stat.enabled = checkbox.isChecked()
         if self._auto_update:
             self.update_face()
+
+    def action_zoom(self, value):
+        z = value / 100
+        self._view.resetTransform()
+        self._view.scale(z, z)
+
+    def fit(self):
+        view_size = self._view.size()
+        scene_rect = self._scene.sceneRect()
+        x_scale = view_size.width() / scene_rect.width()
+        y_scale = view_size.height() / scene_rect.height()
+        scale_factor = (
+            min(x_scale, y_scale) * 100
+        )  # Scale factor adjusted for action_zoom
+        self.action_zoom(int(scale_factor))
+        self._spin_zoom.setValue(int(scale_factor))
