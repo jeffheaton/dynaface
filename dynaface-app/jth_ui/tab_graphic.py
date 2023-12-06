@@ -57,6 +57,8 @@ class TabGraphic(QWidget):
         self._scene = None
         self._view = None
         self._render_buffer = None
+        self._steps = 0
+        self._timer = None
 
     def init_graphics(self, layout):
         if layout is None:
@@ -77,6 +79,8 @@ class TabGraphic(QWidget):
         self._steps = 0
 
     def init_animate(self, target_fps):
+        if self._timer:
+            self.stop_animate()
         # Animation timer
         self._target_fps = target_fps
         self._timer_interval = int(1000 / self._target_fps)
@@ -85,6 +89,12 @@ class TabGraphic(QWidget):
         self._timer.timeout.connect(self._timer_proc)
         self._timer.start(self._timer_interval)
         self._force_update = 0
+
+    def stop_animate(self):
+        if self._timer:
+            self._timer.stop()
+            self._running = False
+            self._timer = None
 
     def on_close(self):
         self._timer.stop()
@@ -158,11 +168,11 @@ class TabGraphic(QWidget):
 
         self._last_event_time = current_time
 
-    def timer_step():
+    def timer_step(self):
         """Called for every frame, regardless of if running."""
         pass
 
-    def running_step():
+    def running_step(self):
         """Called for every frame, only if running."""
         pass
 

@@ -106,7 +106,11 @@ class AnalyzeVideoTab(TabGraphic):
         # Get the frame rate of the video
         self.frame_rate = int(self.video_stream.get(cv2.CAP_PROP_FPS))
         self.frame_count = int(self.video_stream.get(cv2.CAP_PROP_FRAME_COUNT))
-        self.video_length = self.frame_count / self.frame_rate, 2
+        self.video_length = self.frame_count / self.frame_rate
+
+        logger.info(f"Frame rate: {self.frame_rate}")
+        logger.info(f"Frame count: {self.frame_count}")
+        logger.info(f"Video length: {self.video_length}")
 
         # Prepare facial analysis
         self._face = facial.AnalyzeFace(facial.STATS, data_path=None)
@@ -126,12 +130,7 @@ class AnalyzeVideoTab(TabGraphic):
         toolbar = QToolBar()
         layout.addWidget(toolbar)  # Add the toolbar to the layout first
 
-        # Start Button
-        btn_start = QPushButton()
-        btn_start.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
-        # btn_start.clicked.connect(self.advance_frame)
-        toolbar.addWidget(btn_start)
-
+        # Back Button
         btn_backward = QPushButton()
         btn_backward.setIcon(
             self.style().standardIcon(QStyle.StandardPixmap.SP_MediaSeekBackward)
@@ -139,6 +138,15 @@ class AnalyzeVideoTab(TabGraphic):
         btn_backward.clicked.connect(self.backward_action)
         toolbar.addWidget(btn_backward)
 
+        # Start Button
+        self._btn_play = QPushButton()
+        self._btn_play.setIcon(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay)
+        )
+        self._btn_play.clicked.connect(self.action_play_pause)
+        toolbar.addWidget(self._btn_play)
+
+        # Forward Button
         btn_forward = QPushButton()
         btn_forward.setIcon(
             self.style().standardIcon(QStyle.StandardPixmap.SP_MediaSeekForward)
@@ -159,13 +167,6 @@ class AnalyzeVideoTab(TabGraphic):
     def init_top_horizontal_toolbar(self, layout):
         toolbar = QToolBar()
         layout.addWidget(toolbar)  # Add the toolbar to the layout first
-
-        # Start Button
-        self._btn_start = QPushButton("Reset")
-        # self._btn_start.clicked.connect(self.advance_frame)
-        # self._btn_start.clicked.connect(self.start_it)
-        toolbar.addWidget(self._btn_start)
-        toolbar.addSeparator()
 
         self._chk_landmarks = QCheckBox("Landmarks")
         toolbar.addWidget(self._chk_landmarks)
@@ -317,26 +318,66 @@ class AnalyzeVideoTab(TabGraphic):
             self.update_face()
 
         self._frames.append(self._face.dump_state())
-        self._video_slider.setRange(0, len(self._frames))
+        self._video_slider.setRange(0, len(self._frames) - 2)
 
     def forward_action(self):
         i = self._video_slider.sliderPosition()
-        if i < self._video_slider.maximum():
+
+        # Auto move back to the beginning if at last frame, if not running
+        if (i == self._video_slider.maximum()) and not self._running:
+            self._video_slider.setSliderPosition(0)
+        elif i < (self._video_slider.maximum()):
             self._video_slider.setSliderPosition(i + 1)
+        elif self._running:
+            self.stop_animate()
+            self._btn_play.setIcon(
+                self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay)
+            )
         self.lbl_status.setText(self.status())
+        self.open_frame()
 
     def backward_action(self):
         i = self._video_slider.sliderPosition()
-        if i >= 0:
+        if i > 0:
             self._video_slider.setSliderPosition(i - 1)
         self.lbl_status.setText(self.status())
+        self.open_frame()
 
     def status(self):
         i = self._video_slider.sliderPosition()
         mx = self._video_slider.maximum()
         if self.loading == False and len(self._frames) == 0:
-            return "(0:0)"
+            return "(0/0)"
         elif self.loading:
             return f"({mx:,}/{self.frame_count:,}, loading...)"
         else:
-            return f"({i:,}/{self.frame_count:,})"
+            return f"({i+1:,}/{self.frame_count:,})"
+
+    def open_frame(self, num=None):
+        if num is None:
+            num = self._video_slider.sliderPosition()
+        frame = self._frames[num]
+        self._face.load_state(frame)
+        self.update_face()
+
+    def action_play_pause(self):
+        if not self._running:
+            # Auto move back to the beginning if at last frame
+            if self._video_slider.value() == self._video_slider.maximum():
+                self._video_slider.setValue(0)
+
+            self._btn_play.setIcon(
+                self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause)
+            )
+            logger.info("play")
+            self.start_game()
+            self.init_animate(30)
+        else:
+            print("pause")
+            self._btn_play.setIcon(
+                self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay)
+            )
+            self.stop_animate()
+
+    def running_step(self):
+        self.forward_action()
