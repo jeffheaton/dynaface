@@ -126,6 +126,7 @@ class AnalyzeFace(ImageAnalysis):
         if not _processor:
             init_processor(device)
 
+        self.original_img = None
         self.data_path = data_path
         self.left_eye = None
         self.right_eye = None
@@ -235,8 +236,11 @@ class AnalyzeFace(ImageAnalysis):
         return copy.copy(result)
 
     def load_state(self, obj):
-        self.original_img[:] = obj[0][:]
-        self.headpose = copy.copy(obj[1])
-        self.landmarks = copy.copy(obj[2])
-        self.pupillary_distance = obj[3]
-        self.pix2mm = obj[4]
+        if self.original_img is None:
+            self.load_image(obj[0], crop=False)
+        else:
+            self.original_img = obj[0][:]
+            self.headpose = copy.copy(obj[1])
+            self.landmarks = copy.copy(obj[2])
+            self.pupillary_distance = obj[3]
+            self.pix2mm = obj[4]

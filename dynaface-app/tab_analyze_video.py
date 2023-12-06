@@ -42,6 +42,7 @@ class Worker(QThread):
     def run(self):
         logger.info("Running background thread")
         self._target.loading = True
+        self._face = facial.AnalyzeFace(facial.STATS, data_path=None)
         try:
             i = 0
             while True:
@@ -53,7 +54,8 @@ class Worker(QThread):
 
                 i += 1
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                self._target._face.load_image(img=frame, crop=True)
+                self._face.load_image(img=frame, crop=True)
+                self._target.add_frame(self._face)
                 self._update_signal.emit(None)
         finally:
             self._update_signal.emit(None)
@@ -160,9 +162,9 @@ class AnalyzeVideoTab(TabGraphic):
 
         self._video_slider = QSlider(Qt.Orientation.Horizontal)
         self._video_slider.setRange(0, 0)
+        self._video_slider.valueChanged.connect(self.action_video_seek)
         toolbar.addWidget(self._video_slider)
         self._frames = []
-        # self.positionSlider.sliderMoved.connect(self.setPosition)
 
     def init_top_horizontal_toolbar(self, layout):
         toolbar = QToolBar()
@@ -310,14 +312,14 @@ class AnalyzeVideoTab(TabGraphic):
     def update_load_progress(self, status):
         # self.lbl_status.setText(status)
         self.lbl_status.setText(self.status())
-        self.add_frame()
 
-    def add_frame(self):
         if self._view is None:
+            self._face.load_state(self._frames[0])
             self.create_graphic(buffer=self._face.render_img)
             self.update_face()
 
-        self._frames.append(self._face.dump_state())
+    def add_frame(self, face):
+        self._frames.append(face.dump_state())
         self._video_slider.setRange(0, len(self._frames) - 2)
 
     def forward_action(self):
@@ -333,15 +335,11 @@ class AnalyzeVideoTab(TabGraphic):
             self._btn_play.setIcon(
                 self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay)
             )
-        self.lbl_status.setText(self.status())
-        self.open_frame()
 
     def backward_action(self):
         i = self._video_slider.sliderPosition()
         if i > 0:
             self._video_slider.setSliderPosition(i - 1)
-        self.lbl_status.setText(self.status())
-        self.open_frame()
 
     def status(self):
         i = self._video_slider.sliderPosition()
@@ -381,3 +379,7 @@ class AnalyzeVideoTab(TabGraphic):
 
     def running_step(self):
         self.forward_action()
+
+    def action_video_seek(self, value):
+        self.open_frame()
+        self.lbl_status.setText(self.status())
