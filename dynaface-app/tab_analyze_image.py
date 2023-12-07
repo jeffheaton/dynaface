@@ -7,6 +7,7 @@ from jth_ui.tab_graphic import TabGraphic
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtWidgets import (
     QCheckBox,
+    QFileDialog,
     QGestureEvent,
     QHBoxLayout,
     QLabel,
@@ -212,3 +213,23 @@ class AnalyzeImageTab(TabGraphic):
         )  # Scale factor adjusted for action_zoom
         self.action_zoom(int(scale_factor))
         self._spin_zoom.setValue(int(scale_factor))
+
+    def on_save_as(self):
+        options = QFileDialog.Option.DontUseNativeDialog
+
+        # Show the dialog and get the selected file name and format
+        filename, _ = QFileDialog.getSaveFileName(
+            self, "Save Image", "", "Images (*.png *.jpeg *.jpg)", options=options
+        )
+
+        if filename:
+            if not (
+                filename.lower().endswith(".png")
+                or filename.lower().endswith(".jpg")
+                or filename.lower().endswith(".jpeg")
+            ):
+                self._window.display_message_box(
+                    "Filename must end in .png or .jpeg/.jpg"
+                )
+            else:
+                self._face.save(filename)

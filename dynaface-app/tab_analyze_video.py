@@ -22,10 +22,13 @@ from PyQt6.QtWidgets import (
     QSpinBox,
     QToolBar,
     QVBoxLayout,
+    QFileDialog,
+    QDialog,
     QWidget,
 )
 from PyQt6.QtCore import QTimer
 from PyQt6.QtCore import Qt
+import dlg_modal
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +72,7 @@ class AnalyzeVideoTab(TabGraphic):
         self._auto_update = False
 
         # Load the face
+        self._frames = []
         self.begin_load_video(path)
 
         # Horiz toolbar
@@ -81,9 +85,6 @@ class AnalyzeVideoTab(TabGraphic):
         self.init_vertical_toolbar(content_layout)
         self.init_graphics(content_layout)
         content_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
-
-        # Setup video buffer
-        self._video_frames = []
         self.loading = False
 
         # Video bar
@@ -153,7 +154,6 @@ class AnalyzeVideoTab(TabGraphic):
         self._video_slider.setRange(0, 0)
         self._video_slider.valueChanged.connect(self.action_video_seek)
         toolbar.addWidget(self._video_slider)
-        self._frames = []
 
     def init_top_horizontal_toolbar(self, layout):
         toolbar = QToolBar()
@@ -385,3 +385,53 @@ class AnalyzeVideoTab(TabGraphic):
         )  # Scale factor adjusted for action_zoom
         self.action_zoom(int(scale_factor))
         self._spin_zoom.setValue(int(scale_factor))
+
+    def _save_as_image(self):
+        options = QFileDialog.Option.DontUseNativeDialog
+
+        # Show the dialog and get the selected file name and format
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Image",
+            "",
+            "Images (*.png *.jpeg *.jpg)",
+            options=options,
+        )
+
+        if filename:
+            if not (
+                filename.lower().endswith(".png")
+                or filename.lower().endswith(".jpg")
+                or filename.lower().endswith(".jpeg")
+            ):
+                self._window.display_message_box("Filename must end in .jpg or .png")
+            else:
+                self._face.save(filename)
+
+    def _save_as_video(self):
+        options = QFileDialog.Option.DontUseNativeDialog
+
+        # Show the dialog and get the selected file name and format
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Video",
+            "",
+            "Videos (*.mp4)",
+            options=options,
+        )
+
+        if filename:
+            if not filename.lower().endswith(".mp4"):
+                self._window.display_message_box("Filename must end in .mp4")
+            else:
+                dialog = dlg_modal.VideoExportDialog(self, filename)
+                dialog.exec()
+
+    def on_save_as(self):
+        # Create and show the dialog
+        dialog = dlg_modal.ChoiceDialog()
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            if dialog.user_choice == "image":
+                self._save_as_image()
+            elif dialog.user_choice == "video":
+                self._save_as_video()

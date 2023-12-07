@@ -48,7 +48,7 @@ class MainWindowJTH(QMainWindow):
         except Exception as e:
             logger.error("Error during tab close", exc_info=True)
 
-    def displayMessageBox(self, text):
+    def display_message_box(self, text):
         msg = QMessageBox(self)
         msg.setText(text)
         msg.exec()
