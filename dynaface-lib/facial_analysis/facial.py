@@ -244,6 +244,3 @@ class AnalyzeFace(ImageAnalysis):
             self.landmarks = copy.copy(obj[2])
             self.pupillary_distance = obj[3]
             self.pix2mm = obj[4]
-
-    def sync_stats(self, source):
-        pass

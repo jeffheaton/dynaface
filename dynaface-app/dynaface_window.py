@@ -157,7 +157,7 @@ class DynafaceWindow(MainWindowJTH):
             self.add_tab(AnalyzeImageTab(self, filename), "Analyze Image")
         except Exception as e:
             logger.error("Error during image open", exc_info=True)
-            self.displayMessageBox("Unable to open image.")
+            self.display_message_box("Unable to open image.")
 
     def show_analyze_video(self, filename):
         try:
@@ -165,7 +165,7 @@ class DynafaceWindow(MainWindowJTH):
             self.add_tab(AnalyzeVideoTab(self, filename), "Analyze Video")
         except Exception as e:
             logger.error("Error during video open", exc_info=True)
-            self.displayMessageBox("Unable to open video.")
+            self.display_message_box("Unable to open video.")
 
     def close_analyze_tabs(self):
         try:

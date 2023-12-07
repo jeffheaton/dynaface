@@ -2,68 +2,35 @@ import logging
 import sys
 import time
 from functools import partial
-
+import csv
 
 import cv2
+import dlg_modal
 import utl_gfx
+import worker_threads
 from facial_analysis import facial
 from facial_analysis.facial import load_face_image
 from jth_ui.tab_graphic import TabGraphic
-from PyQt6.QtCore import QEvent, Qt, QThread, pyqtSignal
+from PyQt6.QtCore import QEvent, QObject, Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
-    QStyle,
     QCheckBox,
+    QDialog,
+    QFileDialog,
     QGestureEvent,
     QHBoxLayout,
     QLabel,
     QPinchGesture,
     QPushButton,
-    QSlider,
     QScrollArea,
+    QSlider,
     QSpinBox,
+    QStyle,
     QToolBar,
     QVBoxLayout,
-    QFileDialog,
-    QDialog,
     QWidget,
 )
-from PyQt6.QtCore import QTimer
-from PyQt6.QtCore import Qt
-import dlg_modal
 
 logger = logging.getLogger(__name__)
-
-from PyQt6.QtCore import QObject, pyqtSignal
-
-
-class WorkerLoad(QThread):
-    _update_signal = pyqtSignal(str)
-
-    def __init__(self, target):
-        super().__init__()
-        self._target = target
-
-    def run(self):
-        logger.info("Running background thread")
-        self._target.loading = True
-        self._face = facial.AnalyzeFace([], data_path=None)
-        try:
-            i = 0
-            while True:
-                ret, frame = self._target.video_stream.read()
-
-                if not ret:
-                    logger.info("Thread done")
-                    break
-
-                i += 1
-                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                self._face.load_image(img=frame, crop=True)
-                self._target.add_frame(self._face)
-                self._update_signal.emit(None)
-        finally:
-            self._update_signal.emit(None)
-            self._target.loading = False
 
 
 class AnalyzeVideoTab(TabGraphic):
@@ -103,7 +70,7 @@ class AnalyzeVideoTab(TabGraphic):
         self.grabGesture(Qt.GestureType.PinchGesture)
         self._auto_update = True
 
-        self.thread = WorkerLoad(self)
+        self.thread = worker_threads.WorkerLoad(self)
         self.thread._update_signal.connect(self.update_load_progress)
         self.thread.start()
 
@@ -375,7 +342,7 @@ class AnalyzeVideoTab(TabGraphic):
     def running_step(self):
         self.forward_action()
 
-    def action_video_seek(self, value):
+    def action_video_seek(self, _):
         self.open_frame()
         self.lbl_status.setText(self.status())
 
@@ -436,6 +403,24 @@ class AnalyzeVideoTab(TabGraphic):
                 dialog = dlg_modal.VideoExportDialog(self, filename)
                 dialog.exec()
 
+    def _save_as_data(self):
+        options = QFileDialog.Option.DontUseNativeDialog
+
+        # Show the dialog and get the selected file name and format
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save CSV Data",
+            "",
+            "Videos (*.csv)",
+            options=options,
+        )
+
+        if filename:
+            if not filename.lower().endswith(".csv"):
+                self._window.display_message_box("Filename must end in .csv")
+            else:
+                self.save_csv(filename)
+
     def on_save_as(self):
         # Create and show the dialog
         dialog = dlg_modal.ChoiceDialog()
@@ -444,3 +429,47 @@ class AnalyzeVideoTab(TabGraphic):
                 self._save_as_image()
             elif dialog.user_choice == "video":
                 self._save_as_video()
+            elif dialog.user_choice == "data":
+                self._save_as_data()
+
+    def collect_data(self):
+        face = facial.AnalyzeFace(self._calcs, data_path=None)
+        stats = face.get_all_stats()
+        data = {stat: [] for stat in stats}
+
+        cols = list(data.keys())
+        cols = ["frame", "time"] + cols
+
+        for i, frame in enumerate(self._frames):
+            face.load_state(frame)
+            rec = face.analyze()
+            for stat in rec.keys():
+                data[stat].append(rec[stat])
+
+        return data
+
+    def save_csv(self, filename):
+        data = self.collect_data()
+
+        with open(filename, "w") as f:
+            writer = csv.writer(f)
+            cols = list(data.keys())
+            writer.writerow(["frame", "time"] + cols)
+            all_stats = self._face.get_all_stats()
+            l = len(data[all_stats[0]])
+            lst_time = [x * self.frame_rate for x in range(l)]
+
+            for i in range(l):
+                row = [str(i), lst_time[i]]
+                for col in cols:
+                    row.append(data[col][i])
+                writer.writerow(row)
+
+        # l = len(self.data[self.stats[0]])
+        # lst_time = [x * self.rate for x in range(l)]
+
+        # for i in range(l):
+        #    row = [str(i), lst_time[i]]
+        #    for col in cols:
+        #        row.append(self.data[col][i])
+        #    writer.writerow(row)
