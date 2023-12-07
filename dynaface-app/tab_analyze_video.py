@@ -3,6 +3,7 @@ import sys
 import time
 from functools import partial
 
+
 import cv2
 import utl_gfx
 from facial_analysis import facial
@@ -45,7 +46,7 @@ class WorkerLoad(QThread):
     def run(self):
         logger.info("Running background thread")
         self._target.loading = True
-        self._face = facial.AnalyzeFace(facial.STATS, data_path=None)
+        self._face = facial.AnalyzeFace([], data_path=None)
         try:
             i = 0
             while True:
@@ -70,6 +71,14 @@ class AnalyzeVideoTab(TabGraphic):
         super().__init__(window)
 
         self._auto_update = False
+
+        self._calcs = [
+            facial.AnalyzeFAI(),
+            facial.AnalyzeOralCommissureExcursion(),
+            facial.AnalyzeBrows(),
+            facial.AnalyzeDentalArea(),
+            facial.AnalyzeEyeArea(),
+        ]
 
         # Load the face
         self._frames = []
@@ -116,7 +125,7 @@ class AnalyzeVideoTab(TabGraphic):
         logger.info(f"Video length: {self.video_length}")
 
         # Prepare facial analysis
-        self._face = facial.AnalyzeFace(facial.STATS, data_path=None)
+        self._face = facial.AnalyzeFace(self._calcs, data_path=None)
 
     def init_bottom_horizontal_toolbar(self, layout):
         toolbar = QToolBar()

@@ -31,7 +31,7 @@ class WorkerExport(QThread):
             self._output_file, fourcc, self._dialog._window.frame_rate, (width, height)
         )
 
-        face = facial.AnalyzeFace(facial.STATS, data_path=None)
+        face = facial.AnalyzeFace(self._dialog._window._calcs, data_path=None)
 
         c = len(self._dialog._window._frames)
         for i, frame in enumerate(self._dialog._window._frames):
