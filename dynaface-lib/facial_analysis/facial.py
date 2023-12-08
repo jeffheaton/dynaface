@@ -139,7 +139,7 @@ class AnalyzeFace(ImageAnalysis):
         self.pix2mm = 1
 
     def get_all_stats(self):
-        return [stat for obj in self.calcs for stat in obj.stats()]
+        return [stat for obj in self.calcs if obj.enabled for stat in obj.stats()]
 
     def _find_landmarks(self, img):
         bbox = FindFace.detect_face(img)

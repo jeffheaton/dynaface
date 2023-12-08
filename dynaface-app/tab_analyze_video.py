@@ -1,17 +1,17 @@
-import logging
-import sys
-import time
-from functools import partial
 import csv
+import logging
+from functools import partial
 
 import cv2
 import dlg_modal
+import plotly.graph_objects as go
 import utl_gfx
 import worker_threads
 from facial_analysis import facial
 from facial_analysis.facial import load_face_image
 from jth_ui.tab_graphic import TabGraphic
 from PyQt6.QtCore import QEvent, QObject, Qt, QThread, QTimer, pyqtSignal
+from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -50,19 +50,20 @@ class AnalyzeVideoTab(TabGraphic):
         # Load the face
         self._frames = []
         self.begin_load_video(path)
+        self._web_engine_view = None
 
         # Horiz toolbar
         tab_layout = QVBoxLayout(self)
         self.init_top_horizontal_toolbar(tab_layout)
 
         # Create a horizontal layout for the content of the tab
-        content_layout = QHBoxLayout()
-        tab_layout.addLayout(content_layout)
-        self.init_vertical_toolbar(content_layout)
-        self.init_graphics(content_layout)
-        content_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.loading = False
+        self._content_layout = QHBoxLayout()
+        tab_layout.addLayout(self._content_layout)
+        self.init_vertical_toolbar(self._content_layout)
+        self.init_graphics(self._content_layout)
+        self._content_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
+        self.loading = False
         # Video bar
         self.init_bottom_horizontal_toolbar(tab_layout)
 
@@ -138,12 +139,16 @@ class AnalyzeVideoTab(TabGraphic):
         self._chk_landmarks = QCheckBox("Landmarks")
         toolbar.addWidget(self._chk_landmarks)
         self._chk_landmarks.stateChanged.connect(self.action_landmarks)
-        toolbar.addSeparator()
 
         self._chk_measures = QCheckBox("Measures")
         toolbar.addWidget(self._chk_measures)
         self._chk_measures.setChecked(True)
         self._chk_measures.stateChanged.connect(self.action_measures)
+
+        self._chk_graph = QCheckBox("Graph")
+        toolbar.addWidget(self._chk_graph)
+        self._chk_graph.setChecked(False)
+        self._chk_graph.stateChanged.connect(self.action_graph)
         toolbar.addSeparator()
 
         toolbar.addWidget(QLabel("Zoom(%): ", toolbar))
@@ -465,11 +470,59 @@ class AnalyzeVideoTab(TabGraphic):
                     row.append(data[col][i])
                 writer.writerow(row)
 
-        # l = len(self.data[self.stats[0]])
-        # lst_time = [x * self.rate for x in range(l)]
+    def action_graph(self):
+        if self._chk_graph.isChecked():
+            if self._web_engine_view is not None:
+                print("here1")
+                self._web_engine_view.show()
+                self._content_layout.addWidget(self._web_engine_view)
+            else:
+                print("here3")
+                self.init_graph(self._content_layout)
+        else:
+            print("here2")
+            self._content_layout.removeWidget(self._web_engine_view)
+            # self._content_layout.setParent(None)
+            self._web_engine_view.hide()
 
-        # for i in range(l):
-        #    row = [str(i), lst_time[i]]
-        #    for col in cols:
-        #        row.append(self.data[col][i])
-        #    writer.writerow(row)
+    def init_graph(self, layout):
+        data = self.collect_data()
+        # Create a Plotly graph
+        plot_stats = data.keys()
+        # create time axis
+        all_stats = self._face.get_all_stats()
+        l = len(data[all_stats[0]])
+        lst_time = [x * self.frame_rate for x in range(l)]
+
+        l = go.Layout(
+            autosize=False,
+            # width=1500,
+            # height=540,
+            xaxis_title="Time (s)",
+            xaxis_showticklabels=True,
+            # yaxis_title="Area (mm^2)",
+            yaxis_title="Value (multiple units)",
+            yaxis_showticklabels=True,
+        )
+
+        fig = go.Figure(layout=l)
+
+        for stat in data.keys():
+            if stat in plot_stats:
+                fig.add_trace(
+                    go.Scatter(
+                        x=lst_time,
+                        y=data[stat],
+                        name=stat,
+                    )
+                )  # line=dict(color='red'))
+
+        # Convert to HTML
+        raw_html = fig.to_html(include_plotlyjs="cdn")
+
+        # Create a QWebEngineView and set the HTML content
+        self._web_engine_view = QWebEngineView()
+        self._web_engine_view.setHtml(raw_html)
+
+        # Set as central widget of the window
+        layout.addWidget(self._web_engine_view)
