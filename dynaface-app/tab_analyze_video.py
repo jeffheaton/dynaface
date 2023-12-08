@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
     QFileDialog,
+    QVBoxLayout,
     QGestureEvent,
     QHBoxLayout,
     QLabel,
@@ -24,6 +25,7 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QSlider,
     QSpinBox,
+    QSplitter,
     QStyle,
     QToolBar,
     QVBoxLayout,
@@ -31,6 +33,8 @@ from PyQt6.QtWidgets import (
 )
 
 logger = logging.getLogger(__name__)
+
+GRAPH_HORIZ = True
 
 
 class AnalyzeVideoTab(TabGraphic):
@@ -57,11 +61,15 @@ class AnalyzeVideoTab(TabGraphic):
         self.init_top_horizontal_toolbar(tab_layout)
 
         # Create a horizontal layout for the content of the tab
-        self._content_layout = QHBoxLayout()
+        if GRAPH_HORIZ:
+            self._content_layout = QHBoxLayout()
+        else:
+            self._content_layout = QVBoxLayout()
+        self._content_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
         tab_layout.addLayout(self._content_layout)
         self.init_vertical_toolbar(self._content_layout)
         self.init_graphics(self._content_layout)
-        self._content_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         self.loading = False
         # Video bar
@@ -470,21 +478,6 @@ class AnalyzeVideoTab(TabGraphic):
                     row.append(data[col][i])
                 writer.writerow(row)
 
-    def action_graph(self):
-        if self._chk_graph.isChecked():
-            if self._web_engine_view is not None:
-                print("here1")
-                self._web_engine_view.show()
-                self._content_layout.addWidget(self._web_engine_view)
-            else:
-                print("here3")
-                self.init_graph(self._content_layout)
-        else:
-            print("here2")
-            self._content_layout.removeWidget(self._web_engine_view)
-            # self._content_layout.setParent(None)
-            self._web_engine_view.hide()
-
     def init_graph(self, layout):
         data = self.collect_data()
         # Create a Plotly graph
@@ -526,3 +519,25 @@ class AnalyzeVideoTab(TabGraphic):
 
         # Set as central widget of the window
         layout.addWidget(self._web_engine_view)
+
+    def action_graph(self):
+        if self._chk_graph.isChecked():
+            if self._web_engine_view is not None:
+                # Show graph again
+                self._web_engine_view.show()
+                self._content_layout.addWidget(self._web_engine_view)
+            else:
+                # Show graph for the first time
+                self._content_layout.removeWidget(self._view)
+                if GRAPH_HORIZ:
+                    splitter = QSplitter(Qt.Orientation.Horizontal)
+                else:
+                    splitter = QSplitter(Qt.Orientation.Vertical)
+                splitter.addWidget(self._view)
+                self.init_graph(splitter)
+                self._content_layout.addWidget(splitter)
+        else:
+            # Hide the graph
+            self._content_layout.removeWidget(self._web_engine_view)
+            # self._content_layout.setParent(None)
+            self._web_engine_view.hide()
