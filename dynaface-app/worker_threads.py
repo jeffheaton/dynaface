@@ -74,3 +74,21 @@ class WorkerLoad(QThread):
         finally:
             self._update_signal.emit(None)
             self._target.loading = False
+
+
+class WorkerWaitLoad(QThread):
+    _update_signal = pyqtSignal(str)
+
+    def __init__(self, dlg):
+        super().__init__()
+        self._dialog = dlg
+
+    def run(self):
+        while self._dialog._window.loading:
+            total = self._dialog._window.frame_count
+            cur = len(self._dialog._window._frames)
+            self._update_signal.emit(
+                f"Waiting for load to complete: {cur:,}/{total:,}."
+            )
+            time.sleep(1)
+        self._update_signal.emit("*")

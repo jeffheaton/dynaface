@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+import custom_control
 
 logger = logging.getLogger(__name__)
 
@@ -166,7 +167,7 @@ class AnalyzeVideoTab(TabGraphic):
         self._chk_measures.setChecked(True)
         self._chk_measures.stateChanged.connect(self.action_measures)
 
-        self._chk_graph = QCheckBox("Graph")
+        self._chk_graph = custom_control.CheckingCheckBox(title="Graph", parent=self)
         toolbar.addWidget(self._chk_graph)
         self._chk_graph.setChecked(False)
         self._chk_graph.stateChanged.connect(self.action_graph)
@@ -536,6 +537,7 @@ class AnalyzeVideoTab(TabGraphic):
     def action_graph(self):
         if self._chk_graph.isChecked():
             if self._web_engine_view is not None:
+                # Redisplay graph
                 self._splitter.addWidget(self._web_engine_view)
                 self._web_engine_view.show()
             else:
@@ -548,3 +550,21 @@ class AnalyzeVideoTab(TabGraphic):
             # Adjust the sizes of the remaining widgets to fill the space
             remaining_size = sum(self._splitter.sizes())
             self._splitter.setSizes([remaining_size])
+
+    def wait_load_complete(self):
+        if self.loading:
+            dialog = dlg_modal.WaitLoadingDialog(self)
+            dialog.exec()
+            return not dialog.did_cancel
+
+        return True
+
+    def checkCheckboxEvent(self, target):
+        if not self.loading:
+            return True
+        if not target.isChecked():
+            if not self.wait_load_complete():
+                return False
+
+            self._chk_graph.setChecked(True)
+        return True
