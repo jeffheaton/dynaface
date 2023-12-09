@@ -34,7 +34,7 @@ from PyQt6.QtWidgets import (
 
 logger = logging.getLogger(__name__)
 
-GRAPH_HORIZ = True
+GRAPH_HORIZ = False
 
 
 class AnalyzeVideoTab(TabGraphic):
@@ -60,16 +60,29 @@ class AnalyzeVideoTab(TabGraphic):
         tab_layout = QVBoxLayout(self)
         self.init_top_horizontal_toolbar(tab_layout)
 
+        self._tab_content_layout = QHBoxLayout()
+
         # Create a horizontal layout for the content of the tab
         if GRAPH_HORIZ:
             self._content_layout = QHBoxLayout()
         else:
             self._content_layout = QVBoxLayout()
-        self._content_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self._tab_content_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
-        tab_layout.addLayout(self._content_layout)
-        self.init_vertical_toolbar(self._content_layout)
-        self.init_graphics(self._content_layout)
+        tab_layout.addLayout(self._tab_content_layout)
+        self.init_vertical_toolbar(self._tab_content_layout)
+        self._tab_content_layout.addLayout(self._content_layout)
+
+        # self._content_layout.removeWidget(self._view)
+        if GRAPH_HORIZ:
+            self._splitter = QSplitter(Qt.Orientation.Horizontal)
+        else:
+            self._splitter = QSplitter(Qt.Orientation.Vertical)
+        # self._splitter.addWidget(self._view)
+        self._content_layout.addWidget(self._splitter)
+
+        # self.init_graphics(self._content_layout)
+        self.init_graphics(self._splitter)
 
         self.loading = False
         # Video bar
@@ -523,21 +536,15 @@ class AnalyzeVideoTab(TabGraphic):
     def action_graph(self):
         if self._chk_graph.isChecked():
             if self._web_engine_view is not None:
-                # Show graph again
+                self._splitter.addWidget(self._web_engine_view)
                 self._web_engine_view.show()
-                self._content_layout.addWidget(self._web_engine_view)
             else:
                 # Show graph for the first time
-                self._content_layout.removeWidget(self._view)
-                if GRAPH_HORIZ:
-                    splitter = QSplitter(Qt.Orientation.Horizontal)
-                else:
-                    splitter = QSplitter(Qt.Orientation.Vertical)
-                splitter.addWidget(self._view)
-                self.init_graph(splitter)
-                self._content_layout.addWidget(splitter)
+                self.init_graph(self._splitter)
         else:
             # Hide the graph
-            self._content_layout.removeWidget(self._web_engine_view)
-            # self._content_layout.setParent(None)
+            self._web_engine_view.setParent(None)
             self._web_engine_view.hide()
+            # Adjust the sizes of the remaining widgets to fill the space
+            remaining_size = sum(self._splitter.sizes())
+            self._splitter.setSizes([remaining_size])
