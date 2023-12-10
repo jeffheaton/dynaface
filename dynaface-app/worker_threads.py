@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 
 
 class WorkerExport(QThread):
+    """Export loaded video frames to an annotated video."""
+
     _update_signal = pyqtSignal(str)
 
     def __init__(self, dlg, output_file):
@@ -47,6 +49,8 @@ class WorkerExport(QThread):
 
 
 class WorkerLoad(QThread):
+    """Load a video in the background."""
+
     _update_signal = pyqtSignal(str)
 
     def __init__(self, target):
@@ -54,21 +58,27 @@ class WorkerLoad(QThread):
         self._target = target
 
     def run(self):
-        logger.info("Running background thread")
+        logger.debug("Running background thread")
         self._target.loading = True
         self._face = facial.AnalyzeFace([], data_path=None)
         try:
             i = 0
             while True:
+                i += 1
+                logger.debug(f"Begin frame {i}")
                 ret, frame = self._target.video_stream.read()
 
                 if not ret:
-                    logger.info("Thread done")
+                    logger.debug("Thread done")
                     break
 
-                i += 1
+                logger.debug(f"Frame shape: {frame.shape}")
+
+                logger.debug("Read frame")
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                logger.debug("Scanning face")
                 self._face.load_image(img=frame, crop=True)
+                logger.debug("Adding frame")
                 self._target.add_frame(self._face)
                 self._update_signal.emit(None)
         finally:

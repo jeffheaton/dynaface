@@ -308,9 +308,11 @@ class AnalyzeVideoTab(TabGraphic):
         self.lbl_status.setText(self.status())
 
         if self._view is None:
+            logger.debug("Display first video frame on load")
             self._face.load_state(self._frames[0])
             self.create_graphic(buffer=self._face.render_img)
             self.update_face()
+            logger.debug("Done, display first video frame on load")
 
     def add_frame(self, face):
         self._frames.append(face.dump_state())
