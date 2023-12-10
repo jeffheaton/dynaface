@@ -24,3 +24,6 @@ PyQt6-Qt6==6.5.0
 PyQt6-sip==13.5.0
 PyQt6-WebEngine==6.5.0
 PyQt6-WebEngine-Qt6==6.5.0
+
+pip install PyQt6-Charts
+pyqtgraph-0.13.3

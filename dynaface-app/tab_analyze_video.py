@@ -2,6 +2,7 @@ import csv
 import logging
 from functools import partial
 
+import custom_control
 import cv2
 import dlg_modal
 import plotly.graph_objects as go
@@ -10,13 +11,17 @@ import worker_threads
 from facial_analysis import facial
 from facial_analysis.facial import load_face_image
 from jth_ui.tab_graphic import TabGraphic
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 from PyQt6.QtCore import QEvent, QObject, Qt, QThread, QTimer, pyqtSignal
+from PyQt6.QtGui import QPainter
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
     QFileDialog,
-    QVBoxLayout,
     QGestureEvent,
+    QGraphicsScene,
+    QGraphicsView,
     QHBoxLayout,
     QLabel,
     QPinchGesture,
@@ -27,10 +32,9 @@ from PyQt6.QtWidgets import (
     QSplitter,
     QStyle,
     QToolBar,
-    QVBoxLayout,QGraphicsScene, QGraphicsView,
+    QVBoxLayout,
     QWidget,
 )
-import custom_control
 
 logger = logging.getLogger(__name__)
 
@@ -491,76 +495,48 @@ class AnalyzeVideoTab(TabGraphic):
                     row.append(data[col][i])
                 writer.writerow(row)
 
-    def update_chart(self, layout):
+    def update_chart(self):
         data = self.collect_data()
-        # Create a Plotly graph
         plot_stats = data.keys()
+
         # create time axis
         all_stats = self._face.get_all_stats()
         l = len(data[all_stats[0]])
         lst_time = [x * self.frame_rate for x in range(l)]
 
-        l = go.Layout(
-            autosize=False,
-            margin=dict(l=20, r=20, t=20, b=20),
-            # width=1500,
-            height=128,
-            xaxis_title="Time (s)",
-            xaxis_showticklabels=True,
-            # yaxis_title="Area (mm^2)",
-            yaxis_title="Value (multiple units)",
-            yaxis_showticklabels=True,
-        )
-
-        fig = go.Figure(layout=l)
+        # Create a Matplotlib figure
+        fig = Figure(figsize=(12, 2.5), dpi=100)  # figsize=(15, 1.28), dpi=100
+        ax = fig.add_subplot(111)
+        fig.subplots_adjust(top=0.85)
+        # fig.tight_layout()
 
         for stat in data.keys():
             if stat in plot_stats:
-                fig.add_trace(
-                    go.Scatter(
-                        x=lst_time,
-                        y=data[stat],
-                        name=stat,
-                    )
-                )  # line=dict(color='red'))
+                ax.plot(lst_time, data[stat], label=stat)
 
-        # Convert to HTML
-        pixmap = utl_gfx.poltly_to_pixmap(fig)
-        
+        ax.set_xlabel("Time (s)")
+        ax.set_ylabel("Value (multiple units)")
+        ax.legend()
+
+        # Create a FigureCanvas
+        canvas = FigureCanvas(fig)
+
         if self._chart_view is None:
-            # Create a QGraphicsScene to hold the image
+            # Create a QGraphicsScene to hold the canvas
             self._chart_scene = QGraphicsScene()
-            self._chart_scene.addPixmap(pixmap)
+            self._chart_scene.addWidget(canvas)
 
             # Create a QGraphicsView to display the scene
             self._chart_view = QGraphicsView(self._chart_scene)
-            self._chart_view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
-            self._chart_view.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+            self._chart_view.setTransformationAnchor(
+                QGraphicsView.ViewportAnchor.AnchorUnderMouse
+            )
+            self._chart_view.setResizeAnchor(
+                QGraphicsView.ViewportAnchor.AnchorUnderMouse
+            )
             self._chart_view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
 
             self._splitter.addWidget(self._chart_view)
-
-        
-        
-        
-
-
-    def action_graph(self):
-        if self._chk_graph.isChecked():
-            if self._chart_view is not None:
-                # Redisplay graph
-                self._splitter.addWidget(self._chart_view)
-                self._chart_view.show()
-            else:
-                # Show graph for the first time
-                self.update_chart(self._splitter)
-        else:
-            # Hide the graph
-            self._chart_view.setParent(None)
-            self._chart_view.hide()
-            # Adjust the sizes of the remaining widgets to fill the space
-            remaining_size = sum(self._splitter.sizes())
-            self._splitter.setSizes([remaining_size])
 
     def wait_load_complete(self):
         if self.loading:
@@ -579,3 +555,20 @@ class AnalyzeVideoTab(TabGraphic):
 
             self._chk_graph.setChecked(True)
         return True
+
+    def action_graph(self):
+        if self._chk_graph.isChecked():
+            if self._chart_view is not None:
+                # Redisplay graph
+                self._splitter.addWidget(self._chart_view)
+                self._chart_view.show()
+            else:
+                # Show graph for the first time
+                self.update_chart()
+        else:
+            # Hide the graph
+            self._chart_view.setParent(None)
+            self._chart_view.hide()
+            # Adjust the sizes of the remaining widgets to fill the space
+            remaining_size = sum(self._splitter.sizes())
+            self._splitter.setSizes([remaining_size])
