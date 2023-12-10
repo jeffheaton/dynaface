@@ -55,6 +55,10 @@ class ImageAnalysis:
 
         if img.shape[0] < 5 or img.shape[1] < 5:
             raise ValueError("Image is empty")
+
+        self.init_image(img)
+
+    def init_image(self, img):
         self.original_img = img.copy()
         self.gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         self.render_img = img.copy()

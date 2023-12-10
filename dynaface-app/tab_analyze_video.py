@@ -191,6 +191,14 @@ class AnalyzeVideoTab(TabGraphic):
         toolbar.addWidget(btn_fit)
         toolbar.addSeparator()
 
+        btn_cut_left = QPushButton("Cut <")
+        toolbar.addWidget(btn_cut_left)
+        btn_cut_left.clicked.connect(self.action_cut_left)
+
+        btn_cut_right = QPushButton("Cut >")
+        toolbar.addWidget(btn_cut_right)
+        btn_cut_right.clicked.connect(self.action_cut_right)
+
     def init_vertical_toolbar(self, layout):
         # Add a vertical toolbar (left side of the tab)
         self.left_toolbar = QToolBar("Left Toolbar", self)
@@ -577,3 +585,19 @@ class AnalyzeVideoTab(TabGraphic):
             # Adjust the sizes of the remaining widgets to fill the space
             remaining_size = sum(self._splitter.sizes())
             self._splitter.setSizes([remaining_size])
+
+    def action_cut_left(self):
+        i = self._video_slider.sliderPosition()
+        self._frames = self._frames[i:]
+        self.frame_count = len(self._frames)
+        self._video_slider.setRange(0, self.frame_count - 1)
+        self._video_slider.setSliderPosition(0)
+        self.lbl_status.setText(self.status())
+
+    def action_cut_right(self):
+        i = self._video_slider.sliderPosition()
+        self._frames = self._frames[: i + 1]
+        self.frame_count = len(self._frames)
+        self._video_slider.setRange(0, self.frame_count - 1)
+        self._video_slider.setSliderPosition(i)
+        self.lbl_status.setText(self.status())

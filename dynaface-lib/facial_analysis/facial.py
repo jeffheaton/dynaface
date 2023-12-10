@@ -26,6 +26,8 @@ STYLEGAN_PUPIL_DIST = STYLEGAN_LEFT_PUPIL[0] - STYLEGAN_RIGHT_PUPIL[0]
 
 SPIGA_MODEL = "wflw"
 
+logger = logging.getLogger(__name__)
+
 STATS = [
     AnalyzeFAI(),
     AnalyzeOralCommissureExcursion(),
@@ -142,13 +144,16 @@ class AnalyzeFace(ImageAnalysis):
         return [stat for obj in self.calcs if obj.enabled for stat in obj.stats()]
 
     def _find_landmarks(self, img):
+        logger.debug("Called _find_landmarks")
         bbox = FindFace.detect_face(img)
+        logger.debug(f"Detected bbox: {bbox}")
 
         if bbox is None:
             bbox = [0, 0, img.shape[1], img.shape[0]]
             logging.info("Could not detect face area")
         # bbox to spiga is x,y,w,h; however, facenet_pytorch deals in x1,y1,x2,y2.
         bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
+        logger.debug("Calling SPIGA")
         features = self.processor.inference(img, [bbox])
 
         # Prepare variables
@@ -161,12 +166,15 @@ class AnalyzeFace(ImageAnalysis):
 
     def load_image(self, img, crop, eyes=None):
         super().load_image(img)
+        logger.debug("Low level-image loaded")
         self.landmarks, self._headpose = self._find_landmarks(img)
+        logger.debug("Landmarks located")
         self.pupillary_distance = abs(
             self.landmarks[LM_LEFT_PUPIL][0] - self.landmarks[LM_RIGHT_PUPIL][0]
         )
         self.pix2mm = STD_PUPIL_DIST / self.pupillary_distance
         if crop:
+            logger.debug("Cropping")
             self.crop_stylegan(eyes)
 
     def draw_landmarks(self, size=0.25, color=[0, 255, 255], numbers=False):
@@ -237,10 +245,11 @@ class AnalyzeFace(ImageAnalysis):
 
     def load_state(self, obj):
         if self.original_img is None:
-            self.load_image(obj[0], crop=False)
+            self.init_image(obj[0])
         else:
             self.original_img = obj[0][:]
-            self.headpose = copy.copy(obj[1])
-            self.landmarks = copy.copy(obj[2])
-            self.pupillary_distance = obj[3]
-            self.pix2mm = obj[4]
+
+        self.headpose = copy.copy(obj[1])
+        self.landmarks = copy.copy(obj[2])
+        self.pupillary_distance = obj[3]
+        self.pix2mm = obj[4]
