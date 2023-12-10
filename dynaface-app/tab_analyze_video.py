@@ -505,9 +505,12 @@ class AnalyzeVideoTab(TabGraphic):
         lst_time = [x * self.frame_rate for x in range(l)]
 
         # Create a Matplotlib figure
-        fig = Figure(figsize=(12, 2.5), dpi=100)  # figsize=(15, 1.28), dpi=100
+        fig = Figure(
+            figsize=(12, 2.5),
+            dpi=100,  # constrained_layout=True
+        )  # figsize=(15, 1.28), dpi=100
         ax = fig.add_subplot(111)
-        fig.subplots_adjust(top=0.85)
+        # fig.subplots_adjust(left=0, right=0.1, top=0.1, bottom=0)
         # fig.tight_layout()
 
         for stat in data.keys():
