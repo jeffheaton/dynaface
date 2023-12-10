@@ -11,7 +11,6 @@ from facial_analysis import facial
 from facial_analysis.facial import load_face_image
 from jth_ui.tab_graphic import TabGraphic
 from PyQt6.QtCore import QEvent, QObject, Qt, QThread, QTimer, pyqtSignal
-from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -28,7 +27,7 @@ from PyQt6.QtWidgets import (
     QSplitter,
     QStyle,
     QToolBar,
-    QVBoxLayout,
+    QVBoxLayout,QGraphicsScene, QGraphicsView,
     QWidget,
 )
 import custom_control
@@ -55,7 +54,7 @@ class AnalyzeVideoTab(TabGraphic):
         # Load the face
         self._frames = []
         self.begin_load_video(path)
-        self._web_engine_view = None
+        self._chart_view = None
 
         # Horiz toolbar
         tab_layout = QVBoxLayout(self)
@@ -492,7 +491,7 @@ class AnalyzeVideoTab(TabGraphic):
                     row.append(data[col][i])
                 writer.writerow(row)
 
-    def init_graph(self, layout):
+    def update_chart(self, layout):
         data = self.collect_data()
         # Create a Plotly graph
         plot_stats = data.keys()
@@ -503,8 +502,9 @@ class AnalyzeVideoTab(TabGraphic):
 
         l = go.Layout(
             autosize=False,
+            margin=dict(l=20, r=20, t=20, b=20),
             # width=1500,
-            # height=540,
+            height=128,
             xaxis_title="Time (s)",
             xaxis_showticklabels=True,
             # yaxis_title="Area (mm^2)",
@@ -525,28 +525,39 @@ class AnalyzeVideoTab(TabGraphic):
                 )  # line=dict(color='red'))
 
         # Convert to HTML
-        raw_html = fig.to_html(include_plotlyjs="cdn")
+        pixmap = utl_gfx.poltly_to_pixmap(fig)
+        
+        if self._chart_view is None:
+            # Create a QGraphicsScene to hold the image
+            self._chart_scene = QGraphicsScene()
+            self._chart_scene.addPixmap(pixmap)
 
-        # Create a QWebEngineView and set the HTML content
-        self._web_engine_view = QWebEngineView()
-        self._web_engine_view.setHtml(raw_html)
+            # Create a QGraphicsView to display the scene
+            self._chart_view = QGraphicsView(self._chart_scene)
+            self._chart_view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+            self._chart_view.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+            self._chart_view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
 
-        # Set as central widget of the window
-        layout.addWidget(self._web_engine_view)
+            self._splitter.addWidget(self._chart_view)
+
+        
+        
+        
+
 
     def action_graph(self):
         if self._chk_graph.isChecked():
-            if self._web_engine_view is not None:
+            if self._chart_view is not None:
                 # Redisplay graph
-                self._splitter.addWidget(self._web_engine_view)
-                self._web_engine_view.show()
+                self._splitter.addWidget(self._chart_view)
+                self._chart_view.show()
             else:
                 # Show graph for the first time
-                self.init_graph(self._splitter)
+                self.update_chart(self._splitter)
         else:
             # Hide the graph
-            self._web_engine_view.setParent(None)
-            self._web_engine_view.hide()
+            self._chart_view.setParent(None)
+            self._chart_view.hide()
             # Adjust the sizes of the remaining widgets to fill the space
             remaining_size = sum(self._splitter.sizes())
             self._splitter.setSizes([remaining_size])

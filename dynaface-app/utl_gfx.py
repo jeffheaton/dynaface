@@ -1,6 +1,9 @@
+import io
 import sys
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtGui import QImage, QClipboard
+from PyQt6.QtGui import QImage, QClipboard, QPixmap
+import plotly.graph_objects as go
+from PIL import Image
 
 
 def opencv_img_to_qimage(opencv_img):
@@ -25,3 +28,12 @@ def copy_image_to_clipboard(opencv_img):
     # Copy image to clipboard
     clipboard = QApplication.clipboard()
     clipboard.setImage(image, mode=QClipboard.Mode.Clipboard)
+
+def poltly_to_pixmap(fig):
+    img_buffer = io.BytesIO()
+    fig.write_image(img_buffer, format='png')
+    img_buffer.seek(0)  # Move to the beginning of the buffer
+    pixmap = QPixmap()
+    pixmap.loadFromData(img_buffer.getvalue())
+    return pixmap
+
