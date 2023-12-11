@@ -1,4 +1,5 @@
 import csv
+import io
 import logging
 from functools import partial
 
@@ -7,6 +8,7 @@ import cv2
 import dlg_modal
 import plotly.graph_objects as go
 import utl_gfx
+import utl_print
 import worker_threads
 from facial_analysis import facial
 from facial_analysis.facial import load_face_image
@@ -35,7 +37,6 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-import io
 
 logger = logging.getLogger(__name__)
 
@@ -629,3 +630,7 @@ class AnalyzeVideoTab(TabGraphic):
         print(f"pix2mm: {self._face.pix2mm}")
         print(f"pd: {self._face.pupillary_distance}")
         print(f"pupils: {landmarks[96]} {landmarks[97]}")
+
+    def on_print(self):
+        pixmap = QPixmap.fromImage(self._display_buffer)
+        utl_print.print_pixmap(self._window, pixmap)

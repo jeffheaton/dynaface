@@ -19,6 +19,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+import utl_print
+from PyQt6.QtGui import QPixmap
 
 logger = logging.getLogger(__name__)
 
@@ -245,3 +247,7 @@ class AnalyzeImageTab(TabGraphic):
         print(f"pix2mm: {self._face.pix2mm}")
         print(f"pd: {self._face.pupillary_distance}")
         print(f"pupils: {landmarks[96]} {landmarks[97]}")
+
+    def on_print(self):
+        pixmap = QPixmap.fromImage(self._display_buffer)
+        utl_print.print_pixmap(self._window, pixmap)

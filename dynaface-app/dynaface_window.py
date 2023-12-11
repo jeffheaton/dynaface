@@ -82,13 +82,21 @@ class DynafaceWindow(MainWindowJTH):
 
         # Add open action
         openAction = QAction("Open...", self)
+        openAction.setShortcut("Ctrl+O")
         openAction.triggered.connect(self.open_action)
         self._file_menu.addAction(openAction)
 
         # Add save as... action
-        openAction = QAction("Save As...", self)
-        openAction.triggered.connect(self.save_as_action)
-        self._file_menu.addAction(openAction)
+        saveAsMenu = QAction("Save As...", self)
+        saveAsMenu.setShortcut("Ctrl+S")
+        saveAsMenu.triggered.connect(self.save_as_action)
+        self._file_menu.addAction(saveAsMenu)
+
+        # Add print... action
+        printAction = QAction("Print...", self)
+        printAction.setShortcut("Ctrl+P")
+        printAction.triggered.connect(self.print_action)
+        self._file_menu.addAction(printAction)
 
         # Close Window action
         closeAction = QAction("Close Window", self)
@@ -223,3 +231,12 @@ class DynafaceWindow(MainWindowJTH):
             # Check if the current tab has the 'on_copy' method
             if hasattr(current_tab, "on_save_as"):
                 current_tab.on_save_as()
+
+    def print_action(self):
+        current_tab = self._tab_widget.currentWidget()
+
+        # Check if there is a current tab
+        if current_tab is not None:
+            # Check if the current tab has the 'on_copy' method
+            if hasattr(current_tab, "on_print"):
+                current_tab.on_print()
