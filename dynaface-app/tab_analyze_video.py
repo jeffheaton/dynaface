@@ -334,6 +334,8 @@ class AnalyzeVideoTab(TabGraphic):
             self.create_graphic(buffer=self._face.render_img)
             self.update_face()
             logger.debug("Done, display first video frame on load")
+            # Auto fit
+            QTimer.singleShot(1, self.fit)
 
     def add_frame(self, face):
         self._frames.append(face.dump_state())

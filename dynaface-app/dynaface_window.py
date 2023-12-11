@@ -26,7 +26,7 @@ class DynafaceWindow(MainWindowJTH):
         self.render_buffer = None
         self.display_buffer = None
 
-        self._drop_ext = (".png", ".jpg", ".jpeg", ".bmp", ".gif")
+        self._drop_ext = (".png", ".jpg", ".jpeg", ".bmp", ".gif", ".mp4", ".mov")
 
         if self.app.get_system_name() == "osx":
             self.setup_mac_menu()

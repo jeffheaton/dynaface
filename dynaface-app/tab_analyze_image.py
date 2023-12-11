@@ -4,7 +4,7 @@ from functools import partial
 import utl_gfx
 from facial_analysis.facial import load_face_image
 from jth_ui.tab_graphic import TabGraphic
-from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtCore import QEvent, Qt, QTimer
 from PyQt6.QtWidgets import (
     QCheckBox,
     QFileDialog,
@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
 )
 import utl_print
 from PyQt6.QtGui import QPixmap
+
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,9 @@ class AnalyzeImageTab(TabGraphic):
         # Allow touch zoom
         self.grabGesture(Qt.GestureType.PinchGesture)
         self._auto_update = True
+
+        # Auto fit
+        QTimer.singleShot(1, self.fit)
 
     def init_horizontal_toolbar(self, layout):
         self._toolbar = QToolBar()

@@ -14,9 +14,7 @@ class MainWindowJTH(QMainWindow):
     def __init__(self, app):
         super().__init__()
         self.app = app
-        self.open_extensions = (
-            "Images (*.jpg *.jpeg *.png *.tiff);;Videos (*.mp4 *.mov)"
-        )
+        self.open_extensions = "All Files (*.mp4 *.mov *.jpg *.jpeg *.png *.tiff);;Images (*.jpg *.jpeg *.png *.tiff);;Videos (*.mp4 *.mov)"
 
         # Enable the main window to accept drops
         self.setAcceptDrops(True)
