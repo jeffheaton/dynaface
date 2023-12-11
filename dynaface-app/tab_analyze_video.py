@@ -200,6 +200,10 @@ class AnalyzeVideoTab(TabGraphic):
         toolbar.addWidget(btn_cut_right)
         btn_cut_right.clicked.connect(self.action_cut_right)
 
+        btn_test = QPushButton("Test")
+        toolbar.addWidget(btn_test)
+        btn_test.clicked.connect(self.test_action)
+
     def init_vertical_toolbar(self, layout):
         # Add a vertical toolbar (left side of the tab)
         self.left_toolbar = QToolBar("Left Toolbar", self)
@@ -617,3 +621,11 @@ class AnalyzeVideoTab(TabGraphic):
         self._video_slider.setRange(0, self.frame_count - 1)
         self._video_slider.setSliderPosition(i)
         self.lbl_status.setText(self.status())
+
+    def test_action(self):
+        landmarks = self._face.landmarks
+        print("Image Dump")
+        print(self._face.shape)
+        print(f"pix2mm: {self._face.pix2mm}")
+        print(f"pd: {self._face.pupillary_distance}")
+        print(f"pupils: {landmarks[96]} {landmarks[97]}")

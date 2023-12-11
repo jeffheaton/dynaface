@@ -171,10 +171,8 @@ class AnalyzeFace(ImageAnalysis):
         logger.debug("Low level-image loaded")
         self.landmarks, self._headpose = self._find_landmarks(img)
         logger.debug("Landmarks located")
-        self.pupillary_distance = abs(
-            self.landmarks[LM_LEFT_PUPIL][0] - self.landmarks[LM_RIGHT_PUPIL][0]
-        )
-        self.pix2mm = AnalyzeFace.pd / self.pupillary_distance
+        self.calc_pd()
+
         if crop:
             logger.debug("Cropping")
             self.crop_stylegan(eyes)
@@ -231,6 +229,13 @@ class AnalyzeFace(ImageAnalysis):
         self.landmarks = scale_crop_points(self.landmarks, crop_x, crop_y, scale)
         logging.debug(f"Resulting image: {img.shape}")
         super().load_image(img)
+        self.calc_pd()
+
+    def calc_pd(self):
+        self.pupillary_distance = abs(
+            self.landmarks[LM_LEFT_PUPIL][0] - self.landmarks[LM_RIGHT_PUPIL][0]
+        )
+        self.pix2mm = AnalyzeFace.pd / self.pupillary_distance
 
     def get_pupils(self):
         return self.landmarks[LM_LEFT_PUPIL], self.landmarks[LM_RIGHT_PUPIL]
