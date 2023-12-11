@@ -14,7 +14,7 @@ from jth_ui.tab_graphic import TabGraphic
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PyQt6.QtCore import QEvent, QObject, Qt, QThread, QTimer, pyqtSignal
-from PyQt6.QtGui import QPainter
+from PyQt6.QtGui import QPainter, QPixmap
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -35,6 +35,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+import io
 
 logger = logging.getLogger(__name__)
 
@@ -306,10 +307,17 @@ class AnalyzeVideoTab(TabGraphic):
         self._auto_update = True
         self.update_face()
 
+        if self._chart_view is not None:
+            logger.debug("Update chart, because measures changed")
+            self.update_chart()
+
     def checkbox_clicked(self, checkbox, stat):
         stat.enabled = checkbox.isChecked()
         if self._auto_update:
             self.update_face()
+            if self._chart_view is not None:
+                logger.debug("Update chart, because measures changed")
+                self.update_chart()
 
     def update_load_progress(self, status):
         # self.lbl_status.setText(status)
@@ -506,22 +514,18 @@ class AnalyzeVideoTab(TabGraphic):
                 writer.writerow(row)
 
     def update_chart(self):
-        data = self.collect_data()
-        plot_stats = data.keys()
-
-        # create time axis
         all_stats = self._face.get_all_stats()
-        l = len(data[all_stats[0]])
-        lst_time = [x * self.frame_rate for x in range(l)]
+        if len(all_stats) < 1:
+            return
 
         # Create a Matplotlib figure
-        fig = Figure(
-            figsize=(12, 2.5),
-            dpi=100,  # constrained_layout=True
-        )  # figsize=(15, 1.28), dpi=100
+        fig = Figure(figsize=(12, 2.5), dpi=100)
         ax = fig.add_subplot(111)
-        # fig.subplots_adjust(left=0, right=0.1, top=0.1, bottom=0)
-        # fig.tight_layout()
+
+        data = self.collect_data()
+        plot_stats = data.keys()
+        l = len(data[all_stats[0]])
+        lst_time = [x * self.frame_rate for x in range(l)]
 
         for stat in data.keys():
             if stat in plot_stats:
@@ -531,15 +535,21 @@ class AnalyzeVideoTab(TabGraphic):
         ax.set_ylabel("Value (multiple units)")
         ax.legend()
 
-        # Create a FigureCanvas
-        canvas = FigureCanvas(fig)
+        # Render figure to a buffer
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png")
+        buf.seek(0)
+
+        # Create QPixmap from buffer
+        pixmap = QPixmap()
+        pixmap.loadFromData(buf.getvalue())
 
         if self._chart_view is None:
-            # Create a QGraphicsScene to hold the canvas
+            logger.debug("New chart created")
             self._chart_scene = QGraphicsScene()
-            self._chart_scene.addWidget(canvas)
+            self._chart_scene.addPixmap(pixmap)
 
-            # Create a QGraphicsView to display the scene
+            # Create and configure QGraphicsView
             self._chart_view = QGraphicsView(self._chart_scene)
             self._chart_view.setTransformationAnchor(
                 QGraphicsView.ViewportAnchor.AnchorUnderMouse
@@ -550,6 +560,12 @@ class AnalyzeVideoTab(TabGraphic):
             self._chart_view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
 
             self._splitter.addWidget(self._chart_view)
+        else:
+            logger.debug("Update existing chart")
+            # Update the scene with the new pixmap
+            self._chart_scene.clear()
+            self._chart_scene.addPixmap(pixmap)
+            self._chart_view.update()
 
     def wait_load_complete(self):
         if self.loading:

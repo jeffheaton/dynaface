@@ -1,13 +1,19 @@
 import logging
+
+import dynaface_app
+from facial_analysis.facial import STD_PUPIL_DIST
+import facial_analysis
+from PyQt6.QtGui import QIntValidator
+from jth_ui import utl_settings
 from PyQt6.QtWidgets import (
-    QPushButton,
-    QWidget,
+    QComboBox,
     QFormLayout,
-    QLabel,
-    QSpinBox,
-    QVBoxLayout,
     QHBoxLayout,
-    QCheckBox,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
 
 logger = logging.getLogger(__name__)
@@ -19,13 +25,12 @@ class SettingsTab(QWidget):
         self._window = window
 
         # Create widgets
-        cell_size_label = QLabel("Cell Size (1-25):", self)
-        self._cell_size_spinbox = QSpinBox(self)
-        self._cell_size_spinbox.setRange(1, 25)
-        animation_speed_label = QLabel("Animation Speed (1-30 FPS):", self)
-        self._animation_speed_spinbox = QSpinBox(self)
-        self._animation_speed_spinbox.setRange(1, 30)
-        self._display_fps_checkbox = QCheckBox("Display FPS/Steps", self)
+        lbl_pd = QLabel("Pupillary Distance (PD, mm):", self)
+        self._text_pd = QLineEdit(self)
+        self._text_pd.setValidator(QIntValidator())
+        log_level_label = QLabel("Log Level:", self)
+        self._log_combo_box = QComboBox()
+        self._log_combo_box.addItems(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
 
         # Create button layout
         save_button = QPushButton("Save", self)
@@ -38,9 +43,8 @@ class SettingsTab(QWidget):
 
         # Form layout for the options
         form_layout = QFormLayout()
-        form_layout.addRow(cell_size_label, self._cell_size_spinbox)
-        form_layout.addRow(animation_speed_label, self._animation_speed_spinbox)
-        form_layout.addRow(self._display_fps_checkbox)
+        form_layout.addRow(lbl_pd, self._text_pd)
+        form_layout.addRow(log_level_label, self._log_combo_box)
 
         # Main layout
         layout = QVBoxLayout()
@@ -49,18 +53,20 @@ class SettingsTab(QWidget):
         self.setLayout(layout)
 
         window.add_tab(self, "Settings")
-        self._cell_size_spinbox.setValue(
-            utl_settings.get_int(utl_settings.CELL_SIZE_KEY)
+
+        settings = self._window.app.settings
+        print(settings)
+        self._text_pd.setText(
+            settings.get(dynaface_app.SETTING_PD, str(STD_PUPIL_DIST))
         )
-        self._animation_speed_spinbox.setValue(
-            utl_settings.get_int(utl_settings.FPS_KEY)
-        )
-        self._display_fps_checkbox.setChecked(
-            utl_settings.get_bool(utl_settings.FPS_OVERLAY)
+        utl_settings.set_combo(
+            self._log_combo_box,
+            settings.get(dynaface_app.SETTING_LOG_LEVEL, "INFO"),
         )
 
     def on_close(self):
-        self._window.close_simulator_tabs()
+        pass
+        # self._window.close_simulator_tabs()
 
     def action_save(self):
         self.save_values()
@@ -73,13 +79,13 @@ class SettingsTab(QWidget):
         pass
 
     def save_values(self):
-        utl_settings.settings[utl_settings.CELL_SIZE_KEY] = int(
-            self._cell_size_spinbox.value()
-        )
-        utl_settings.settings[utl_settings.FPS_KEY] = int(
-            self._animation_speed_spinbox.value()
-        )
-        utl_settings.settings[utl_settings.FPS_OVERLAY] = bool(
-            self._display_fps_checkbox.isChecked()
-        )
-        utl_settings.save_settings()
+        settings = self._window.app.settings
+
+        settings[dynaface_app.SETTING_PD] = self._text_pd.text()
+        settings[dynaface_app.SETTING_LOG_LEVEL] = self._log_combo_box.currentText()
+        level = settings[dynaface_app.SETTING_LOG_LEVEL]
+        logging_level = getattr(logging, level)
+        self._window.app.change_log_level(logging_level)
+        pd = settings.get(dynaface_app.SETTING_PD, STD_PUPIL_DIST)
+        facial_analysis.facial.AnalyzeFace.pd = int(pd)
+        self._window.app.save_settings()

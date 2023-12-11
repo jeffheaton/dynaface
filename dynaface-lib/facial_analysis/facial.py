@@ -118,6 +118,8 @@ def scale_crop_points(lst, crop_x, crop_y, scale):
 
 
 class AnalyzeFace(ImageAnalysis):
+    pd = STD_PUPIL_DIST
+
     def __init__(self, stats, data_path=None, device=None):
         global _processor
 
@@ -172,7 +174,7 @@ class AnalyzeFace(ImageAnalysis):
         self.pupillary_distance = abs(
             self.landmarks[LM_LEFT_PUPIL][0] - self.landmarks[LM_RIGHT_PUPIL][0]
         )
-        self.pix2mm = STD_PUPIL_DIST / self.pupillary_distance
+        self.pix2mm = AnalyzeFace.pd / self.pupillary_distance
         if crop:
             logger.debug("Cropping")
             self.crop_stylegan(eyes)

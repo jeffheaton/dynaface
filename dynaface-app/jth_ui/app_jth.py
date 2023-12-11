@@ -7,6 +7,7 @@ import logging.handlers
 import os
 import platform
 import sys
+import plistlib
 
 import appdirs
 from PyQt6.QtCore import Qt, QtMsgType, qInstallMessageHandler
@@ -25,6 +26,7 @@ class AppJTH:
         self.COPYRIGHT = copyright
         self.VERSION = version
         self.APP_ID = self.BUNDLE_ID.split(".")[-1]
+        self.settings = {}
 
         if self.get_system_name() == "osx":
             if self.is_sandboxed():
@@ -118,7 +120,7 @@ class AppJTH:
                 os.remove(file)
 
     # Define the logging configuration
-    def setup_logging(self):
+    def setup_logging(self, level=logging.INFO):
         os.makedirs(self.LOG_DIR, exist_ok=True)
 
         # Create the directory if it doesn't exist
@@ -134,27 +136,32 @@ class AppJTH:
         log_filename = os.path.join(self.LOG_DIR, f"{date_str}.log")
 
         # Set up logging
-        logger = logging.getLogger()
-        logger.setLevel(logging.DEBUG)
+        self._logger = logging.getLogger()
+        self._logger.setLevel(level)
 
         # Create a file handler to write log messages to the file
-        file_handler = logging.handlers.TimedRotatingFileHandler(
+        self._file_handler = logging.handlers.TimedRotatingFileHandler(
             log_filename, when="midnight", interval=1, backupCount=7
         )
-        file_handler.setLevel(logging.DEBUG)
+        self._file_handler.setLevel(level)
 
         # Create a formatter to format the log messages
         formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-        file_handler.setFormatter(formatter)
+        self._file_handler.setFormatter(formatter)
 
         # Add the handler to the logger
-        logger.addHandler(file_handler)
+        logger.addHandler(self._file_handler)
 
         # Add a stream handler (console handler) for console output
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.DEBUG)
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
+        self._console_handler = logging.StreamHandler()
+        self._console_handler.setLevel(level)
+        self._console_handler.setFormatter(formatter)
+        logger.addHandler(self._console_handler)
+
+    def change_log_level(self, level):
+        self._console_handler.setLevel(level)
+        self._logger.setLevel(level)
+        self._file_handler.setLevel(level)
 
     def shutdown(self):
         self.save_state()
@@ -182,3 +189,51 @@ class AppJTH:
         home_directory = os.path.expanduser("~")
         documents_path = os.path.join(home_directory, "Documents")
         self.state = {STATE_LAST_FOLDER: documents_path}
+
+    def init_settings(self):
+        self.settings = {}
+
+    # Save settings to a JSON file
+    def save_settings(self):
+        try:
+            if self.get_system_name() == "osx":
+                logger.info("Saved MacOS settings")
+                with open(self.SETTING_FILE, "wb") as fp:
+                    plistlib.dump(self.settings, fp)
+            else:
+                logger.info("Saved Windows settings")
+                with open(self.SETTING_FILE, "w") as fp:
+                    json.dump(self.settings, fp)
+        except Exception as e:
+            logging.error("Caught an exception saving settings", exc_info=True)
+
+    def load_settings(self):
+        try:
+            os.makedirs(self.SETTING_DIR, exist_ok=True)
+
+            if not os.path.exists(self.SETTING_FILE):
+                logger.info("Resetting to default settings")
+                self.init_settings()
+            else:
+                if self.get_system_name() == "osx":
+                    with open(self.SETTING_FILE, "rb") as fp:
+                        self.settings = plistlib.load(fp)
+                    logger.info("Loaded MacOS settings")
+                else:
+                    with open(self.SETTING_FILE, "r") as fp:
+                        self.settings = json.load(fp)
+                        logger.info("Loaded Windows settings")
+        except Exception as e:
+            logging.error("Caught an exception loading settings", exc_info=True)
+
+    def get_bool(self, key):
+        result = settings.get(key, False)
+        if not result:
+            result = False
+        return result
+
+    def get_int(self, key):
+        result = settings.get(key, 1)
+        if not result:
+            result = 1
+        return result
