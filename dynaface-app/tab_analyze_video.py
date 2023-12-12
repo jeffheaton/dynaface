@@ -574,6 +574,14 @@ class AnalyzeVideoTab(TabGraphic):
             )
             self._chart_view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
 
+            self._chart_view.setHorizontalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+            )
+            self._chart_view.setVerticalScrollBarPolicy(
+                Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+            )
+            self._chart_view.setContentsMargins(0, 0, 0, 0)
+
             self._splitter.addWidget(self._chart_view)
         else:
             logger.debug("Update existing chart")
@@ -609,6 +617,7 @@ class AnalyzeVideoTab(TabGraphic):
             else:
                 # Show graph for the first time
                 self.update_chart()
+                self._adjust_chart()
         else:
             # Hide the graph
             self._chart_view.setParent(None)
@@ -633,27 +642,27 @@ class AnalyzeVideoTab(TabGraphic):
         self._video_slider.setSliderPosition(i)
         self.lbl_status.setText(self.status())
 
+    def _adjust_chart(self):
+        # Resize the QGraphicsView to fit the pixmap
+        self._chart_view.fitInView(
+            self._chart_scene.itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio
+        )
+
+        # Get the size of the graphics view
+        view_size = self._chart_view.sizeHint()
+
+        # Set the splitter sizes
+        self._splitter.setSizes(
+            [(self.height() - view_size.height()), view_size.height()]
+        )
+
+        # adjust video area
+        self.fit()
+
     def test_action(self):
-        # landmarks = self._face.landmarks
-        # print("Image Dump")
-        # print(self._face.shape)
-        # print(f"pix2mm: {self._face.pix2mm}")
-        # print(f"pd: {self._face.pupillary_distance}")
-        # print(f"pupils: {landmarks[96]} {landmarks[97]}")
-        # Get the size policy object
-        sizePolicy = self._splitter.sizePolicy()
-
-        # Retrieve the horizontal and vertical policies
-        horizontalPolicy = sizePolicy.horizontalPolicy()
-        verticalPolicy = sizePolicy.verticalPolicy()
-
-        # Convert the policies to readable string format
-        horizontalPolicyStr = QSizePolicy.Policy(horizontalPolicy).name
-        verticalPolicyStr = QSizePolicy.Policy(verticalPolicy).name
-
-        # Print the size policies
-        print(f"Horizontal Policy: {horizontalPolicyStr}")
-        print(f"Vertical Policy: {verticalPolicyStr}")
+        pass
+        # Set splitter as the central widget
+        # self.setCentralWidget(self.splitter)
 
     def on_print(self):
         pixmap = QPixmap.fromImage(self._display_buffer)
