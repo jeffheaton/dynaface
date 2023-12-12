@@ -528,6 +528,7 @@ class AnalyzeVideoTab(TabGraphic):
         # Create a Matplotlib figure
         fig = Figure(figsize=(12, 2.5), dpi=100)
         ax = fig.add_subplot(111)
+        fig.subplots_adjust(right=0.75)  # Adjust this value as needed
 
         data = self.collect_data()
         plot_stats = data.keys()
@@ -540,7 +541,8 @@ class AnalyzeVideoTab(TabGraphic):
 
         ax.set_xlabel("Time (s)")
         ax.set_ylabel("Value (multiple units)")
-        ax.legend()
+        # ax.legend()
+        ax.legend(loc="upper left", bbox_to_anchor=(1, 1.04))
 
         # Render figure to a buffer
         buf = io.BytesIO()
@@ -550,6 +552,7 @@ class AnalyzeVideoTab(TabGraphic):
         # Create QPixmap from buffer
         pixmap = QPixmap()
         pixmap.loadFromData(buf.getvalue())
+        pixmap = utl_gfx.crop_pixmap(pixmap, 5)
 
         if self._chart_view is None:
             logger.debug("New chart created")
