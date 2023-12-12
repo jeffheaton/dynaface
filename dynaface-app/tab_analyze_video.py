@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
     QDialog,
     QFileDialog,
     QGestureEvent,
+    QSizePolicy,
     QGraphicsScene,
     QGraphicsView,
     QHBoxLayout,
@@ -84,7 +85,11 @@ class AnalyzeVideoTab(TabGraphic):
             self._splitter = QSplitter(Qt.Orientation.Horizontal)
         else:
             self._splitter = QSplitter(Qt.Orientation.Vertical)
-        # self._splitter.addWidget(self._view)
+
+        self._splitter.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+
         self._content_layout.addWidget(self._splitter)
 
         # self.init_graphics(self._content_layout)
@@ -629,12 +634,26 @@ class AnalyzeVideoTab(TabGraphic):
         self.lbl_status.setText(self.status())
 
     def test_action(self):
-        landmarks = self._face.landmarks
-        print("Image Dump")
-        print(self._face.shape)
-        print(f"pix2mm: {self._face.pix2mm}")
-        print(f"pd: {self._face.pupillary_distance}")
-        print(f"pupils: {landmarks[96]} {landmarks[97]}")
+        # landmarks = self._face.landmarks
+        # print("Image Dump")
+        # print(self._face.shape)
+        # print(f"pix2mm: {self._face.pix2mm}")
+        # print(f"pd: {self._face.pupillary_distance}")
+        # print(f"pupils: {landmarks[96]} {landmarks[97]}")
+        # Get the size policy object
+        sizePolicy = self._splitter.sizePolicy()
+
+        # Retrieve the horizontal and vertical policies
+        horizontalPolicy = sizePolicy.horizontalPolicy()
+        verticalPolicy = sizePolicy.verticalPolicy()
+
+        # Convert the policies to readable string format
+        horizontalPolicyStr = QSizePolicy.Policy(horizontalPolicy).name
+        verticalPolicyStr = QSizePolicy.Policy(verticalPolicy).name
+
+        # Print the size policies
+        print(f"Horizontal Policy: {horizontalPolicyStr}")
+        print(f"Vertical Policy: {verticalPolicyStr}")
 
     def on_print(self):
         pixmap = QPixmap.fromImage(self._display_buffer)
