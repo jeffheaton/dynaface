@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
     QDialog,
     QFileDialog,
     QGestureEvent,
-    QSizePolicy,
+    QGraphicsProxyWidget,
     QGraphicsScene,
     QGraphicsView,
     QHBoxLayout,
@@ -30,6 +30,7 @@ from PyQt6.QtWidgets import (
     QPinchGesture,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSlider,
     QSpinBox,
     QSplitter,
@@ -100,7 +101,7 @@ class AnalyzeVideoTab(TabGraphic):
         self.init_bottom_horizontal_toolbar(tab_layout)
 
         # Allow touch zoom
-        self.grabGesture(Qt.GestureType.PinchGesture)
+        # self.grabGesture(Qt.GestureType.PinchGesture)
         self._auto_update = True
 
         self.thread = worker_threads.WorkerLoad(self)
@@ -276,18 +277,6 @@ class AnalyzeVideoTab(TabGraphic):
             self._render_buffer[:, :] = self._face.render_img
             self.update_graphic(resize=False)
 
-    def gestureEvent(self, event: QGestureEvent):
-        pinch = event.gesture(Qt.GestureType.PinchGesture)
-        if isinstance(pinch, QPinchGesture):
-            scaleFactor = pinch.scaleFactor()
-            if scaleFactor > 1:
-                new_value = self._spin_zoom.value() + 2
-            else:
-                new_value = self._spin_zoom.value() - 2
-            self._spin_zoom.setValue(new_value)
-            return True
-        return super().event(event)
-
     def event(self, event):
         if event.type() == QEvent.Type.Gesture:
             return self.gestureEvent(event)
@@ -337,6 +326,8 @@ class AnalyzeVideoTab(TabGraphic):
             logger.debug("Display first video frame on load")
             self._face.load_state(self._frames[0])
             self.create_graphic(buffer=self._face.render_img)
+            self._view.grabGesture(Qt.GestureType.PinchGesture)
+            self._view.installEventFilter(self)
             self.update_face()
             logger.debug("Done, display first video frame on load")
             # Auto fit
@@ -572,6 +563,8 @@ class AnalyzeVideoTab(TabGraphic):
 
             # Create and configure QGraphicsView
             self._chart_view = QGraphicsView(self._chart_scene)
+            self._chart_view.grabGesture(Qt.GestureType.PinchGesture)
+            self._chart_view.installEventFilter(self)
             self._chart_view.setTransformationAnchor(
                 QGraphicsView.ViewportAnchor.AnchorUnderMouse
             )
@@ -673,3 +666,36 @@ class AnalyzeVideoTab(TabGraphic):
     def on_print(self):
         pixmap = QPixmap.fromImage(self._display_buffer)
         utl_print.print_pixmap(self._window, pixmap)
+
+    def eventFilter(self, source, event):
+        if event.type() == QEvent.Type.Gesture:
+            return self.handleGestureEvent(source, event)
+        return super().eventFilter(source, event)
+
+    def handleGestureEvent(self, source, event):
+        if isinstance(event, QGestureEvent):
+            pinch = event.gesture(Qt.GestureType.PinchGesture)
+            if isinstance(pinch, QPinchGesture):
+                # Check if the gesture is over the top widget or the bottom widget
+                if source == self._view:
+                    self.gestureEvent(pinch)
+                elif (self._chart_view is not None) and (source == self._chart_view):
+                    self.zoom_chart(pinch)
+                return True
+        return False
+
+    def gestureEvent(self, pinch):
+        # pinch = event.gesture(Qt.GestureType.PinchGesture)
+        if isinstance(pinch, QPinchGesture):
+            scaleFactor = pinch.scaleFactor()
+            if scaleFactor > 1:
+                new_value = self._spin_zoom.value() + 2
+            else:
+                new_value = self._spin_zoom.value() - 2
+            self._spin_zoom.setValue(new_value)
+            return True
+        return True
+        # return super().event(event)
+
+    def zoom_chart(self, pinch):
+        print("Chart zoom")
