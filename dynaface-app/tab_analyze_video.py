@@ -405,6 +405,8 @@ class AnalyzeVideoTab(TabGraphic):
     def action_video_seek(self, _):
         self.open_frame()
         self.lbl_status.setText(self.status())
+        if self._chart_view:
+            self.update_chart()
 
     def action_zoom(self, value):
         z = value / 100
@@ -548,6 +550,10 @@ class AnalyzeVideoTab(TabGraphic):
         ax.set_ylabel("Value (multiple units)")
         # ax.legend()
         ax.legend(loc="upper left", bbox_to_anchor=(1, 1.04))
+
+        # Add the red vertical bar at current_frame
+        current_frame = self._video_slider.value()
+        ax.axvline(x=current_frame * self.frame_rate, color="red", linewidth=2)
 
         # Render figure to a buffer
         buf = io.BytesIO()
