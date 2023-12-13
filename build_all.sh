@@ -8,6 +8,7 @@ fi
 cd ./dynaface-lib
 cp $models/spiga_wflw.pt ./facial_analysis/spiga/models/weights/
 python setup.py bdist_wheel
+mkdir -p ../dynaface-app/wheels/
 cp ./dist/*.whl ../dynaface-app/wheels/
 cd ../dynaface-app
 cp $models/onet.pt ./data
