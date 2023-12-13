@@ -2,7 +2,7 @@ import logging
 from functools import partial
 
 import utl_gfx
-from facial_analysis.facial import load_face_image
+from facial_analysis.facial import load_face_image, AnalyzeFace, STATS
 from jth_ui.tab_graphic import TabGraphic
 from PyQt6.QtCore import QEvent, Qt, QTimer
 from PyQt6.QtWidgets import (
@@ -21,6 +21,10 @@ from PyQt6.QtWidgets import (
 )
 import utl_print
 from PyQt6.QtGui import QPixmap
+from PIL import Image
+import numpy as np
+import cv2
+import time
 
 
 logger = logging.getLogger(__name__)
@@ -33,7 +37,7 @@ class AnalyzeImageTab(TabGraphic):
         self._auto_update = False
 
         # Load the face
-        self._face = load_face_image(path, crop=True)
+        self.load_image(path)
 
         # Horiz toolbar
         tab_layout = QVBoxLayout(self)
@@ -58,6 +62,16 @@ class AnalyzeImageTab(TabGraphic):
 
         # Auto fit
         QTimer.singleShot(1, self.fit)
+
+    def load_image(self, path):
+        if path.lower().endswith(".heif"):
+            pil_image = Image.open(path)
+            image_np = np.array(pil_image)
+            # image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+            self._face = AnalyzeFace(STATS, data_path=None)
+            self._face.load_image(image_np, crop=True)
+        else:
+            self._face = load_face_image(path, crop=True)
 
     def init_horizontal_toolbar(self, layout):
         self._toolbar = QToolBar()

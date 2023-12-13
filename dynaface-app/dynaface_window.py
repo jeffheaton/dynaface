@@ -27,7 +27,16 @@ class DynafaceWindow(MainWindowJTH):
         self.render_buffer = None
         self.display_buffer = None
 
-        self._drop_ext = (".png", ".jpg", ".jpeg", ".bmp", ".gif", ".mp4", ".mov")
+        self._drop_ext = (
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".bmp",
+            ".gif",
+            ".mp4",
+            ".mov",
+            ".heic",
+        )
 
         if self.app.get_system_name() == "osx":
             self.setup_mac_menu()
@@ -212,15 +221,18 @@ class DynafaceWindow(MainWindowJTH):
         webbrowser.open("https://www.heatonresearch.com/mergelife/heaton-ca.html")
 
     def open_file(self, file_path):
-        super().open_file(file_path)
-        logger.info(f"Open File: {file_path}")
+        try:
+            super().open_file(file_path)
+            logger.info(f"Open File: {file_path}")
 
-        if file_path.lower().endswith((".jpg", ".jpeg", ".png", ".tiff")):
-            self.show_analyze_image(file_path)
-            self.update_recent_files(file_path)
-        elif file_path.lower().endswith((".mp4", ".mov")):
-            self.show_analyze_video(file_path)
-            self.update_recent_files(file_path)
+            if file_path.lower().endswith((".jpg", ".jpeg", ".png", ".tiff", ".heic")):
+                self.show_analyze_image(file_path)
+                self.update_recent_files(file_path)
+            elif file_path.lower().endswith((".mp4", ".mov")):
+                self.show_analyze_video(file_path)
+                self.update_recent_files(file_path)
+        except:
+            logger.error("Error during open file", exc_info=True)
 
     def perform_edit_copy(self):
         current_tab = self._tab_widget.currentWidget()

@@ -11,12 +11,15 @@ from facial_analysis.find_face import FindFace
 from facial_analysis.facial import STD_PUPIL_DIST
 import facial_analysis
 from jth_ui.app_jth import AppJTH
+from pillow_heif import register_heif_opener
 
 logger = logging.getLogger(__name__)
 
 # Constants for settings keys
 SETTING_PD = "pd"
 SETTING_LOG_LEVEL = "log_level"
+
+register_heif_opener()
 
 
 class AppDynaface(AppJTH):
