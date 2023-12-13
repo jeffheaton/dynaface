@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import QMenu, QMenuBar, QTabWidget
 from tab_about import AboutTab
 from tab_analyze_image import AnalyzeImageTab
 from tab_analyze_video import AnalyzeVideoTab
+from jth_ui import app_jth
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,7 @@ class DynafaceWindow(MainWindowJTH):
         else:
             self.setup_menu()
         self.initUI()
+        self.update_recent_menu()
 
     def setup_menu(self):
         # Create the File menu
@@ -85,6 +87,10 @@ class DynafaceWindow(MainWindowJTH):
         openAction.setShortcut("Ctrl+O")
         openAction.triggered.connect(self.open_action)
         self._file_menu.addAction(openAction)
+
+        # Open recent submenu
+        self._recent_menu = QMenu("Open &Recent", self)
+        self._file_menu.addMenu(self._recent_menu)
 
         # Add save as... action
         saveAsMenu = QAction("Save As...", self)
@@ -211,8 +217,10 @@ class DynafaceWindow(MainWindowJTH):
 
         if file_path.lower().endswith((".jpg", ".jpeg", ".png", ".tiff")):
             self.show_analyze_image(file_path)
+            self.update_recent_files(file_path)
         elif file_path.lower().endswith((".mp4", ".mov")):
             self.show_analyze_video(file_path)
+            self.update_recent_files(file_path)
 
     def perform_edit_copy(self):
         current_tab = self._tab_widget.currentWidget()
@@ -240,3 +248,24 @@ class DynafaceWindow(MainWindowJTH):
             # Check if the current tab has the 'on_copy' method
             if hasattr(current_tab, "on_print"):
                 current_tab.on_print()
+
+    def get_recent_file_list(self):
+        recent_files = self.app.state.get(app_jth.STATE_LAST_FILES, [])
+        self.app.state[app_jth.STATE_LAST_FILES] = recent_files
+        return recent_files
+
+    def update_recent_files(self, path):
+        recent_files = self.get_recent_file_list()
+        if path not in recent_files:
+            recent_files.append(path)
+            if len(recent_files) > 5:
+                recent_files.pop(0)
+        self.update_recent_menu()
+
+    def update_recent_menu(self):
+        recent_files = self.get_recent_file_list()
+        self._recent_menu.clear()
+        for path in reversed(recent_files):
+            action = QAction(path, self)
+            action.triggered.connect(lambda _, p=path: self.open_file(p))
+            self._recent_menu.addAction(action)

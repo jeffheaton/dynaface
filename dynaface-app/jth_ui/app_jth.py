@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox
 logger = logging.getLogger(__name__)
 
 STATE_LAST_FOLDER = "last_folder"
+STATE_LAST_FILES = "recent"
 
 
 class AppJTH:
@@ -188,7 +189,7 @@ class AppJTH:
     def init_state(self):
         home_directory = os.path.expanduser("~")
         documents_path = os.path.join(home_directory, "Documents")
-        self.state = {STATE_LAST_FOLDER: documents_path}
+        self.state = {STATE_LAST_FOLDER: documents_path, STATE_LAST_FILES: []}
 
     def init_settings(self):
         self.settings = {}

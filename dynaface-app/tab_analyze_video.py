@@ -16,7 +16,7 @@ from jth_ui.tab_graphic import TabGraphic
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PyQt6.QtCore import QEvent, QObject, Qt, QThread, QTimer, pyqtSignal
-from PyQt6.QtGui import QPainter, QPixmap
+from PyQt6.QtGui import QPainter, QPixmap, QColor
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -193,6 +193,15 @@ class AnalyzeVideoTab(TabGraphic):
         self._spin_zoom.setValue(100)  # Starting value
         self._spin_zoom.setFixedWidth(60)  # Adjust the width as needed
         self._spin_zoom.valueChanged.connect(self.action_zoom)
+
+        self._spin_zoom_chart = QSpinBox()
+        toolbar.addWidget(self._spin_zoom_chart)
+        self._spin_zoom_chart.setMinimum(1)
+        self._spin_zoom_chart.setMaximum(200)
+        self._spin_zoom_chart.setSingleStep(5)
+        self._spin_zoom_chart.setValue(100)  # Starting value
+        self._spin_zoom_chart.setFixedWidth(60)  # Adjust the width as needed
+        self._spin_zoom_chart.valueChanged.connect(self.action_zoom_chart)
 
         btn_fit = QPushButton("Fit")
         btn_fit.clicked.connect(self.fit)
@@ -404,6 +413,11 @@ class AnalyzeVideoTab(TabGraphic):
         self._view.resetTransform()
         self._view.scale(z, z)
 
+    def action_zoom_chart(self, value):
+        z = value / 100
+        self._chart_view.resetTransform()
+        self._chart_view.scale(z, z)
+
     def fit(self):
         view_size = self._view.size()
         scene_rect = self._scene.sceneRect()
@@ -559,11 +573,16 @@ class AnalyzeVideoTab(TabGraphic):
         if self._chart_view is None:
             logger.debug("New chart created")
             self._chart_scene = QGraphicsScene()
+            self._chart_scene.setBackgroundBrush(QColor("white"))
             self._chart_scene.addPixmap(pixmap)
 
             # Create and configure QGraphicsView
             self._chart_view = QGraphicsView(self._chart_scene)
+            self._chart_view.setBackgroundBrush(QColor("white"))
             self._chart_view.grabGesture(Qt.GestureType.PinchGesture)
+            self._chart_view.setAlignment(
+                Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter
+            )
             self._chart_view.installEventFilter(self)
             self._chart_view.setTransformationAnchor(
                 QGraphicsView.ViewportAnchor.AnchorUnderMouse
@@ -682,7 +701,7 @@ class AnalyzeVideoTab(TabGraphic):
                 elif (self._chart_view is not None) and (source == self._chart_view):
                     self.zoom_chart(pinch)
                 return True
-        return False
+        return super().handleGestureEvent(event)
 
     def gestureEvent(self, pinch):
         # pinch = event.gesture(Qt.GestureType.PinchGesture)
@@ -694,8 +713,15 @@ class AnalyzeVideoTab(TabGraphic):
                 new_value = self._spin_zoom.value() - 2
             self._spin_zoom.setValue(new_value)
             return True
-        return True
-        # return super().event(event)
+        return False
 
     def zoom_chart(self, pinch):
-        print("Chart zoom")
+        if isinstance(pinch, QPinchGesture):
+            scaleFactor = pinch.scaleFactor()
+            if scaleFactor > 1:
+                new_value = self._spin_zoom_chart.value() + 2
+            else:
+                new_value = self._spin_zoom_chart.value() - 2
+            self._spin_zoom_chart.setValue(new_value)
+            return True
+        return False
