@@ -6,7 +6,6 @@ if [ -z "${app_certificate}" ]; then
 fi
 
 cd ./dynaface-lib
-cp $models/spiga_wflw.pt ./facial_analysis/spiga/models/weights/
 python setup.py bdist_wheel
 mkdir -p ../dynaface-app/wheels/
 cp ./dist/*.whl ../dynaface-app/wheels/
@@ -14,6 +13,7 @@ cd ../dynaface-app
 cp $models/onet.pt ./data
 cp $models/pnet.pt ./data
 cp $models/rnet.pt ./data
+cp $models/spiga_wflw.pt ./data
 rm -rf ./venv || true
 python3.11 -m venv venv
 source venv/bin/activate
