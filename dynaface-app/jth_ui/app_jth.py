@@ -28,7 +28,7 @@ class AppJTH:
         self.VERSION = version
         self.APP_ID = self.BUNDLE_ID.split(".")[-1]
         self.settings = {}
-
+        print("***",self.get_system_name())
         if self.get_system_name() == "osx":
             if self.is_sandboxed():
                 self.LOG_DIR = os.path.join(os.path.expanduser("~"), "logs")
@@ -48,7 +48,7 @@ class AppJTH:
             )
             self.LOG_DIR = os.path.join(base_dir, "logs")
             self.SETTING_DIR = os.path.join(base_dir, "preferences")
-            self.SETTING_FILE = os.path.join(self.SETTING_DIR, f"{APP_ID}.json")
+            self.SETTING_FILE = os.path.join(self.SETTING_DIR, f"{self.APP_ID}.json")
             self.STATE_FILE = os.path.join(self.SETTING_DIR, "state.json")
         else:
             pass

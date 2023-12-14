@@ -1,4 +1,3 @@
-import const_values
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
@@ -8,7 +7,7 @@ class AboutTab(QWidget):
         super().__init__()
         self._window = window
         text = f"""
-<H1>{const_values.APP_NAME} {self._window.app.VERSION}</H1>
+<H1>{self._window.app.APP_NAME} {self._window.app.VERSION}</H1>
 {self._window.app.COPYRIGHT}
 <br>
 <hr>

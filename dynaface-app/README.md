@@ -11,7 +11,8 @@ pip install facial_analysis -f ./wheels
 
 C:\Users\jeffh\AppData\Local\Programs\Python\Python312
 
-.\.venv\Scripts\activate.bat
+.\venv\Scripts\activate.bat
+.\venv\Scripts\Activate.ps1
 
 Version:
 build.sh
@@ -29,3 +30,8 @@ pip install PyQt6-Charts
 
 pyqtgraph-0.13.3
 pip install PyQt6-Charts
+
+
+Windows
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+

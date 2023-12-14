@@ -38,55 +38,31 @@ class DynafaceWindow(MainWindowJTH):
             ".heic",
         )
 
-        if self.app.get_system_name() == "osx":
-            self.setup_mac_menu()
-        else:
-            self.setup_menu()
+        self.setup_menu()
         self.initUI()
         self.update_recent_menu()
 
     def setup_menu(self):
-        # Create the File menu
-        file_menu = self.menuBar().addMenu("File")
-
-        # Create a "Exit" action
-        exit_action = QAction("Exit", self)
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
-
-        # Create the Edit menu
-        edit_menu = self.menuBar().addMenu("Edit")
-
-        # Create an "About" action
-        about_action = QAction("About", self)
-        about_action.triggered.connect(self.show_about)
-        edit_menu.addAction(about_action)
-
-    def setup_mac_menu(self):
-        # Create a main menu bar
-        # if platform.uname().system.startswith('Darw') :
-        #    self.menubar = QMenuBar() # parentless menu bar for Mac OS
-        # else:
-        #    self.menubar = self.menuBar() # refer to the default one
-
-        self.menubar = QMenuBar()  # self.menuBar()
+        self.menubar = QMenuBar(self)
+        self.setMenuBar(self.menubar)
 
         # Create the app menu and add it to the menu bar
         app_menu = QMenu(self.app.APP_NAME, self)
 
         # Add items to the app menu
-        about_action = QAction(f"About {self.app.APP_NAME}", self)
-        app_menu.addAction(about_action)
-        self.about_menu = QMenu("About", self)
-        about_action.triggered.connect(self.show_about)
+        if self.app.get_system_name() == "osx":
+            about_action = QAction(f"About {self.app.APP_NAME}", self)
+            app_menu.addAction(about_action)
+            self.about_menu = QMenu("About", self)
+            about_action.triggered.connect(self.show_about)
 
-        preferences_action = QAction("Settings...", self)
-        app_menu.addAction(preferences_action)
-        preferences_action.triggered.connect(self.show_properties)
+            preferences_action = QAction("Settings...", self)
+            app_menu.addAction(preferences_action)
+            preferences_action.triggered.connect(self.show_properties)
 
-        exit_action = QAction("Quit", self)
-        exit_action.triggered.connect(self.close)
-        app_menu.addAction(exit_action)
+            exit_action = QAction("Quit", self)
+            exit_action.triggered.connect(self.close)
+            app_menu.addAction(exit_action)
 
         # File menu
         self._file_menu = QMenu("File", self)
@@ -113,11 +89,15 @@ class DynafaceWindow(MainWindowJTH):
         printAction.triggered.connect(self.print_action)
         self._file_menu.addAction(printAction)
 
-        # Close Window action
-        closeAction = QAction("Close Window", self)
-        closeAction.setShortcut(QKeySequence(QKeySequence.StandardKey.Close))
-        closeAction.triggered.connect(self.close)
-        self._file_menu.addAction(closeAction)
+        if self.app.get_system_name() == "windows":
+            preferences_action = QAction("Settings...", self)
+            self._file_menu.addAction(preferences_action)
+            preferences_action.triggered.connect(self.show_properties)
+
+            exit_action = QAction("Exit", self)
+            exit_action.triggered.connect(self.close)
+            self._file_menu.addAction(exit_action)
+
 
         # Edit menu
         self._edit_menu = QMenu("Edit", self)
@@ -136,6 +116,12 @@ class DynafaceWindow(MainWindowJTH):
 
         # Help menu
         self._help_menu = QMenu("Help", self)
+
+        if self.app.get_system_name() == "windows":
+            about_action = QAction(f"About {self.app.APP_NAME}", self)
+            self._help_menu.addAction(about_action)
+            about_action.triggered.connect(self.show_about)
+
         tutorial_action = QAction("Tutorial", self)
         tutorial_action.triggered.connect(self.open_tutorial)
         self._help_menu.addAction(tutorial_action)
@@ -170,7 +156,7 @@ class DynafaceWindow(MainWindowJTH):
     def show_about(self):
         try:
             if not self.is_tab_open("About"):
-                self.add_tab(AboutTab(), "About Dynaface")
+                self.add_tab(AboutTab(self), "About Dynaface")
         except Exception as e:
             logger.error("Error during about open", exc_info=True)
 
