@@ -11,8 +11,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-import testme
-
 
 class SplashTab(QWidget):
     def __init__(self, window):
@@ -46,11 +44,11 @@ class SplashTab(QWidget):
         )
         button_open.clicked.connect(self._window.open_action)
 
-        button_rule_viewer = QPushButton(f"Test")
-        button_rule_viewer.setSizePolicy(
+        button_about = QPushButton(f"About")
+        button_about.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        button_rule_viewer.clicked.connect(testme.test_it)
+        button_about.clicked.connect(self.open_about)
 
         button_exit = QPushButton(f"Exit")
         button_exit.setSizePolicy(
@@ -65,7 +63,7 @@ class SplashTab(QWidget):
         button_settings.clicked.connect(self._window.show_properties)
 
         buttons_layout.addWidget(button_open, 0, 0)
-        buttons_layout.addWidget(button_rule_viewer, 0, 1)
+        buttons_layout.addWidget(button_about, 0, 1)
         buttons_layout.addWidget(button_exit, 1, 1)
         buttons_layout.addWidget(button_settings, 1, 0)
 
@@ -106,3 +104,6 @@ class SplashTab(QWidget):
         self.version_label.move(self.width() - self.version_label.width() - 10, 10)
         self.update_image()
         super().resizeEvent(event)
+
+    def open_about(self):
+        self._window.show_about()

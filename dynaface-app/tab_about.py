@@ -1,20 +1,26 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
+import facial_analysis
 
 
 class AboutTab(QWidget):
     def __init__(self, window):
         super().__init__()
         self._window = window
+        device = facial_analysis.detect_device()
         text = f"""
 <H1>{self._window.app.APP_NAME} {self._window.app.VERSION}</H1>
 {self._window.app.COPYRIGHT}
 <br>
+Produced in collaboration with [insert names], [Johns Hopkins reference]. 
+<br>
+This program is for education and research purposes only.
 <hr>
-This program implements the cellular automata described in the paper:<br>
-Heaton, J. March (2018). Evolving continuous cellular automata for aesthetic objectives. <i>Genetic Programming Evolvable Machines<i>.<br><a href='https://doi.org/10.1007/s10710-018-9336-1'>https://doi.org/10.1007/s10710-018-9336-1</a>
+This program implements the algorithms described in the paper:<br>
+[insert actual paper cite]
 <hr>
-Log path: {self._window.app.LOG_DIR}
+Log path: {self._window.app.LOG_DIR} <br>
+Accelerator Hardware Detected: {device}
 """
 
         # Create the QLabel with the hyperlink
