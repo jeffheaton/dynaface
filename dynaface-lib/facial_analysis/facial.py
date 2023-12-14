@@ -5,12 +5,12 @@ import cv2
 import numpy as np
 import torch
 from facial_analysis.calc import *
-from facial_analysis.find_face import FindFace
 from facial_analysis.image import ImageAnalysis, load_image
 from facial_analysis.spiga.inference.config import ModelConfig
 from facial_analysis.spiga.inference.framework import SPIGAFramework
 from facial_analysis.util import PolyArea
 import copy
+from facial_analysis import models
 
 STD_PUPIL_DIST = 63
 
@@ -35,7 +35,6 @@ STATS = [
     AnalyzeDentalArea(),
     AnalyzeEyeArea(),
 ]
-_processor = None
 
 
 def init_processor(device=None):
@@ -50,9 +49,9 @@ def init_processor(device=None):
     _processor = SPIGAFramework(config, device=device)
 
 
-def load_face_image(filename, crop=True, stats=STATS, data_path=None, device=None):
+def load_face_image(filename, crop=True, stats=STATS):
     img = load_image(filename)
-    face = AnalyzeFace(stats, data_path=data_path, device=device)
+    face = AnalyzeFace(stats)
     face.load_image(img, crop)
     return face
 
@@ -120,24 +119,13 @@ def scale_crop_points(lst, crop_x, crop_y, scale):
 class AnalyzeFace(ImageAnalysis):
     pd = STD_PUPIL_DIST
 
-    def __init__(self, stats, data_path=None, device=None):
-        global _processor
-
-        if device is None:
-            has_mps = torch.backends.mps.is_built()
-            device = "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
-
-        if not _processor:
-            init_processor(device)
-
+    def __init__(self, stats):
         self.original_img = None
-        self.data_path = data_path
         self.left_eye = None
         self.right_eye = None
         self.nose = None
         self.calcs = stats
         self.headpose = [0, 0, 0]
-        self.processor = _processor
         self.landmarks = []
         self.pupillary_distance = 0
         self.pix2mm = 1
@@ -147,16 +135,19 @@ class AnalyzeFace(ImageAnalysis):
 
     def _find_landmarks(self, img):
         logger.debug("Called _find_landmarks")
-        bbox = FindFace.detect_face(img)
+        bbox, _ = models.mtcnn_model.detect(img)
         logger.debug(f"Detected bbox: {bbox}")
 
         if bbox is None:
             bbox = [0, 0, img.shape[1], img.shape[0]]
             logging.info("Could not detect face area")
+        else:
+            bbox = bbox[0]
         # bbox to spiga is x,y,w,h; however, facenet_pytorch deals in x1,y1,x2,y2.
+
         bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
         logger.debug("Calling SPIGA")
-        features = self.processor.inference(img, [bbox])
+        features = models.spiga_model.inference(img, [bbox])
 
         # Prepare variables
         x0, y0, w, h = bbox

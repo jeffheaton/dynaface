@@ -7,7 +7,6 @@ import sys
 
 import torch
 from dynaface_window import DynafaceWindow
-from facial_analysis.find_face import FindFace
 from facial_analysis.facial import STD_PUPIL_DIST
 import facial_analysis
 from jth_ui.app_jth import AppJTH
@@ -43,7 +42,8 @@ class AppDynaface(AppJTH):
             device = "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
             logger.info(f"PyTorch Device: {device}")
 
-            level = self.settings[SETTING_LOG_LEVEL]
+            # Set logging level
+            level = self.settings.get(SETTING_LOG_LEVEL, "INFO")
             logging_level = getattr(logging, level)
             self.change_log_level(logging_level)
 
@@ -53,7 +53,7 @@ class AppDynaface(AppJTH):
             except:
                 facial_analysis.facial.AnalyzeFace.pd = STD_PUPIL_DIST
 
-            FindFace.init(path=self.DATA_DIR, device=device)
+            facial_analysis.init_models(model_path=self.DATA_DIR, device=device)
         except Exception as e:
             logger.error("Error running app", exc_info=True)
 

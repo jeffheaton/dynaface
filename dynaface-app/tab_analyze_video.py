@@ -126,7 +126,7 @@ class AnalyzeVideoTab(TabGraphic):
         logger.info(f"Video length: {self.video_length}")
 
         # Prepare facial analysis
-        self._face = facial.AnalyzeFace(self._calcs, data_path=None)
+        self._face = facial.AnalyzeFace(self._calcs)
 
     def init_bottom_horizontal_toolbar(self, layout):
         toolbar = QToolBar()
@@ -500,7 +500,7 @@ class AnalyzeVideoTab(TabGraphic):
                 self._save_as_data()
 
     def collect_data(self):
-        face = facial.AnalyzeFace(self._calcs, data_path=None)
+        face = facial.AnalyzeFace(self._calcs)
         stats = face.get_all_stats()
         data = {stat: [] for stat in stats}
 

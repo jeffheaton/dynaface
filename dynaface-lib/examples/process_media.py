@@ -1,3 +1,4 @@
+import facial_analysis
 from facial_analysis.facial import load_face_image
 from facial_analysis.calc import (
     AnalyzeFAI,
@@ -76,10 +77,10 @@ args = parser.parse_args()
 
 device = args.device
 if device == "detect":
-    has_mps = torch.backends.mps.is_built()
-    device = "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
-    print("Detecting compute device")
+    device = facial_analysis.detect_device()
+    print(f"Detecting compute device")
 print(f"Using device: {device}")
+facial_analysis.init_models(model_path=None, device=device)
 
 input_file = args.input_file
 if args.output_file:

@@ -64,11 +64,13 @@ class AnalyzeImageTab(TabGraphic):
         QTimer.singleShot(1, self.fit)
 
     def load_image(self, path):
-        if path.lower().endswith(".heif"):
+        print(f"***{path}")
+        if path.lower().endswith(".heic"):
+            print("***here")
             pil_image = Image.open(path)
             image_np = np.array(pil_image)
             # image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
-            self._face = AnalyzeFace(STATS, data_path=None)
+            self._face = AnalyzeFace(STATS)
             self._face.load_image(image_np, crop=True)
         else:
             self._face = load_face_image(path, crop=True)

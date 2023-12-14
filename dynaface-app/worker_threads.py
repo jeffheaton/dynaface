@@ -60,7 +60,7 @@ class WorkerLoad(QThread):
     def run(self):
         logger.debug("Running background thread")
         self._target.loading = True
-        self._face = facial.AnalyzeFace([], data_path=None)
+        self._face = facial.AnalyzeFace([])
         try:
             i = 0
             while True:

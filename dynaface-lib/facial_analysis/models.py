@@ -3,7 +3,16 @@ import os
 import torch
 from facenet_pytorch import MTCNN
 from facenet_pytorch.models.mtcnn import ONet, PNet, RNet
+from facial_analysis.spiga.inference.config import ModelConfig
+from facial_analysis.spiga.inference.framework import SPIGAFramework
 from torch import nn
+
+_model_path = None
+_device = None
+mtcnn_model = None
+spiga_model = None
+
+SPIGA_MODEL = "wflw"
 
 
 class MTCNN2(MTCNN):
@@ -48,53 +57,51 @@ class MTCNN2(MTCNN):
         if not self.selection_method:
             self.selection_method = "largest" if self.select_largest else "probability"
 
-        # pnet.pt
-
     def load_weights(self, net, filename):
         state_dict = torch.load(filename)
         net.load_state_dict(state_dict)
 
 
-class FindFace:
-    mtcnn = None
+def _init_mtcnn() -> None:
+    global mtcnn_model
+    # Mac M1 issue - hope to remove some day
+    # RuntimeError: Adaptive pool MPS: input sizes must be divisible by output sizes.
+    # https://github.com/pytorch/pytorch/issues/96056#issuecomment-1457633408
+    # https://github.com/pytorch/pytorch/issues/97109
+    if _device == "mps":
+        device = "cpu"  # seems to be some mps issue we need to look at
+    else:
+        device = _device
 
-    def init(device=None, path=None):
-        # https://github.com/pytorch/pytorch/issues/96056#issuecomment-1457633408
-        if device is None:
-            has_mps = torch.backends.mps.is_built()
-            device = "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
+    if _model_path is None:
+        mtcnn_model = MTCNN(keep_all=True, device=device)
+    else:
+        mtcnn_model = MTCNN2(keep_all=True, device=device, path=_model_path)
 
-        # Mac M1 issue - hope to remove some day
-        # RuntimeError: Adaptive pool MPS: input sizes must be divisible by output sizes.
-        # https://github.com/pytorch/pytorch/issues/96056#issuecomment-1457633408
-        # https://github.com/pytorch/pytorch/issues/97109
-        if device == "mps":
-            device = "cpu"  # seems to be some mps issue we need to look at
 
-        if path is None:
-            FindFace.mtcnn = MTCNN(keep_all=True, device=device)
-        else:
-            FindFace.mtcnn = MTCNN2(keep_all=True, device=device, path=path)
+def _init_spiga() -> None:
+    global spiga_model
 
-    def is_init():
-        return not FindFace.mtcnn is None
+    config = ModelConfig(dataset_name=SPIGA_MODEL, load_model_url=False)
+    config.model_weights_path = _model_path
+    spiga_model = SPIGAFramework(config, device=_device)
 
-    def detect_face(img):
-        if FindFace.mtcnn is None:
-            FindFace.init()
-        boxes, _ = FindFace.mtcnn.detect(img)
-        if boxes is None:
-            return None
-        return boxes[0]
 
-    def crop(img):
-        if FindFace.mtcnn is None:
-            FindFace.init()
-        boxes, _ = FindFace.mtcnn.detect(img)
-        if boxes is not None:
-            # Assuming the first face detected
-            box = boxes[0]
-            x1, y1, x2, y2 = int(box[0]), int(box[1]), int(box[2]), int(box[3])
-            return img[y1:y2, x1:x2]
+def init_models(model_path: str, device: str) -> None:
+    global _model_path, _device
 
-        return None
+    _model_path = model_path
+    _device = device
+
+    _init_mtcnn()
+    _init_spiga()
+
+
+def are_models_init() -> bool:
+    global _device
+    return _device is not None
+
+
+def detect_device() -> str:
+    has_mps = torch.backends.mps.is_built()
+    return "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"

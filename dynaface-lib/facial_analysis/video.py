@@ -9,7 +9,6 @@ import cv2
 import plotly.graph_objects as go
 import plotly.io as pio
 from facial_analysis.facial import AnalyzeFace
-from facial_analysis.find_face import FindFace
 
 SAMPLE_RATE = 44100
 
