@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 # Constants for settings keys
 SETTING_PD = "pd"
 SETTING_LOG_LEVEL = "log_level"
+SETTING_ACC = "accelerator"
 
 register_heif_opener()
 
@@ -53,6 +54,10 @@ class AppDynaface(AppJTH):
             except:
                 facial_analysis.facial.AnalyzeFace.pd = STD_PUPIL_DIST
 
+            if not self.settings.get(SETTING_ACC, True):
+                device = "cpu"
+
+            logging.info("Using device: {device}")
             facial_analysis.init_models(model_path=self.DATA_DIR, device=device)
         except Exception as e:
             logger.error("Error running app", exc_info=True)
@@ -65,4 +70,8 @@ class AppDynaface(AppJTH):
             logger.error("Error shutting down app", exc_info=True)
 
     def init_settings(self):
-        self.settings = {SETTING_PD: STD_PUPIL_DIST, SETTING_LOG_LEVEL: "INFO"}
+        self.settings = {
+            SETTING_PD: STD_PUPIL_DIST,
+            SETTING_LOG_LEVEL: "INFO",
+            SETTING_ACC: True,
+        }

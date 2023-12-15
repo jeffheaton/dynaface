@@ -111,9 +111,9 @@ class AnalyzeImageTab(TabGraphic):
         self._toolbar.addWidget(btn_fit)
         self._toolbar.addSeparator()
 
-        btn_test = QPushButton("Test")
-        self._toolbar.addWidget(btn_test)
-        btn_test.clicked.connect(self.test_action)
+        # btn_test = QPushButton("Test")
+        # self._toolbar.addWidget(btn_test)
+        # btn_test.clicked.connect(self.test_action)
 
     def init_vertical_toolbar(self, layout):
         # Add a vertical toolbar (left side of the tab)
@@ -259,15 +259,6 @@ class AnalyzeImageTab(TabGraphic):
                 )
             else:
                 self._face.save(filename)
-
-    def test_action(self):
-        # landmarks = self._face.landmarks
-        # print("Image Dump")
-        # print(self._face.shape)
-        # print(f"pix2mm: {self._face.pix2mm}")
-        # print(f"pd: {self._face.pupillary_distance}")
-        # print(f"pupils: {landmarks[96]} {landmarks[97]}")
-        print(self._view.maximumSize())
 
     def on_print(self):
         pixmap = QPixmap.fromImage(self._display_buffer)

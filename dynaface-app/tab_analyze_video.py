@@ -216,9 +216,9 @@ class AnalyzeVideoTab(TabGraphic):
         toolbar.addWidget(btn_cut_right)
         btn_cut_right.clicked.connect(self.action_cut_right)
 
-        btn_test = QPushButton("Test")
-        toolbar.addWidget(btn_test)
-        btn_test.clicked.connect(self.test_action)
+        # btn_test = QPushButton("Test")
+        # toolbar.addWidget(btn_test)
+        # btn_test.clicked.connect(self.test_action)
 
     def init_vertical_toolbar(self, layout):
         # Add a vertical toolbar (left side of the tab)

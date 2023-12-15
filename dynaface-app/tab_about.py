@@ -8,6 +8,7 @@ class AboutTab(QWidget):
         super().__init__()
         self._window = window
         device = facial_analysis.detect_device()
+        current_device = facial_analysis.models._device
         text = f"""
 <H1>{self._window.app.APP_NAME} {self._window.app.VERSION}</H1>
 {self._window.app.COPYRIGHT}
@@ -20,7 +21,7 @@ This program implements the algorithms described in the paper:<br>
 [insert actual paper cite]
 <hr>
 Log path: {self._window.app.LOG_DIR} <br>
-Accelerator Hardware Detected: {device}
+Processor in use: {current_device} (detected: {device})
 """
 
         # Create the QLabel with the hyperlink

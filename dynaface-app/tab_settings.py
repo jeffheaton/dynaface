@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
     QWidget,
+    QCheckBox,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,8 @@ class SettingsTab(QWidget):
         log_level_label = QLabel("Log Level:", self)
         self._log_combo_box = QComboBox()
         self._log_combo_box.addItems(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
+        lbl_acc = QLabel("Use Accelerator (GPU)")
+        self._chk_accelerator = QCheckBox()
 
         # Create button layout
         save_button = QPushButton("Save", self)
@@ -45,6 +48,7 @@ class SettingsTab(QWidget):
         form_layout = QFormLayout()
         form_layout.addRow(lbl_pd, self._text_pd)
         form_layout.addRow(log_level_label, self._log_combo_box)
+        form_layout.addRow(lbl_acc, self._chk_accelerator)
 
         # Main layout
         layout = QVBoxLayout()
@@ -55,7 +59,6 @@ class SettingsTab(QWidget):
         window.add_tab(self, "Settings")
 
         settings = self._window.app.settings
-        print(settings)
         self._text_pd.setText(
             settings.get(dynaface_app.SETTING_PD, str(STD_PUPIL_DIST))
         )
@@ -63,6 +66,7 @@ class SettingsTab(QWidget):
             self._log_combo_box,
             settings.get(dynaface_app.SETTING_LOG_LEVEL, "INFO"),
         )
+        self._chk_accelerator.setChecked(settings.get(dynaface_app.SETTING_ACC, True))
 
     def on_close(self):
         pass
@@ -83,9 +87,15 @@ class SettingsTab(QWidget):
 
         settings[dynaface_app.SETTING_PD] = self._text_pd.text()
         settings[dynaface_app.SETTING_LOG_LEVEL] = self._log_combo_box.currentText()
+        settings[dynaface_app.SETTING_ACC] = self._chk_accelerator.isChecked()
         level = settings[dynaface_app.SETTING_LOG_LEVEL]
         logging_level = getattr(logging, level)
         self._window.app.change_log_level(logging_level)
         pd = settings.get(dynaface_app.SETTING_PD, STD_PUPIL_DIST)
         facial_analysis.facial.AnalyzeFace.pd = int(pd)
         self._window.app.save_settings()
+
+        if facial_analysis.models._device != settings[dynaface_app.SETTING_ACC]:
+            self._window.display_message_box(
+                "Changes to accelerator settings will be effective on application restart."
+            )
