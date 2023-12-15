@@ -5,6 +5,7 @@ import cv2
 from facial_analysis import facial
 from facial_analysis.facial import load_face_image
 from PyQt6.QtCore import QThread, pyqtSignal
+from jth_ui import utl_etc
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ class WorkerExport(QThread):
             self._output_file, fourcc, self._dialog._window.frame_rate, (width, height)
         )
 
-        face = facial.AnalyzeFace(self._dialog._window._calcs, data_path=None)
+        face = facial.AnalyzeFace(self._dialog._window._calcs)
 
         c = len(self._dialog._window._frames)
         for i, frame in enumerate(self._dialog._window._frames):
@@ -56,10 +57,12 @@ class WorkerLoad(QThread):
     def __init__(self, target):
         super().__init__()
         self._target = target
+        self._total = self._target.frame_count
 
     def run(self):
         logger.debug("Running background thread")
         self._target.loading = True
+        self._loading_etc = utl_etc.CalcETC(self._total)
         self._face = facial.AnalyzeFace([])
         try:
             i = 0
@@ -72,15 +75,10 @@ class WorkerLoad(QThread):
                     logger.debug("Thread done")
                     break
 
-                logger.debug(f"Frame shape: {frame.shape}")
-
-                logger.debug("Read frame")
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                logger.debug("Scanning face")
                 self._face.load_image(img=frame, crop=True)
-                logger.debug("Adding frame")
                 self._target.add_frame(self._face)
-                self._update_signal.emit(None)
+                self._update_signal.emit(self._loading_etc.cycle())
         finally:
             self._update_signal.emit(None)
             self._target.loading = False
@@ -92,13 +90,15 @@ class WorkerWaitLoad(QThread):
     def __init__(self, dlg):
         super().__init__()
         self._dialog = dlg
+        self._total = self._dialog._window.frame_count
+        self._etc = utl_etc.CalcETC(self._total)
 
     def run(self):
         while self._dialog._window.loading:
-            total = self._dialog._window.frame_count
             cur = len(self._dialog._window._frames)
+            time_left = self._etc.cycle()
             self._update_signal.emit(
-                f"Waiting for load to complete: {cur:,}/{total:,}."
+                f"Loading frame {cur:,} of {self._total:,}; time left: {time_left}."
             )
             time.sleep(1)
         self._update_signal.emit("*")

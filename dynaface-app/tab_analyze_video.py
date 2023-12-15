@@ -329,7 +329,7 @@ class AnalyzeVideoTab(TabGraphic):
 
     def update_load_progress(self, status):
         # self.lbl_status.setText(status)
-        self.lbl_status.setText(self.status())
+        self.lbl_status.setText(self.status(status))
 
         if self._view is None:
             logger.debug("Display first video frame on load")
@@ -365,13 +365,13 @@ class AnalyzeVideoTab(TabGraphic):
         if i > 0:
             self._video_slider.setSliderPosition(i - 1)
 
-    def status(self):
+    def status(self, etc=None):
         i = self._video_slider.sliderPosition()
         mx = self._video_slider.maximum()
         if self.loading == False and len(self._frames) == 0:
             return "(0/0)"
         elif self.loading:
-            return f"({mx:,}/{self.frame_count:,}, loading...)"
+            return f"({mx:,}/{self.frame_count:,}, loading... etc: {etc})"
         else:
             return f"({i+1:,}/{self.frame_count:,})"
 
@@ -414,6 +414,8 @@ class AnalyzeVideoTab(TabGraphic):
         self._view.scale(z, z)
 
     def action_zoom_chart(self, value):
+        if self.loading:
+            return
         z = value / 100
         self._chart_view.resetTransform()
         self._chart_view.scale(z, z)
@@ -467,6 +469,8 @@ class AnalyzeVideoTab(TabGraphic):
             if not filename.lower().endswith(".mp4"):
                 self._window.display_message_box("Filename must end in .mp4")
             else:
+                if not self.wait_load_complete():
+                    return
                 dialog = dlg_modal.VideoExportDialog(self, filename)
                 dialog.exec()
 
@@ -545,7 +549,8 @@ class AnalyzeVideoTab(TabGraphic):
         data = self.collect_data()
         plot_stats = data.keys()
         l = len(data[all_stats[0]])
-        lst_time = [x * self.frame_rate for x in range(l)]
+        # lst_time = [x * self.frame_rate for x in range(l)]
+        lst_time = list(range(l))
 
         for stat in data.keys():
             if stat in plot_stats:
@@ -676,11 +681,6 @@ class AnalyzeVideoTab(TabGraphic):
 
         # adjust video area
         self.fit()
-
-    def test_action(self):
-        pass
-        # Set splitter as the central widget
-        # self.setCentralWidget(self.splitter)
 
     def on_print(self):
         pixmap = QPixmap.fromImage(self._display_buffer)
