@@ -11,7 +11,6 @@ import utl_gfx
 import utl_print
 import worker_threads
 from facial_analysis import facial
-from facial_analysis.facial import load_face_image
 from jth_ui.tab_graphic import TabGraphic
 from matplotlib.figure import Figure
 from PyQt6.QtCore import QEvent, Qt, QTimer
@@ -673,16 +672,18 @@ class AnalyzeVideoTab(TabGraphic):
         self._video_slider.setRange(i, self._frame_end - 1)
         self._frame_begin = i
         self.lbl_status.setText(self.status())
-        self.update_chart()
-        self.render_chart()
+        if self._chart_view is not None:
+            self.update_chart()
+            self.render_chart()
 
     def action_cut_right(self):
         i = self._video_slider.sliderPosition()
         self._frame_end = i
         self._video_slider.setRange(self._frame_begin, self._frame_end - 1)
         self.lbl_status.setText(self.status())
-        self.update_chart()
-        self.render_chart()
+        if self._chart_view is not None:
+            self.update_chart()
+            self.render_chart()
 
     def _adjust_chart(self):
         # Resize the QGraphicsView to fit the pixmap
@@ -750,5 +751,6 @@ class AnalyzeVideoTab(TabGraphic):
         self._frame_end = len(self._frames)
         self.lbl_status.setText(self.status())
         self._video_slider.setRange(0, len(self._frames) - 2)
-        self.update_chart()
-        self.render_chart()
+        if self._chart_view is not None:
+            self.update_chart()
+            self.render_chart()

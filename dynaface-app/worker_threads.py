@@ -37,7 +37,10 @@ class WorkerExport(QThread):
         face = facial.AnalyzeFace(self._dialog._window._calcs)
 
         c = len(self._dialog._window._frames)
-        for i, frame in enumerate(self._dialog._window._frames):
+
+        t = self._dialog._window
+        for i in range(t._frame_begin, t._frame_end):
+            frame = t._frames[i]
             self._update_signal.emit(f"Exporting frame {i:,}/{c:,}...")
             face.load_state(frame)
             face.render_reset()
