@@ -585,7 +585,7 @@ class AnalyzeVideoTab(TabGraphic):
             logger.debug("New chart created")
             self._chart_scene = QGraphicsScene()
             self._chart_scene.setBackgroundBrush(QColor("white"))
-            self._chart_scene.addPixmap(pixmap)
+            self._chart_pixmap_item = self._chart_scene.addPixmap(pixmap)
 
             # Create and configure QGraphicsView
             self._chart_view = QGraphicsView(self._chart_scene)
@@ -615,9 +615,11 @@ class AnalyzeVideoTab(TabGraphic):
         else:
             logger.debug("Update existing chart")
             # Update the scene with the new pixmap
-            self._chart_scene.clear()
-            self._chart_scene.addPixmap(pixmap)
-            self._chart_view.update()
+            # self._chart_scene.clear()
+            # self._chart_scene.addPixmap(pixmap)
+            # self._chart_view.update()
+
+            self._chart_pixmap_item.setPixmap(pixmap)
 
     def wait_load_complete(self):
         if self.loading:
