@@ -21,6 +21,8 @@ SETTING_ACC = "accelerator"
 
 register_heif_opener()
 
+# https://stackoverflow.com/questions/75746637/how-to-suppress-qt-pointer-dispatch-warning
+
 
 class AppDynaface(AppJTH):
     def __init__(self):

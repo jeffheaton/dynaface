@@ -13,16 +13,14 @@ import worker_threads
 from facial_analysis import facial
 from facial_analysis.facial import load_face_image
 from jth_ui.tab_graphic import TabGraphic
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from PyQt6.QtCore import QEvent, QObject, Qt, QThread, QTimer, pyqtSignal
-from PyQt6.QtGui import QPainter, QPixmap, QColor
+from PyQt6.QtCore import QEvent, Qt, QTimer
+from PyQt6.QtGui import QColor, QPixmap
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
     QFileDialog,
     QGestureEvent,
-    QGraphicsProxyWidget,
     QGraphicsScene,
     QGraphicsView,
     QHBoxLayout,
@@ -61,6 +59,8 @@ class AnalyzeVideoTab(TabGraphic):
 
         # Load the face
         self._frames = []
+        self._frame_begin = 0
+        self._frame_end = 0
         self.begin_load_video(path)
         self._chart_view = None
 
@@ -216,6 +216,10 @@ class AnalyzeVideoTab(TabGraphic):
         toolbar.addWidget(btn_cut_right)
         btn_cut_right.clicked.connect(self.action_cut_right)
 
+        btn_cut_restore = QPushButton("Restore")
+        toolbar.addWidget(btn_cut_restore)
+        btn_cut_restore.clicked.connect(self.action_restore)
+
         # btn_test = QPushButton("Test")
         # toolbar.addWidget(btn_test)
         # btn_test.clicked.connect(self.test_action)
@@ -347,6 +351,7 @@ class AnalyzeVideoTab(TabGraphic):
     def add_frame(self, face):
         self._frames.append(face.dump_state())
         self._video_slider.setRange(0, len(self._frames) - 2)
+        self._frame_end = len(self._frames)
 
     def forward_action(self):
         i = self._video_slider.sliderPosition()
@@ -368,14 +373,15 @@ class AnalyzeVideoTab(TabGraphic):
             self._video_slider.setSliderPosition(i - 1)
 
     def status(self, etc=None):
-        i = self._video_slider.sliderPosition()
+        i = self._video_slider.sliderPosition() - self._frame_begin
         mx = self._video_slider.maximum()
+        frame_count = self._frame_end - self._frame_begin
         if self.loading == False and len(self._frames) == 0:
             return "(0/0)"
         elif self.loading:
-            return f"({mx:,}/{self.frame_count:,}, loading... etc: {etc})"
+            return f"({mx:,}/{self.frame_count:,}, loading... time: {etc})"
         else:
-            return f"({i+1:,}/{self.frame_count:,})"
+            return f"({i+1:,}/{frame_count:,})"
 
     def open_frame(self, num=None):
         if num is None:
@@ -409,7 +415,7 @@ class AnalyzeVideoTab(TabGraphic):
         self.lbl_status.setText(self.status())
         if self._chart_view:
             # self.update_chart()
-            current_frame = self._video_slider.value()
+            current_frame = self._video_slider.value() - self._frame_begin
             self._frame_line.set_xdata(current_frame)
             self.render_chart()
 
@@ -516,7 +522,8 @@ class AnalyzeVideoTab(TabGraphic):
         cols = list(data.keys())
         cols = ["frame", "time"] + cols
 
-        for i, frame in enumerate(self._frames):
+        for i in range(self._frame_begin, self._frame_end):
+            frame = self._frames[i]
             face.load_state(frame)
             rec = face.analyze()
             for stat in rec.keys():
@@ -542,6 +549,7 @@ class AnalyzeVideoTab(TabGraphic):
                 writer.writerow(row)
 
     def update_chart(self):
+        """Create the chart object, or update it if already there."""
         all_stats = self._face.get_all_stats()
         if len(all_stats) < 1:
             return
@@ -561,16 +569,17 @@ class AnalyzeVideoTab(TabGraphic):
             if stat in plot_stats:
                 ax.plot(lst_time, data[stat], label=stat)
 
-        ax.set_xlabel("Time (s)")
-        ax.set_ylabel("Value (multiple units)")
+        ax.set_xlabel("Frame")
+        ax.set_ylabel("Value")
         # ax.legend()
         ax.legend(loc="upper left", bbox_to_anchor=(1, 1.04))
 
         # Add the red vertical bar at current_frame
-        current_frame = self._video_slider.value()
+        current_frame = self._video_slider.value() - self._frame_begin
         self._frame_line = ax.axvline(x=current_frame, color="red", linewidth=2)
 
     def render_chart(self):
+        """Now that the chart has been created, render it."""
         # Render figure to a buffer, going in and out of PNG is not ideal, but seems fast enough
         # will find more direct route later.
         buf = io.BytesIO()
@@ -661,19 +670,19 @@ class AnalyzeVideoTab(TabGraphic):
 
     def action_cut_left(self):
         i = self._video_slider.sliderPosition()
-        self._frames = self._frames[i:]
-        self.frame_count = len(self._frames)
-        self._video_slider.setRange(0, self.frame_count - 1)
-        self._video_slider.setSliderPosition(0)
+        self._video_slider.setRange(i, self._frame_end - 1)
+        self._frame_begin = i
         self.lbl_status.setText(self.status())
+        self.update_chart()
+        self.render_chart()
 
     def action_cut_right(self):
         i = self._video_slider.sliderPosition()
-        self._frames = self._frames[: i + 1]
-        self.frame_count = len(self._frames)
-        self._video_slider.setRange(0, self.frame_count - 1)
-        self._video_slider.setSliderPosition(i)
+        self._frame_end = i
+        self._video_slider.setRange(self._frame_begin, self._frame_end - 1)
         self.lbl_status.setText(self.status())
+        self.update_chart()
+        self.render_chart()
 
     def _adjust_chart(self):
         # Resize the QGraphicsView to fit the pixmap
@@ -735,3 +744,11 @@ class AnalyzeVideoTab(TabGraphic):
             self._spin_zoom_chart.setValue(new_value)
             return True
         return False
+
+    def action_restore(self):
+        self._frame_begin = 0
+        self._frame_end = len(self._frames)
+        self.lbl_status.setText(self.status())
+        self._video_slider.setRange(0, len(self._frames) - 2)
+        self.update_chart()
+        self.render_chart()
