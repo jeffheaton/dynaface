@@ -571,14 +571,15 @@ class AnalyzeVideoTab(TabGraphic):
         self._frame_line = ax.axvline(x=current_frame, color="red", linewidth=2)
 
     def render_chart(self):
-        # Render figure to a buffer
+        # Render figure to a buffer, going in and out of PNG is not ideal, but seems fast enough
+        # will find more direct route later.
         buf = io.BytesIO()
         self.chart_fig.savefig(buf, format="png")
         buf.seek(0)
 
         # Create QPixmap from buffer
         pixmap = QPixmap()
-        pixmap.loadFromData(buf.getvalue())
+        pixmap.loadFromData(buf.getvalue(), format="png")
         pixmap = utl_gfx.crop_pixmap(pixmap, 5)
 
         if self._chart_view is None:
