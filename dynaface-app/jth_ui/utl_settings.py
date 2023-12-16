@@ -14,7 +14,6 @@ def get_int(settings, key):
 
 def set_combo(cb, value):
     idx = cb.findText(value)
-    print(idx, value)
     if idx >= 0:
         cb.setCurrentIndex(idx)
     else:

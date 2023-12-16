@@ -64,9 +64,7 @@ class AnalyzeImageTab(TabGraphic):
         QTimer.singleShot(1, self.fit)
 
     def load_image(self, path):
-        print(f"***{path}")
         if path.lower().endswith(".heic"):
-            print("***here")
             pil_image = Image.open(path)
             image_np = np.array(pil_image)
             # image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
