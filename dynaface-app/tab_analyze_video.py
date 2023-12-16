@@ -318,6 +318,7 @@ class AnalyzeVideoTab(TabGraphic):
         if self._chart_view is not None:
             logger.debug("Update chart, because measures changed")
             self.update_chart()
+            self.render_chart()
 
     def checkbox_clicked(self, checkbox, stat):
         stat.enabled = checkbox.isChecked()
@@ -326,6 +327,7 @@ class AnalyzeVideoTab(TabGraphic):
             if self._chart_view is not None:
                 logger.debug("Update chart, because measures changed")
                 self.update_chart()
+                self.render_chart()
 
     def update_load_progress(self, status):
         # self.lbl_status.setText(status)
@@ -406,7 +408,10 @@ class AnalyzeVideoTab(TabGraphic):
         self.open_frame()
         self.lbl_status.setText(self.status())
         if self._chart_view:
-            self.update_chart()
+            # self.update_chart()
+            current_frame = self._video_slider.value()
+            self._frame_line.set_xdata(current_frame)
+            self.render_chart()
 
     def action_zoom(self, value):
         z = value / 100
@@ -542,9 +547,9 @@ class AnalyzeVideoTab(TabGraphic):
             return
 
         # Create a Matplotlib figure
-        fig = Figure(figsize=(12, 2.5), dpi=100)
-        ax = fig.add_subplot(111)
-        fig.subplots_adjust(right=0.75)  # Adjust this value as needed
+        self.chart_fig = Figure(figsize=(12, 2.5), dpi=100)
+        ax = self.chart_fig.add_subplot(111)
+        self.chart_fig.subplots_adjust(right=0.75)  # Adjust this value as needed
 
         data = self.collect_data()
         plot_stats = data.keys()
@@ -563,11 +568,12 @@ class AnalyzeVideoTab(TabGraphic):
 
         # Add the red vertical bar at current_frame
         current_frame = self._video_slider.value()
-        ax.axvline(x=current_frame * self.frame_rate, color="red", linewidth=2)
+        self._frame_line = ax.axvline(x=current_frame, color="red", linewidth=2)
 
+    def render_chart(self):
         # Render figure to a buffer
         buf = io.BytesIO()
-        fig.savefig(buf, format="png")
+        self.chart_fig.savefig(buf, format="png")
         buf.seek(0)
 
         # Create QPixmap from buffer
@@ -640,6 +646,7 @@ class AnalyzeVideoTab(TabGraphic):
             else:
                 # Show graph for the first time
                 self.update_chart()
+                self.render_chart()
                 self._adjust_chart()
         else:
             # Hide the graph
