@@ -98,9 +98,23 @@ class DynafaceWindow(MainWindowJTH):
             exit_action.triggered.connect(self.close)
             self._file_menu.addAction(exit_action)
 
-
         # Edit menu
         self._edit_menu = QMenu("Edit", self)
+
+        # Create the Undo action with a standard shortcut
+        self._undo_action = QAction("Undo", self)
+        self._undo_action.setShortcut(QKeySequence.StandardKey.Undo)
+        self._undo_action.triggered.connect(self.undo_action)
+        self._edit_menu.addAction(self._undo_action)
+
+        # Create the Redo action with a standard shortcut
+        self._redo_action = QAction("Redo", self)
+        self._redo_action.setShortcut(QKeySequence.StandardKey.Redo)
+        self._redo_action.triggered.connect(self.redo_action)
+        self._edit_menu.addAction(self._redo_action)
+
+        self._edit_menu.addSeparator()
+
         cutAction = QAction("Cut", self)
         cutAction.setShortcut(QKeySequence(QKeySequence.StandardKey.Cut))
         self._edit_menu.addAction(cutAction)
@@ -267,3 +281,9 @@ class DynafaceWindow(MainWindowJTH):
             action = QAction(path, self)
             action.triggered.connect(lambda _, p=path: self.open_file(p))
             self._recent_menu.addAction(action)
+
+    def undo_action(self):
+        pass
+
+    def redo_action(self):
+        pass
