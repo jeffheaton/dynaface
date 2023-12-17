@@ -14,7 +14,7 @@ from facial_analysis import facial
 from jth_ui.tab_graphic import TabGraphic
 from matplotlib.figure import Figure
 from PyQt6.QtCore import QEvent, Qt, QTimer
-from PyQt6.QtGui import QColor, QPixmap
+from PyQt6.QtGui import QColor, QPixmap, QUndoStack
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -36,6 +36,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+import cmds
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +103,9 @@ class AnalyzeVideoTab(TabGraphic):
         # Allow touch zoom
         # self.grabGesture(Qt.GestureType.PinchGesture)
         self._auto_update = True
+
+        # Undo stack
+        self._undo_stack = QUndoStack(self)
 
         self.thread = worker_threads.WorkerLoad(self)
         self.thread._update_signal.connect(self.update_load_progress)
@@ -667,23 +671,43 @@ class AnalyzeVideoTab(TabGraphic):
             remaining_size = sum(self._splitter.sizes())
             self._splitter.setSizes([remaining_size])
 
-    def action_cut_left(self):
-        i = self._video_slider.sliderPosition()
-        self._video_slider.setRange(i, self._frame_end - 1)
-        self._frame_begin = i
-        self.lbl_status.setText(self.status())
-        if self._chart_view is not None:
-            self.update_chart()
-            self.render_chart()
-
-    def action_cut_right(self):
-        i = self._video_slider.sliderPosition()
-        self._frame_end = i
+    def set_video_range(self, frame_begin: int, frame_end: int):
+        self._frame_begin = frame_begin
+        self._frame_end = frame_end
         self._video_slider.setRange(self._frame_begin, self._frame_end - 1)
         self.lbl_status.setText(self.status())
         if self._chart_view is not None:
             self.update_chart()
             self.render_chart()
+        print(f"begin: {self._frame_begin}")
+        print(f"end: {self._frame_end}")
+        print(f"pos: {self._video_slider.sliderPosition()}")
+
+    def action_cut_left(self):
+        cmd = cmds.CommandClip(
+            self, self._video_slider.sliderPosition(), self._frame_end - 1
+        )
+        self._undo_stack.push(cmd)
+        # i = self._video_slider.sliderPosition()
+        # self._video_slider.setRange(i, self._frame_end - 1)
+        # self._frame_begin = i
+        # self.lbl_status.setText(self.status())
+        # if self._chart_view is not None:
+        #    self.update_chart()
+        #    self.render_chart()
+
+    def action_cut_right(self):
+        cmd = cmds.CommandClip(
+            self, self._frame_begin, self._video_slider.sliderPosition()
+        )
+        self._undo_stack.push(cmd)
+        # i = self._video_slider.sliderPosition()
+        # self._frame_end = i
+        # self._video_slider.setRange(self._frame_begin, self._frame_end - 1)
+        # self.lbl_status.setText(self.status())
+        # if self._chart_view is not None:
+        #    self.update_chart()
+        #    self.render_chart()
 
     def _adjust_chart(self):
         # Resize the QGraphicsView to fit the pixmap
@@ -747,10 +771,19 @@ class AnalyzeVideoTab(TabGraphic):
         return False
 
     def action_restore(self):
-        self._frame_begin = 0
-        self._frame_end = len(self._frames)
-        self.lbl_status.setText(self.status())
-        self._video_slider.setRange(0, len(self._frames) - 2)
-        if self._chart_view is not None:
-            self.update_chart()
-            self.render_chart()
+        cmd = cmds.CommandClip(self, 0, len(self._frames) - 1)
+        self._undo_stack.push(cmd)
+
+        # self._frame_begin = 0
+        # self._frame_end = len(self._frames)
+        # self.lbl_status.setText(self.status())
+        # self._video_slider.setRange(0, len(self._frames) - 2)
+        # if self._chart_view is not None:
+        #    self.update_chart()
+        #    self.render_chart()
+
+    def on_redo(self):
+        self._undo_stack.redo()
+
+    def on_undo(self):
+        self._undo_stack.undo()

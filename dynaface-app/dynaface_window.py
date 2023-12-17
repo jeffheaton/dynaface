@@ -283,7 +283,19 @@ class DynafaceWindow(MainWindowJTH):
             self._recent_menu.addAction(action)
 
     def undo_action(self):
-        pass
+        current_tab = self._tab_widget.currentWidget()
+
+        # Check if there is a current tab
+        if current_tab is not None:
+            # Check if the current tab has the 'on_undo' method
+            if hasattr(current_tab, "on_undo"):
+                current_tab.on_undo()
 
     def redo_action(self):
-        pass
+        current_tab = self._tab_widget.currentWidget()
+
+        # Check if there is a current tab
+        if current_tab is not None:
+            # Check if the current tab has the 'on_undo' method
+            if hasattr(current_tab, "on_redo"):
+                current_tab.on_redo()
