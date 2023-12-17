@@ -513,7 +513,7 @@ class AnalyzeVideoTab(TabGraphic):
 
     def on_save_as(self):
         # Create and show the dialog
-        dialog = dlg_modal.ChoiceDialog()
+        dialog = dlg_modal.SaveVideoDialog()
         if dialog.exec() == QDialog.DialogCode.Accepted:
             if dialog.user_choice == "image":
                 self._save_as_image()

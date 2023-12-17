@@ -1,37 +1,74 @@
-import logging
-import time
-
 from facial_analysis import facial
-from PyQt6.QtCore import QEvent, Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import QDialog, QPushButton, QVBoxLayout, QLabel
-import cv2
 import worker_threads
 
 
-class ChoiceDialog(QDialog):
+class SaveVideoDialog(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Save Options")
         self.user_choice = None  # Attribute to store user's choice
 
         # Buttons for video and image
+        self.save_document_button = QPushButton("Save Document", self)
         self.save_video_button = QPushButton("Save Video", self)
         self.save_image_button = QPushButton("Save Image", self)
         self.save_data_button = QPushButton("Save Data (CSV)", self)
 
         # Connect buttons to functions
+        self.save_document_button.clicked.connect(self.save_document)
         self.save_video_button.clicked.connect(self.save_video)
         self.save_image_button.clicked.connect(self.save_image)
         self.save_data_button.clicked.connect(self.save_data)
 
         # Layout
         layout = QVBoxLayout(self)
+        layout.addWidget(self.save_document_button)
         layout.addWidget(self.save_video_button)
         layout.addWidget(self.save_image_button)
         layout.addWidget(self.save_data_button)
 
+    def save_document(self):
+        self.user_choice = "document"
+        self.accept()
+
     def save_video(self):
         self.user_choice = "video"
+        self.accept()
+
+    def save_image(self):
+        self.user_choice = "image"
+        self.accept()
+
+    def save_data(self):
+        self.user_choice = "data"
+        self.accept()
+
+
+class SaveImageDialog(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Save Options")
+        self.user_choice = None  # Attribute to store user's choice
+
+        # Buttons for video and image
+        self.save_document_button = QPushButton("Save Document", self)
+        self.save_image_button = QPushButton("Save Image", self)
+        self.save_data_button = QPushButton("Save Data (CSV)", self)
+
+        # Connect buttons to functions
+        self.save_document_button.clicked.connect(self.save_document)
+        self.save_image_button.clicked.connect(self.save_image)
+        self.save_data_button.clicked.connect(self.save_data)
+
+        # Layout
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.save_document_button)
+        layout.addWidget(self.save_image_button)
+        layout.addWidget(self.save_data_button)
+
+    def save_document(self):
+        self.user_choice = "document"
         self.accept()
 
     def save_image(self):

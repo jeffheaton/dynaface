@@ -1,12 +1,19 @@
+import csv
 import logging
 from functools import partial
 
+import dlg_modal
+import numpy as np
 import utl_gfx
-from facial_analysis.facial import load_face_image, AnalyzeFace, STATS
+import utl_print
+from facial_analysis.facial import STATS, AnalyzeFace, load_face_image
 from jth_ui.tab_graphic import TabGraphic
+from PIL import Image
 from PyQt6.QtCore import QEvent, Qt, QTimer
+from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
     QCheckBox,
+    QDialog,
     QFileDialog,
     QGestureEvent,
     QHBoxLayout,
@@ -19,13 +26,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-import utl_print
-from PyQt6.QtGui import QPixmap
-from PIL import Image
-import numpy as np
-import cv2
-import time
-
+import dynaface_document
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,10 @@ class AnalyzeImageTab(TabGraphic):
         self._auto_update = False
 
         # Load the face
-        self.load_image(path)
+        if path.lower().endswith(".dyfc"):
+            self.load_document(path)
+        else:
+            self.load_image(path)
 
         # Horiz toolbar
         tab_layout = QVBoxLayout(self)
@@ -239,6 +243,17 @@ class AnalyzeImageTab(TabGraphic):
         self._spin_zoom.setValue(int(scale_factor))
 
     def on_save_as(self):
+        # Create and show the dialog
+        dialog = dlg_modal.SaveImageDialog()
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            if dialog.user_choice == "image":
+                self._save_as_image()
+            elif dialog.user_choice == "data":
+                self._save_as_data()
+            elif dialog.user_choice == "document":
+                self._save_as_document()
+
+    def _save_as_image(self):
         options = QFileDialog.Option.DontUseNativeDialog
 
         # Show the dialog and get the selected file name and format
@@ -258,6 +273,57 @@ class AnalyzeImageTab(TabGraphic):
             else:
                 self._face.save(filename)
 
+    def _save_as_data(self):
+        options = QFileDialog.Option.DontUseNativeDialog
+
+        # Show the dialog and get the selected file name and format
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save CSV Data",
+            "",
+            "Videos (*.csv)",
+            options=options,
+        )
+
+        if filename:
+            if not filename.lower().endswith(".csv"):
+                self._window.display_message_box("Filename must end in .csv")
+            else:
+                self.save_csv(filename)
+
+    def _save_as_document(self):
+        options = QFileDialog.Option.DontUseNativeDialog
+
+        # Show the dialog and get the selected file name and format
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Dynaface Document",
+            "",
+            "Dynaface (*.dyfc)",
+            options=options,
+        )
+
+        if filename:
+            if not filename.lower().endswith(".dyfc"):
+                self._window.display_message_box("Filename must end in .dyfc")
+            else:
+                self.save_document(filename)
+
     def on_print(self):
         pixmap = QPixmap.fromImage(self._display_buffer)
         utl_print.print_pixmap(self._window, pixmap)
+
+    def save_csv(self, filename):
+        with open(filename, "w") as f:
+            writer = csv.writer(f)
+            rec = self._face.analyze()
+            writer.writerow(list(rec.keys()))
+            writer.writerow(list(rec.values()))
+
+    def save_document(self, filename):
+        doc = dynaface_document.DynafaceDocument(dynaface_document.DOC_TYPE_IMAGE)
+        doc.save(filename)
+
+    def load_document(self, filename):
+        doc = dynaface_document.DynafaceDocument(dynaface_document.DOC_TYPE_IMAGE)
+        doc.load(filename)

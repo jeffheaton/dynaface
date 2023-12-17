@@ -13,6 +13,7 @@ from tab_about import AboutTab
 from tab_analyze_image import AnalyzeImageTab
 from tab_analyze_video import AnalyzeVideoTab
 from jth_ui import app_jth
+import dynaface_document
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,10 @@ class DynafaceWindow(MainWindowJTH):
             ".mp4",
             ".mov",
             ".heic",
+            ".dyfc",
         )
+
+        self.open_extensions = "All Files (*.mp4 *.mov *.jpg *.jpeg *.png *.tiff *.heic *.dyfc);;Images (*.jpg *.jpeg *.png *.tiff *.heic);;Videos (*.mp4 *.mov);;Dynaface Documents (*.dyfc)"
 
         self.setup_menu()
         self.initUI()
@@ -231,6 +235,14 @@ class DynafaceWindow(MainWindowJTH):
             elif file_path.lower().endswith((".mp4", ".mov")):
                 self.show_analyze_video(file_path)
                 self.update_recent_files(file_path)
+            elif file_path.lower().endswith((".dyfc")):
+                typ = dynaface_document.check_dyfc_type(file_path)
+                if typ.startswith("Error"):
+                    self.display_message_box(typ)
+                else:
+                    logger.info(f"Opening file type: {typ}")
+                    if typ == "image":
+                        self.show_analyze_image(file_path)
         except:
             logger.error("Error during open file", exc_info=True)
 
