@@ -61,6 +61,7 @@ class WorkerLoad(QThread):
         super().__init__()
         self._target = target
         self._total = self._target.frame_count
+        self.running = True
 
     def run(self):
         logger.debug("Running background thread")
@@ -69,7 +70,7 @@ class WorkerLoad(QThread):
         self._face = facial.AnalyzeFace([])
         try:
             i = 0
-            while True:
+            while self.running:
                 i += 1
                 logger.debug(f"Begin frame {i}")
                 ret, frame = self._target.video_stream.read()
@@ -79,9 +80,19 @@ class WorkerLoad(QThread):
                     break
 
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                self._face.load_image(img=frame, crop=True)
-                self._target.add_frame(self._face)
-                self._update_signal.emit(self._loading_etc.cycle())
+
+                # Make sure we did not get a request to stop during each of these:
+                if self.running:
+                    self._face.load_image(img=frame, crop=True)
+
+                if self.running:
+                    self._target.add_frame(self._face)
+
+                if self.running:
+                    self._update_signal.emit(self._loading_etc.cycle())
+
+        except Exception as e:
+            logger.error("Error loading video", exc_info=True)
         finally:
             self._update_signal.emit(None)
             self._target.loading = False

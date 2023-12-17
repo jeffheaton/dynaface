@@ -299,7 +299,12 @@ class AnalyzeVideoTab(TabGraphic):
         return super().event(event)
 
     def on_close(self):
-        pass
+        if self.loading:
+            logger.info("Closed analyze video tab (during load)")
+        else:
+            logger.info("Closed analyze video tab")
+        self.loading = False
+        self.thread.running = False
 
     def on_resize(self):
         pass
@@ -679,35 +684,18 @@ class AnalyzeVideoTab(TabGraphic):
         if self._chart_view is not None:
             self.update_chart()
             self.render_chart()
-        print(f"begin: {self._frame_begin}")
-        print(f"end: {self._frame_end}")
-        print(f"pos: {self._video_slider.sliderPosition()}")
 
     def action_cut_left(self):
         cmd = cmds.CommandClip(
             self, self._video_slider.sliderPosition(), self._frame_end - 1
         )
         self._undo_stack.push(cmd)
-        # i = self._video_slider.sliderPosition()
-        # self._video_slider.setRange(i, self._frame_end - 1)
-        # self._frame_begin = i
-        # self.lbl_status.setText(self.status())
-        # if self._chart_view is not None:
-        #    self.update_chart()
-        #    self.render_chart()
 
     def action_cut_right(self):
         cmd = cmds.CommandClip(
             self, self._frame_begin, self._video_slider.sliderPosition()
         )
         self._undo_stack.push(cmd)
-        # i = self._video_slider.sliderPosition()
-        # self._frame_end = i
-        # self._video_slider.setRange(self._frame_begin, self._frame_end - 1)
-        # self.lbl_status.setText(self.status())
-        # if self._chart_view is not None:
-        #    self.update_chart()
-        #    self.render_chart()
 
     def _adjust_chart(self):
         # Resize the QGraphicsView to fit the pixmap
@@ -773,14 +761,6 @@ class AnalyzeVideoTab(TabGraphic):
     def action_restore(self):
         cmd = cmds.CommandClip(self, 0, len(self._frames) - 1)
         self._undo_stack.push(cmd)
-
-        # self._frame_begin = 0
-        # self._frame_end = len(self._frames)
-        # self.lbl_status.setText(self.status())
-        # self._video_slider.setRange(0, len(self._frames) - 2)
-        # if self._chart_view is not None:
-        #    self.update_chart()
-        #    self.render_chart()
 
     def on_redo(self):
         self._undo_stack.redo()
