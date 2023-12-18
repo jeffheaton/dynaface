@@ -8,7 +8,7 @@ import tab_splash
 from jth_ui.window_jth import MainWindowJTH
 from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QAction, QKeySequence
-from PyQt6.QtWidgets import QMenu, QMenuBar, QTabWidget
+from PyQt6.QtWidgets import QMenu, QMenuBar, QTabWidget, QMessageBox
 from tab_about import AboutTab
 from tab_analyze_image import AnalyzeImageTab
 from tab_analyze_video import AnalyzeVideoTab
@@ -80,12 +80,26 @@ class DynafaceWindow(MainWindowJTH):
         # Open recent submenu
         self._recent_menu = QMenu("Open &Recent", self)
         self._file_menu.addMenu(self._recent_menu)
+        self._file_menu.addSeparator()
+
+        # Add save action
+        self._close_menu = QAction("Close", self)
+        self._close_menu.setShortcut(QKeySequence.StandardKey.Close)
+        self._close_menu.triggered.connect(self.close_action)
+        self._file_menu.addAction(self._close_menu)
+
+        self._save_menu = QAction("Save", self)
+        self._save_menu.setShortcut(QKeySequence.StandardKey.Save)
+        self._save_menu.triggered.connect(self.save_action)
+        self._file_menu.addAction(self._save_menu)
 
         # Add save as... action
-        saveAsMenu = QAction("Save As...", self)
-        saveAsMenu.setShortcut("Ctrl+S")
-        saveAsMenu.triggered.connect(self.save_as_action)
-        self._file_menu.addAction(saveAsMenu)
+        self._save_as_menu = QAction("Save As...", self)
+        self._save_as_menu.setShortcut(QKeySequence.StandardKey.SaveAs)
+        self._save_as_menu.triggered.connect(self.save_as_action)
+        self._file_menu.addAction(self._save_as_menu)
+
+        self._file_menu.addSeparator()
 
         # Add print... action
         printAction = QAction("Print...", self)
@@ -260,9 +274,18 @@ class DynafaceWindow(MainWindowJTH):
 
         # Check if there is a current tab
         if current_tab is not None:
-            # Check if the current tab has the 'on_copy' method
+            # Check if the current tab has the 'on_save_as' method
             if hasattr(current_tab, "on_save_as"):
                 current_tab.on_save_as()
+
+    def save_action(self):
+        current_tab = self._tab_widget.currentWidget()
+
+        # Check if there is a current tab
+        if current_tab is not None:
+            # Check if the current tab has the 'on_save' method
+            if hasattr(current_tab, "on_save"):
+                current_tab.on_save()
 
     def print_action(self):
         current_tab = self._tab_widget.currentWidget()
@@ -311,3 +334,8 @@ class DynafaceWindow(MainWindowJTH):
             # Check if the current tab has the 'on_undo' method
             if hasattr(current_tab, "on_redo"):
                 current_tab.on_redo()
+
+    def close_action(self):
+        current_index = self._tab_widget.currentIndex()
+        if current_index != -1:
+            self.close_tab(current_index)

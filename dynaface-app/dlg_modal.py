@@ -1,5 +1,5 @@
 from facial_analysis import facial
-from PyQt6.QtWidgets import QDialog, QPushButton, QVBoxLayout, QLabel
+from PyQt6.QtWidgets import QDialog, QPushButton, QVBoxLayout, QLabel, QMessageBox
 import worker_threads
 
 
@@ -155,3 +155,17 @@ class WaitLoadingDialog(QDialog):
             self.accept()
         else:
             self._update_status.setText(status)
+
+
+def prompt_save_changes():
+    msg_box = QMessageBox()
+    msg_box.setIcon(QMessageBox.Icon.Warning)
+    msg_box.setText("You have unsaved changes")
+    msg_box.setInformativeText("Do you want to save your changes?")
+    msg_box.setStandardButtons(
+        QMessageBox.StandardButton.Yes
+        | QMessageBox.StandardButton.No
+        # | QMessageBox.StandardButton.Cancel
+    )
+    msg_box.setDefaultButton(QMessageBox.StandardButton.Yes)
+    return msg_box.exec()

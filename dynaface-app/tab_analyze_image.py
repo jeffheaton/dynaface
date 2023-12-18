@@ -3,6 +3,7 @@ import logging
 from functools import partial
 
 import dlg_modal
+import dynaface_document
 import numpy as np
 import utl_gfx
 import utl_print
@@ -18,6 +19,7 @@ from PyQt6.QtWidgets import (
     QGestureEvent,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPinchGesture,
     QPushButton,
     QScrollArea,
@@ -26,7 +28,6 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-import dynaface_document
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ class AnalyzeImageTab(TabGraphic):
         super().__init__(window)
 
         self._auto_update = False
+        self.unsaved_changes = False
 
         # Load the face
         if path.lower().endswith(".dyfc"):
@@ -77,15 +79,12 @@ class AnalyzeImageTab(TabGraphic):
         else:
             self._face = load_face_image(path, crop=True)
 
+        # We did not load a document, so this forces a "save as" if a save is requested
+        self.filename = None
+
     def init_horizontal_toolbar(self, layout):
         self._toolbar = QToolBar()
         layout.addWidget(self._toolbar)  # Add the toolbar to the layout first
-
-        # Start Button
-        self._btn_start = QPushButton("Reset")
-        self._btn_start.clicked.connect(self.start_game)
-        self._toolbar.addWidget(self._btn_start)
-        self._toolbar.addSeparator()
 
         self._chk_landmarks = QCheckBox("Landmarks")
         self._toolbar.addWidget(self._chk_landmarks)
@@ -159,12 +158,15 @@ class AnalyzeImageTab(TabGraphic):
                 partial(self.checkbox_clicked, checkbox, stat)
             )
             self.scroll_area_layout.addWidget(checkbox)
-            checkbox.setChecked(True)
+            checkbox.setChecked(stat.enabled)
             self.checkboxes.append(checkbox)
 
         # Connect buttons to slot functions
         self.all_button.clicked.connect(self.check_all)
         self.none_button.clicked.connect(self.uncheck_all)
+
+        # Since we just finished updating all the check boxes, which likely triggeded it
+        self.unsaved_changes = False
 
     def action_landmarks(self, state):
         self.update_face()
@@ -198,7 +200,16 @@ class AnalyzeImageTab(TabGraphic):
         return super().event(event)
 
     def on_close(self):
-        pass
+        # Check for unsaved changes here
+        print(self.unsaved_changes)
+        if self.unsaved_changes:
+            response = dlg_modal.prompt_save_changes()
+
+            if response == QMessageBox.StandardButton.Yes:
+                self.on_save()
+            elif response == QMessageBox.StandardButton.Cancel:
+                # Cancel the tab closing
+                return
 
     def on_resize(self):
         pass
@@ -223,6 +234,7 @@ class AnalyzeImageTab(TabGraphic):
 
     def checkbox_clicked(self, checkbox, stat):
         stat.enabled = checkbox.isChecked()
+        self.unsaved_changes = True
         if self._auto_update:
             self.update_face()
 
@@ -322,8 +334,18 @@ class AnalyzeImageTab(TabGraphic):
 
     def save_document(self, filename):
         doc = dynaface_document.DynafaceDocument(dynaface_document.DOC_TYPE_IMAGE)
+        doc.face = self._face
         doc.save(filename)
+        self.unsaved_changes = False
 
     def load_document(self, filename):
         doc = dynaface_document.DynafaceDocument(dynaface_document.DOC_TYPE_IMAGE)
         doc.load(filename)
+        self._face = doc.face
+        self.filename = filename
+
+    def on_save(self):
+        if self.filename is None:
+            self.on_save_as()
+        else:
+            self.save_document(self.filename)
