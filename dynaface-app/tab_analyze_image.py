@@ -375,3 +375,6 @@ class AnalyzeImageTab(TabGraphic):
             self.on_save_as()
         else:
             self.save_document(self.filename)
+
+    def update_enabled(self) -> None:
+        pass

@@ -29,7 +29,6 @@ class AppJTH:
         self.VERSION = version
         self.APP_ID = self.BUNDLE_ID.split(".")[-1]
         self.settings = {}
-        print("***", self.get_system_name())
         if self.get_system_name() == "osx":
             if self.is_sandboxed():
                 self.LOG_DIR = os.path.join(os.path.expanduser("~"), "logs")

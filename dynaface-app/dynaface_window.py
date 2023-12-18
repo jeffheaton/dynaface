@@ -102,10 +102,10 @@ class DynafaceWindow(MainWindowJTH):
         self._file_menu.addSeparator()
 
         # Add print... action
-        printAction = QAction("Print...", self)
-        printAction.setShortcut("Ctrl+P")
-        printAction.triggered.connect(self.print_action)
-        self._file_menu.addAction(printAction)
+        self._print_menu = QAction("Print...", self)
+        self._print_menu.setShortcut("Ctrl+P")
+        self._print_menu.triggered.connect(self.print_action)
+        self._file_menu.addAction(self._print_menu)
 
         if self.app.get_system_name() == "windows":
             preferences_action = QAction("Settings...", self)
@@ -120,16 +120,16 @@ class DynafaceWindow(MainWindowJTH):
         self._edit_menu = QMenu("Edit", self)
 
         # Create the Undo action with a standard shortcut
-        self._undo_action = QAction("Undo", self)
-        self._undo_action.setShortcut(QKeySequence.StandardKey.Undo)
-        self._undo_action.triggered.connect(self.undo_action)
-        self._edit_menu.addAction(self._undo_action)
+        self._undo_menu = QAction("Undo", self)
+        self._undo_menu.setShortcut(QKeySequence.StandardKey.Undo)
+        self._undo_menu.triggered.connect(self.undo_action)
+        self._edit_menu.addAction(self._undo_menu)
 
         # Create the Redo action with a standard shortcut
-        self._redo_action = QAction("Redo", self)
-        self._redo_action.setShortcut(QKeySequence.StandardKey.Redo)
-        self._redo_action.triggered.connect(self.redo_action)
-        self._edit_menu.addAction(self._redo_action)
+        self._redo_menu = QAction("Redo", self)
+        self._redo_menu.setShortcut(QKeySequence.StandardKey.Redo)
+        self._redo_menu.triggered.connect(self.redo_action)
+        self._edit_menu.addAction(self._redo_menu)
 
         self._edit_menu.addSeparator()
 
@@ -172,6 +172,7 @@ class DynafaceWindow(MainWindowJTH):
         self._tab_widget = QTabWidget()
         self._tab_widget.setTabsClosable(True)
         self._tab_widget.tabCloseRequested.connect(self.close_tab)
+        self._tab_widget.currentChanged.connect(self.onTabChanged)
         self.setCentralWidget(self._tab_widget)
 
         # Configure the resize timer
@@ -299,7 +300,7 @@ class DynafaceWindow(MainWindowJTH):
 
             # Check if there is a current tab
             if current_tab is not None:
-                # Check if the current tab has the 'on_copy' method
+                # Check if the current tab has the 'on_print' method
                 if hasattr(current_tab, "on_print"):
                     current_tab.on_print()
         except:
@@ -364,3 +365,42 @@ class DynafaceWindow(MainWindowJTH):
 
     def open_logs(self):
         self.app.open_logs()
+
+    def has_method(self, name):
+        current_tab = self._tab_widget.currentWidget()
+        if current_tab is None:
+            return False
+        return hasattr(current_tab, name)
+
+    def update_enabled(self) -> None:
+        current_tab = self._tab_widget.currentWidget()
+
+        self._print_menu.setEnabled(self.has_method("on_print"))
+        self._save_menu.setEnabled(self.has_method("on_save"))
+        self._save_as_menu.setEnabled(self.has_method("on_save_as"))
+
+        if self.has_method("can_redo"):
+            self._redo_menu.setEnabled(current_tab.can_redo())
+        else:
+            self._redo_menu.setEnabled(False)
+
+        if self.has_method("can_undo"):
+            self._undo_menu.setEnabled(current_tab.can_undo())
+        else:
+            self._undo_menu.setEnabled(False)
+
+        # Pass on to the tabs
+        for index in range(self._tab_widget.count()):
+            # Get the widget of the current tab
+            tab = self._tab_widget.widget(index)
+
+            # Check if the 'update_enabled' method exists for the tab
+            if hasattr(tab, "update_enabled") and callable(
+                getattr(tab, "update_enabled")
+            ):
+                # Call the 'update_enabled' method
+                tab.update_enabled()
+
+    def onTabChanged(self):
+        self.update_enabled()
+        logger.info("Updated enabled/disabled")

@@ -127,6 +127,7 @@ class AnalyzeVideoTab(TabGraphic):
             self._video_slider.setRange(0, len(self._frames) - 2)
 
         self.unsaved_changes = False
+        self._window.update_enabled()
 
     def begin_load_video(self, path):
         # Open the video file
@@ -211,7 +212,7 @@ gesture you wish to analyze."""
         self._chk_measures.setChecked(True)
         self._chk_measures.stateChanged.connect(self.action_measures)
 
-        self._chk_graph = custom_control.CheckingCheckBox(title="Graph", parent=self)
+        self._chk_graph = custom_control.CheckingCheckBox(title="Chart", parent=self)
         toolbar.addWidget(self._chk_graph)
         self._chk_graph.setChecked(False)
         self._chk_graph.stateChanged.connect(self.action_graph)
@@ -241,17 +242,17 @@ gesture you wish to analyze."""
         toolbar.addWidget(btn_fit)
         toolbar.addSeparator()
 
-        btn_cut_left = QPushButton("Cut <")
-        toolbar.addWidget(btn_cut_left)
-        btn_cut_left.clicked.connect(self.action_cut_left)
+        self._btn_cut_left = QPushButton("Cut <")
+        toolbar.addWidget(self._btn_cut_left)
+        self._btn_cut_left.clicked.connect(self.action_cut_left)
 
-        btn_cut_right = QPushButton("Cut >")
-        toolbar.addWidget(btn_cut_right)
-        btn_cut_right.clicked.connect(self.action_cut_right)
+        self._btn_cut_right = QPushButton("Cut >")
+        toolbar.addWidget(self._btn_cut_right)
+        self._btn_cut_right.clicked.connect(self.action_cut_right)
 
-        btn_cut_restore = QPushButton("Restore")
-        toolbar.addWidget(btn_cut_restore)
-        btn_cut_restore.clicked.connect(self.action_restore)
+        self._btn_restore = QPushButton("Restore")
+        toolbar.addWidget(self._btn_restore)
+        self._btn_restore.clicked.connect(self.action_restore)
 
         # btn_test = QPushButton("Test")
         # toolbar.addWidget(btn_test)
@@ -380,6 +381,8 @@ gesture you wish to analyze."""
 
         if self._view is None:
             self.load_first_frame()
+
+        self._window.update_enabled()
 
     def load_first_frame(self):
         logger.debug("Display first video frame on load")
@@ -739,6 +742,8 @@ gesture you wish to analyze."""
             remaining_size = sum(self._splitter.sizes())
             self._splitter.setSizes([remaining_size])
 
+        self._window.update_enabled()
+
     def set_video_range(self, frame_begin: int, frame_end: int):
         self._frame_begin = frame_begin
         self._frame_end = frame_end
@@ -749,16 +754,26 @@ gesture you wish to analyze."""
             self.render_chart()
 
     def action_cut_left(self):
-        cmd = cmds.CommandClip(
-            self, self._video_slider.sliderPosition(), self._frame_end - 1
-        )
-        self._undo_stack.push(cmd)
+        if (
+            len(self._frames) > 1
+            and self._video_slider.sliderPosition() < self._frame_end
+        ):
+            cmd = cmds.CommandClip(
+                self, self._video_slider.sliderPosition(), self._frame_end - 1
+            )
+            self._undo_stack.push(cmd)
+            self._window.update_enabled()
 
     def action_cut_right(self):
-        cmd = cmds.CommandClip(
-            self, self._frame_begin, self._video_slider.sliderPosition()
-        )
-        self._undo_stack.push(cmd)
+        if (
+            len(self._frames) > 1
+            and self._video_slider.sliderPosition() > self._frame_begin
+        ):
+            cmd = cmds.CommandClip(
+                self, self._frame_begin, self._video_slider.sliderPosition()
+            )
+            self._undo_stack.push(cmd)
+            self._window.update_enabled()
 
     def _adjust_chart(self):
         # Resize the QGraphicsView to fit the pixmap
@@ -822,14 +837,17 @@ gesture you wish to analyze."""
         return False
 
     def action_restore(self):
-        cmd = cmds.CommandClip(self, 0, len(self._frames) - 1)
+        cmd = cmds.CommandClip(self, 0, len(self._frames))
         self._undo_stack.push(cmd)
+        self._window.update_enabled()
 
     def on_redo(self):
         self._undo_stack.redo()
+        self._window.update_enabled()
 
     def on_undo(self):
         self._undo_stack.undo()
+        self._window.update_enabled()
 
     def _save_as_document(self):
         options = QFileDialog.Option.DontUseNativeDialog
@@ -874,3 +892,37 @@ gesture you wish to analyze."""
             self.on_save_as()
         else:
             self.save_document(self.filename)
+
+    def can_undo(self) -> bool:
+        """
+        Check if an undo operation is available.
+        Returns:
+            bool: True if undo operation can be performed, False otherwise.
+        """
+        return self._undo_stack.canUndo()
+
+    def can_redo(self) -> bool:
+        """
+        Check if a redo operation is available.
+        Returns:
+            bool: True if redo operation can be performed, False otherwise.
+        """
+        return self._undo_stack.canRedo()
+
+    def update_enabled(self) -> None:
+        if (self._frame_begin == 0) and (self._frame_end == len(self._frames)):
+            self._btn_restore.setEnabled(False)
+        else:
+            self._btn_restore.setEnabled(True)
+
+        if abs(self._frame_begin - self._frame_end) < 2:
+            self._btn_cut_left.setEnabled(False)
+            self._btn_cut_right.setEnabled(False)
+        else:
+            self._btn_cut_left.setEnabled(True)
+            self._btn_cut_right.setEnabled(True)
+
+        if self._chk_graph.isChecked():
+            self._spin_zoom_chart.setEnabled(True)
+        else:
+            self._spin_zoom_chart.setEnabled(False)
