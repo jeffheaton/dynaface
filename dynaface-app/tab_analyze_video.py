@@ -3,14 +3,17 @@ import io
 import logging
 from functools import partial
 
+import cmds
 import custom_control
 import cv2
 import dlg_modal
+import dynaface_document
 import plotly.graph_objects as go
 import utl_gfx
 import utl_print
 import worker_threads
 from facial_analysis import facial
+from jth_ui import utl_etc
 from jth_ui.tab_graphic import TabGraphic
 from matplotlib.figure import Figure
 from PyQt6.QtCore import QEvent, Qt, QTimer
@@ -36,12 +39,11 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-import cmds
-import dynaface_document
 
 logger = logging.getLogger(__name__)
 
 GRAPH_HORIZ = False
+MAX_FRAMES = 5000
 
 
 class AnalyzeVideoTab(TabGraphic):
@@ -138,6 +140,19 @@ class AnalyzeVideoTab(TabGraphic):
         self.frame_rate = int(self.video_stream.get(cv2.CAP_PROP_FPS))
         self.frame_count = int(self.video_stream.get(cv2.CAP_PROP_FRAME_COUNT))
         self.video_length = self.frame_count / self.frame_rate
+
+        if self.frame_count > MAX_FRAMES:
+            self._window.display_message_box(
+                f"""This program can open at most {MAX_FRAMES} video frames, 
+and is designed mainly to analyze short video clips. Please cut this video down to just the
+gesture you wish to analyze."""
+            )
+            self.video_stream.release()
+            self.video_stream = None
+            self.frame_count = 0
+            self.frame_rate = 1
+            self.video_length = 0
+            raise ValueError("Video too long")
 
         logger.info(f"Frame rate: {self.frame_rate}")
         logger.info(f"Frame count: {self.frame_count}")
@@ -483,6 +498,8 @@ class AnalyzeVideoTab(TabGraphic):
             options=options,
         )
 
+        filename = utl_etc.default_extension(filename, ".jpg")
+
         if filename:
             if not (
                 filename.lower().endswith(".png")
@@ -505,6 +522,8 @@ class AnalyzeVideoTab(TabGraphic):
             options=options,
         )
 
+        filename = utl_etc.default_extension(filename, ".mp4")
+
         if filename:
             if not filename.lower().endswith(".mp4"):
                 self._window.display_message_box("Filename must end in .mp4")
@@ -522,9 +541,11 @@ class AnalyzeVideoTab(TabGraphic):
             self,
             "Save CSV Data",
             "",
-            "Videos (*.csv)",
+            "CSV Data (*.csv)",
             options=options,
         )
+
+        filename = utl_etc.default_extension(filename, ".csv")
 
         if filename:
             if not filename.lower().endswith(".csv"):
@@ -533,17 +554,36 @@ class AnalyzeVideoTab(TabGraphic):
                 self.save_csv(filename)
 
     def on_save_as(self):
-        # Create and show the dialog
-        dialog = dlg_modal.SaveVideoDialog()
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            if dialog.user_choice == "image":
-                self._save_as_image()
-            elif dialog.user_choice == "video":
-                self._save_as_video()
-            elif dialog.user_choice == "data":
-                self._save_as_data()
-            elif dialog.user_choice == "document":
-                self._save_as_document()
+        try:
+            # Create and show the dialog
+            dialog = dlg_modal.SaveVideoDialog()
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                if dialog.user_choice == "image":
+                    self._save_as_image()
+                elif dialog.user_choice == "video":
+                    self._save_as_video()
+                elif dialog.user_choice == "data":
+                    self._save_as_data()
+                elif dialog.user_choice == "document":
+                    self._save_as_document()
+        except FileNotFoundError as e:
+            logger.error("Error during save (FileNotFoundError)", exc_info=True)
+            self._window.display_message_box("Unable to save file. (FileNotFoundError)")
+        except PermissionError as e:
+            logger.error("Error during save (PermissionError)", exc_info=True)
+            self._window.display_message_box("Unable to save file. (PermissionError)")
+        except IsADirectoryError as e:
+            logger.error("Error during save (IsADirectoryError)", exc_info=True)
+            self._window.display_message_box("Unable to save file. (IsADirectoryError)")
+        except FileExistsError as e:
+            logger.error("Error during save (FileExistsError)", exc_info=True)
+            self._window.display_message_box("Unable to save file. (FileExistsError)")
+        except OSError as e:
+            logger.error("Error during save (OSError)", exc_info=True)
+            self._window.display_message_box("Unable to save file. (OSError)")
+        except Exception as e:
+            logger.error("Error during save", exc_info=True)
+            self._window.display_message_box("Unable to save file.")
 
     def collect_data(self):
         face = facial.AnalyzeFace(self._calcs)

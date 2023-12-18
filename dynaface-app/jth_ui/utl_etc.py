@@ -46,3 +46,9 @@ class CalcETC:
             return f"{minutes:02d}:{seconds:02d}"
         else:
             return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def default_extension(file_path, ext):
+    if not file_path.endswith(ext):
+        file_path += ext
+    return file_path

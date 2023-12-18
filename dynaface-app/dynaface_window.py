@@ -294,13 +294,17 @@ class DynafaceWindow(MainWindowJTH):
                 current_tab.on_save()
 
     def print_action(self):
-        current_tab = self._tab_widget.currentWidget()
+        try:
+            current_tab = self._tab_widget.currentWidget()
 
-        # Check if there is a current tab
-        if current_tab is not None:
-            # Check if the current tab has the 'on_copy' method
-            if hasattr(current_tab, "on_print"):
-                current_tab.on_print()
+            # Check if there is a current tab
+            if current_tab is not None:
+                # Check if the current tab has the 'on_copy' method
+                if hasattr(current_tab, "on_print"):
+                    current_tab.on_print()
+        except:
+            logger.error("Error during print", exc_info=True)
+            self.display_message_box("Unable to print image.")
 
     def get_recent_file_list(self):
         recent_files = self.app.state.get(app_jth.STATE_LAST_FILES, [])
@@ -324,27 +328,39 @@ class DynafaceWindow(MainWindowJTH):
             self._recent_menu.addAction(action)
 
     def undo_action(self):
-        current_tab = self._tab_widget.currentWidget()
+        try:
+            current_tab = self._tab_widget.currentWidget()
 
-        # Check if there is a current tab
-        if current_tab is not None:
-            # Check if the current tab has the 'on_undo' method
-            if hasattr(current_tab, "on_undo"):
-                current_tab.on_undo()
+            # Check if there is a current tab
+            if current_tab is not None:
+                # Check if the current tab has the 'on_undo' method
+                if hasattr(current_tab, "on_undo"):
+                    current_tab.on_undo()
+        except:
+            logger.error("Error during undo", exc_info=True)
+            self.display_message_box("Unable to undo.")
 
     def redo_action(self):
-        current_tab = self._tab_widget.currentWidget()
+        try:
+            current_tab = self._tab_widget.currentWidget()
 
-        # Check if there is a current tab
-        if current_tab is not None:
-            # Check if the current tab has the 'on_undo' method
-            if hasattr(current_tab, "on_redo"):
-                current_tab.on_redo()
+            # Check if there is a current tab
+            if current_tab is not None:
+                # Check if the current tab has the 'on_undo' method
+                if hasattr(current_tab, "on_redo"):
+                    current_tab.on_redo()
+        except:
+            logger.error("Error during redo", exc_info=True)
+            self.display_message_box("Unable to redo.")
 
     def close_action(self):
-        current_index = self._tab_widget.currentIndex()
-        if current_index != -1:
-            self.close_tab(current_index)
+        try:
+            current_index = self._tab_widget.currentIndex()
+            if current_index != -1:
+                self.close_tab(current_index)
+        except:
+            logger.error("Error during close tab", exc_info=True)
+            self.display_message_box("Unable to close tab.")
 
     def open_logs(self):
         self.app.open_logs()

@@ -8,6 +8,7 @@ import numpy as np
 import utl_gfx
 import utl_print
 from facial_analysis.facial import STATS, AnalyzeFace, load_face_image
+from jth_ui import utl_etc
 from jth_ui.tab_graphic import TabGraphic
 from PIL import Image
 from PyQt6.QtCore import QEvent, Qt, QTimer
@@ -255,15 +256,34 @@ class AnalyzeImageTab(TabGraphic):
         self._spin_zoom.setValue(int(scale_factor))
 
     def on_save_as(self):
-        # Create and show the dialog
-        dialog = dlg_modal.SaveImageDialog()
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            if dialog.user_choice == "image":
-                self._save_as_image()
-            elif dialog.user_choice == "data":
-                self._save_as_data()
-            elif dialog.user_choice == "document":
-                self._save_as_document()
+        try:
+            # Create and show the dialog
+            dialog = dlg_modal.SaveImageDialog()
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                if dialog.user_choice == "image":
+                    self._save_as_image()
+                elif dialog.user_choice == "data":
+                    self._save_as_data()
+                elif dialog.user_choice == "document":
+                    self._save_as_document()
+        except FileNotFoundError as e:
+            logger.error("Error during save (FileNotFoundError)", exc_info=True)
+            self._window.display_message_box("Unable to save file. (FileNotFoundError)")
+        except PermissionError as e:
+            logger.error("Error during save (PermissionError)", exc_info=True)
+            self._window.display_message_box("Unable to save file. (PermissionError)")
+        except IsADirectoryError as e:
+            logger.error("Error during save (IsADirectoryError)", exc_info=True)
+            self._window.display_message_box("Unable to save file. (IsADirectoryError)")
+        except FileExistsError as e:
+            logger.error("Error during save (FileExistsError)", exc_info=True)
+            self._window.display_message_box("Unable to save file. (FileExistsError)")
+        except OSError as e:
+            logger.error("Error during save (OSError)", exc_info=True)
+            self._window.display_message_box("Unable to save file. (OSError)")
+        except Exception as e:
+            logger.error("Error during save", exc_info=True)
+            self._window.display_message_box("Unable to save file.")
 
     def _save_as_image(self):
         options = QFileDialog.Option.DontUseNativeDialog
@@ -272,6 +292,8 @@ class AnalyzeImageTab(TabGraphic):
         filename, _ = QFileDialog.getSaveFileName(
             self, "Save Image", "", "Images (*.png *.jpeg *.jpg)", options=options
         )
+
+        filename = utl_etc.default_extension(filename, ".jpeg")
 
         if filename:
             if not (
@@ -293,9 +315,11 @@ class AnalyzeImageTab(TabGraphic):
             self,
             "Save CSV Data",
             "",
-            "Videos (*.csv)",
+            "CSV Data (*.csv)",
             options=options,
         )
+
+        filename = utl_etc.default_extension(filename, ".csv")
 
         if filename:
             if not filename.lower().endswith(".csv"):
@@ -314,6 +338,8 @@ class AnalyzeImageTab(TabGraphic):
             "Dynaface (*.dyfc)",
             options=options,
         )
+
+        filename = utl_etc.default_extension(filename, ".dyfc")
 
         if filename:
             if not filename.lower().endswith(".dyfc"):
