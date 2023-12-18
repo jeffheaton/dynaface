@@ -59,7 +59,7 @@ class AppDynaface(AppJTH):
             if not self.settings.get(SETTING_ACC, True):
                 device = "cpu"
 
-            logging.info("Using device: {device}")
+            logging.info(f"Using device: {device}")
             facial_analysis.init_models(model_path=self.DATA_DIR, device=device)
         except Exception as e:
             logger.error("Error running app", exc_info=True)

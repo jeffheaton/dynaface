@@ -257,6 +257,8 @@ class DynafaceWindow(MainWindowJTH):
                     logger.info(f"Opening file type: {typ}")
                     if typ == "image":
                         self.show_analyze_image(file_path)
+                    elif typ == "video":
+                        self.show_analyze_video(file_path)
         except:
             logger.error("Error during open file", exc_info=True)
 

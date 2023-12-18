@@ -37,6 +37,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 import cmds
+import dynaface_document
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,7 @@ GRAPH_HORIZ = False
 class AnalyzeVideoTab(TabGraphic):
     def __init__(self, window, path):
         super().__init__(window)
+        self.unsaved_changes = False
 
         self._auto_update = False
 
@@ -61,7 +63,12 @@ class AnalyzeVideoTab(TabGraphic):
         self._frames = []
         self._frame_begin = 0
         self._frame_end = 0
-        self.begin_load_video(path)
+        if path.lower().endswith(".dyfc"):
+            self.filename = path
+            self.load_document(path)
+        else:
+            self.begin_load_video(path)
+            self.filename = None
         self._chart_view = None
 
         # Horiz toolbar
@@ -107,9 +114,17 @@ class AnalyzeVideoTab(TabGraphic):
         # Undo stack
         self._undo_stack = QUndoStack(self)
 
-        self.thread = worker_threads.WorkerLoad(self)
-        self.thread._update_signal.connect(self.update_load_progress)
-        self.thread.start()
+        if self.filename is None:
+            self.thread = worker_threads.WorkerLoad(self)
+            self.thread._update_signal.connect(self.update_load_progress)
+            self.thread.start()
+        else:
+            self.thread = None
+            self.load_first_frame()
+            self.lbl_status.setText(self.status())
+            self._video_slider.setRange(0, len(self._frames) - 2)
+
+        self.unsaved_changes = False
 
     def begin_load_video(self, path):
         # Open the video file
@@ -269,7 +284,7 @@ class AnalyzeVideoTab(TabGraphic):
                 partial(self.checkbox_clicked, checkbox, stat)
             )
             self.scroll_area_layout.addWidget(checkbox)
-            checkbox.setChecked(True)
+            checkbox.setChecked(stat.enabled)
             self.checkboxes.append(checkbox)
 
         # Connect buttons to slot functions
@@ -303,8 +318,10 @@ class AnalyzeVideoTab(TabGraphic):
             logger.info("Closed analyze video tab (during load)")
         else:
             logger.info("Closed analyze video tab")
-        self.loading = False
-        self.thread.running = False
+
+        if self.thread is not None:
+            self.loading = False
+            self.thread.running = False
 
     def on_resize(self):
         pass
@@ -334,6 +351,7 @@ class AnalyzeVideoTab(TabGraphic):
 
     def checkbox_clicked(self, checkbox, stat):
         stat.enabled = checkbox.isChecked()
+        self.unsaved_changes = True
         if self._auto_update:
             self.update_face()
             if self._chart_view is not None:
@@ -346,15 +364,18 @@ class AnalyzeVideoTab(TabGraphic):
         self.lbl_status.setText(self.status(status))
 
         if self._view is None:
-            logger.debug("Display first video frame on load")
-            self._face.load_state(self._frames[0])
-            self.create_graphic(buffer=self._face.render_img)
-            self._view.grabGesture(Qt.GestureType.PinchGesture)
-            self._view.installEventFilter(self)
-            self.update_face()
-            logger.debug("Done, display first video frame on load")
-            # Auto fit
-            QTimer.singleShot(1, self.fit)
+            self.load_first_frame()
+
+    def load_first_frame(self):
+        logger.debug("Display first video frame on load")
+        self._face.load_state(self._frames[0])
+        self.create_graphic(buffer=self._face.render_img)
+        self._view.grabGesture(Qt.GestureType.PinchGesture)
+        self._view.installEventFilter(self)
+        self.update_face()
+        logger.debug("Done, display first video frame on load")
+        # Auto fit
+        QTimer.singleShot(1, self.fit)
 
     def add_frame(self, face):
         self._frames.append(face.dump_state())
@@ -521,6 +542,8 @@ class AnalyzeVideoTab(TabGraphic):
                 self._save_as_video()
             elif dialog.user_choice == "data":
                 self._save_as_data()
+            elif dialog.user_choice == "document":
+                self._save_as_document()
 
     def collect_data(self):
         face = facial.AnalyzeFace(self._calcs)
@@ -767,3 +790,47 @@ class AnalyzeVideoTab(TabGraphic):
 
     def on_undo(self):
         self._undo_stack.undo()
+
+    def _save_as_document(self):
+        options = QFileDialog.Option.DontUseNativeDialog
+
+        # Show the dialog and get the selected file name and format
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Dynaface Document",
+            "",
+            "Dynaface (*.dyfc)",
+            options=options,
+        )
+
+        if filename:
+            if not filename.lower().endswith(".dyfc"):
+                self._window.display_message_box("Filename must end in .dyfc")
+            else:
+                self.save_document(filename)
+
+    def save_document(self, filename):
+        doc = dynaface_document.DynafaceDocument(dynaface_document.DOC_TYPE_VIDEO)
+        doc.calcs = self._face.calcs
+        doc.frames = self._frames[self._frame_begin : self._frame_end]
+        doc.fps = self.frame_rate
+        doc.save(filename)
+        self.unsaved_changes = False
+
+    def load_document(self, filename):
+        doc = dynaface_document.DynafaceDocument(dynaface_document.DOC_TYPE_VIDEO)
+        doc.load(filename)
+        print("**", doc.calcs)
+        self._face = facial.AnalyzeFace(doc.calcs)
+        self._frames = doc.frames
+        self.filename = filename
+        self.frame_count = len(self._frames)
+        self._frame_begin = 0
+        self._frame_end = len(self._frames)
+        self.frame_rate = doc.fps
+
+    def on_save(self):
+        if self.filename is None:
+            self.on_save_as()
+        else:
+            self.save_document(self.filename)
