@@ -158,6 +158,10 @@ class DynafaceWindow(MainWindowJTH):
         tutorial_action.triggered.connect(self.open_tutorial)
         self._help_menu.addAction(tutorial_action)
 
+        logs_action = QAction("Open Support Logs...", self)
+        logs_action.triggered.connect(self.open_logs)
+        self._help_menu.addAction(logs_action)
+
         #
         self.menubar.addMenu(app_menu)
         self.menubar.addMenu(self._file_menu)
@@ -341,3 +345,6 @@ class DynafaceWindow(MainWindowJTH):
         current_index = self._tab_widget.currentIndex()
         if current_index != -1:
             self.close_tab(current_index)
+
+    def open_logs(self):
+        self.app.open_logs()

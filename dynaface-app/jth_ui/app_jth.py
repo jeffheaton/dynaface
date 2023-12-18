@@ -6,11 +6,12 @@ import logging.config
 import logging.handlers
 import os
 import platform
-import sys
 import plistlib
+import sys
 
 import appdirs
-from PyQt6.QtCore import Qt, QtMsgType, qInstallMessageHandler
+from PyQt6.QtCore import Qt, QtMsgType, QUrl, qInstallMessageHandler
+from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ class AppJTH:
         self.VERSION = version
         self.APP_ID = self.BUNDLE_ID.split(".")[-1]
         self.settings = {}
-        print("***",self.get_system_name())
+        print("***", self.get_system_name())
         if self.get_system_name() == "osx":
             if self.is_sandboxed():
                 self.LOG_DIR = os.path.join(os.path.expanduser("~"), "logs")
@@ -227,14 +228,9 @@ class AppJTH:
         except Exception as e:
             logging.error("Caught an exception loading settings", exc_info=True)
 
-    def get_bool(self, key):
-        result = settings.get(key, False)
-        if not result:
-            result = False
-        return result
+    def open_logs(self):
+        # Convert the file path to a QUrl object
+        file_url = QUrl.fromLocalFile(self.LOG_DIR)
 
-    def get_int(self, key):
-        result = settings.get(key, 1)
-        if not result:
-            result = 1
-        return result
+        # Open the file location in the default file explorer
+        QDesktopServices.openUrl(file_url)
