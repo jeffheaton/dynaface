@@ -37,8 +37,11 @@ from PyQt6.QtWidgets import (
     QStyle,
     QToolBar,
     QVBoxLayout,
+    QTreeWidget,
+    QTreeWidgetItem,
     QWidget,
 )
+from facial_analysis.calc import MeasureItem
 
 logger = logging.getLogger(__name__)
 
@@ -292,20 +295,63 @@ gesture you wish to analyze."""
         self.left_toolbar.addWidget(self.scroll_area)
 
         # Store checkboxes in a list for easy access
-        self.checkboxes = []
+        self._tree = QTreeWidget()
+        self._tree.setHeaderLabel("Measures")
+        # self._tree.itemChanged.connect(on_item_changed)
 
         for stat in self._face.calcs:
-            checkbox = QCheckBox(stat.abbrev())
-            checkbox.stateChanged.connect(
-                partial(self.checkbox_clicked, checkbox, stat)
+            parent = QTreeWidgetItem(self._tree)
+            parent.setText(0, stat.abbrev())
+            parent.setFlags(parent.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            parent.setCheckState(
+                0, Qt.CheckState.Checked if stat.enabled else Qt.CheckState.Unchecked
             )
-            self.scroll_area_layout.addWidget(checkbox)
-            checkbox.setChecked(stat.enabled)
-            self.checkboxes.append(checkbox)
+            parent.setData(0, Qt.ItemDataRole.UserRole, stat)
 
+            for item in stat.stats:
+                child = QTreeWidgetItem(parent)
+                child.setFlags(child.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                child.setText(0, item.name)
+                child.setCheckState(
+                    0,
+                    Qt.CheckState.Checked
+                    if (stat.enabled and item.enabled)
+                    else Qt.CheckState.Unchecked,
+                )
+                child.setData(0, Qt.ItemDataRole.UserRole, item)
+            # parent.stateChanged.connect(partial(self.checkbox_clicked, checkbox, stat))
+
+            # checkbox = QCheckBox(stat.abbrev())
+            # checkbox.stateChanged.connect(
+            #    partial(self.checkbox_clicked, checkbox, stat)
+            # )
+            # self.scroll_area_layout.addWidget(checkbox)
+            # checkbox.setChecked(stat.enabled)
+            # self.checkboxes.append(checkbox)
+
+        self._tree.itemChanged.connect(self.on_tree_item_changed)
+        self.scroll_area_layout.addWidget(self._tree)
         # Connect buttons to slot functions
         self.all_button.clicked.connect(self.check_all)
         self.none_button.clicked.connect(self.uncheck_all)
+
+    def on_tree_item_changed(self, item, column):
+        data = item.data(0, Qt.ItemDataRole.UserRole)
+        data.enabled = item.checkState(0) == Qt.CheckState.Checked
+        # Check if the item is a parent
+        if item.childCount() > 0 and column == 0:
+            # Parent item
+            # Update all children based on the parent's state
+            for i in range(item.childCount()):
+                child = item.child(i)
+                child.setCheckState(0, item.checkState(0))
+
+        if self._auto_update:
+            self.update_face()
+            if self._chk_graph.isChecked():
+                logger.debug("Update chart, because measures changed")
+                self.update_chart()
+                self.render_chart()
 
     def action_landmarks(self, state):
         self.update_face()
@@ -347,16 +393,25 @@ gesture you wish to analyze."""
         utl_gfx.copy_image_to_clipboard(self._face.render_img)
 
     def check_all(self):
+        """Check all checkboxes in top-level tree items."""
+
         self._auto_update = False
-        for checkbox in self.checkboxes:
-            checkbox.setChecked(True)
+        for i in range(self._tree.topLevelItemCount()):
+            item = self._tree.topLevelItem(i)
+            item.setCheckState(0, Qt.CheckState.Checked)
         self._auto_update = True
         self.update_face()
 
+        if self._chart_view is not None:
+            logger.debug("Update chart, because measures changed")
+            self.update_chart()
+            self.render_chart()
+
     def uncheck_all(self):
         self._auto_update = False
-        for checkbox in self.checkboxes:
-            checkbox.setChecked(False)
+        for i in range(self._tree.topLevelItemCount()):
+            item = self._tree.topLevelItem(i)
+            item.setCheckState(0, Qt.CheckState.Unchecked)
         self._auto_update = True
         self.update_face()
 
@@ -478,7 +533,7 @@ gesture you wish to analyze."""
         self._chart_view.resetTransform()
         self._chart_view.scale(z, z)
 
-    def fit(self):
+    def _fit_face(self):
         view_size = self._view.size()
         scene_rect = self._scene.sceneRect()
         x_scale = view_size.width() / scene_rect.width()
@@ -488,6 +543,22 @@ gesture you wish to analyze."""
         )  # Scale factor adjusted for action_zoom
         self.action_zoom(int(scale_factor))
         self._spin_zoom.setValue(int(scale_factor))
+
+    def _fit_chart(self):
+        view_size = self._chart_view.size()
+        scene_rect = self._chart_scene.sceneRect()
+        x_scale = view_size.width() / scene_rect.width()
+        y_scale = view_size.height() / scene_rect.height()
+        scale_factor = (
+            min(x_scale, y_scale) * 100
+        )  # Scale factor adjusted for action_zoom
+        self.zoom_chart(int(scale_factor))
+        self._spin_zoom_chart.setValue(int(scale_factor))
+
+    def fit(self):
+        self._fit_face()
+        if self._chk_graph.isChecked():
+            self._fit_chart()
 
     def _save_as_image(self):
         options = QFileDialog.Option.DontUseNativeDialog
@@ -589,7 +660,7 @@ gesture you wish to analyze."""
             self._window.display_message_box("Unable to save file.")
 
     def collect_data(self):
-        face = facial.AnalyzeFace(self._calcs)
+        face = facial.AnalyzeFace(self._face.calcs)
         stats = face.get_all_stats()
         data = {stat: [] for stat in stats}
 
@@ -601,7 +672,8 @@ gesture you wish to analyze."""
             face.load_state(frame)
             rec = face.analyze()
             for stat in rec.keys():
-                data[stat].append(rec[stat])
+                if stat in data:
+                    data[stat].append(rec[stat])
 
         return data
 
@@ -625,8 +697,6 @@ gesture you wish to analyze."""
     def update_chart(self):
         """Create the chart object, or update it if already there."""
         all_stats = self._face.get_all_stats()
-        if len(all_stats) < 1:
-            return
 
         # Create a Matplotlib figure
         self.chart_fig = Figure(figsize=(12, 2.5), dpi=100)
@@ -635,8 +705,8 @@ gesture you wish to analyze."""
 
         data = self.collect_data()
         plot_stats = data.keys()
-        l = len(data[all_stats[0]])
-        # lst_time = [x * self.frame_rate for x in range(l)]
+
+        l = len(data[all_stats[0]]) if len(all_stats) > 0 else 0
         lst_time = list(range(l))
 
         for stat in data.keys():
@@ -696,6 +766,10 @@ gesture you wish to analyze."""
             self._chart_view.setContentsMargins(0, 0, 0, 0)
 
             self._splitter.addWidget(self._chart_view)
+
+            # size the splitter (just the first time to 3/4)
+            height = self.height()
+            self._splitter.setSizes([height // 4, 3 * height // 4])
         else:
             logger.debug("Update existing chart")
             # Update the scene with the new pixmap
@@ -734,6 +808,7 @@ gesture you wish to analyze."""
                 self.update_chart()
                 self.render_chart()
                 self._adjust_chart()
+
         else:
             # Hide the graph
             self._chart_view.setParent(None)
@@ -878,7 +953,6 @@ gesture you wish to analyze."""
     def load_document(self, filename):
         doc = dynaface_document.DynafaceDocument(dynaface_document.DOC_TYPE_VIDEO)
         doc.load(filename)
-        print("**", doc.calcs)
         self._face = facial.AnalyzeFace(doc.calcs)
         self._frames = doc.frames
         self.filename = filename

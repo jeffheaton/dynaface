@@ -1,15 +1,32 @@
 import numpy as np
 
 
+def filter(data, items):
+    result = {}
+    for item in items:
+        result[item.name] = data[item.name]
+    return result
+
+
+class MeasureItem:
+    def __init__(self, name: str, enabled: bool = True):
+        self.name = name
+        self.enabled = enabled
+
+    def __str__(self):
+        return f"(name={self.name},enabled={self.enabled})"
+
+    def __repr__(self):
+        return self.__str__()
+
+
 class AnalyzeFAI:
     def __init__(self) -> None:
         self.enabled = True
+        self.stats = [MeasureItem("fai")]
 
     def abbrev(self):
         return "FAI"
-
-    def stats(self):
-        return ["fai"]
 
     def calc(self, face, render=True):
         d1 = face.measure(face.landmarks[64], face.landmarks[76])
@@ -22,34 +39,30 @@ class AnalyzeFAI:
         fai_pt = (face.stats_right, face.landmarks[82][1])
         if render:
             face.write_text(fai_pt, f"FAI={fai:.2f} mm")
-        return {"fai": fai}
+        return filter({"fai": fai}, (self.stats))
 
 
 class AnalyzeOralCommissureExcursion:
     def __init__(self) -> None:
         self.enabled = True
+        self.stats = [MeasureItem("oce.a"), MeasureItem("oce.b")]
 
     def abbrev(self):
         return "Oral CE"
 
-    def stats(self):
-        return ["oce.a", "oce.b"]
-
     def calc(self, face, render=True):
         oce_a = face.measure(face.landmarks[76], face.landmarks[85])
         oce_b = face.measure(face.landmarks[82], face.landmarks[85])
-        return {"oce.a": oce_a, "oce.b": oce_b}
+        return filter({"oce.a": oce_a, "oce.b": oce_b}, self.stats)
 
 
 class AnalyzeBrows:
     def __init__(self) -> None:
         self.enabled = True
+        self.stats = [MeasureItem("brow.d")]
 
     def abbrev(self):
         return "Brow"
-
-    def stats(self):
-        return ["brow.d"]
 
     def calc(self, face, render=True):
         # left brow
@@ -93,18 +106,16 @@ class AnalyzeBrows:
                 f"d.brow={diff:.2f} mm",
             )
 
-        return {"brow.d": diff}
+        return filter({"brow.d": diff}, self.stats)
 
 
 class AnalyzeDentalArea:
     def __init__(self) -> None:
         self.enabled = True
+        self.stats = [MeasureItem("dental_area")]
 
     def abbrev(self):
         return "Dental Display"
-
-    def stats(self):
-        return ["dental_area"]
 
     def calc(self, face, render=True):
         contours = [
@@ -122,18 +133,22 @@ class AnalyzeDentalArea:
         dental_area = face.measure_polygon(contours, face.pix2mm)
         dental_pt = (face.stats_right, face.landmarks[85][1] + 20)
         face.write_text_sq(dental_pt, f"dental={round(dental_area,2)}mm")
-        return {"dental_area": dental_area}
+        return filter({"dental_area": dental_area}, self.stats)
 
 
 class AnalyzeEyeArea:
     def __init__(self) -> None:
         self.enabled = True
+        self.stats = [
+            MeasureItem("eye.l"),
+            MeasureItem("eye.r"),
+            MeasureItem("eye.d"),
+            MeasureItem("eye.rlr"),
+            MeasureItem("eye.rrl"),
+        ]
 
     def abbrev(self):
         return "Eye Area"
-
-    def stats(self):
-        return ["eye.l", "eye.r", "eye.d", "eye.rlr", "eye.rrl"]
 
     def calc(self, face, render=True):
         right_eye_area = face.measure_polygon(
@@ -189,10 +204,13 @@ class AnalyzeEyeArea:
             f"rrl.eye={round(eye_ratio_rl,2)}mm",
         )
 
-        return {
-            "eye.l": left_eye_area,
-            "eye.r": right_eye_area,
-            "eye.d": eye_area_diff,
-            "eye.rlr": eye_ratio_lr,
-            "eye.rrl": eye_ratio_rl,
-        }
+        return filter(
+            {
+                "eye.l": left_eye_area,
+                "eye.r": right_eye_area,
+                "eye.d": eye_area_diff,
+                "eye.rlr": eye_ratio_lr,
+                "eye.rrl": eye_ratio_rl,
+            },
+            self.stats,
+        )

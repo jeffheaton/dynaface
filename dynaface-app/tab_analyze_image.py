@@ -202,7 +202,6 @@ class AnalyzeImageTab(TabGraphic):
 
     def on_close(self):
         # Check for unsaved changes here
-        print(self.unsaved_changes)
         if self.unsaved_changes:
             response = dlg_modal.prompt_save_changes()
 
