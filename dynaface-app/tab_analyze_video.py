@@ -41,7 +41,7 @@ from PyQt6.QtWidgets import (
     QTreeWidgetItem,
     QWidget,
 )
-from facial_analysis.calc import MeasureItem
+from facial_analysis.measures import MeasureItem
 
 logger = logging.getLogger(__name__)
 
@@ -299,23 +299,23 @@ gesture you wish to analyze."""
         self._tree.setHeaderLabel("Measures")
         # self._tree.itemChanged.connect(on_item_changed)
 
-        for stat in self._face.calcs:
+        for measure in self._face.measures:
             parent = QTreeWidgetItem(self._tree)
-            parent.setText(0, stat.abbrev())
+            parent.setText(0, measure.abbrev())
             parent.setFlags(parent.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             parent.setCheckState(
-                0, Qt.CheckState.Checked if stat.enabled else Qt.CheckState.Unchecked
+                0, Qt.CheckState.Checked if measure.enabled else Qt.CheckState.Unchecked
             )
-            parent.setData(0, Qt.ItemDataRole.UserRole, stat)
+            parent.setData(0, Qt.ItemDataRole.UserRole, measure)
 
-            for item in stat.stats:
+            for item in measure.items:
                 child = QTreeWidgetItem(parent)
                 child.setFlags(child.flags() | Qt.ItemFlag.ItemIsUserCheckable)
                 child.setText(0, item.name)
                 child.setCheckState(
                     0,
                     Qt.CheckState.Checked
-                    if (stat.enabled and item.enabled)
+                    if (measure.enabled and item.enabled)
                     else Qt.CheckState.Unchecked,
                 )
                 child.setData(0, Qt.ItemDataRole.UserRole, item)
@@ -660,7 +660,7 @@ gesture you wish to analyze."""
             self._window.display_message_box("Unable to save file.")
 
     def collect_data(self):
-        face = facial.AnalyzeFace(self._face.calcs)
+        face = facial.AnalyzeFace(self._face.measures)
         stats = face.get_all_stats()
         data = {stat: [] for stat in stats}
 
@@ -936,6 +936,8 @@ gesture you wish to analyze."""
             options=options,
         )
 
+        filename = utl_etc.default_extension(filename, ".dyfc")
+
         if filename:
             if not filename.lower().endswith(".dyfc"):
                 self._window.display_message_box("Filename must end in .dyfc")
@@ -944,7 +946,7 @@ gesture you wish to analyze."""
 
     def save_document(self, filename):
         doc = dynaface_document.DynafaceDocument(dynaface_document.DOC_TYPE_VIDEO)
-        doc.calcs = self._face.calcs
+        doc.measures = self._face.measures
         doc.frames = self._frames[self._frame_begin : self._frame_end]
         doc.fps = self.frame_rate
         doc.save(filename)
@@ -953,7 +955,7 @@ gesture you wish to analyze."""
     def load_document(self, filename):
         doc = dynaface_document.DynafaceDocument(dynaface_document.DOC_TYPE_VIDEO)
         doc.load(filename)
-        self._face = facial.AnalyzeFace(doc.calcs)
+        self._face = facial.AnalyzeFace(doc.measures)
         self._frames = doc.frames
         self.filename = filename
         self.frame_count = len(self._frames)

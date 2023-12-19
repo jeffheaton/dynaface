@@ -4,13 +4,19 @@ import math
 import cv2
 import numpy as np
 import torch
-from facial_analysis.calc import *
+from facial_analysis.measures import (
+    AnalyzeFAI,
+    AnalyzeOralCommissureExcursion,
+    AnalyzeBrows,
+    AnalyzeDentalArea,
+    AnalyzeEyeArea,
+)
 from facial_analysis.image import ImageAnalysis, load_image
 from facial_analysis.spiga.inference.config import ModelConfig
 from facial_analysis.spiga.inference.framework import SPIGAFramework
 from facial_analysis.util import PolyArea
 import copy
-from facial_analysis import models
+from facial_analysis import models, measures
 
 STD_PUPIL_DIST = 63
 
@@ -28,14 +34,6 @@ SPIGA_MODEL = "wflw"
 
 logger = logging.getLogger(__name__)
 
-STATS = [
-    AnalyzeFAI(),
-    AnalyzeOralCommissureExcursion(),
-    AnalyzeBrows(),
-    AnalyzeDentalArea(),
-    AnalyzeEyeArea(),
-]
-
 
 def init_processor(device=None):
     global _processor
@@ -49,7 +47,9 @@ def init_processor(device=None):
     _processor = SPIGAFramework(config, device=device)
 
 
-def load_face_image(filename, crop=True, stats=STATS):
+def load_face_image(filename, crop=True, stats=None):
+    if stats is None:
+        stats = measures.all_measures()
     img = load_image(filename)
     face = AnalyzeFace(stats)
     face.load_image(img, crop)
@@ -119,23 +119,23 @@ def scale_crop_points(lst, crop_x, crop_y, scale):
 class AnalyzeFace(ImageAnalysis):
     pd = STD_PUPIL_DIST
 
-    def __init__(self, stats):
+    def __init__(self, measures):
         self.original_img = None
         self.left_eye = None
         self.right_eye = None
         self.nose = None
-        self.calcs = stats
+        self.measures = measures
         self.headpose = [0, 0, 0]
         self.landmarks = []
         self.pupillary_distance = 0
         self.pix2mm = 1
 
-    def get_all_stats(self):
+    def get_all_items(self):
         return [
             stat.name
-            for obj in self.calcs
+            for obj in self.measures
             if obj.enabled
-            for stat in obj.stats
+            for stat in obj.items
             if stat.enabled
         ]
 
@@ -191,7 +191,7 @@ class AnalyzeFace(ImageAnalysis):
 
     def analyze(self):
         result = {}
-        for calc in self.calcs:
+        for calc in self.measures:
             if calc.enabled:
                 result.update(calc.calc(self))
         return result

@@ -7,7 +7,7 @@ import dynaface_document
 import numpy as np
 import utl_gfx
 import utl_print
-from facial_analysis.facial import STATS, AnalyzeFace, load_face_image
+from facial_analysis.facial import AnalyzeFace, load_face_image
 from jth_ui import utl_etc
 from jth_ui.tab_graphic import TabGraphic
 from PIL import Image
@@ -153,7 +153,7 @@ class AnalyzeImageTab(TabGraphic):
         # Store checkboxes in a list for easy access
         self.checkboxes = []
 
-        for stat in self._face.calcs:
+        for stat in self._face.measures:
             checkbox = QCheckBox(stat.abbrev())
             checkbox.stateChanged.connect(
                 partial(self.checkbox_clicked, checkbox, stat)
