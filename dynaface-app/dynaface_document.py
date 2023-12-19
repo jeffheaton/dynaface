@@ -2,11 +2,7 @@ import pickle
 from facial_analysis.facial import AnalyzeFace, load_face_image
 from jth_ui import utl_classes
 
-DOC_TYPE_VIDEO = "video"
-DOC_TYPE_IMAGE = "image"
-
 DOC_HEADER = "header"
-DOC_HEADER_TYPE = "type"
 DOC_HEADER_VERSION = "version"
 DOC_HEADER_FPS = "fps"
 DOC_BODY = "body"
@@ -20,60 +16,29 @@ DOC_NAME = "name"
 DOC_ENABLED = "enabled"
 
 
-def check_dyfc_type(filename):
+def check_dyfc_type(filename) -> None:
     with open(filename, "rb") as f:
         doc = pickle.load(f)
 
     v = doc[DOC_HEADER][DOC_HEADER_VERSION]
-    t = doc[DOC_HEADER][DOC_HEADER_TYPE]
 
     if v > 1:
         return "Error, this application can only read Dynaface version 1 document files. Please update Dynaface."
 
-    if t != "video" and t != "image":
-        return "Error, this application only supports Dynaface video and image files."
-
-    return t
-
 
 class DynafaceDocument:
-    def __init__(self, type):
+    def __init__(self):
         self._version = 1
-        self._type = type
         self.face = None
         self.frames = []
         self.measures = []
         self.fps = 0
 
     def save(self, filename: str):
-        if self._type == DOC_TYPE_IMAGE:
-            self._save_image(filename)
-        elif self._type == DOC_TYPE_VIDEO:
-            self._save_video(filename)
-
-    def _save_image(self, filename: str):
-        measures = self._save_measures(self.face.measures)
-
-        doc = {
-            DOC_HEADER: {
-                DOC_HEADER_TYPE: self._type,
-                DOC_HEADER_VERSION: self._version,
-            },
-            DOC_BODY: {
-                DOC_BODY_FACE: self.face.dump_state(),
-                DOC_BODY_MEASURES: measures,
-            },
-        }
-
-        with open(filename, "wb") as f:
-            pickle.dump(doc, f)
-
-    def _save_video(self, filename: str):
         measures = self._save_measures(self.measures)
 
         doc = {
             DOC_HEADER: {
-                DOC_HEADER_TYPE: self._type,
                 DOC_HEADER_VERSION: self._version,
                 DOC_HEADER_FPS: self.fps,
             },
@@ -84,22 +49,6 @@ class DynafaceDocument:
             pickle.dump(doc, f)
 
     def load(self, filename: str):
-        if self._type == DOC_TYPE_IMAGE:
-            self._load_image(filename)
-        elif self._type == DOC_TYPE_VIDEO:
-            self._load_video(filename)
-
-    def _load_image(self, filename: str):
-        with open(filename, "rb") as f:
-            doc = pickle.load(f)
-
-        measures = self._load_measures(doc[DOC_BODY][DOC_BODY_MEASURES])
-
-        state = doc[DOC_BODY][DOC_BODY_FACE]
-        self.face = AnalyzeFace(measures)
-        self.face.load_state(state)
-
-    def _load_video(self, filename: str):
         with open(filename, "rb") as f:
             doc = pickle.load(f)
 

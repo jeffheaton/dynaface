@@ -946,7 +946,7 @@ gesture you wish to analyze."""
                 self.save_document(filename)
 
     def save_document(self, filename):
-        doc = dynaface_document.DynafaceDocument(dynaface_document.DOC_TYPE_VIDEO)
+        doc = dynaface_document.DynafaceDocument()
         doc.measures = self._face.measures
         doc.frames = self._frames[self._frame_begin : self._frame_end]
         doc.fps = self.frame_rate
@@ -954,9 +954,9 @@ gesture you wish to analyze."""
         self.unsaved_changes = False
 
     def load_document(self, filename):
-        doc = dynaface_document.DynafaceDocument(dynaface_document.DOC_TYPE_VIDEO)
+        doc = dynaface_document.DynafaceDocument()
         doc.load(filename)
-        self._face = facial.AnalyzeFace(doc.measures)
+        self._face = AnalyzeFace(doc.measures)
         self._frames = doc.frames
         self.filename = filename
         self.frame_count = len(self._frames)
