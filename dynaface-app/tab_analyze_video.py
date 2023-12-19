@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 import utl_gfx
 import utl_print
 import worker_threads
-from facial_analysis import facial
+from facial_analysis.facial import AnalyzeFace, load_face_image
 from jth_ui import utl_etc
 from jth_ui.tab_graphic import TabGraphic
 from matplotlib.figure import Figure
@@ -41,7 +41,10 @@ from PyQt6.QtWidgets import (
     QTreeWidgetItem,
     QWidget,
 )
-from facial_analysis.measures import MeasureItem
+from facial_analysis.measures import MeasureItem, all_measures
+import numpy as np
+from PIL import Image
+
 
 logger = logging.getLogger(__name__)
 
@@ -56,19 +59,15 @@ class AnalyzeVideoTab(TabGraphic):
 
         self._auto_update = False
 
-        self._calcs = [
-            facial.AnalyzeFAI(),
-            facial.AnalyzeOralCommissureExcursion(),
-            facial.AnalyzeBrows(),
-            facial.AnalyzeDentalArea(),
-            facial.AnalyzeEyeArea(),
-        ]
-
         # Load the face
         self._frames = []
         self._frame_begin = 0
         self._frame_end = 0
-        if path.lower().endswith(".dyfc"):
+        self.frame_rate = 30
+
+        if path.lower().endswith((".jpg", ".jpeg", ".png", ".tiff", ".heic")):
+            self.load_image(path)
+        elif path.lower().endswith(".dyfc"):
             self.filename = path
             self.load_document(path)
         else:
@@ -119,7 +118,9 @@ class AnalyzeVideoTab(TabGraphic):
         # Undo stack
         self._undo_stack = QUndoStack(self)
 
-        if self.filename is None:
+        # If the filename is set, we loaded a document, that is already decoded
+        # If there are frames already defined (1), we loaded a single image.
+        if self.filename is None and len(self._frames) == 0:
             self.thread = worker_threads.WorkerLoad(self)
             self.thread._update_signal.connect(self.update_load_progress)
             self.thread.start()
@@ -163,19 +164,19 @@ gesture you wish to analyze."""
         logger.info(f"Video length: {self.video_length}")
 
         # Prepare facial analysis
-        self._face = facial.AnalyzeFace(self._calcs)
+        self._face = AnalyzeFace(all_measures())
 
     def init_bottom_horizontal_toolbar(self, layout):
         toolbar = QToolBar()
         layout.addWidget(toolbar)  # Add the toolbar to the layout first
 
         # Back Button
-        btn_backward = QPushButton()
-        btn_backward.setIcon(
+        self._btn_backward = QPushButton()
+        self._btn_backward.setIcon(
             self.style().standardIcon(QStyle.StandardPixmap.SP_MediaSeekBackward)
         )
-        btn_backward.clicked.connect(self.backward_action)
-        toolbar.addWidget(btn_backward)
+        self._btn_backward.clicked.connect(self.backward_action)
+        toolbar.addWidget(self._btn_backward)
 
         # Start Button
         self._btn_play = QPushButton()
@@ -186,12 +187,12 @@ gesture you wish to analyze."""
         toolbar.addWidget(self._btn_play)
 
         # Forward Button
-        btn_forward = QPushButton()
-        btn_forward.setIcon(
+        self._btn_forward = QPushButton()
+        self._btn_forward.setIcon(
             self.style().standardIcon(QStyle.StandardPixmap.SP_MediaSeekForward)
         )
-        btn_forward.clicked.connect(self.forward_action)
-        toolbar.addWidget(btn_forward)
+        self._btn_forward.clicked.connect(self.forward_action)
+        toolbar.addWidget(self._btn_forward)
         toolbar.addSeparator()
 
         self.lbl_status = QLabel("0/0")
@@ -660,8 +661,8 @@ gesture you wish to analyze."""
             self._window.display_message_box("Unable to save file.")
 
     def collect_data(self):
-        face = facial.AnalyzeFace(self._face.measures)
-        stats = face.get_all_stats()
+        face = AnalyzeFace(self._face.measures)
+        stats = face.get_all_items()
         data = {stat: [] for stat in stats}
 
         cols = list(data.keys())
@@ -684,7 +685,7 @@ gesture you wish to analyze."""
             writer = csv.writer(f)
             cols = list(data.keys())
             writer.writerow(["frame", "time"] + cols)
-            all_stats = self._face.get_all_stats()
+            all_stats = self._face.get_all_items()
             l = len(data[all_stats[0]])
             lst_time = [x * self.frame_rate for x in range(l)]
 
@@ -696,7 +697,7 @@ gesture you wish to analyze."""
 
     def update_chart(self):
         """Create the chart object, or update it if already there."""
-        all_stats = self._face.get_all_stats()
+        all_measures = self._face.get_all_items()
 
         # Create a Matplotlib figure
         self.chart_fig = Figure(figsize=(12, 2.5), dpi=100)
@@ -706,7 +707,7 @@ gesture you wish to analyze."""
         data = self.collect_data()
         plot_stats = data.keys()
 
-        l = len(data[all_stats[0]]) if len(all_stats) > 0 else 0
+        l = len(data[all_measures[0]]) if len(all_measures) > 0 else 0
         lst_time = list(range(l))
 
         for stat in data.keys():
@@ -1002,3 +1003,31 @@ gesture you wish to analyze."""
             self._spin_zoom_chart.setEnabled(True)
         else:
             self._spin_zoom_chart.setEnabled(False)
+
+        # Single image mode?
+        if (self._frame_end - self._frame_begin) <= 1:
+            self._btn_backward.setEnabled(False)
+            self._btn_play.setEnabled(False)
+            self._btn_forward.setEnabled(False)
+            self._chk_graph.setEnabled(False)
+        else:
+            self._btn_backward.setEnabled(True)
+            self._btn_play.setEnabled(True)
+            self._btn_forward.setEnabled(True)
+            self._chk_graph.setEnabled(True)
+
+    def load_image(self, path):
+        if path.lower().endswith(".heic"):
+            pil_image = Image.open(path)
+            image_np = np.array(pil_image)
+            # image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+            self._face = AnalyzeFace(all_measures())
+            self._face.load_image(image_np, crop=True)
+        else:
+            self._face = load_face_image(path, crop=True)
+
+        self._frame_begin = 0
+        self._frame_end = 1
+        self._frames.append(self._face.dump_state())
+        self.filename = None
+        self.frame_count = 30

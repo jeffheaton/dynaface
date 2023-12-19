@@ -10,7 +10,6 @@ from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenu, QMenuBar, QTabWidget, QMessageBox
 from tab_about import AboutTab
-from tab_analyze_image import AnalyzeImageTab
 from tab_analyze_video import AnalyzeVideoTab
 from jth_ui import app_jth
 import dynaface_document
@@ -197,18 +196,10 @@ class DynafaceWindow(MainWindowJTH):
         except Exception as e:
             logger.error("Error during about open", exc_info=True)
 
-    def show_analyze_image(self, filename):
-        try:
-            self.close_analyze_tabs()
-            self.add_tab(AnalyzeImageTab(self, filename), "Analyze Image")
-        except Exception as e:
-            logger.error("Error during image open", exc_info=True)
-            self.display_message_box("Unable to open image.")
-
     def show_analyze_video(self, filename):
         try:
             self.close_analyze_tabs()
-            self.add_tab(AnalyzeVideoTab(self, filename), "Analyze Video")
+            self.add_tab(AnalyzeVideoTab(self, filename), "Analyze")
         except Exception as e:
             logger.error("Error during video open", exc_info=True)
             self.display_message_box("Unable to open video.")
@@ -248,10 +239,9 @@ class DynafaceWindow(MainWindowJTH):
             super().open_file(file_path)
             logger.info(f"Open File: {file_path}")
 
-            if file_path.lower().endswith((".jpg", ".jpeg", ".png", ".tiff", ".heic")):
-                self.show_analyze_image(file_path)
-                self.update_recent_files(file_path)
-            elif file_path.lower().endswith((".mp4", ".mov")):
+            if file_path.lower().endswith(
+                (".jpg", ".jpeg", ".png", ".tiff", ".heic", ".mp4", ".mov")
+            ):
                 self.show_analyze_video(file_path)
                 self.update_recent_files(file_path)
             elif file_path.lower().endswith((".dyfc")):

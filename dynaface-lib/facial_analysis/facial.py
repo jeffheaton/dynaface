@@ -119,12 +119,15 @@ def scale_crop_points(lst, crop_x, crop_y, scale):
 class AnalyzeFace(ImageAnalysis):
     pd = STD_PUPIL_DIST
 
-    def __init__(self, measures):
+    def __init__(self, measures=None):
         self.original_img = None
         self.left_eye = None
         self.right_eye = None
         self.nose = None
-        self.measures = measures
+        if measures is None:
+            self.measures = measures.all_measures()
+        else:
+            self.measures = measures
         self.headpose = [0, 0, 0]
         self.landmarks = []
         self.pupillary_distance = 0
