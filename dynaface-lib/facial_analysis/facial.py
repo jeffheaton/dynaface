@@ -4,13 +4,6 @@ import math
 import cv2
 import numpy as np
 import torch
-from facial_analysis.measures import (
-    AnalyzeFAI,
-    AnalyzeOralCommissureExcursion,
-    AnalyzeBrows,
-    AnalyzeDentalArea,
-    AnalyzeEyeArea,
-)
 from facial_analysis.image import ImageAnalysis, load_image
 from facial_analysis.spiga.inference.config import ModelConfig
 from facial_analysis.spiga.inference.framework import SPIGAFramework
@@ -185,11 +178,13 @@ class AnalyzeFace(ImageAnalysis):
         self.circle(self.left_eye, color=color)
         self.circle(self.right_eye, color=color)
 
-    def measure(self, pt1, pt2, color=(255, 0, 0), thickness=3):
-        self.arrow(pt1, pt2, color, thickness)
+    def measure(self, pt1, pt2, color=(255, 0, 0), thickness=3, render=True):
+        if render:
+            self.arrow(pt1, pt2, color, thickness)
         d = math.dist(pt1, pt2) * self.pix2mm
         mp = [int((pt1[0] + pt2[0]) // 2), int((pt1[1] + pt2[1]) // 2)]
-        self.write_text(mp, f"{d:.2f}mm")
+        if render:
+            self.write_text(mp, f"{d:.2f}mm")
         return d
 
     def analyze(self):

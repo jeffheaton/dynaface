@@ -200,13 +200,16 @@ class ImageAnalysis:
         image = cv2.cvtColor(self.render_img, cv2.COLOR_RGB2BGR)
         cv2.imwrite(filename, image)
 
-    def measure_polygon(self, contours, pix2mm, alpha=0.4, color=(0, 0, 255)):
+    def measure_polygon(
+        self, contours, pix2mm, alpha=0.4, color=(0, 0, 255), render=True
+    ):
         contours = np.array(contours)
-        overlay = self.render_img.copy()
-        cv2.fillPoly(overlay, pts=[contours], color=color)
-        self.render_img[:, :] = cv2.addWeighted(
-            overlay, alpha, self.render_img, 1 - alpha, 0
-        )
+        if render:
+            overlay = self.render_img.copy()
+            cv2.fillPoly(overlay, pts=[contours], color=color)
+            self.render_img[:, :] = cv2.addWeighted(
+                overlay, alpha, self.render_img, 1 - alpha, 0
+            )
         contours = contours * pix2mm
         x = contours[:, 0]
         y = contours[:, 1]
