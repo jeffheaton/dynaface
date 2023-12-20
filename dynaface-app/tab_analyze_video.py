@@ -276,14 +276,6 @@ gesture you wish to analyze."""
         self.buttons_widget.setLayout(self.buttons_layout)
         self.left_toolbar.addWidget(self.buttons_widget)
 
-        # Create a scrollable area for checkboxes
-        self.scroll_area = QScrollArea(self)
-        self.scroll_area_widget = QWidget()
-        self.scroll_area.setWidget(self.scroll_area_widget)
-        self.scroll_area.setWidgetResizable(True)
-        self.scroll_area_layout = QVBoxLayout(self.scroll_area_widget)
-        self.left_toolbar.addWidget(self.scroll_area)
-
         # Store checkboxes in a list for easy access
         self._tree = QTreeWidget()
         self._tree.setHeaderLabel("Measures")
@@ -311,7 +303,7 @@ gesture you wish to analyze."""
                 child.setData(0, Qt.ItemDataRole.UserRole, item)
 
         self._tree.itemChanged.connect(self.on_tree_item_changed)
-        self.scroll_area_layout.addWidget(self._tree)
+        self.left_toolbar.addWidget(self._tree)
         # Connect buttons to slot functions
         self.all_button.clicked.connect(self.check_all)
         self.none_button.clicked.connect(self.uncheck_all)
