@@ -48,7 +48,6 @@ from PIL import Image
 
 logger = logging.getLogger(__name__)
 
-GRAPH_HORIZ = False
 MAX_FRAMES = 5000
 
 
@@ -82,10 +81,7 @@ class AnalyzeVideoTab(TabGraphic):
         self._tab_content_layout = QHBoxLayout()
 
         # Create a horizontal layout for the content of the tab
-        if GRAPH_HORIZ:
-            self._content_layout = QHBoxLayout()
-        else:
-            self._content_layout = QVBoxLayout()
+        self._content_layout = QVBoxLayout()
         self._tab_content_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         tab_layout.addLayout(self._tab_content_layout)
@@ -93,19 +89,16 @@ class AnalyzeVideoTab(TabGraphic):
         self._tab_content_layout.addLayout(self._content_layout)
 
         # self._content_layout.removeWidget(self._view)
-        if GRAPH_HORIZ:
-            self._splitter = QSplitter(Qt.Orientation.Horizontal)
-        else:
-            self._splitter = QSplitter(Qt.Orientation.Vertical)
+        self._graph_splitter = QSplitter(Qt.Orientation.Vertical)
 
-        self._splitter.setSizePolicy(
+        self._graph_splitter.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
 
-        self._content_layout.addWidget(self._splitter)
+        self._content_layout.addWidget(self._graph_splitter)
 
         # self.init_graphics(self._content_layout)
-        self.init_graphics(self._splitter)
+        self.init_graphics(self._graph_splitter)
 
         self.loading = False
         # Video bar
@@ -762,11 +755,11 @@ gesture you wish to analyze."""
             )
             self._chart_view.setContentsMargins(0, 0, 0, 0)
 
-            self._splitter.addWidget(self._chart_view)
+            self._graph_splitter.addWidget(self._chart_view)
 
             # size the splitter (just the first time to 3/4)
             height = self.height()
-            self._splitter.setSizes([height // 4, 3 * height // 4])
+            self._graph_splitter.setSizes([height // 4, 3 * height // 4])
         else:
             logger.debug("Update existing chart")
             # Update the scene with the new pixmap
@@ -798,7 +791,7 @@ gesture you wish to analyze."""
         if self._chk_graph.isChecked():
             if self._chart_view is not None:
                 # Redisplay graph
-                self._splitter.addWidget(self._chart_view)
+                self._graph_splitter.addWidget(self._chart_view)
                 self._chart_view.show()
             else:
                 # Show graph for the first time
@@ -811,8 +804,8 @@ gesture you wish to analyze."""
             self._chart_view.setParent(None)
             self._chart_view.hide()
             # Adjust the sizes of the remaining widgets to fill the space
-            remaining_size = sum(self._splitter.sizes())
-            self._splitter.setSizes([remaining_size])
+            remaining_size = sum(self._graph_splitter.sizes())
+            self._graph_splitter.setSizes([remaining_size])
 
         self._window.update_enabled()
 
@@ -857,7 +850,7 @@ gesture you wish to analyze."""
         view_size = self._chart_view.sizeHint()
 
         # Set the splitter sizes
-        self._splitter.setSizes(
+        self._graph_splitter.setSizes(
             [(self.height() - view_size.height()), view_size.height()]
         )
 
