@@ -148,7 +148,7 @@ class AnalyzeVideoTab(TabGraphic):
 
         if self.frame_count > MAX_FRAMES:
             self._window.display_message_box(
-                f"""This program can open at most {MAX_FRAMES} video frames, 
+                f"""This program can open at most {MAX_FRAMES} video frames, you have {self.frame_count} frames.
 and is designed mainly to analyze short video clips. Please cut this video down to just the
 gesture you wish to analyze."""
             )
@@ -258,10 +258,6 @@ gesture you wish to analyze."""
         toolbar.addWidget(self._btn_restore)
         self._btn_restore.clicked.connect(self.action_restore)
 
-        # btn_test = QPushButton("Test")
-        # toolbar.addWidget(btn_test)
-        # btn_test.clicked.connect(self.test_action)
-
     def init_vertical_toolbar(self, layout):
         # Add a vertical toolbar (left side of the tab)
         self.left_toolbar = QToolBar("Left Toolbar", self)
@@ -320,15 +316,6 @@ gesture you wish to analyze."""
                     else Qt.CheckState.Unchecked,
                 )
                 child.setData(0, Qt.ItemDataRole.UserRole, item)
-            # parent.stateChanged.connect(partial(self.checkbox_clicked, checkbox, stat))
-
-            # checkbox = QCheckBox(stat.abbrev())
-            # checkbox.stateChanged.connect(
-            #    partial(self.checkbox_clicked, checkbox, stat)
-            # )
-            # self.scroll_area_layout.addWidget(checkbox)
-            # checkbox.setChecked(stat.enabled)
-            # self.checkboxes.append(checkbox)
 
         self._tree.itemChanged.connect(self.on_tree_item_changed)
         self.scroll_area_layout.addWidget(self._tree)
@@ -339,6 +326,7 @@ gesture you wish to analyze."""
     def on_tree_item_changed(self, item, column):
         data = item.data(0, Qt.ItemDataRole.UserRole)
         data.enabled = item.checkState(0) == Qt.CheckState.Checked
+
         # Check if the item is a parent
         if item.childCount() > 0 and column == 0:
             # Parent item
@@ -346,6 +334,24 @@ gesture you wish to analyze."""
             for i in range(item.childCount()):
                 child = item.child(i)
                 child.setCheckState(0, item.checkState(0))
+        else:
+            # Child item
+            # Update parent based on children's state
+            parent = item.parent()
+            if parent is not None:
+                all_unchecked = all(
+                    parent.child(i).checkState(0) == Qt.CheckState.Unchecked
+                    for i in range(parent.childCount())
+                )
+                any_checked = any(
+                    parent.child(i).checkState(0) == Qt.CheckState.Checked
+                    for i in range(parent.childCount())
+                )
+
+                if all_unchecked:
+                    parent.setCheckState(0, Qt.CheckState.Unchecked)
+                elif any_checked:
+                    parent.setCheckState(0, Qt.CheckState.Checked)
 
         if self._auto_update:
             self.update_face()
@@ -420,16 +426,6 @@ gesture you wish to analyze."""
             logger.debug("Update chart, because measures changed")
             self.update_chart()
             self.render_chart()
-
-    def checkbox_clicked(self, checkbox, stat):
-        stat.enabled = checkbox.isChecked()
-        self.unsaved_changes = True
-        if self._auto_update:
-            self.update_face()
-            if self._chart_view is not None:
-                logger.debug("Update chart, because measures changed")
-                self.update_chart()
-                self.render_chart()
 
     def update_load_progress(self, status):
         # self.lbl_status.setText(status)
