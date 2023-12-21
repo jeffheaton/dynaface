@@ -68,6 +68,14 @@ app = BUNDLE(
     info_plist={
         'NSPrincipalClass': 'NSApplication',
         'NSAppleScriptEnabled': False,
+        'CFBundleDocumentTypes': [
+            {
+                'CFBundleTypeName': 'Dynaface Document',
+                'CFBundleTypeIconFile': 'dynaface_doc_icon.icns',
+                'LSItemContentTypes': ['com.heatonresearch.dynaface'],
+                'LSHandlerRank': 'Owner'
+                }
+            ],
         'LSBackgroundOnly': False,
         'NSRequiresAquaSystemAppearance': 'No',
         'CFBundlePackageType': 'APPL',

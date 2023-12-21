@@ -2,6 +2,7 @@ rm -rf ./working
 mkdir ./working
 cp ./entitlements.plist ./working
 cp ./dynaface_icon.icns ./working
+cp ./dynaface_doc_icon.icns ./working
 cp ./dynaface-macos.spec ./working
 cp ./build.py ./working
 cp ./build.sh ./working
