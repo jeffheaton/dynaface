@@ -70,7 +70,7 @@ class ImageAnalysis:
         self.text_font = cv2.FONT_HERSHEY_SIMPLEX
         self.text_size = 0.75
         self.text_color = (255, 255, 255)
-        self.text_thick = 1
+        self.text_thick = 2
         self.text_back = 5
 
         self.height, self.width = self.original_img.shape[:2]
@@ -103,6 +103,12 @@ class ImageAnalysis:
             thick,
             cv2.LINE_AA,
         )
+
+    def calc_text_size(self, txt, size=1, thick=1):
+        size = self.text_size * size
+        thick = int(self.text_thick * thick)
+        textSize, baseline = cv2.getTextSize(txt, self.text_font, size, thick)
+        return textSize, baseline
 
     def write_text_sq(self, pos, txt, color=None):
         if color is None:

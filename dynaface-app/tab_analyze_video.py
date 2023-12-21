@@ -250,6 +250,17 @@ gesture you wish to analyze."""
         self._btn_restore = QPushButton("Restore")
         toolbar.addWidget(self._btn_restore)
         self._btn_restore.clicked.connect(self.action_restore)
+        toolbar.addSeparator()
+
+        toolbar.addWidget(QLabel("Text: ", toolbar))
+        self._spin_text_zoom = QSpinBox()
+        toolbar.addWidget(self._spin_text_zoom)
+        self._spin_text_zoom.setMinimum(1)
+        self._spin_text_zoom.setMaximum(5)
+        self._spin_text_zoom.setSingleStep(1)
+        self._spin_text_zoom.setValue(1)  # Starting value
+        self._spin_text_zoom.setFixedWidth(60)  # Adjust the width as needed
+        self._spin_text_zoom.valueChanged.connect(self.action_text_zoom)
 
     def init_vertical_toolbar(self, layout):
         # Add a vertical toolbar (left side of the tab)
@@ -278,7 +289,7 @@ gesture you wish to analyze."""
 
         # Store checkboxes in a list for easy access
         self._tree = QTreeWidget()
-        self._tree.setHeaderLabel("Measures")
+        self._tree.header().hide()
         # self._tree.itemChanged.connect(on_item_changed)
 
         for measure in self._face.measures:
@@ -1012,3 +1023,7 @@ gesture you wish to analyze."""
         self._frames.append(self._face.dump_state())
         self.filename = None
         self.frame_count = 30
+
+    def action_text_zoom(self, value):
+        self._face.text_size = 0.75 + (0.25 * value)
+        self.update_face()

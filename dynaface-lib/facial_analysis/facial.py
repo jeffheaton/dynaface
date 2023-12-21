@@ -178,16 +178,33 @@ class AnalyzeFace(ImageAnalysis):
         self.circle(self.left_eye, color=color)
         self.circle(self.right_eye, color=color)
 
-    def measure(self, pt1, pt2, color=(255, 0, 0), thickness=3, render=True):
+    def measure(self, pt1, pt2, color=(255, 0, 0), thickness=3, render=True, dir="r"):
         if render:
             self.arrow(pt1, pt2, color, thickness)
         d = math.dist(pt1, pt2) * self.pix2mm
-        mp = [int((pt1[0] + pt2[0]) // 2), int((pt1[1] + pt2[1]) // 2)]
+        txt = f"{d:.2f}mm"
+        m = self.calc_text_size(txt)
+        if dir == "r":
+            mp = [int((pt1[0] + pt2[0]) // 2) + 15, int((pt1[1] + pt2[1]) // 2)]
+        else:
+            mp = [
+                int((pt1[0] + pt2[0]) // 2) - (m[0][0] + 15),
+                int((pt1[1] + pt2[1]) // 2),
+            ]
         if render:
-            self.write_text(mp, f"{d:.2f}mm")
+            self.write_text(mp, txt)
         return d
 
+    def analyze_next_pt(self, txt):
+        result = (self.analyze_x, self.analyze_y)
+        m = self.calc_text_size(txt)
+        self.analyze_y += int(m[0][1] * 2)
+        return result
+
     def analyze(self):
+        m = self.calc_text_size("W")
+        self.analyze_x = int(m[0][0] * 0.25)
+        self.analyze_y = int(m[0][1] * 1.5)
         result = {}
         for calc in self.measures:
             if calc.enabled:

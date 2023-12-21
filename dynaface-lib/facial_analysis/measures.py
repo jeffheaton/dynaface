@@ -55,19 +55,20 @@ class AnalyzeFAI(MeasureBase):
     def calc(self, face, render=True):
         render2 = self.is_enabled("fai")
         d1 = face.measure(
-            face.landmarks[64], face.landmarks[76], render=(render & render2)
+            face.landmarks[64], face.landmarks[76], render=(render & render2), dir="l"
         )
         d2 = face.measure(
-            face.landmarks[68], face.landmarks[82], render=(render & render2)
+            face.landmarks[68], face.landmarks[82], render=(render & render2), dir="r"
         )
         if d1 > d2:
             fai = d1 - d2
         else:
             fai = d2 - d1
 
-        fai_pt = (face.stats_right, face.landmarks[82][1])
         if render & render2:
-            face.write_text(fai_pt, f"FAI={fai:.2f} mm")
+            txt = f"FAI={fai:.2f} mm"
+            pos = face.analyze_next_pt(txt)
+            face.write_text(pos, txt)
         return filter({"fai": fai}, (self.items))
 
 
@@ -83,10 +84,10 @@ class AnalyzeOralCommissureExcursion(MeasureBase):
         render2_a = self.is_enabled("oce.a")
         render2_b = self.is_enabled("oce.b")
         oce_a = face.measure(
-            face.landmarks[76], face.landmarks[85], render=(render & render2_a)
+            face.landmarks[76], face.landmarks[85], render=(render & render2_a), dir="l"
         )
         oce_b = face.measure(
-            face.landmarks[82], face.landmarks[85], render=(render & render2_b)
+            face.landmarks[82], face.landmarks[85], render=(render & render2_b), dir="r"
         )
         return filter({"oce.a": oce_a, "oce.b": oce_b}, self.items)
 
@@ -138,9 +139,12 @@ class AnalyzeBrows(MeasureBase):
         diff = abs(left_brow_y - right_brow_y) * face.pix2mm
         if render & render2:
             face.arrow((right_brow_x, right_brow_y), (1024, right_brow_y), apt2=False)
+            txt = f"d.brow={diff:.2f} mm"
+            m = face.calc_text_size(txt)
+
             face.write_text(
-                (face.stats_right, min(left_brow_y, right_brow_y) - 10),
-                f"d.brow={diff:.2f} mm",
+                (face.width - (m[0][0] + 5), min(left_brow_y, right_brow_y) - 10),
+                txt,
             )
 
         return filter({"brow.d": diff}, self.items)
@@ -172,9 +176,10 @@ class AnalyzeDentalArea(MeasureBase):
         dental_area = face.measure_polygon(
             contours, face.pix2mm, render=(render & render2)
         )
-        dental_pt = (face.stats_right, face.landmarks[85][1] + 20)
         if render & render2:
-            face.write_text_sq(dental_pt, f"dental={round(dental_area,2)}mm")
+            txt = f"dental={round(dental_area,2)}mm"
+            pos = face.analyze_next_pt(txt)
+            face.write_text_sq(pos, txt)
         return filter({"dental_area": dental_area}, self.items)
 
 
@@ -235,7 +240,7 @@ class AnalyzeEyeArea(MeasureBase):
 
         if render & render2_eye_r:
             face.write_text_sq(
-                (face.landmarks[66][0] - 50, face.landmarks[66][1] + 20),
+                (face.landmarks[66][0] - 150, face.landmarks[66][1] + 20),
                 f"R={round(right_eye_area,2)}mm",
             )
 
@@ -246,22 +251,19 @@ class AnalyzeEyeArea(MeasureBase):
             )
 
         if render & render2_eye_d:
-            face.write_text_sq(
-                (face.stats_right, face.landmarks[74][1] + 50),
-                f"d.eye={round(eye_area_diff,2)}mm",
-            )
+            txt = f"d.eye={round(eye_area_diff,2)}mm"
+            pos = face.analyze_next_pt(txt)
+            face.write_text_sq(pos, txt)
 
         if render & render2_eye_rlr:
-            face.write_text_sq(
-                (face.stats_right, face.landmarks[74][1] + 80),
-                f"rlr.eye={round(eye_ratio_lr,2)}mm",
-            )
+            txt = f"rlr.eye={round(eye_ratio_lr,2)}mm"
+            pos = face.analyze_next_pt(txt)
+            face.write_text_sq(pos, txt)
 
         if render & render2_eye_rrl:
-            face.write_text_sq(
-                (face.stats_right, face.landmarks[74][1] + 110),
-                f"rrl.eye={round(eye_ratio_rl,2)}mm",
-            )
+            txt = f"rrl.eye={round(eye_ratio_rl,2)}mm"
+            pos = face.analyze_next_pt(txt)
+            face.write_text_sq(pos, txt)
 
         return filter(
             {
