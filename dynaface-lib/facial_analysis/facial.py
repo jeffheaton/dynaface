@@ -1,15 +1,16 @@
+import copy
 import logging
 import math
+import time
 
 import cv2
 import numpy as np
 import torch
+from facial_analysis import measures, models
 from facial_analysis.image import ImageAnalysis, load_image
 from facial_analysis.spiga.inference.config import ModelConfig
 from facial_analysis.spiga.inference.framework import SPIGAFramework
 from facial_analysis.util import PolyArea
-import copy
-from facial_analysis import models, measures
 
 STD_PUPIL_DIST = 63
 
@@ -137,7 +138,10 @@ class AnalyzeFace(ImageAnalysis):
 
     def _find_landmarks(self, img):
         logger.debug("Called _find_landmarks")
+        start_time = time.time()
         bbox, _ = models.mtcnn_model.detect(img)
+        end_time = time.time()
+        mtcnn_duration = end_time - start_time
         logger.debug(f"Detected bbox: {bbox}")
 
         if bbox is None:
@@ -149,8 +153,14 @@ class AnalyzeFace(ImageAnalysis):
 
         bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
         logger.debug("Calling SPIGA")
+        start_time = time.time()
         features = models.spiga_model.inference(img, [bbox])
+        end_time = time.time()
+        spiga_duration = end_time - start_time
 
+        logger.debug(
+            f"Elapsed time (sec): MTCNN={mtcnn_duration:,}, SPIGA={spiga_duration:,}"
+        )
         # Prepare variables
         x0, y0, w, h = bbox
         landmarks2 = [
