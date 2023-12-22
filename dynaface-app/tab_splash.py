@@ -54,7 +54,7 @@ class SplashTab(QWidget):
         button_exit.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
-        button_exit.clicked.connect(self._window.app.app.quit)
+        button_exit.clicked.connect(self._window.app.quit)
 
         button_settings = QPushButton(f"Settings")
         button_settings.setSizePolicy(

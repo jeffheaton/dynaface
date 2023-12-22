@@ -48,7 +48,7 @@ class MainWindowJTH(QMainWindow):
 
     def display_message_box(self, text):
         msg = QMessageBox(self)
-        msg.setText(text)
+        msg.setText(str(text))
         msg.exec()
 
     def is_tab_open(self, title):

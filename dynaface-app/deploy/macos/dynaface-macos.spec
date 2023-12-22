@@ -1,14 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
-version = os.getenv('version')
+
+version = os.getenv("version")
 
 block_cipher = None
 
-added_files = [('data/', 'data')]
+added_files = [("data/", "data")]
 
 a = Analysis(
-    ['dynaface.py'],
-    pathex=['.'],
+    ["dynaface.py"],
+    pathex=["."],
     binaries=[],
     datas=added_files,
     hiddenimports=[],
@@ -19,21 +20,17 @@ a = Analysis(
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
-    noarchive=False
+    noarchive=False,
 )
 
-pyz = PYZ(
-    a.pure,
-    a.zipped_data,
-    cipher=block_cipher
-)
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
     pyz,
     a.scripts,
     [],
     exclude_binaries=True,
-    name='dynaface',
+    name="dynaface",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -42,10 +39,10 @@ exe = EXE(
     runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
-    target_arch='arm64', # universal2
+    target_arch="arm64",  # universal2
     codesign_identity=None,
     entitlements_file=None,
-    icon='dynaface_icon.icns'
+    icon="dynaface_icon.icns",
 )
 
 
@@ -57,34 +54,44 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='app'
+    name="app",
 )
 
 app = BUNDLE(
     coll,
-    name='Dynaface.app',
-    icon='dynaface_icon.icns',
-    bundle_identifier='com.heatonresearch.dynaface',
+    name="Dynaface.app",
+    icon="dynaface_icon.icns",
+    bundle_identifier="com.heatonresearch.dynaface",
     info_plist={
-        'NSPrincipalClass': 'NSApplication',
-        'NSAppleScriptEnabled': False,
-        'CFBundleDocumentTypes': [
+        "NSPrincipalClass": "NSApplication",
+        "NSAppleScriptEnabled": False,
+        "CFBundleDocumentTypes": [
             {
-                'CFBundleTypeName': 'Dynaface Document',
-                'CFBundleTypeIconFile': 'dynaface_doc_icon.icns',
-                'LSItemContentTypes': ['com.heatonresearch.dynaface'],
-                'LSHandlerRank': 'Owner'
-                }
-            ],
-        'LSBackgroundOnly': False,
-        'NSRequiresAquaSystemAppearance': 'No',
-        'CFBundlePackageType': 'APPL',
-        'CFBundleSupportedPlatforms': ['MacOSX'],
-        'CFBundleIdentifier': 'com.heatonresearch.dynaface',
-        'CFBundleVersion': version,
-        'CFBundleShortVersionString': version,
-        'LSMinimumSystemVersion': '12.0',
-        'LSApplicationCategoryType': 'public.app-category.utilities',
-        'ITSAppUsesNonExemptEncryption': False,
-    }
+                "CFBundleTypeExtensions": ["dyfc"],
+                "CFBundleTypeName": "Dynaface Document",
+                "CFBundleTypeRole": "Editor",
+                "CFBundleTypeIconFile": "dynaface_doc_icon.icns",
+                "LSItemContentTypes": ["com.heatonresearch.dyfc"],
+                "LSHandlerRank": "Owner",
+            }
+        ],
+        "UTExportedTypeDeclarations": [
+            {
+                "UTTypeIdentifier": "com.heatonresearch.dyfc",
+                "UTTypeConformsTo": ["public.data"],
+                "UTTypeDescription": "Dynaface Document",
+                "UTTypeTagSpecification": {"public.filename-extension": ["dyfc"]},
+            }
+        ],
+        "LSBackgroundOnly": False,
+        "NSRequiresAquaSystemAppearance": "No",
+        "CFBundlePackageType": "APPL",
+        "CFBundleSupportedPlatforms": ["MacOSX"],
+        "CFBundleIdentifier": "com.heatonresearch.dynaface",
+        "CFBundleVersion": version,
+        "CFBundleShortVersionString": version,
+        "LSMinimumSystemVersion": "12.0",
+        "LSApplicationCategoryType": "public.app-category.utilities",
+        "ITSAppUsesNonExemptEncryption": False,
+    },
 )

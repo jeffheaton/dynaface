@@ -10,8 +10,8 @@ import plistlib
 import sys
 
 import appdirs
-from PyQt6.QtCore import Qt, QtMsgType, QUrl, qInstallMessageHandler
-from PyQt6.QtGui import QDesktopServices
+from PyQt6.QtCore import Qt, QtMsgType, QUrl, qInstallMessageHandler, QEvent
+from PyQt6.QtGui import QDesktopServices, QFileOpenEvent
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox
 
 logger = logging.getLogger(__name__)
@@ -20,8 +20,10 @@ STATE_LAST_FOLDER = "last_folder"
 STATE_LAST_FILES = "recent"
 
 
-class AppJTH:
+class AppJTH(QApplication):
     def __init__(self, app_name, app_author, copyright, version, bundle_id):
+        super().__init__(sys.argv)
+
         self.BUNDLE_ID = bundle_id
         self.APP_NAME = app_name
         self.APP_AUTHOR = app_author
@@ -70,15 +72,14 @@ class AppJTH:
         if s == "osx":
             logging.info(f"Sandbox mode: {self.is_sandboxed()}")
 
-        self.app = QApplication(sys.argv)
-        self.app.setApplicationName(app_name)
+        self.setApplicationName(app_name)
 
         self.load_state()
 
     def exec(self):
         try:
             logger.info("Starting app main loop")
-            self.app.exec()
+            super().exec()
             logger.info("Exited app main loop")
         except Exception as e:
             logger.error("Error running app", exc_info=True)
@@ -233,3 +234,16 @@ class AppJTH:
 
         # Open the file location in the default file explorer
         QDesktopServices.openUrl(file_url)
+
+    def event(self, event):
+        try:
+            logger.info(f"**App event: {event}, {event.type()}")
+            logger.info("===1")
+            if event.type() == QEvent.Type.FileOpen:
+                file_path = event.file()
+                self.file_open_request = file_path
+                logger.info(f"MacOS open file request: {file_path}")
+                return True
+            return super().event(event)
+        except FileNotFoundError as e:
+            logger.error("Error during application event", exc_info=True)

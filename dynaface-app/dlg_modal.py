@@ -1,5 +1,13 @@
 from facial_analysis import facial
-from PyQt6.QtWidgets import QDialog, QPushButton, QVBoxLayout, QLabel, QMessageBox
+from PyQt6.QtWidgets import (
+    QDialog,
+    QPushButton,
+    QVBoxLayout,
+    QLabel,
+    QMessageBox,
+    QFileDialog,
+    QWidget,
+)
 import worker_threads
 
 
@@ -169,3 +177,55 @@ def prompt_save_changes():
     )
     msg_box.setDefaultButton(QMessageBox.StandardButton.Yes)
     return msg_box.exec()
+
+
+from PyQt6.QtWidgets import QFileDialog, QWidget
+
+
+from PyQt6.QtWidgets import QFileDialog, QWidget
+
+
+from PyQt6.QtWidgets import QFileDialog, QWidget
+
+
+from PyQt6.QtWidgets import QFileDialog, QWidget
+
+from PyQt6.QtWidgets import QFileDialog, QWidget
+
+
+from PyQt6.QtWidgets import QFileDialog, QWidget
+
+
+def save_as_document(
+    window: QWidget,
+    caption: str,
+    defaultSuffix: str,
+    filter: str,
+    initialFilter: str,
+    required_ext: list,
+    directory: str = "",  # Move the default parameter to the end
+) -> str:
+    dialog = QFileDialog(window, caption)
+    dialog.setFileMode(QFileDialog.FileMode.AnyFile)
+    dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+    dialog.setNameFilters([filter])
+    if initialFilter:
+        dialog.selectNameFilter(initialFilter)
+    dialog.setDirectory(directory)
+    dialog.setOption(QFileDialog.Option.DontUseNativeDialog, False)
+    dialog.setDefaultSuffix(defaultSuffix)
+
+    if dialog.exec() == QFileDialog.DialogCode.Accepted:
+        filenames = dialog.selectedFiles()
+        if filenames:
+            filename = filenames[0]
+            # Check the file extension
+            extension = filename.split(".")[-1]
+            if extension not in required_ext:
+                window.display_message_box(
+                    "Invalid File Extension",
+                    f"Filename must end in one of {required_ext}.",
+                )
+                return None
+            return filename
+    return None

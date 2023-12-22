@@ -8,20 +8,22 @@ import custom_control
 import cv2
 import dlg_modal
 import dynaface_document
+import numpy as np
 import plotly.graph_objects as go
 import utl_gfx
 import utl_print
 import worker_threads
 from facial_analysis.facial import AnalyzeFace, load_face_image
-from jth_ui import utl_etc
+from facial_analysis.measures import MeasureItem, all_measures
+from jth_ui import app_jth, utl_etc
 from jth_ui.tab_graphic import TabGraphic
 from matplotlib.figure import Figure
+from PIL import Image
 from PyQt6.QtCore import QEvent, Qt, QTimer
 from PyQt6.QtGui import QColor, QPixmap, QUndoStack
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
-    QFileDialog,
     QGestureEvent,
     QGraphicsScene,
     QGraphicsView,
@@ -36,15 +38,11 @@ from PyQt6.QtWidgets import (
     QSplitter,
     QStyle,
     QToolBar,
-    QVBoxLayout,
     QTreeWidget,
     QTreeWidgetItem,
+    QVBoxLayout,
     QWidget,
 )
-from facial_analysis.measures import MeasureItem, all_measures
-import numpy as np
-from PIL import Image
-
 
 logger = logging.getLogger(__name__)
 
@@ -554,71 +552,55 @@ gesture you wish to analyze."""
             self._fit_chart()
 
     def _save_as_image(self):
-        options = QFileDialog.Option.DontUseNativeDialog
-
-        # Show the dialog and get the selected file name and format
-        filename, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save Image",
-            "",
-            "Images (*.png *.jpeg *.jpg)",
-            options=options,
+        filename = dlg_modal.save_as_document(
+            window=self._window,
+            caption="Save Image",
+            defaultSuffix="jpeg",
+            filter="Images (*.png *.jpeg *.jpg)",
+            initialFilter=None,
+            required_ext=["png", "jpeg", "jpg"],
+            directory=self._window.app.state[app_jth.STATE_LAST_FOLDER],
         )
 
-        filename = utl_etc.default_extension(filename, ".jpg")
+        if not filename:
+            return
 
-        if filename:
-            if not (
-                filename.lower().endswith(".png")
-                or filename.lower().endswith(".jpg")
-                or filename.lower().endswith(".jpeg")
-            ):
-                self._window.display_message_box("Filename must end in .jpg or .png")
-            else:
-                self._face.save(filename)
+        self._face.save(filename)
 
     def _save_as_video(self):
-        options = QFileDialog.Option.DontUseNativeDialog
-
-        # Show the dialog and get the selected file name and format
-        filename, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save Video",
-            "",
-            "Videos (*.mp4)",
-            options=options,
+        filename = dlg_modal.save_as_document(
+            window=self._window,
+            caption="Save Video",
+            defaultSuffix="jpeg",
+            filter="Videos (*.mp4)",
+            initialFilter=None,
+            required_ext=["mp4"],
+            directory=self._window.app.state[app_jth.STATE_LAST_FOLDER],
         )
 
-        filename = utl_etc.default_extension(filename, ".mp4")
+        if not filename:
+            return
 
-        if filename:
-            if not filename.lower().endswith(".mp4"):
-                self._window.display_message_box("Filename must end in .mp4")
-            else:
-                if not self.wait_load_complete():
-                    return
-                dialog = dlg_modal.VideoExportDialog(self, filename)
-                dialog.exec()
+        if not self.wait_load_complete():
+            return
+        dialog = dlg_modal.VideoExportDialog(self, filename)
+        dialog.exec()
 
     def _save_as_data(self):
-        options = QFileDialog.Option.DontUseNativeDialog
-
-        # Show the dialog and get the selected file name and format
-        filename, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save CSV Data",
-            "",
-            "CSV Data (*.csv)",
-            options=options,
+        filename = dlg_modal.save_as_document(
+            window=self._window,
+            caption="Save CSV Data",
+            defaultSuffix="csv",
+            filter="CSV Data (*.csv)",
+            initialFilter=None,
+            required_ext=["csv"],
+            directory=self._window.app.state[app_jth.STATE_LAST_FOLDER],
         )
 
-        filename = utl_etc.default_extension(filename, ".csv")
+        if not filename:
+            return
 
-        if filename:
-            if not filename.lower().endswith(".csv"):
-                self._window.display_message_box("Filename must end in .csv")
-            else:
-                self.save_csv(filename)
+        self.save_csv(filename)
 
     def on_save_as(self):
         try:
@@ -918,24 +900,20 @@ gesture you wish to analyze."""
         self._window.update_enabled()
 
     def _save_as_document(self):
-        options = QFileDialog.Option.DontUseNativeDialog
-
-        # Show the dialog and get the selected file name and format
-        filename, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save Dynaface Document",
-            "",
-            "Dynaface (*.dyfc)",
-            options=options,
+        filename = dlg_modal.save_as_document(
+            window=self._window,
+            caption="Save Dynaface Document",
+            defaultSuffix="dyfc",
+            filter="Dynaface (*.dyfc)",
+            initialFilter=None,
+            required_ext=["dyfc"],
+            directory=self._window.app.state[app_jth.STATE_LAST_FOLDER],
         )
 
-        filename = utl_etc.default_extension(filename, ".dyfc")
+        if not filename:
+            return
 
-        if filename:
-            if not filename.lower().endswith(".dyfc"):
-                self._window.display_message_box("Filename must end in .dyfc")
-            else:
-                self.save_document(filename)
+        self.save_document(filename)
 
     def save_document(self, filename):
         doc = dynaface_document.DynafaceDocument()

@@ -7,7 +7,7 @@ import logging.handlers
 
 from dynaface_app import AppDynaface
 
-# Need this setting because of this issue:
+# Need the above thread setting because of this issue:
 # https://github.com/numpy/numpy/issues/654
 # See note in spgia.augmentors.utils
 

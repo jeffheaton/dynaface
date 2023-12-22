@@ -1,18 +1,19 @@
 import logging
 import logging.config
 import logging.handlers
+import sys
 import webbrowser
 
+import dynaface_document
 import tab_settings
 import tab_splash
+from jth_ui import app_jth
 from jth_ui.window_jth import MainWindowJTH
 from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QAction, QKeySequence
-from PyQt6.QtWidgets import QMenu, QMenuBar, QTabWidget, QMessageBox
+from PyQt6.QtWidgets import QMenu, QMenuBar, QMessageBox, QTabWidget
 from tab_about import AboutTab
 from tab_analyze_video import AnalyzeVideoTab
-from jth_ui import app_jth
-import dynaface_document
 
 logger = logging.getLogger(__name__)
 
@@ -179,7 +180,7 @@ class DynafaceWindow(MainWindowJTH):
         self.resize_timer.timeout.connect(self.finished_resizing)
         self.resize_timer.setInterval(300)  # 300 milliseconds
 
-        # Configure the resize timer
+        # Configure the background timer
         self._background_timer = QTimer(self)
         self._background_timer.timeout.connect(self.background_timer)
         self._background_timer.setInterval(1000)  # 1 second
@@ -188,6 +189,11 @@ class DynafaceWindow(MainWindowJTH):
     def background_timer(self):
         if self._tab_widget.count() == 0:
             self.add_tab(tab_splash.SplashTab(self), "Welcome to Dynaface")
+
+        if self.app.file_open_request:
+            filename = self.app.file_open_request
+            self.app.file_open_request = None
+            self.open_file(filename)
 
     def show_about(self):
         try:
