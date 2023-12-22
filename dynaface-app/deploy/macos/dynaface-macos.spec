@@ -5,7 +5,10 @@ version = os.getenv("version")
 
 block_cipher = None
 
-added_files = [("data/", "data")]
+added_files = [
+    ("data/", "data"),  # existing files you're adding
+    ("dynaface_doc_icon.icns", "."),  # path to your icon file
+]
 
 a = Analysis(
     ["dynaface.py"],
@@ -69,8 +72,8 @@ app = BUNDLE(
             {
                 "CFBundleTypeExtensions": ["dyfc"],
                 "CFBundleTypeName": "Dynaface Document",
-                "CFBundleTypeRole": "Editor",
-                "CFBundleTypeIconFile": "dynaface_doc_icon.icns",
+                "CFBundleTypeRole": "None",
+                "CFBundleTypeIconFile": "dynaface_doc_icon",
                 "LSItemContentTypes": ["com.heatonresearch.dyfc"],
                 "LSHandlerRank": "Owner",
             }
