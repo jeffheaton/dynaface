@@ -187,13 +187,16 @@ class DynafaceWindow(MainWindowJTH):
         self._background_timer.start()
 
     def background_timer(self):
-        if self._tab_widget.count() == 0:
-            self.add_tab(tab_splash.SplashTab(self), "Welcome to Dynaface")
+        try:
+            if self._tab_widget.count() == 0:
+                self.add_tab(tab_splash.SplashTab(self), "Welcome to Dynaface")
 
-        if self.app.file_open_request:
-            filename = self.app.file_open_request
-            self.app.file_open_request = None
-            self.open_file(filename)
+            if self.app.file_open_request:
+                filename = self.app.file_open_request
+                self.app.file_open_request = None
+                self.open_file(filename)
+        except Exception as e:
+            logger.error("Error during background timer", exc_info=True)
 
     def show_about(self):
         try:

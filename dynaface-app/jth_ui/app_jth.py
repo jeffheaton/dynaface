@@ -23,7 +23,7 @@ STATE_LAST_FILES = "recent"
 class AppJTH(QApplication):
     def __init__(self, app_name, app_author, copyright, version, bundle_id):
         super().__init__(sys.argv)
-
+        self.file_open_request = None
         self.BUNDLE_ID = bundle_id
         self.APP_NAME = app_name
         self.APP_AUTHOR = app_author
@@ -237,13 +237,11 @@ class AppJTH(QApplication):
 
     def event(self, event):
         try:
-            logger.info(f"**App event: {event}, {event.type()}")
-            logger.info("===1")
             if event.type() == QEvent.Type.FileOpen:
                 file_path = event.file()
                 self.file_open_request = file_path
                 logger.info(f"MacOS open file request: {file_path}")
                 return True
             return super().event(event)
-        except FileNotFoundError as e:
+        except Exception as e:
             logger.error("Error during application event", exc_info=True)
