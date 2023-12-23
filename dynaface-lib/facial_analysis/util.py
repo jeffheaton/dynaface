@@ -73,7 +73,6 @@ def scale_crop_points(lst, crop_x, crop_y, scale):
 def crop_stylegan(img, pupils, landmarks):
     print(img.shape)
     width, height = img.shape[1], img.shape[0]
-    print("**", width, height)
 
     if pupils:
         left_eye, right_eye = pupils

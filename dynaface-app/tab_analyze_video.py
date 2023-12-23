@@ -441,8 +441,8 @@ gesture you wish to analyze."""
         # Auto fit
         QTimer.singleShot(1, self.fit)
 
-    def add_frame(self, face):
-        self._frames.append(face.dump_state())
+    def add_frame(self, state):
+        self._frames.append(state)
         self._video_slider.setRange(0, len(self._frames) - 2)
         self._frame_end = len(self._frames)
 

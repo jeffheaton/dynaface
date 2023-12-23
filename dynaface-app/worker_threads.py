@@ -6,7 +6,7 @@ from facial_analysis import facial
 from facial_analysis.facial import load_face_image
 from PyQt6.QtCore import QThread, pyqtSignal
 from jth_ui import utl_etc
-from facial_analysis import models
+from facial_analysis import models, util
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +65,7 @@ class WorkerLoad(QThread):
         self.running = True
 
     def run(self):
+        start_time = time.time()
         logger.debug("Running background thread")
         self._target.loading = True
         self._loading_etc = utl_etc.CalcETC(self._total)
@@ -81,23 +82,43 @@ class WorkerLoad(QThread):
                     break
 
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+                # Find face bounding box
                 bbox, prob = models.mtcnn_model.detect(frame)
                 bbox = bbox[0]
-                print(bbox)
 
                 bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
-                features = models.spiga_model.inference(frame, [bbox])
-                print(features)
 
-                # Make sure we did not get a request to stop during each of these:
-                if self.running:
-                    self._face.load_image(img=frame, crop=True)
+                # Find the facial features
+                landmarks = models.spiga_model.inference(frame, [bbox])
+                landmarks = models.convert_landmarks(landmarks)
 
-                if self.running:
-                    self._target.add_frame(self._face)
+                # Crop to the eyes
+                frame, landmarks = util.crop_stylegan(
+                    img=frame, pupils=None, landmarks=landmarks
+                )
+
+                # Extract
+                pupillary_distance, pix2mm = util.calc_pd(landmarks)
+
+                if not self.running:
+                    break
+
+                # Build frame-state data
+                frame_state = [
+                    frame,
+                    None,
+                    landmarks,
+                    pupillary_distance,
+                    pix2mm,
+                ]
+                self._target.add_frame(frame_state)
 
                 if self.running:
                     self._update_signal.emit(self._loading_etc.cycle())
+            end_time = time.time()
+            duration = end_time - start_time
+            logger.info(f"Video processing time: {duration}")
 
         except Exception as e:
             logger.error("Error loading video", exc_info=True)

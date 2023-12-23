@@ -1,7 +1,8 @@
 import os
 
-import torch
 import facenet_pytorch
+import numpy as np
+import torch
 from facenet_pytorch import MTCNN
 from facenet_pytorch.models.mtcnn import ONet, PNet, RNet
 from facial_analysis.spiga.inference.config import ModelConfig
@@ -123,3 +124,7 @@ def are_models_init() -> bool:
 def detect_device() -> str:
     has_mps = torch.backends.mps.is_built()
     return "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
+
+
+def convert_landmarks(landmarks):
+    return [(int(x[0]), int(x[1])) for x in np.array(landmarks["landmarks"][0])]
