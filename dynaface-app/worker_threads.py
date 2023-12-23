@@ -70,6 +70,8 @@ class WorkerLoad(QThread):
         self._target.loading = True
         self._loading_etc = utl_etc.CalcETC(self._total)
         self._face = facial.AnalyzeFace([])
+
+        last_bbox = 100
         try:
             i = 0
             while self.running:
@@ -84,10 +86,13 @@ class WorkerLoad(QThread):
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
                 # Find face bounding box
-                bbox, prob = models.mtcnn_model.detect(frame)
-                bbox = bbox[0]
-
-                bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
+                if last_bbox > 30:
+                    bbox, prob = models.mtcnn_model.detect(frame)
+                    bbox = bbox[0]
+                    last_bbox = 0
+                    bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
+                else:
+                    last_bbox += 1
 
                 # Find the facial features
                 landmarks = models.spiga_model.inference(frame, [bbox])
