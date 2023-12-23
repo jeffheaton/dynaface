@@ -1,7 +1,6 @@
 import csv
 import io
 import logging
-from functools import partial
 
 import cmds
 import custom_control
@@ -14,7 +13,7 @@ import utl_gfx
 import utl_print
 import worker_threads
 from facial_analysis.facial import AnalyzeFace, load_face_image
-from facial_analysis.measures import MeasureItem, all_measures
+from facial_analysis.measures import all_measures
 from jth_ui import app_jth, utl_etc
 from jth_ui.tab_graphic import TabGraphic
 from matplotlib.figure import Figure
@@ -320,6 +319,7 @@ gesture you wish to analyze."""
     def on_tree_item_changed(self, item, column):
         data = item.data(0, Qt.ItemDataRole.UserRole)
         data.enabled = item.checkState(0) == Qt.CheckState.Checked
+        print(data.enabled)
 
         # Check if the item is a parent
         if item.childCount() > 0 and column == 0:
@@ -337,14 +337,14 @@ gesture you wish to analyze."""
                     parent.child(i).checkState(0) == Qt.CheckState.Unchecked
                     for i in range(parent.childCount())
                 )
-                any_checked = any(
+                all_checked = all(
                     parent.child(i).checkState(0) == Qt.CheckState.Checked
                     for i in range(parent.childCount())
                 )
 
                 if all_unchecked:
                     parent.setCheckState(0, Qt.CheckState.Unchecked)
-                elif any_checked:
+                elif all_checked:
                     parent.setCheckState(0, Qt.CheckState.Checked)
 
         if self._auto_update:
@@ -774,16 +774,6 @@ gesture you wish to analyze."""
             dialog.exec()
             return not dialog.did_cancel
 
-        return True
-
-    def checkCheckboxEvent(self, target):
-        if not self.loading:
-            return True
-        if not target.isChecked():
-            if not self.wait_load_complete():
-                return False
-
-            self._chk_graph.setChecked(True)
         return True
 
     def action_graph(self):
