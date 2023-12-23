@@ -6,6 +6,7 @@ from facial_analysis import facial
 from facial_analysis.facial import load_face_image
 from PyQt6.QtCore import QThread, pyqtSignal
 from jth_ui import utl_etc
+from facial_analysis import models
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,13 @@ class WorkerLoad(QThread):
                     break
 
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                bbox, prob = models.mtcnn_model.detect(frame)
+                bbox = bbox[0]
+                print(bbox)
+
+                bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
+                features = models.spiga_model.inference(frame, [bbox])
+                print(features)
 
                 # Make sure we did not get a request to stop during each of these:
                 if self.running:
