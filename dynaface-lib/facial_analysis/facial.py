@@ -139,7 +139,11 @@ class AnalyzeFace(ImageAnalysis):
     def _find_landmarks(self, img):
         logger.debug("Called _find_landmarks")
         start_time = time.time()
-        bbox, _ = models.mtcnn_model.detect(img)
+        bbox, prob = models.mtcnn_model.detect(img)
+
+        if prob[0] == None or prob[0] < 0.9:
+            return None, None
+
         end_time = time.time()
         mtcnn_duration = end_time - start_time
         logger.debug(f"Detected bbox: {bbox}")
@@ -173,14 +177,20 @@ class AnalyzeFace(ImageAnalysis):
         super().load_image(img)
         logger.debug("Low level-image loaded")
         self.landmarks, self._headpose = self._find_landmarks(img)
-        logger.debug("Landmarks located")
-        self.calc_pd()
 
-        if crop:
-            logger.debug("Cropping")
-            self.crop_stylegan(eyes)
+        if self.landmarks is not None:
+            logger.debug("Landmarks located")
+            self.calc_pd()
+
+            if crop:
+                logger.debug("Cropping")
+                self.crop_stylegan(eyes)
+        else:
+            logger.info("No face detected")
 
     def draw_landmarks(self, size=0.25, color=[0, 255, 255], numbers=False):
+        if self.landmarks is None:
+            return
         for i, landmark in enumerate(self.landmarks):
             self.circle(landmark, radius=3, color=color)
             if numbers:
@@ -212,6 +222,8 @@ class AnalyzeFace(ImageAnalysis):
         return result
 
     def analyze(self):
+        if self.landmarks is None:
+            return
         m = self.calc_text_size("W")
         self.analyze_x = int(m[0][0] * 0.25)
         self.analyze_y = int(m[0][1] * 1.5)

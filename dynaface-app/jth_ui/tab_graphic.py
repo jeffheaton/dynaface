@@ -4,6 +4,7 @@ import numpy as np
 from PyQt6.QtCore import QDateTime, Qt, QTimer
 from PyQt6.QtGui import QColor, QFont, QFontMetrics, QImage, QPainter, QPixmap
 from PyQt6.QtWidgets import QGraphicsScene, QGraphicsView, QVBoxLayout, QWidget
+from jth_ui.overlay import OverlayGraphicsView
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +102,9 @@ class TabGraphic(QWidget):
         self._scene.clear()
         logger.info("Closed graphic tab")
 
-    def create_graphic(self, height=None, width=None, buffer=None, fps_overlay=False):
+    def create_graphic(
+        self, height=None, width=None, buffer=None, fps_overlay=False, msg_overlay=False
+    ):
         if buffer is None:
             self._render_buffer = np.zeros((height, width, 3), dtype=np.uint8)
         else:
@@ -124,7 +127,9 @@ class TabGraphic(QWidget):
 
         # QGraphicsView and QGraphicsScene
         self._scene = QGraphicsScene(self)
-        if fps_overlay:
+        if msg_overlay:
+            self._view = OverlayGraphicsView(self._scene, self)
+        elif fps_overlay:
             self._view = FPSGraphicsView(self._scene, self)
         else:
             self._view = QGraphicsView(self._scene, self)

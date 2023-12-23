@@ -1,18 +1,36 @@
 import os
 
 import torch
+import facenet_pytorch
 from facenet_pytorch import MTCNN
 from facenet_pytorch.models.mtcnn import ONet, PNet, RNet
 from facial_analysis.spiga.inference.config import ModelConfig
 from facial_analysis.spiga.inference.framework import SPIGAFramework
 from torch import nn
 
+# Mac M1 issue - hope to remove some day
+# RuntimeError: Adaptive pool MPS: input sizes must be divisible by output sizes.
+# https://github.com/pytorch/pytorch/issues/96056#issuecomment-1457633408
+# https://github.com/pytorch/pytorch/issues/97109
+FIX_MPS_ISSUE = True
+
+# Other values
 _model_path = None
 _device = None
 mtcnn_model = None
 spiga_model = None
 
 SPIGA_MODEL = "wflw"
+
+from torch.nn.functional import interpolate
+
+
+def imresample_mps(img, sz):
+    # Move the tensor to the CPU
+    img_cpu = img.to("cpu")
+    # Perform the interpolation on the CPU
+    im_data = interpolate(img_cpu, size=sz, mode="area")
+    return im_data.to("mps")
 
 
 class MTCNN2(MTCNN):
@@ -64,14 +82,14 @@ class MTCNN2(MTCNN):
 
 def _init_mtcnn() -> None:
     global mtcnn_model
-    # Mac M1 issue - hope to remove some day
-    # RuntimeError: Adaptive pool MPS: input sizes must be divisible by output sizes.
-    # https://github.com/pytorch/pytorch/issues/96056#issuecomment-1457633408
-    # https://github.com/pytorch/pytorch/issues/97109
-    if _device == "mps":
-        device = "cpu"  # seems to be some mps issue we need to look at
+
+    if _device == "mps" and FIX_MPS_ISSUE:
+        device = "cpu"
     else:
         device = _device
+        # print(facenet_pytorch.models.utils.imresample)
+        # facenet_pytorch.models.utils.detect_face.imresample = imresample_mps
+        # print(facenet_pytorch.models.utils.detect_face.imresample)
 
     if _model_path is None:
         mtcnn_model = MTCNN(keep_all=True, device=device)

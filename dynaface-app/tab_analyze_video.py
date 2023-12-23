@@ -433,7 +433,7 @@ gesture you wish to analyze."""
     def load_first_frame(self):
         logger.debug("Display first video frame on load")
         self._face.load_state(self._frames[0])
-        self.create_graphic(buffer=self._face.render_img)
+        self.create_graphic(buffer=self._face.render_img, msg_overlay=True)
         self._view.grabGesture(Qt.GestureType.PinchGesture)
         self._view.installEventFilter(self)
         self.update_face()
@@ -472,9 +472,23 @@ gesture you wish to analyze."""
         if self.loading == False and len(self._frames) == 0:
             return "(0/0)"
         elif self.loading:
+            if self.loading:
+                self.update_top_message("Loading... " + etc)
+            else:
+                self.update_top_message("")
             return f"({mx:,}/{self.frame_count:,}, loading... time: {etc})"
         else:
+            if self._face.landmarks is None:
+                self.update_top_message("No face detected")
+            else:
+                self.update_top_message("")
             return f"({i+1:,}/{frame_count:,})"
+
+    def update_top_message(self, message):
+        if self._view:
+            self._view.message = message
+            self._view.update()
+            self._scene.update()
 
     def open_frame(self, num=None):
         if num is None:
