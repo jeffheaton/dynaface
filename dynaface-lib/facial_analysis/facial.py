@@ -107,7 +107,7 @@ class AnalyzeFace(ImageAnalysis):
         )
         # Prepare variables
         x0, y0, w, h = bbox
-        landmarks2 = models.convert_landmarks(features)
+        landmarks2 = models.convert_landmarks(features)[0]
 
         headpose = np.array(features["headpose"][0])
         return landmarks2, headpose

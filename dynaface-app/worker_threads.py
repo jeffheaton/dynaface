@@ -58,6 +58,30 @@ class WorkerLoad(QThread):
         self._total = self._target.frame_count
         self.running = True
 
+    def process_batch(self, frame, x1, y1, x2, y2):
+        frame2 = frame[y1:y2, x1:x2]
+        bbox = [0, 0, x2 - x1, y2 - y1]
+        landmarks = models.spiga_model.inference_batch([frame2], bbox)
+        landmarks = models.convert_landmarks(landmarks)[0]
+        landmarks = util.scale_crop_points(
+            lst=landmarks, crop_x=-x1, crop_y=-y1, scale=1.0
+        )
+        # Crop to the eyes
+        frame, landmarks = util.crop_stylegan(
+            img=frame, pupils=None, landmarks=landmarks
+        )
+        # Extract
+        pupillary_distance, pix2mm = util.calc_pd(landmarks)
+        # Build frame-state data
+        frame_state = [
+            frame,
+            None,
+            landmarks,
+            pupillary_distance,
+            pix2mm,
+        ]
+        self._target.add_frame(frame_state)
+
     def run(self):
         start_time = time.time()
         logger.debug("Running background thread")
@@ -89,31 +113,9 @@ class WorkerLoad(QThread):
                     last_bbox = 0
                 else:
                     last_bbox += 1
-                # Find the facial features
-                frame2 = frame[y1:y2, x1:x2]
-                # bbox = [0, 0, x2 - x1, y2 - y1]
-                bbox = [0, 0, x2 - x1, y2 - y1]
-                # landmarks = models.spiga_model.inference(frame2, [bbox])
-                landmarks = models.spiga_model.inference_batch([frame2], bbox)
-                landmarks = models.convert_landmarks(landmarks)
-                landmarks = util.scale_crop_points(
-                    lst=landmarks, crop_x=-x1, crop_y=-y1, scale=1.0
-                )
-                # Crop to the eyes
-                frame, landmarks = util.crop_stylegan(
-                    img=frame, pupils=None, landmarks=landmarks
-                )
-                # Extract
-                pupillary_distance, pix2mm = util.calc_pd(landmarks)
-                # Build frame-state data
-                frame_state = [
-                    frame,
-                    None,
-                    landmarks,
-                    pupillary_distance,
-                    pix2mm,
-                ]
-                self._target.add_frame(frame_state)
+
+                self.process_batch(frame, x1, y1, x2, y2)
+
                 if self.running:
                     self._update_signal.emit(self._loading_etc.cycle())
             end_time = time.time()

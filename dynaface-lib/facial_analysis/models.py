@@ -127,4 +127,7 @@ def detect_device() -> str:
 
 
 def convert_landmarks(landmarks):
-    return [(int(x[0]), int(x[1])) for x in np.array(landmarks["landmarks"][0])]
+    return [
+        [(int(x[0]), int(x[1])) for x in np.array(landmark)]
+        for landmark in landmarks["landmarks"]
+    ]
