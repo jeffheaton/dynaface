@@ -58,29 +58,31 @@ class WorkerLoad(QThread):
         self._total = self._target.frame_count
         self.running = True
 
-    def process_batch(self, frame, x1, y1, x2, y2):
-        frame2 = frame[y1:y2, x1:x2]
+    def process_batch(self, frames, x1, y1, x2, y2):
+        frames_cropped = [x[y1:y2, x1:x2] for x in frames]
         bbox = [0, 0, x2 - x1, y2 - y1]
-        landmarks = models.spiga_model.inference_batch([frame2], bbox)
-        landmarks = models.convert_landmarks(landmarks)[0]
-        landmarks = util.scale_crop_points(
-            lst=landmarks, crop_x=-x1, crop_y=-y1, scale=1.0
-        )
-        # Crop to the eyes
-        frame, landmarks = util.crop_stylegan(
-            img=frame, pupils=None, landmarks=landmarks
-        )
-        # Extract
-        pupillary_distance, pix2mm = util.calc_pd(landmarks)
-        # Build frame-state data
-        frame_state = [
-            frame,
-            None,
-            landmarks,
-            pupillary_distance,
-            pix2mm,
-        ]
-        self._target.add_frame(frame_state)
+        landmarks_batch = models.spiga_model.inference_batch(frames_cropped, bbox)
+        landmarks_batch = models.convert_landmarks(landmarks_batch)
+
+        for landmarks, frame in zip(landmarks_batch, frames):
+            landmarks = util.scale_crop_points(
+                lst=landmarks, crop_x=-x1, crop_y=-y1, scale=1.0
+            )
+            # Crop to the eyes
+            frame, landmarks = util.crop_stylegan(
+                img=frames[0], pupils=None, landmarks=landmarks
+            )
+            # Extract
+            pupillary_distance, pix2mm = util.calc_pd(landmarks)
+            # Build frame-state data
+            frame_state = [
+                frame,
+                None,
+                landmarks,
+                pupillary_distance,
+                pix2mm,
+            ]
+            self._target.add_frame(frame_state)
 
     def run(self):
         start_time = time.time()
@@ -107,14 +109,12 @@ class WorkerLoad(QThread):
                     x2 = int(bbox[2])
                     y1 = int(bbox[1])
                     y2 = int(bbox[3])
-                    print(bbox)
                     bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
-                    print(bbox)
                     last_bbox = 0
                 else:
                     last_bbox += 1
 
-                self.process_batch(frame, x1, y1, x2, y2)
+                self.process_batch([frame], x1, y1, x2, y2)
 
                 if self.running:
                     self._update_signal.emit(self._loading_etc.cycle())
