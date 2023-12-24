@@ -1,6 +1,5 @@
 import logging
 import time
-
 import cv2
 from facial_analysis import facial
 from facial_analysis.facial import load_face_image
@@ -26,7 +25,6 @@ class WorkerExport(QThread):
             self._update_signal.emit("Waiting for load to complete.")
             while self._dialog._window.loading:
                 time.sleep(1)
-
         self._update_signal.emit("Exporting...")
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # or use 'XVID'
         width = self._dialog._window._face.width
@@ -34,11 +32,8 @@ class WorkerExport(QThread):
         out = cv2.VideoWriter(
             self._output_file, fourcc, self._dialog._window.frame_rate, (width, height)
         )
-
         face = facial.AnalyzeFace(self._dialog._window._face.measures)
-
         c = len(self._dialog._window._frames)
-
         t = self._dialog._window
         for i in range(t._frame_begin, t._frame_end):
             frame = t._frames[i]
@@ -48,7 +43,6 @@ class WorkerExport(QThread):
             face.analyze()
             image = cv2.cvtColor(face.render_img, cv2.COLOR_BGR2RGB)
             out.write(image)
-
         out.release()
         self._update_signal.emit("*")
 
@@ -70,7 +64,6 @@ class WorkerLoad(QThread):
         self._target.loading = True
         self._loading_etc = utl_etc.CalcETC(self._total)
         self._face = facial.AnalyzeFace([])
-
         last_bbox = 100
         try:
             i = 0
@@ -78,37 +71,40 @@ class WorkerLoad(QThread):
                 i += 1
                 logger.debug(f"Begin frame {i}")
                 ret, frame = self._target.video_stream.read()
-
                 if not ret:
                     logger.debug("Thread done")
                     break
-
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-
                 # Find face bounding box
                 if last_bbox > 30:
                     bbox, prob = models.mtcnn_model.detect(frame)
                     bbox = bbox[0]
-                    last_bbox = 0
+                    x1 = int(bbox[0])
+                    x2 = int(bbox[2])
+                    y1 = int(bbox[1])
+                    y2 = int(bbox[3])
+                    print(bbox)
                     bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
+                    print(bbox)
+                    last_bbox = 0
                 else:
                     last_bbox += 1
-
                 # Find the facial features
-                landmarks = models.spiga_model.inference(frame, [bbox])
+                frame2 = frame[y1:y2, x1:x2]
+                print("***", frame.shape)
+                # bbox = [0, 0, x2 - x1, y2 - y1]
+                bbox = [0, 0, x2 - x1, y2 - y1]
+                landmarks = models.spiga_model.inference(frame2, [bbox])
                 landmarks = models.convert_landmarks(landmarks)
-
+                landmarks = util.scale_crop_points(
+                    lst=landmarks, crop_x=-x1, crop_y=-y1, scale=1.0
+                )
                 # Crop to the eyes
                 frame, landmarks = util.crop_stylegan(
                     img=frame, pupils=None, landmarks=landmarks
                 )
-
                 # Extract
                 pupillary_distance, pix2mm = util.calc_pd(landmarks)
-
-                if not self.running:
-                    break
-
                 # Build frame-state data
                 frame_state = [
                     frame,
@@ -118,13 +114,11 @@ class WorkerLoad(QThread):
                     pix2mm,
                 ]
                 self._target.add_frame(frame_state)
-
                 if self.running:
                     self._update_signal.emit(self._loading_etc.cycle())
             end_time = time.time()
             duration = end_time - start_time
             logger.info(f"Video processing time: {duration}")
-
         except Exception as e:
             logger.error("Error loading video", exc_info=True)
         finally:
