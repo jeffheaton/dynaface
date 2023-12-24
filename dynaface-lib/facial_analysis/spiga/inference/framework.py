@@ -25,6 +25,7 @@ class SPIGAFramework:
 
         # Pretreatment initialization
         self.transforms = pretreat.get_transformers(self.model_cfg)
+        self.transform_batch = pretreat.get_transformers_batch()
 
         # SPIGA model
         self.model_inputs = ["image", "model3d", "cam_matrix"]
@@ -67,6 +68,32 @@ class SPIGAFramework:
             params_3DM = self._data2device(loader_3DM())
             self.model3d = params_3DM["model3d"]
             self.cam_matrix = params_3DM["cam_matrix"]
+
+    def inference_batch(self, images, bbox):
+        images2 = []
+        crop_bboxes = []
+        for x in images:
+            x = {"image": x, "bbox": bbox}
+            x = self.transforms(x)
+            images2.append(x["image"])
+            crop_bboxes.append(x["bbox"])
+
+        # Images to tensor and device
+        batch_images = torch.tensor(np.array(images2), dtype=torch.float)
+        batch_images = self._data2device(batch_images)
+        # Batch 3D model and camera intrinsic matrix
+        batch_model3D = self.model3d.unsqueeze(0).repeat(len(images), 1, 1)
+        batch_cam_matrix = self.cam_matrix.unsqueeze(0).repeat(len(images), 1, 1)
+
+        # SPIGA inputs
+        model_inputs = [batch_images, batch_model3D, batch_cam_matrix]
+        # return model_inputs, crop_bboxes
+
+        bboxes = [bbox] * len(images)
+
+        outputs = self.net_forward(model_inputs)
+        features = self.postreatment(outputs, crop_bboxes, bboxes)
+        return features
 
     def inference(self, image, bboxes):
         """

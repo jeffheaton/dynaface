@@ -91,10 +91,10 @@ class WorkerLoad(QThread):
                     last_bbox += 1
                 # Find the facial features
                 frame2 = frame[y1:y2, x1:x2]
-                print("***", frame.shape)
                 # bbox = [0, 0, x2 - x1, y2 - y1]
                 bbox = [0, 0, x2 - x1, y2 - y1]
-                landmarks = models.spiga_model.inference(frame2, [bbox])
+                # landmarks = models.spiga_model.inference(frame2, [bbox])
+                landmarks = models.spiga_model.inference_batch([frame2], bbox)
                 landmarks = models.convert_landmarks(landmarks)
                 landmarks = util.scale_crop_points(
                     lst=landmarks, crop_x=-x1, crop_y=-y1, scale=1.0

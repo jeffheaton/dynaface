@@ -20,6 +20,13 @@ def get_transformers(data_config):
     return transforms.Compose(transformer_seq)
 
 
+def get_transformers_batch():
+    transformer_seq = [
+        NormalizeAndPermute(),
+    ]
+    return transforms.Compose(transformer_seq)
+
+
 class NormalizeAndPermute:
     def __call__(self, sample):
         image = np.array(sample["image"], dtype=float)
