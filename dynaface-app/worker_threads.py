@@ -9,6 +9,8 @@ from facial_analysis import models, util
 
 logger = logging.getLogger(__name__)
 
+BATCH_SIZE = 2
+
 
 class WorkerExport(QThread):
     """Export loaded video frames to an annotated video."""
@@ -91,6 +93,8 @@ class WorkerLoad(QThread):
         self._loading_etc = utl_etc.CalcETC(self._total)
         self._face = facial.AnalyzeFace([])
         last_bbox = 100
+        update_ready = False
+        frames = []
         try:
             i = 0
             while self.running:
@@ -114,10 +118,19 @@ class WorkerLoad(QThread):
                 else:
                     last_bbox += 1
 
-                self.process_batch([frame], x1, y1, x2, y2)
+                frames.append(frame)
+                if len(frames) > BATCH_SIZE:
+                    self.process_batch(frames, x1, y1, x2, y2)
+                    frames.clear()
+                    update_ready = True
+                else:
+                    frames.append(frame)
 
-                if self.running:
+                if self.running and update_ready:
                     self._update_signal.emit(self._loading_etc.cycle())
+
+            if len(frames) > 0:
+                self.process_batch(frames, x1, y1, x2, y2)
             end_time = time.time()
             duration = end_time - start_time
             logger.info(f"Video processing time: {duration}")

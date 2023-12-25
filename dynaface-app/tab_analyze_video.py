@@ -1009,3 +1009,14 @@ gesture you wish to analyze."""
     def action_text_zoom(self, value):
         self._face.text_size = 0.75 + (0.25 * value)
         self.update_face()
+
+    def checkCheckboxEvent(self, target):
+        """Check to see if the graph checkbox can be selected."""
+        if not self.loading:
+            return True
+        if not target.isChecked():
+            if not self.wait_load_complete():
+                return False
+
+            self._chk_graph.setChecked(True)
+        return True
