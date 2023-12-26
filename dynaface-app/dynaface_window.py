@@ -259,8 +259,9 @@ class DynafaceWindow(MainWindowJTH):
                     self.display_message_box(typ)
                 else:
                     self.show_analyze_video(file_path)
-        except:
+        except Exception as ex:
             logger.error("Error during open file", exc_info=True)
+            self.display_message_box(f"Error opening file: {ex}")
 
     def perform_edit_copy(self):
         current_tab = self._tab_widget.currentWidget()

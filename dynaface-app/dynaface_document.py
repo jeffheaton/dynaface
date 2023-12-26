@@ -1,6 +1,7 @@
 import pickle
 from facial_analysis.facial import AnalyzeFace, load_face_image
 from jth_ui import utl_classes
+import gzip
 
 DOC_HEADER = "header"
 DOC_HEADER_VERSION = "version"
@@ -17,10 +18,13 @@ DOC_ENABLED = "enabled"
 
 
 def check_dyfc_type(filename) -> None:
-    with open(filename, "rb") as f:
-        doc = pickle.load(f)
+    try:
+        with gzip.open(filename, "rb") as f:
+            doc = pickle.load(f)
 
-    v = doc[DOC_HEADER][DOC_HEADER_VERSION]
+        v = doc[DOC_HEADER][DOC_HEADER_VERSION]
+    except gzip.BadGzipFile:
+        return "Error, not a valid Dynaface file."
 
     if v > 1:
         return "Error, this application can only read Dynaface version 1 document files. Please update Dynaface."
@@ -45,12 +49,17 @@ class DynafaceDocument:
             DOC_BODY: {DOC_BODY_MEASURES: measures, DOC_BODY_FRAMES: self.frames},
         }
 
-        with open(filename, "wb") as f:
+        with gzip.open(filename, "wb") as f:
             pickle.dump(doc, f)
 
     def load(self, filename: str):
-        with open(filename, "rb") as f:
-            doc = pickle.load(f)
+        try:
+            with gzip.open(filename, "rb") as f:
+                doc = pickle.load(f)
+        except gzip.BadGzipFile:
+            raise TypeError(
+                f"The file '{filename}' does not appear to be a valid Dynaface document."
+            )
 
         # load
         measures = self._load_measures(doc[DOC_BODY][DOC_BODY_MEASURES])

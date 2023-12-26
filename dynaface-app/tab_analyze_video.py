@@ -119,7 +119,7 @@ class AnalyzeVideoTab(TabGraphic):
             self.thread = None
             self.load_first_frame()
             self.lbl_status.setText(self.status())
-            self._video_slider.setRange(0, len(self._frames) - 2)
+            self._video_slider.setRange(0, len(self._frames) - 1)
 
         self.unsaved_changes = False
         self._window.update_enabled()
@@ -186,7 +186,7 @@ gesture you wish to analyze."""
         toolbar.addWidget(self._btn_forward)
         toolbar.addSeparator()
 
-        self.lbl_status = QLabel("0/0")
+        self.lbl_status = QLabel("0 / 0")
         toolbar.addWidget(self.lbl_status)
 
         self._video_slider = QSlider(Qt.Orientation.Horizontal)
@@ -448,9 +448,15 @@ gesture you wish to analyze."""
         QTimer.singleShot(1, self.fit)
 
     def add_frame(self, state):
+        if self._video_slider.value() == self._video_slider.maximum():
+            at_end = True
         self._frames.append(state)
-        self._video_slider.setRange(0, len(self._frames) - 2)
+        self._video_slider.setRange(0, len(self._frames) - 1)
         self._frame_end = len(self._frames)
+
+        # If we were at the end, move back to the end
+        if at_end:
+            self._video_slider.setValue(self._video_slider.maximum())
 
     def forward_action(self):
         i = self._video_slider.sliderPosition()
@@ -481,14 +487,18 @@ gesture you wish to analyze."""
             if self.loading:
                 self.update_top_message("Loading... " + etc)
             else:
+                # Loading complete
+                if self._video_slider.value() != self._video_slider.maximum():
+                    # If not at the end, then move to beginning
+                    self._video_slider.setValue(0)
                 self.update_top_message("")
-            return f"({mx:,}/{self.frame_count:,}, loading... time: {etc})"
+            return f"({mx:,} / {self.frame_count:,}, loading... time: {etc})"
         else:
             if self._face.landmarks is None:
                 self.update_top_message("No face detected")
             else:
                 self.update_top_message("")
-            return f"({i+1:,}/{frame_count:,})"
+            return f"({i+1:,} / {frame_count:,})"
 
     def update_top_message(self, message):
         if self._view:
