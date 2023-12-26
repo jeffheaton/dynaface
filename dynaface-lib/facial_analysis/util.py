@@ -71,7 +71,6 @@ def scale_crop_points(lst, crop_x, crop_y, scale):
 
 
 def crop_stylegan(img, pupils, landmarks):
-    print(img.shape)
     width, height = img.shape[1], img.shape[0]
 
     if pupils:
@@ -80,6 +79,9 @@ def crop_stylegan(img, pupils, landmarks):
         left_eye, right_eye = get_pupils(landmarks=landmarks)
 
     d = abs(right_eye[0] - left_eye[0])
+
+    if d == 0:
+        return img, landmarks
     ar = width / height
     new_width = int(width * (facial.STYLEGAN_PUPIL_DIST / d))
     new_height = int(new_width / ar)

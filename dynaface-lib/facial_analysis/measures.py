@@ -235,8 +235,15 @@ class AnalyzeEyeArea(MeasureBase):
         )
 
         eye_area_diff = round(abs(right_eye_area - left_eye_area), 2)
-        eye_ratio_lr = round(left_eye_area / right_eye_area, 2)
-        eye_ratio_rl = round(right_eye_area / left_eye_area, 2)
+        if right_eye_area == 0:
+            eye_ratio_lr = 0
+        else:
+            eye_ratio_lr = round(left_eye_area / right_eye_area, 2)
+
+        if left_eye_area == 0:
+            eye_ratio_rl = 0
+        else:
+            eye_ratio_rl = round(right_eye_area / left_eye_area, 2)
 
         if render & render2_eye_r:
             face.write_text_sq(

@@ -9,7 +9,7 @@ from facial_analysis import models, util
 
 logger = logging.getLogger(__name__)
 
-BATCH_SIZE = 2
+BATCH_SIZE = 5
 
 
 class WorkerExport(QThread):
@@ -108,6 +108,15 @@ class WorkerLoad(QThread):
                 # Find face bounding box
                 if last_bbox > 30:
                     bbox, prob = models.mtcnn_model.detect(frame)
+
+                    if (
+                        bbox is None
+                        or len(bbox) < 1
+                        or prob[0] is None
+                        or prob[0] < 0.9
+                    ):
+                        continue
+
                     bbox = bbox[0]
                     x1 = int(bbox[0])
                     x2 = int(bbox[2])
@@ -123,8 +132,6 @@ class WorkerLoad(QThread):
                     self.process_batch(frames, x1, y1, x2, y2)
                     frames.clear()
                     update_ready = True
-                else:
-                    frames.append(frame)
 
                 if self.running and update_ready:
                     self._update_signal.emit(self._loading_etc.cycle())

@@ -30,7 +30,6 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPinchGesture,
     QPushButton,
-    QScrollArea,
     QSizePolicy,
     QSlider,
     QSpinBox,
@@ -46,6 +45,7 @@ from PyQt6.QtWidgets import (
 logger = logging.getLogger(__name__)
 
 MAX_FRAMES = 5000
+GRAPH_MAX = 100
 
 
 class AnalyzeVideoTab(TabGraphic):
@@ -60,6 +60,7 @@ class AnalyzeVideoTab(TabGraphic):
         self._frame_begin = 0
         self._frame_end = 0
         self.frame_rate = 30
+        self._frame_step = 1  # The scale of the video graph
 
         if path.lower().endswith((".jpg", ".jpeg", ".png", ".tiff", ".heic")):
             self.load_image(path)
@@ -317,36 +318,41 @@ gesture you wish to analyze."""
         self.none_button.clicked.connect(self.uncheck_all)
 
     def on_tree_item_changed(self, item, column):
-        data = item.data(0, Qt.ItemDataRole.UserRole)
-        data.enabled = item.checkState(0) == Qt.CheckState.Checked
-        print(data.enabled)
+        """Handle changes to the checkboxes on the measures."""
+        try:
+            self._tree.blockSignals(True)
+            data = item.data(0, Qt.ItemDataRole.UserRole)
+            data.enabled = item.checkState(0) == Qt.CheckState.Checked
 
-        # Check if the item is a parent
-        if item.childCount() > 0 and column == 0:
-            # Parent item
-            # Update all children based on the parent's state
-            for i in range(item.childCount()):
-                child = item.child(i)
-                child.setCheckState(0, item.checkState(0))
-        else:
-            # Child item
-            # Update parent based on children's state
-            parent = item.parent()
-            if parent is not None:
-                all_unchecked = all(
-                    parent.child(i).checkState(0) == Qt.CheckState.Unchecked
-                    for i in range(parent.childCount())
-                )
-                all_checked = all(
-                    parent.child(i).checkState(0) == Qt.CheckState.Checked
-                    for i in range(parent.childCount())
-                )
+            # Check if the item is a parent
+            if item.childCount() > 0 and column == 0:
+                # Parent item
+                # Update all children based on the parent's state
+                for i in range(item.childCount()):
+                    child = item.child(i)
+                    child.setCheckState(0, item.checkState(0))
+            else:
+                # Child item
+                # Update parent based on children's state
+                parent = item.parent()
+                if parent is not None:
+                    all_unchecked = all(
+                        parent.child(i).checkState(0) == Qt.CheckState.Unchecked
+                        for i in range(parent.childCount())
+                    )
+                    all_checked = all(
+                        parent.child(i).checkState(0) == Qt.CheckState.Checked
+                        for i in range(parent.childCount())
+                    )
 
-                if all_unchecked:
-                    parent.setCheckState(0, Qt.CheckState.Unchecked)
-                elif all_checked:
-                    parent.setCheckState(0, Qt.CheckState.Checked)
-
+                    if all_unchecked:
+                        parent.setCheckState(0, Qt.CheckState.Unchecked)
+                    elif all_checked:
+                        parent.setCheckState(0, Qt.CheckState.Checked)
+        except Exception as e:
+            logger.error("Error updating measures", exc_info=True)
+        finally:
+            self._tree.blockSignals(False)
         if self._auto_update:
             self.update_face()
             if self._chk_graph.isChecked():
@@ -465,7 +471,7 @@ gesture you wish to analyze."""
         if i > 0:
             self._video_slider.setSliderPosition(i - 1)
 
-    def status(self, etc=None):
+    def status(self, etc=""):
         i = self._video_slider.sliderPosition() - self._frame_begin
         mx = self._video_slider.maximum()
         frame_count = self._frame_end - self._frame_begin
@@ -656,14 +662,21 @@ gesture you wish to analyze."""
         cols = list(data.keys())
         cols = ["frame", "time"] + cols
 
-        for i in range(self._frame_begin, self._frame_end):
+        count = self._frame_end - self._frame_begin
+        if count > GRAPH_MAX:
+            self._frame_step = int(count / GRAPH_MAX)
+        else:
+            self._frame_step = 1
+
+        frames = range(self._frame_begin, self._frame_end, self._frame_step)
+        for i in frames:
             frame = self._frames[i]
             face.load_state(frame)
             rec = face.analyze()
             for stat in rec.keys():
                 if stat in data:
                     data[stat].append(rec[stat])
-
+        data["frame"] = list(frames)
         return data
 
     def save_csv(self, filename):
@@ -696,10 +709,10 @@ gesture you wish to analyze."""
         plot_stats = data.keys()
 
         l = len(data[all_measures[0]]) if len(all_measures) > 0 else 0
-        lst_time = list(range(l))
+        lst_time = data["frame"]  # list(range(l))
 
         for stat in data.keys():
-            if stat in plot_stats:
+            if stat in plot_stats and stat != "frame":
                 ax.plot(lst_time, data[stat], label=stat)
 
         ax.set_xlabel("Frame")
