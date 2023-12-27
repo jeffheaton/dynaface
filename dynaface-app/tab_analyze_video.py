@@ -947,12 +947,14 @@ gesture you wish to analyze."""
         doc.measures = self._face.measures
         doc.frames = self._frames[self._frame_begin : self._frame_end]
         doc.fps = self.frame_rate
-        doc.save(filename)
+        f = lambda: doc.save(filename)
+        dlg_modal.display_please_wait(window=self, f=f, message="Saving document")
         self.unsaved_changes = False
 
     def load_document(self, filename):
         doc = dynaface_document.DynafaceDocument()
-        doc.load(filename)
+        f = lambda: doc.load(filename)
+        dlg_modal.display_please_wait(window=self, f=f, message="Loading document")
         self._face = AnalyzeFace(doc.measures)
         self._frames = doc.frames
         self.filename = filename

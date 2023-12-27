@@ -1,11 +1,12 @@
 import logging
 import time
+from typing import Callable
+
 import cv2
-from facial_analysis import facial
+from facial_analysis import facial, models, util
 from facial_analysis.facial import load_face_image
-from PyQt6.QtCore import QThread, pyqtSignal
 from jth_ui import utl_etc
-from facial_analysis import models, util
+from PyQt6.QtCore import QThread, pyqtSignal
 
 logger = logging.getLogger(__name__)
 
@@ -166,3 +167,15 @@ class WorkerWaitLoad(QThread):
             )
             time.sleep(1)
         self._update_signal.emit("*")
+
+
+class WorkerPleaseWait(QThread):
+    update_signal = pyqtSignal()
+
+    def __init__(self, proc: Callable):
+        super().__init__()
+        self._proc = proc
+
+    def run(self):
+        self._proc()
+        self.update_signal.emit()

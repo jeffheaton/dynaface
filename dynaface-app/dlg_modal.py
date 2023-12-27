@@ -1,14 +1,17 @@
+from typing import Callable
+
+import worker_threads
 from facial_analysis import facial
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QDialog,
-    QPushButton,
-    QVBoxLayout,
+    QFileDialog,
     QLabel,
     QMessageBox,
-    QFileDialog,
+    QPushButton,
+    QVBoxLayout,
     QWidget,
 )
-import worker_threads
 
 
 class SaveVideoDialog(QDialog):
@@ -165,6 +168,41 @@ class WaitLoadingDialog(QDialog):
             self._update_status.setText(status)
 
 
+class PleaseWaitDialog(QDialog):
+    def __init__(self, window, f: Callable, message: str = "Waiting"):
+        super().__init__()
+        self.setWindowTitle("Waiting")
+        self._window = window
+        self.did_cancel = False
+
+        self._update_status = QLabel(message)
+
+        # Layout
+        layout = QVBoxLayout(self)
+        layout.addWidget(self._update_status)
+
+        # Set window flags to disable maximize and close buttons
+        self.setWindowFlags(
+            Qt.WindowType.Dialog
+            | Qt.WindowType.CustomizeWindowHint
+            | Qt.WindowType.WindowTitleHint
+        )
+
+        # Thread
+        self.thread = worker_threads.WorkerPleaseWait(f)
+        self.thread.finished.connect(self.close)  # Close dialog when thread finishes
+        self.thread.start()
+        self.thread.update_signal.connect(self.thread_done)
+
+    def thread_done(self):
+        self.accept()
+
+
+def display_please_wait(window: QWidget, f: Callable, message: str = "Waiting") -> None:
+    dlog = PleaseWaitDialog(window=window, f=f, message=message)
+    dlog.exec()
+
+
 def prompt_save_changes():
     msg_box = QMessageBox()
     msg_box.setIcon(QMessageBox.Icon.Warning)
@@ -177,23 +215,6 @@ def prompt_save_changes():
     )
     msg_box.setDefaultButton(QMessageBox.StandardButton.Yes)
     return msg_box.exec()
-
-
-from PyQt6.QtWidgets import QFileDialog, QWidget
-
-
-from PyQt6.QtWidgets import QFileDialog, QWidget
-
-
-from PyQt6.QtWidgets import QFileDialog, QWidget
-
-
-from PyQt6.QtWidgets import QFileDialog, QWidget
-
-from PyQt6.QtWidgets import QFileDialog, QWidget
-
-
-from PyQt6.QtWidgets import QFileDialog, QWidget
 
 
 def save_as_document(

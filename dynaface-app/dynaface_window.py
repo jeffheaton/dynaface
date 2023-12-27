@@ -254,11 +254,7 @@ class DynafaceWindow(MainWindowJTH):
                 self.show_analyze_video(file_path)
                 self.update_recent_files(file_path)
             elif file_path.lower().endswith((".dyfc")):
-                typ = dynaface_document.check_dyfc_type(file_path)
-                if typ and typ.startswith("Error"):
-                    self.display_message_box(typ)
-                else:
-                    self.show_analyze_video(file_path)
+                self.show_analyze_video(file_path)
         except Exception as ex:
             logger.error("Error during open file", exc_info=True)
             self.display_message_box(f"Error opening file: {ex}")

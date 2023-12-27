@@ -17,19 +17,6 @@ DOC_NAME = "name"
 DOC_ENABLED = "enabled"
 
 
-def check_dyfc_type(filename) -> None:
-    try:
-        with gzip.open(filename, "rb") as f:
-            doc = pickle.load(f)
-
-        v = doc[DOC_HEADER][DOC_HEADER_VERSION]
-    except gzip.BadGzipFile:
-        return "Error, not a valid Dynaface file."
-
-    if v > 1:
-        return "Error, this application can only read Dynaface version 1 document files. Please update Dynaface."
-
-
 class DynafaceDocument:
     def __init__(self):
         self._version = 1
