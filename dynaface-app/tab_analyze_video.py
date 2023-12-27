@@ -450,6 +450,8 @@ gesture you wish to analyze."""
     def add_frame(self, state):
         if self._video_slider.value() == self._video_slider.maximum():
             at_end = True
+        else:
+            at_end = False
         self._frames.append(state)
         self._video_slider.setRange(0, len(self._frames) - 1)
         self._frame_end = len(self._frames)

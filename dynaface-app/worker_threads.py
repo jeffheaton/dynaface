@@ -98,6 +98,7 @@ class WorkerLoad(QThread):
         frames = []
         try:
             i = 0
+            always_find_face = False
             while self.running:
                 i += 1
                 logger.debug(f"Begin frame {i}")
@@ -107,32 +108,40 @@ class WorkerLoad(QThread):
                     break
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                 # Find face bounding box
-                if last_bbox > 30:
+                found_face = False
+                print(f"==last bbox: {last_bbox}")
+                if last_bbox > 30 or always_find_face:
                     bbox, prob = models.mtcnn_model.detect(frame)
-
+                    print(f"***Frame {i}: prob={prob}, bbox={bbox}")
                     if (
                         bbox is None
                         or len(bbox) < 1
                         or prob[0] is None
-                        or prob[0] < 0.9
+                        or prob[0] < 0.97
                     ):
-                        continue
-
-                    bbox = bbox[0]
-                    x1 = int(bbox[0])
-                    x2 = int(bbox[2])
-                    y1 = int(bbox[1])
-                    y2 = int(bbox[3])
-                    bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
-                    last_bbox = 0
+                        print(f"Frame {i}: fail")
+                        last_bbox = 100
+                        found_face = False
+                    else:
+                        print(f"Frame {i}: success")
+                        bbox = bbox[0]
+                        x1 = int(bbox[0])
+                        x2 = int(bbox[2])
+                        y1 = int(bbox[1])
+                        y2 = int(bbox[3])
+                        bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
+                        last_bbox = 0
+                        found_face = True
                 else:
                     last_bbox += 1
 
-                frames.append(frame)
-                if len(frames) > BATCH_SIZE:
-                    self.process_batch(frames, x1, y1, x2, y2)
-                    frames.clear()
-                    update_ready = True
+                if found_face:
+                    print(f"added {i}")
+                    frames.append(frame)
+                    if len(frames) > BATCH_SIZE:
+                        self.process_batch(frames, x1, y1, x2, y2)
+                        frames.clear()
+                        update_ready = True
 
                 if self.running and update_ready:
                     self._update_signal.emit(self._loading_etc.cycle())
