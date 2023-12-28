@@ -154,11 +154,12 @@ class WorkerLoad(QThread):
         frames_pass2 = []
         try:
             i = 0
-            self._update_signal.emit(self._loading_etc.cycle())
             while self.running:
                 if frames_available:
                     i += 1
                     # left = self._loading_etc.cycle()
+                    msg = self._loading_etc.cycle()
+                    self._update_signal.emit(msg)
                     logger.debug(f"Read frame {i} of {self._total}")
                     ret, frame = self._target.video_stream.read()
                     if not ret:
@@ -187,8 +188,8 @@ class WorkerLoad(QThread):
             print("done")
             end_time = time.time()
             duration = end_time - start_time
-
             logger.info(f"Video processing time: {duration}")
+            self._update_signal.emit("****")
         except Exception as e:
             logger.error("Error loading video", exc_info=True)
         finally:

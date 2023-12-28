@@ -428,13 +428,26 @@ gesture you wish to analyze."""
             self.render_chart()
 
     def update_load_progress(self, status):
-        # self.lbl_status.setText(status)
-        self.lbl_status.setText(self.status(status))
+        print(f"**status: '{status}'")
+        if len(status) > 0 and status[0] == "*":
+            # Loading complete
+            print(
+                "Load complete",
+                self._video_slider.value(),
+                self._video_slider.maximum(),
+            )
+            if self._video_slider.value() == self._video_slider.maximum():
+                # If at the end, then move to beginning
+                self._video_slider.setValue(0)
+            self.update_top_message("")
+        else:
+            # self.lbl_status.setText(status)
+            self.lbl_status.setText(self.status(status))
 
-        if self._view is None:
-            self.load_first_frame()
+            if self._view is None:
+                self.load_first_frame()
 
-        self._window.update_enabled()
+            self._window.update_enabled()
 
     def load_first_frame(self):
         if len(self._frames) > 0:
@@ -487,14 +500,7 @@ gesture you wish to analyze."""
         if self.loading == False and len(self._frames) == 0:
             return "(0/0)"
         elif self.loading:
-            if self.loading:
-                self.update_top_message("Loading... " + etc)
-            else:
-                # Loading complete
-                if self._video_slider.value() != self._video_slider.maximum():
-                    # If not at the end, then move to beginning
-                    self._video_slider.setValue(0)
-                self.update_top_message("")
+            self.update_top_message("Loading... " + etc)
             return f"({mx:,} / {self.frame_count:,}, loading... time: {etc})"
         else:
             if self._face.landmarks is None:
