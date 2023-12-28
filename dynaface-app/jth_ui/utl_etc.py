@@ -29,8 +29,8 @@ class CalcETC:
             # Estimate the remaining time based on the average time per cycle
             estimated_remaining_time = average_time_per_cycle * remaining_cycles
         else:
-            # If all cycles are completed, set the remaining time to zero
-            estimated_remaining_time = 0
+            # If all cycles are completed, set the remaining time to 1 sec
+            estimated_remaining_time = 1
 
         # Return the formatted time
         return self._format_time(estimated_remaining_time)

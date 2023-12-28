@@ -72,8 +72,8 @@ class SPIGAFramework:
     def inference_batch(self, images, bbox):
         images2 = []
         crop_bboxes = []
-        for x in images:
-            x = {"image": x, "bbox": bbox}
+        for x, y in zip(images, bbox):
+            x = {"image": x, "bbox": y}
             x = self.transforms(x)
             images2.append(x["image"])
             crop_bboxes.append(x["bbox"])
@@ -89,10 +89,8 @@ class SPIGAFramework:
         model_inputs = [batch_images, batch_model3D, batch_cam_matrix]
         # return model_inputs, crop_bboxes
 
-        bboxes = [bbox] * len(images)
-
         outputs = self.net_forward(model_inputs)
-        features = self.postreatment(outputs, crop_bboxes, bboxes)
+        features = self.postreatment(outputs, crop_bboxes, bbox)
         return features
 
     def inference(self, image, bboxes):

@@ -61,32 +61,6 @@ class WorkerLoad(QThread):
         self._total = self._target.frame_count
         self.running = True
 
-    def process_batch(self, frames, x1, y1, x2, y2):
-        frames_cropped = [x[y1:y2, x1:x2] for x in frames]
-        bbox = [0, 0, x2 - x1, y2 - y1]
-        landmarks_batch = models.spiga_model.inference_batch(frames_cropped, bbox)
-        landmarks_batch = models.convert_landmarks(landmarks_batch)
-
-        for landmarks, frame in zip(landmarks_batch, frames):
-            landmarks = util.scale_crop_points(
-                lst=landmarks, crop_x=-x1, crop_y=-y1, scale=1.0
-            )
-            # Crop to the eyes
-            frame, landmarks = util.crop_stylegan(
-                img=frames[0], pupils=None, landmarks=landmarks
-            )
-            # Extract
-            pupillary_distance, pix2mm = util.calc_pd(landmarks)
-            # Build frame-state data
-            frame_state = [
-                frame,
-                None,
-                landmarks,
-                pupillary_distance,
-                pix2mm,
-            ]
-            self._target.add_frame(frame_state)
-
     def detect_faces(self, frames_pass1, frames_pass2):
         print("Detecting faces")
         bbox, prob = models.mtcnn_model.detect(frames_pass1)
@@ -103,7 +77,7 @@ class WorkerLoad(QThread):
         lst_crop = []
         lst_frames = []
         for i in range(top):
-            item = frames_pass2.pop(0)
+            item = frames_pass2[i]
             bbox = item[1]
             x1 = int(bbox[0])
             x2 = int(bbox[2])
@@ -116,10 +90,11 @@ class WorkerLoad(QThread):
             lst_bbox.append(bbox)
             lst_crop.append(frame)
 
-        landmarks_batch = models.spiga_model.inference_batch(lst_crop, lst_bbox[0])
+        del frames_pass2[0:top]
+
+        landmarks_batch = models.spiga_model.inference_batch(lst_crop, lst_bbox)
         landmarks_batch = models.convert_landmarks(landmarks_batch)
         self.dispatch_frames(landmarks_batch, lst_frames, x1, y1)
-        frames_pass2.clear()
 
     def dispatch_frames(self, landmarks_batch, frames, x1, y1):
         for landmarks, frame in zip(landmarks_batch, frames):
@@ -128,7 +103,7 @@ class WorkerLoad(QThread):
             )
             # Crop to the eyes
             frame, landmarks = util.crop_stylegan(
-                img=frames[0], pupils=None, landmarks=landmarks
+                img=frame, pupils=None, landmarks=landmarks
             )
             # Extract
             pupillary_distance, pix2mm = util.calc_pd(landmarks)
