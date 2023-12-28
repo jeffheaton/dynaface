@@ -437,15 +437,16 @@ gesture you wish to analyze."""
         self._window.update_enabled()
 
     def load_first_frame(self):
-        logger.debug("Display first video frame on load")
-        self._face.load_state(self._frames[0])
-        self.create_graphic(buffer=self._face.render_img, msg_overlay=True)
-        self._view.grabGesture(Qt.GestureType.PinchGesture)
-        self._view.installEventFilter(self)
-        self.update_face()
-        logger.debug("Done, display first video frame on load")
-        # Auto fit
-        QTimer.singleShot(1, self.fit)
+        if len(self._frames) > 0:
+            logger.debug("Display first video frame on load")
+            self._face.load_state(self._frames[0])
+            self.create_graphic(buffer=self._face.render_img, msg_overlay=True)
+            self._view.grabGesture(Qt.GestureType.PinchGesture)
+            self._view.installEventFilter(self)
+            self.update_face()
+            logger.debug("Done, display first video frame on load")
+            # Auto fit
+            QTimer.singleShot(1, self.fit)
 
     def add_frame(self, state):
         if self._video_slider.value() == self._video_slider.maximum():

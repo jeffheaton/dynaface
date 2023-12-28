@@ -10,7 +10,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 logger = logging.getLogger(__name__)
 
-BATCH_SIZE = 5
+BATCH_SIZE = 10
 
 
 class WorkerExport(QThread):
@@ -87,6 +87,61 @@ class WorkerLoad(QThread):
             ]
             self._target.add_frame(frame_state)
 
+    def detect_faces(self, frames_pass1, frames_pass2):
+        print("Detecting faces")
+        bbox, prob = models.mtcnn_model.detect(frames_pass1)
+        for i in range(len(prob)):
+            if prob[i][0] > 0.98:
+                frames_pass2.append((frames_pass1[i], bbox[i][0]))
+
+        frames_pass1.clear()
+
+    def detect_landmarks(self, frames_pass2):
+        print("Detecting landmarks")
+        top = min(BATCH_SIZE, len(frames_pass2))
+        lst_bbox = []
+        lst_crop = []
+        lst_frames = []
+        for i in range(top):
+            item = frames_pass2.pop(0)
+            bbox = item[1]
+            x1 = int(bbox[0])
+            x2 = int(bbox[2])
+            y1 = int(bbox[1])
+            y2 = int(bbox[3])
+            frame = item[0]
+            lst_frames.append(frame)
+            frame = frame[y1:y2, x1:x2]
+            bbox = [0, 0, x2 - x1, y2 - y1]
+            lst_bbox.append(bbox)
+            lst_crop.append(frame)
+
+        landmarks_batch = models.spiga_model.inference_batch(lst_crop, lst_bbox[0])
+        landmarks_batch = models.convert_landmarks(landmarks_batch)
+        self.dispatch_frames(landmarks_batch, lst_frames, x1, y1)
+        frames_pass2.clear()
+
+    def dispatch_frames(self, landmarks_batch, frames, x1, y1):
+        for landmarks, frame in zip(landmarks_batch, frames):
+            landmarks = util.scale_crop_points(
+                lst=landmarks, crop_x=-x1, crop_y=-y1, scale=1.0
+            )
+            # Crop to the eyes
+            frame, landmarks = util.crop_stylegan(
+                img=frames[0], pupils=None, landmarks=landmarks
+            )
+            # Extract
+            pupillary_distance, pix2mm = util.calc_pd(landmarks)
+            # Build frame-state data
+            frame_state = [
+                frame,
+                None,
+                landmarks,
+                pupillary_distance,
+                pix2mm,
+            ]
+            self._target.add_frame(frame_state)
+
     def run(self):
         start_time = time.time()
         logger.debug("Running background thread")
@@ -94,62 +149,45 @@ class WorkerLoad(QThread):
         self._loading_etc = utl_etc.CalcETC(self._total)
         self._face = facial.AnalyzeFace([])
         last_bbox = 100
-        update_ready = False
-        frames = []
+        frames_available = True
+        frames_pass1 = []
+        frames_pass2 = []
         try:
             i = 0
-            always_find_face = False
+            self._update_signal.emit(self._loading_etc.cycle())
             while self.running:
-                i += 1
-                logger.debug(f"Begin frame {i}")
-                ret, frame = self._target.video_stream.read()
-                if not ret:
-                    logger.debug("Thread done")
-                    break
-                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                # Find face bounding box
-                found_face = False
-                print(f"==last bbox: {last_bbox}")
-                if last_bbox > 30 or always_find_face:
-                    bbox, prob = models.mtcnn_model.detect(frame)
-                    print(f"***Frame {i}: prob={prob}, bbox={bbox}")
-                    if (
-                        bbox is None
-                        or len(bbox) < 1
-                        or prob[0] is None
-                        or prob[0] < 0.97
-                    ):
-                        print(f"Frame {i}: fail")
-                        last_bbox = 100
-                        found_face = False
+                if frames_available:
+                    i += 1
+                    # left = self._loading_etc.cycle()
+                    logger.debug(f"Read frame {i} of {self._total}")
+                    ret, frame = self._target.video_stream.read()
+                    if not ret:
+                        frames_available = False
                     else:
-                        print(f"Frame {i}: success")
-                        bbox = bbox[0]
-                        x1 = int(bbox[0])
-                        x2 = int(bbox[2])
-                        y1 = int(bbox[1])
-                        y2 = int(bbox[3])
-                        bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
-                        last_bbox = 0
-                        found_face = True
-                else:
-                    last_bbox += 1
+                        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                        frames_pass1.append(frame)
 
-                if found_face:
-                    print(f"added {i}")
-                    frames.append(frame)
-                    if len(frames) > BATCH_SIZE:
-                        self.process_batch(frames, x1, y1, x2, y2)
-                        frames.clear()
-                        update_ready = True
+                if (len(frames_pass1) >= BATCH_SIZE) or (
+                    (not frames_available) and (len(frames_pass1) > 0)
+                ):
+                    self.detect_faces(frames_pass1, frames_pass2)
 
-                if self.running and update_ready:
-                    self._update_signal.emit(self._loading_etc.cycle())
+                if (len(frames_pass2) >= BATCH_SIZE) or (
+                    (not frames_available) and (len(frames_pass2) > 0)
+                ):
+                    self.detect_landmarks(frames_pass2)
 
-            if len(frames) > 0:
-                self.process_batch(frames, x1, y1, x2, y2)
+                if (
+                    (not frames_available)
+                    and (len(frames_pass1) < 1)
+                    and (len(frames_pass2) < 1)
+                ):
+                    self.running = False
+
+            print("done")
             end_time = time.time()
             duration = end_time - start_time
+
             logger.info(f"Video processing time: {duration}")
         except Exception as e:
             logger.error("Error loading video", exc_info=True)
