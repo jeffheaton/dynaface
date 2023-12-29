@@ -14,6 +14,10 @@ class OverlayGraphicsView(QGraphicsView):
 
     def paintEvent(self, event):
         super().paintEvent(event)
+
+        if len(self.message) < 1:
+            return
+
         painter = QPainter(self.viewport())
 
         # Setting up text properties

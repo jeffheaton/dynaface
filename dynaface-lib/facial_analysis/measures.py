@@ -75,21 +75,21 @@ class AnalyzeFAI(MeasureBase):
 class AnalyzeOralCommissureExcursion(MeasureBase):
     def __init__(self) -> None:
         self.enabled = True
-        self.items = [MeasureItem("oce.a"), MeasureItem("oce.b")]
+        self.items = [MeasureItem("oce.l"), MeasureItem("oce.r")]
 
     def abbrev(self):
         return "Oral CE"
 
     def calc(self, face, render=True):
-        render2_a = self.is_enabled("oce.a")
-        render2_b = self.is_enabled("oce.b")
-        oce_a = face.measure(
-            face.landmarks[76], face.landmarks[85], render=(render & render2_a), dir="l"
+        render2_l = self.is_enabled("oce.l")
+        render2_r = self.is_enabled("oce.r")
+        oce_r = face.measure(
+            face.landmarks[76], face.landmarks[85], render=(render & render2_r), dir="l"
         )
-        oce_b = face.measure(
-            face.landmarks[82], face.landmarks[85], render=(render & render2_b), dir="r"
+        oce_l = face.measure(
+            face.landmarks[82], face.landmarks[85], render=(render & render2_l), dir="r"
         )
-        return filter({"oce.a": oce_a, "oce.b": oce_b}, self.items)
+        return filter({"oce.l": oce_l, "oce.r": oce_r}, self.items)
 
 
 class AnalyzeBrows(MeasureBase):

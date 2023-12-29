@@ -428,7 +428,6 @@ gesture you wish to analyze."""
             self.render_chart()
 
     def update_load_progress(self, status):
-        print(f"**status: '{status}'")
         if len(status) > 0 and status[0] == "*":
             # Loading complete
             print(

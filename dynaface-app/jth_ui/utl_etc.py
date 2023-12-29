@@ -28,6 +28,8 @@ class CalcETC:
 
             # Estimate the remaining time based on the average time per cycle
             estimated_remaining_time = average_time_per_cycle * remaining_cycles
+
+            estimated_remaining_time = max(estimated_remaining_time, 1)
         else:
             # If all cycles are completed, set the remaining time to 1 sec
             estimated_remaining_time = 1

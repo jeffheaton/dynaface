@@ -60,47 +60,47 @@ class WorkerLoad(QThread):
         self._target = target
         self._total = self._target.frame_count
         self.running = True
+        self.frame_number = 1
+        self.accepted_frame_number = 1
 
     def detect_faces(self, frames_pass1, frames_pass2):
-        print("Detecting faces")
-        bbox, prob = models.mtcnn_model.detect(frames_pass1)
+        """Find the rectangle outlines of faces in the image."""
+        logger.debug("Detecting faces")
+        bbox_list, prob = models.mtcnn_model.detect(frames_pass1)
         for i in range(len(prob)):
-            if prob[i][0] > 0.98:
-                frames_pass2.append((frames_pass1[i], bbox[i][0]))
+            if (
+                (prob[i] is not None)
+                and (prob[i][0] is not None)
+                and (prob[i][0] > 0.98)
+            ):
+                bbox = bbox_list[i][0]
+                bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
+                frames_pass2.append((frames_pass1[i], bbox))
+                logger.debug(
+                    f"Actual frame {self.frame_number} -> analyze frame {self.accepted_frame_number}"
+                )
+                self.accepted_frame_number += 1
+
+            self.frame_number += 1
 
         frames_pass1.clear()
 
     def detect_landmarks(self, frames_pass2):
-        print("Detecting landmarks")
+        logger.debug("Detecting landmarks")
         top = min(BATCH_SIZE, len(frames_pass2))
-        lst_bbox = []
-        lst_crop = []
-        lst_frames = []
+
         for i in range(top):
             item = frames_pass2[i]
             bbox = item[1]
-            x1 = int(bbox[0])
-            x2 = int(bbox[2])
-            y1 = int(bbox[1])
-            y2 = int(bbox[3])
             frame = item[0]
-            lst_frames.append(frame)
-            frame = frame[y1:y2, x1:x2]
-            bbox = [0, 0, x2 - x1, y2 - y1]
-            lst_bbox.append(bbox)
-            lst_crop.append(frame)
+            landmarks_batch = models.spiga_model.inference(frame, [bbox])
+            landmarks_batch = models.convert_landmarks(landmarks_batch)
+            self.dispatch_frames(landmarks_batch=landmarks_batch, frames=[frame])
 
         del frames_pass2[0:top]
 
-        landmarks_batch = models.spiga_model.inference_batch(lst_crop, lst_bbox)
-        landmarks_batch = models.convert_landmarks(landmarks_batch)
-        self.dispatch_frames(landmarks_batch, lst_frames, x1, y1)
-
-    def dispatch_frames(self, landmarks_batch, frames, x1, y1):
+    def dispatch_frames(self, landmarks_batch, frames):
         for landmarks, frame in zip(landmarks_batch, frames):
-            landmarks = util.scale_crop_points(
-                lst=landmarks, crop_x=-x1, crop_y=-y1, scale=1.0
-            )
             # Crop to the eyes
             frame, landmarks = util.crop_stylegan(
                 img=frame, pupils=None, landmarks=landmarks
@@ -123,7 +123,6 @@ class WorkerLoad(QThread):
         self._target.loading = True
         self._loading_etc = utl_etc.CalcETC(self._total)
         self._face = facial.AnalyzeFace([])
-        last_bbox = 100
         frames_available = True
         frames_pass1 = []
         frames_pass2 = []
@@ -160,7 +159,6 @@ class WorkerLoad(QThread):
                 ):
                     self.running = False
 
-            print("done")
             end_time = time.time()
             duration = end_time - start_time
             logger.info(f"Video processing time: {duration}")
