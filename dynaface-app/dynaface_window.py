@@ -241,7 +241,9 @@ class DynafaceWindow(MainWindowJTH):
             logger.error("Error during show properties", exc_info=True)
 
     def open_tutorial(self):
-        webbrowser.open("https://www.heatonresearch.com/mergelife/heaton-ca.html")
+        webbrowser.open(
+            "https://github.com/jeffheaton/present/blob/master/facial/manual.md"
+        )
 
     def open_file(self, file_path):
         try:

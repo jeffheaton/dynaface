@@ -321,8 +321,8 @@ gesture you wish to analyze."""
         """Handle changes to the checkboxes on the measures."""
         try:
             self._tree.blockSignals(True)
-            data = item.data(0, Qt.ItemDataRole.UserRole)
-            data.enabled = item.checkState(0) == Qt.CheckState.Checked
+            # data = item.data(0, Qt.ItemDataRole.UserRole)
+            # data.enabled = item.checkState(0) == Qt.CheckState.Checked
 
             # Check if the item is a parent
             if item.childCount() > 0 and column == 0:
@@ -353,12 +353,43 @@ gesture you wish to analyze."""
             logger.error("Error updating measures", exc_info=True)
         finally:
             self._tree.blockSignals(False)
+
         if self._auto_update:
+            self.update_items()
             self.update_face()
             if self._chk_graph.isChecked():
                 logger.debug("Update chart, because measures changed")
                 self.update_chart()
                 self.render_chart()
+
+    def update_items(self):
+        """Sync the tree of measures/sub-measures with the face analysis."""
+        root = self._tree.invisibleRootItem()
+        child_count = root.childCount()
+
+        for i in range(child_count):
+            parent_item = root.child(i)
+            self._update_item(parent_item)
+            self._update_children(parent_item)
+
+    def _update_item(self, item):
+        if item is not None:
+            # Assuming the checkbox is in the first column
+            is_checked = item.checkState(0) == Qt.CheckState.Checked
+
+            # Accessing the first user data item
+            user_data = item.data(0, Qt.ItemDataRole.UserRole)
+            if user_data is not None:
+                # Update the 'enabled' property based on the checkbox state
+                user_data.enabled = is_checked
+
+    def _update_children(self, parent_item):
+        child_count = parent_item.childCount()
+        for i in range(child_count):
+            child_item = parent_item.child(i)
+            self._update_item(child_item)
+            # If the child item has its own children, call _update_children recursively
+            self._update_children(child_item)
 
     def action_landmarks(self, state):
         self.update_face()
@@ -702,6 +733,10 @@ gesture you wish to analyze."""
         with open(filename, "w") as f:
             writer = csv.writer(f)
             cols = list(data.keys())
+            if "frame" in cols:
+                cols.remove("frame")
+            if "time" in cols:
+                cols.remove("time")
             writer.writerow(["frame", "time"] + cols)
             all_stats = self._face.get_all_items()
             l = len(data[all_stats[0]])
