@@ -429,12 +429,11 @@ gesture you wish to analyze."""
 
     def update_load_progress(self, status):
         if len(status) > 0 and status[0] == "*":
+            if len(self._frames) < 1:
+                self._window.display_message_box("No faces found in that video")
+                logger.info("No faces found in video")
+                self._window.close_action()
             # Loading complete
-            print(
-                "Load complete",
-                self._video_slider.value(),
-                self._video_slider.maximum(),
-            )
             if self._video_slider.value() == self._video_slider.maximum():
                 # If at the end, then move to beginning
                 self._video_slider.setValue(0)
