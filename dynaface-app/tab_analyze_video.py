@@ -111,6 +111,7 @@ class AnalyzeVideoTab(TabGraphic):
 
         # If the filename is set, we loaded a document, that is already decoded
         # If there are frames already defined (1), we loaded a single image.
+        self._last_etc = ""
         if self.filename is None and len(self._frames) == 0:
             self.thread = worker_threads.WorkerLoad(self)
             self.thread._update_signal.connect(self.update_load_progress)
@@ -438,6 +439,7 @@ gesture you wish to analyze."""
             item = self._tree.topLevelItem(i)
             item.setCheckState(0, Qt.CheckState.Checked)
         self._auto_update = True
+        self.update_items()
         self.update_face()
 
         if self._chart_view is not None:
@@ -451,6 +453,7 @@ gesture you wish to analyze."""
             item = self._tree.topLevelItem(i)
             item.setCheckState(0, Qt.CheckState.Unchecked)
         self._auto_update = True
+        self.update_items()
         self.update_face()
 
         if self._chart_view is not None:
@@ -522,13 +525,17 @@ gesture you wish to analyze."""
         if i > 0:
             self._video_slider.setSliderPosition(i - 1)
 
-    def status(self, etc=""):
+    def status(self, etc=None):
         i = self._video_slider.sliderPosition() - self._frame_begin
         mx = self._video_slider.maximum()
         frame_count = self._frame_end - self._frame_begin
         if self.loading == False and len(self._frames) == 0:
             return "(0/0)"
         elif self.loading:
+            if not etc:
+                etc = self._last_etc
+            else:
+                self._last_etc = etc
             self.update_top_message("Loading... " + etc)
             return f"({mx:,} / {self.frame_count:,}, loading... time: {etc})"
         else:
@@ -702,7 +709,7 @@ gesture you wish to analyze."""
             logger.error("Error during save", exc_info=True)
             self._window.display_message_box("Unable to save file.")
 
-    def collect_data(self):
+    def collect_data(self, step_size=1):
         face = AnalyzeFace(self._face.measures)
         stats = face.get_all_items()
         data = {stat: [] for stat in stats}
@@ -710,13 +717,8 @@ gesture you wish to analyze."""
         cols = list(data.keys())
         cols = ["frame", "time"] + cols
 
-        count = self._frame_end - self._frame_begin
-        if count > GRAPH_MAX:
-            self._frame_step = int(count / GRAPH_MAX)
-        else:
-            self._frame_step = 1
+        frames = range(self._frame_begin, self._frame_end, step_size)
 
-        frames = range(self._frame_begin, self._frame_end, self._frame_step)
         for i in frames:
             frame = self._frames[i]
             face.load_state(frame)
@@ -724,7 +726,8 @@ gesture you wish to analyze."""
             for stat in rec.keys():
                 if stat in data:
                     data[stat].append(rec[stat])
-        data["frame"] = list(frames)
+        frame_count = self._frame_end - self._frame_begin
+        data["frame"] = list(range(0, frame_count, step_size))
         return data
 
     def save_csv(self, filename):
@@ -740,7 +743,8 @@ gesture you wish to analyze."""
             writer.writerow(["frame", "time"] + cols)
             all_stats = self._face.get_all_items()
             l = len(data[all_stats[0]])
-            lst_time = [x * self.frame_rate for x in range(l)]
+            rt = 1.0 / self.frame_rate
+            lst_time = [round(x * rt, 2) for x in range(l)]
 
             for i in range(l):
                 row = [str(i), lst_time[i]]
@@ -750,17 +754,21 @@ gesture you wish to analyze."""
 
     def update_chart(self):
         """Create the chart object, or update it if already there."""
-        all_measures = self._face.get_all_items()
+
+        # Do we need to scale?
+        count = self._frame_end - self._frame_begin
+        if count > GRAPH_MAX:
+            self._frame_step = int(count / GRAPH_MAX)
+        else:
+            self._frame_step = 1
 
         # Create a Matplotlib figure
         self.chart_fig = Figure(figsize=(12, 2.5), dpi=100)
         ax = self.chart_fig.add_subplot(111)
         self.chart_fig.subplots_adjust(right=0.75)  # Adjust this value as needed
 
-        data = self.collect_data()
+        data = self.collect_data(self._frame_step)
         plot_stats = data.keys()
-
-        l = len(data[all_measures[0]]) if len(all_measures) > 0 else 0
         lst_time = data["frame"]  # list(range(l))
 
         for stat in data.keys():
@@ -873,7 +881,9 @@ gesture you wish to analyze."""
             self.render_chart()
 
     def action_cut_left(self):
-        if (
+        if self.loading:
+            self._window.display_message_box("Can't cut while loading.")
+        elif (
             len(self._frames) > 1
             and self._video_slider.sliderPosition() < self._frame_end
         ):
@@ -884,7 +894,9 @@ gesture you wish to analyze."""
             self._window.update_enabled()
 
     def action_cut_right(self):
-        if (
+        if self.loading:
+            self._window.display_message_box("Can't cut while loading.")
+        elif (
             len(self._frames) > 1
             and self._video_slider.sliderPosition() > self._frame_begin
         ):
