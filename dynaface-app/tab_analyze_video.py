@@ -8,7 +8,6 @@ import cv2
 import dlg_modal
 import dynaface_document
 import numpy as np
-import plotly.graph_objects as go
 import utl_gfx
 import utl_print
 import worker_threads

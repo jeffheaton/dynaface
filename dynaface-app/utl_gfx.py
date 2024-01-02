@@ -1,7 +1,6 @@
 import sys
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QImage, QClipboard, QPixmap
-import plotly.graph_objects as go
 from PIL import Image
 
 

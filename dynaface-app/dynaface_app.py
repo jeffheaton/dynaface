@@ -31,7 +31,7 @@ class AppDynaface(AppJTH):
                 app_name="Dynaface",
                 app_author="HeatonResearch",
                 copyright="Copyright 2023 by Jeff Heaton, released under the <a href='https://opensource.org/license/mit/'>MIT License</a>",
-                version="1.0.0",
+                version="1.0.3",
                 bundle_id="com.heatonresearch.dynaface",
             )
 

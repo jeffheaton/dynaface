@@ -93,8 +93,11 @@ app = BUNDLE(
         "CFBundleIdentifier": "com.heatonresearch.dynaface",
         "CFBundleVersion": version,
         "CFBundleShortVersionString": version,
+        "UIRequiredDeviceCapabilities":["arm64"],
         "LSMinimumSystemVersion": "12.0",
         "LSApplicationCategoryType": "public.app-category.utilities",
         "ITSAppUsesNonExemptEncryption": False,
+        "DTPlatformBuild": "13C90",
+        "DTPlatformName": "macos",
     },
 )

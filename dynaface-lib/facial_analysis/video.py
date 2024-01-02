@@ -6,8 +6,9 @@ import subprocess
 import tempfile
 
 import cv2
-import plotly.graph_objects as go
-import plotly.io as pio
+
+# import plotly.graph_objects as go
+# import plotly.io as pio
 from facial_analysis.facial import AnalyzeFace
 
 SAMPLE_RATE = 44100
@@ -231,38 +232,7 @@ class VideoToVideo:
         return True
 
     def plot_chart(self, filename, plot_stats=None):
-        if plot_stats is None:
-            plot_stats = self.data.keys()
-        # create time axis
-        l = len(self.data[self.stats[0]])
-        lst_time = [x * self.rate for x in range(l)]
-
-        layout = go.Layout(
-            title=f"Blink Efficency",
-            autosize=False,
-            width=1500,
-            height=540,
-            xaxis_title="Time (s)",
-            xaxis_showticklabels=True,
-            # yaxis_title="Area (mm^2)",
-            yaxis_title="Value (multiple units)",
-            yaxis_showticklabels=True,
-        )
-
-        fig = go.Figure(layout=layout)
-
-        for stat in self.data.keys():
-            if stat in plot_stats:
-                fig.add_trace(
-                    go.Scatter(
-                        x=lst_time,
-                        y=self.data[stat],
-                        name=stat,
-                    )
-                )  # line=dict(color='red'))
-
-        # fig.add_trace(go.Scatter(x=lst_time, y=self.right_area, name="Right Area", line=dict(color='blue')))
-        fig.write_image(filename)
+        pass
 
     def dump_data(self, filename):
         with open(filename, "w") as f:
