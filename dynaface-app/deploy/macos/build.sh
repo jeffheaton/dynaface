@@ -1,3 +1,9 @@
+#!/bin/bash
+set -e
+set -o pipefail
+
+trap 'echo "An error occurred. Exiting..."; exit 1;' ERR
+
 rm -rf ./working
 mkdir ./working
 cp ./entitlements.plist ./working
@@ -5,7 +11,6 @@ cp ./entitlements-nest.plist ./working
 cp ./dynaface_icon.icns ./working
 cp ./dynaface_doc_icon.icns ./working
 cp ./dynaface-macos.spec ./working
-cp ./build.py ./working
 cp ./build.sh ./working
 cp ../../*.py ./working
 cp -r ../../data ./working/data
@@ -33,3 +38,6 @@ codesign --verify --verbose dist/Dynaface.app
 
 echo "** Package **"
 productbuild --component dist/Dynaface.app /Applications --sign "${installer_certificate}" --version "${version}" dist/Dynaface.pkg
+
+echo "Build of application executed successfully."
+exit 0

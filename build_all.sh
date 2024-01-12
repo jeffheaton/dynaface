@@ -1,4 +1,8 @@
 #!/bin/bash
+set -e
+set -o pipefail
+
+trap 'echo "An error occurred. Exiting..."; exit 1;' ERR
 
 if [ -z "${app_certificate}" ]; then
     echo "Error: Environment variable app_certificate is not set."
@@ -6,7 +10,7 @@ if [ -z "${app_certificate}" ]; then
 fi
 
 cd ./dynaface-lib
-python setup.py bdist_wheel
+python3 setup.py bdist_wheel
 mkdir -p ../dynaface-app/wheels/
 cp ./dist/*.whl ../dynaface-app/wheels/
 cd ../dynaface-app
@@ -15,10 +19,13 @@ cp $models/pnet.pt ./data
 cp $models/rnet.pt ./data
 cp $models/spiga_wflw.pt ./data
 rm -rf ./venv || true
-python3.11 -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 pip install facial_analysis -f ./wheels
 cd deploy/macos
 rm -rf ./working || true
 ./build.sh
+
+echo "Build of library/app executed successfully."
+exit 0
