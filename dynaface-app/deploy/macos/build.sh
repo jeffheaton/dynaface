@@ -36,6 +36,11 @@ codesign --force --timestamp --verbose --options runtime --entitlements entitlem
 echo "** Verify Sign **"
 codesign --verify --verbose dist/Dynaface.app
 
+# Set permissions, sometimes the transport app will complain about this
+echo "** Set Permissions **"
+find dist/Dynaface.app -type f -exec chmod a=u {} \;
+find dist/Dynaface.app -type d -exec chmod a=u {} \;
+
 echo "** Package **"
 productbuild --component dist/Dynaface.app /Applications --sign "${installer_certificate}" --version "${version}" dist/Dynaface.pkg
 
