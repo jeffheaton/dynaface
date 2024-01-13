@@ -22,6 +22,7 @@ echo "** Pyinstaller **"
 pyinstaller --clean --noconfirm --distpath dist --workpath build dynaface-macos.spec
 
 echo "** Sign Deep **"
+cp $provisionprofile dist/Dynaface.app/Contents/embedded.provisionprofile
 codesign --force --timestamp --deep --verbose --options runtime --sign "${app_certificate}" dist/Dynaface.app
 
 echo "** Sign nested **"
@@ -30,7 +31,6 @@ codesign --force --timestamp --verbose --options runtime --entitlements entitlem
 codesign --force --timestamp --verbose --options runtime --entitlements entitlements-nest.plist --sign "${app_certificate}" dist/Dynaface.app/Contents/Frameworks/torch/bin/torch_shm_manager
 
 echo "** Sign App **"
-cp $provisionprofile dist/Dynaface.app/Contents/embedded.provisionprofile
 codesign --force --timestamp --verbose --options runtime --entitlements entitlements.plist --sign "${app_certificate}" dist/Dynaface.app/Contents/MacOS/dynaface
 
 echo "** Verify Sign **"
