@@ -31,7 +31,5 @@ pip install PyQt6-Charts
 pyqtgraph-0.13.3
 pip install PyQt6-Charts
 
-
 Windows
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-
