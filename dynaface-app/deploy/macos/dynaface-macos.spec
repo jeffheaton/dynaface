@@ -1,7 +1,19 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
+import platform
+import sys
 
-version = os.getenv("version")
+version = os.getenv('version')
+
+# Accessing the environment variable
+arch = os.environ.get('arch')
+
+# Setting the target_arch based on the environment variable or detection logic
+if not arch:
+    arch = platform.machine()
+
+if arch not in ['arm64', 'x86_64']:
+    raise ValueError("Unsupported architecture: " + arch)
 
 block_cipher = None
 
@@ -62,7 +74,7 @@ coll = COLLECT(
 
 app = BUNDLE(
     coll,
-    name="Dynaface.app",
+    name=f'Dynaface-{arch}.app',
     icon="dynaface_icon.icns",
     bundle_identifier="com.heatonresearch.dynaface",
     info_plist={
