@@ -1,4 +1,9 @@
 #!/bin/bash
+set -e
+set -o pipefail
+
+trap 'echo "An error occurred. Exiting..."; exit 1;' ERR
+
 if [ -z "${app_certificate}" ]; then
     echo "Error: Environment variable app_certificate is not set."
     exit 1  # Exit with a non-zero value to indicate an error
@@ -16,6 +21,7 @@ rm -rf ./venv || true
 python3.11 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+pip install facial_analysis -f ./wheels
 cd deploy/macos
 
 # Build it
