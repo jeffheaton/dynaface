@@ -9,7 +9,7 @@ import torch
 from dynaface_window import DynafaceWindow
 from facial_analysis.facial import STD_PUPIL_DIST
 import facial_analysis
-from jth_ui.app_jth import AppJTH
+from jth_ui.app_jth import AppJTH, get_library_version
 from pillow_heif import register_heif_opener
 
 
@@ -61,6 +61,11 @@ class AppDynaface(AppJTH):
                 device = "cpu"
 
             logging.info(f"Using device: {device}")
+            v = get_library_version("torch")
+            logging.info(f"Torch version: {v}")
+            v = get_library_version("facenet-pytorch")
+            logging.info(f"Facenet-pytorch version: {v}")
+
             facial_analysis.init_models(model_path=self.DATA_DIR, device=device)
         except Exception as e:
             logger.error("Error running app", exc_info=True)

@@ -5,6 +5,7 @@ import logging
 import logging.config
 import logging.handlers
 import os
+import pkg_resources
 import platform
 import plistlib
 import sys
@@ -18,6 +19,18 @@ logger = logging.getLogger(__name__)
 
 STATE_LAST_FOLDER = "last_folder"
 STATE_LAST_FILES = "recent"
+
+
+def get_library_version(library_name):
+    try:
+        library = __import__(library_name)
+        version = library.__version__
+    except (ImportError, AttributeError):
+        try:
+            version = pkg_resources.get_distribution(library_name).version
+        except pkg_resources.DistributionNotFound:
+            version = None
+    return version
 
 
 class AppJTH(QApplication):

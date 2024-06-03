@@ -1,5 +1,6 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from jth_ui.app_jth import get_library_version
 import facial_analysis
 
 
@@ -9,6 +10,8 @@ class AboutTab(QWidget):
         self._window = window
         device = facial_analysis.detect_device()
         current_device = facial_analysis.models._device
+        v1 = get_library_version("torch")
+        v2 = get_library_version("facenet-pytorch")
         text = f"""
 <H1>{self._window.app.APP_NAME} {self._window.app.VERSION}</H1>
 {self._window.app.COPYRIGHT}
@@ -21,6 +24,8 @@ This program implements the algorithms described in the paper:<br>
 [insert actual paper cite]
 <hr>
 Log path: {self._window.app.LOG_DIR} <br>
+Torch version: {v1}<br>
+Facenet-pytorch version: {v2}<br>
 Processor in use: {current_device} (detected: {device})
 """
 
