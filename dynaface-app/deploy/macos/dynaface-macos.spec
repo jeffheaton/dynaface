@@ -54,7 +54,7 @@ exe = EXE(
     runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
-    target_arch="arm64",  # universal2
+    target_arch=arch,  # universal2
     codesign_identity=None,
     entitlements_file=None,
     icon="dynaface_icon.icns",
@@ -105,7 +105,7 @@ app = BUNDLE(
         "CFBundleIdentifier": "com.heatonresearch.dynaface",
         "CFBundleVersion": version,
         "CFBundleShortVersionString": version,
-        "UIRequiredDeviceCapabilities":["arm64"],
+        "UIRequiredDeviceCapabilities":[arch],
         "LSMinimumSystemVersion": "12.0",
         "LSApplicationCategoryType": "public.app-category.utilities",
         "ITSAppUsesNonExemptEncryption": False,
