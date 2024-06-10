@@ -1,5 +1,10 @@
 import os
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['MKL_DYNAMIC'] = 'FALSE'
+os.environ['MKL_THREADING_LAYER'] = 'GNU'
+
 import logging
 import logging.config
 import logging.handlers

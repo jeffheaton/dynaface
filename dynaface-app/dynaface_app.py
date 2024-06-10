@@ -42,7 +42,10 @@ class AppDynaface(AppJTH):
             self.main_window = DynafaceWindow(app=self, app_name=self.APP_NAME)
             self.main_window.show()
 
-            has_mps = torch.backends.mps.is_built()
+            has_mps = False
+            if torch.backends.mps.is_available():
+                if torch.backends.mps.is_built():
+                    has_mps = True
             device = "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
             logger.info(f"PyTorch Device: {device}")
 
@@ -66,7 +69,15 @@ class AppDynaface(AppJTH):
             v = get_library_version("facenet-pytorch")
             logging.info(f"Facenet-pytorch version: {v}")
 
-            facial_analysis.init_models(model_path=self.DATA_DIR, device=device)
+            try:
+                facial_analysis.init_models(model_path=self.DATA_DIR, device=device)
+            except Exception as e: 
+                logger.error(f"Error starting AI models on device {device}", exc_info=True)
+                if device != "cpu":
+                    logger.info("Trying CPU as AI device.")
+                device = "cpu"
+                self.settings[SETTING_ACC] = "cpu"
+                facial_analysis.init_models(model_path=self.DATA_DIR, device=device)
         except Exception as e:
             logger.error("Error running app", exc_info=True)
 
