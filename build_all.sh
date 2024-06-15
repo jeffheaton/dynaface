@@ -8,7 +8,12 @@ if [ -z "${app_certificate}" ]; then
     echo "Error: Environment variable app_certificate is not set."
     exit 1  # Exit with a non-zero value to indicate an error
 fi
-
+# Baseline utilities to build package
+rm -rf ./venv || true
+python3 -m venv venv   
+source venv/bin/activate   
+pip install setuptools wheel
+# Build it
 cd ./dynaface-lib
 python3 setup.py bdist_wheel
 mkdir -p ../dynaface-app/wheels/
@@ -21,8 +26,8 @@ cp $models/spiga_wflw.pt ./data
 rm -rf ./venv || true
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
-pip install facial_analysis -f ./wheels
+pip install -r requirements.txt -f /Users/jeff/output/pytorch
+pip install facial_analysis -f ./wheels -f /Users/jeff/output/PyTorch
 cd deploy/macos
 rm -rf ./working || true
 ./build.sh

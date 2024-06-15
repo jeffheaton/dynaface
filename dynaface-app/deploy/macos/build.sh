@@ -18,7 +18,7 @@ fi
 # Environment
 cd ../..
 rm -rf ./venv || true
-python3.11 -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 pip install facial_analysis -f ./wheels
@@ -38,7 +38,9 @@ cp -r ../../data ./working/data
 cp -r ../../jth_ui ./working/jth_ui
 
 cd ./working
-
+echo "** Force PyTorch Upgrade **"
+pip install /Users/jeff/output/wheel/torch-2.4.0a0+git1cd4199-cp312-cp312-macosx_14_0_arm64.whl
+pip install /Users/jeff/output/wheel/torchvision-0.9.0a0+761d09f-cp312-cp312-macosx_14_0_arm64.whl
 echo "** Pyinstaller **"
 pyinstaller --clean --noconfirm --distpath dist --workpath build dynaface-macos.spec
 
