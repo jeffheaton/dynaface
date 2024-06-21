@@ -12,7 +12,7 @@ import utl_gfx
 import utl_print
 import worker_threads
 from facial_analysis.facial import AnalyzeFace, load_face_image
-from facial_analysis.measures import all_measures
+from facial_analysis.measures import all_measures, AnalyzeDentalArea
 from jth_ui import app_jth, utl_etc
 from jth_ui.tab_graphic import TabGraphic
 from matplotlib.figure import Figure
@@ -260,6 +260,11 @@ gesture you wish to analyze."""
         self._spin_text_zoom.setFixedWidth(60)  # Adjust the width as needed
         self._spin_text_zoom.valueChanged.connect(self.action_text_zoom)
 
+        toolbar.addSeparator()
+        self._btn_max_smile = QPushButton("Max Smile")
+        self._btn_max_smile.clicked.connect(self.jump_max_smile)
+        toolbar.addWidget(self._btn_max_smile)
+
     def init_vertical_toolbar(self, layout):
         # Add a vertical toolbar (left side of the tab)
         self.left_toolbar = QToolBar("Left Toolbar", self)
@@ -305,9 +310,11 @@ gesture you wish to analyze."""
                 child.setText(0, item.name)
                 child.setCheckState(
                     0,
-                    Qt.CheckState.Checked
-                    if (measure.enabled and item.enabled)
-                    else Qt.CheckState.Unchecked,
+                    (
+                        Qt.CheckState.Checked
+                        if (measure.enabled and item.enabled)
+                        else Qt.CheckState.Unchecked
+                    ),
                 )
                 child.setData(0, Qt.ItemDataRole.UserRole, item)
 
@@ -1062,11 +1069,13 @@ gesture you wish to analyze."""
             self._btn_play.setEnabled(False)
             self._btn_forward.setEnabled(False)
             self._chk_graph.setEnabled(False)
+            self._btn_max_smile.setEnabled(False)
         else:
             self._btn_backward.setEnabled(True)
             self._btn_play.setEnabled(True)
             self._btn_forward.setEnabled(True)
             self._chk_graph.setEnabled(True)
+            self._btn_max_smile.setEnabled(not self.loading)
 
     def load_image(self, path):
         if path.lower().endswith(".heic"):
@@ -1098,3 +1107,30 @@ gesture you wish to analyze."""
 
             self._chk_graph.setChecked(True)
         return True
+
+    def find_max_smile(self):
+        print(self._face.measures)
+        measures = [AnalyzeDentalArea()]
+        face = AnalyzeFace(measures)
+        frames = range(self._frame_begin, self._frame_end, 1)
+
+        max_smile_idx = max_smile = -1
+        for i in frames:
+            frame = self._frames[i]
+            face.load_state(frame)
+            rec = face.analyze()
+            da = rec["dental_area"]
+            if max_smile == -1 or da > max_smile:
+                max_smile_idx = i
+                max_smile = da
+
+        return max_smile_idx
+
+    def exec_max_smile(self):
+        idx = self.find_max_smile()
+        self._video_slider.setValue(idx)
+
+    def jump_max_smile(self):
+        logger.info("Jump max smile")
+        f = lambda: self.exec_max_smile()
+        dlg_modal.display_please_wait(window=self, f=f, message="Finding max smile")
