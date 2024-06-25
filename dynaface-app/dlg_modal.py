@@ -187,6 +187,8 @@ class PleaseWaitDialog(QDialog):
             | Qt.WindowType.CustomizeWindowHint
             | Qt.WindowType.WindowTitleHint
         )
+        # Set fixed size for the dialog
+        self.setFixedSize(300, 100)  # You can adjust the size as needed
 
         # Thread
         self.thread = worker_threads.WorkerPleaseWait(f)

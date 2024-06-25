@@ -12,7 +12,7 @@ import utl_gfx
 import utl_print
 import worker_threads
 from facial_analysis.facial import AnalyzeFace, load_face_image
-from facial_analysis.measures import all_measures, AnalyzeDentalArea
+from facial_analysis.measures import all_measures, AnalyzeDentalArea, AnalyzeEyeArea
 from jth_ui import app_jth, utl_etc
 from jth_ui.tab_graphic import TabGraphic
 from matplotlib.figure import Figure
@@ -39,6 +39,7 @@ from PyQt6.QtWidgets import (
     QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
+    QComboBox,
 )
 
 logger = logging.getLogger(__name__)
@@ -260,10 +261,18 @@ gesture you wish to analyze."""
         self._spin_text_zoom.setFixedWidth(60)  # Adjust the width as needed
         self._spin_text_zoom.valueChanged.connect(self.action_text_zoom)
 
+        # Create a combo box and add items
+        self._jump_to = QComboBox()
+        self._jump_to.addItem("Jump To")
+        self._jump_to.addItem("Max Dental")
+        self._jump_to.addItem("Max Ocular")
+        toolbar.addWidget(self._jump_to)
+        self._jump_to.currentIndexChanged.connect(self.jump_option_selected)
+
         toolbar.addSeparator()
-        self._btn_max_smile = QPushButton("Max Smile")
-        self._btn_max_smile.clicked.connect(self.jump_max_smile)
-        toolbar.addWidget(self._btn_max_smile)
+        self._btn_eval = QPushButton("Eval")
+        self._btn_eval.clicked.connect(self.action_eval)
+        toolbar.addWidget(self._btn_eval)
 
     def init_vertical_toolbar(self, layout):
         # Add a vertical toolbar (left side of the tab)
@@ -1069,13 +1078,15 @@ gesture you wish to analyze."""
             self._btn_play.setEnabled(False)
             self._btn_forward.setEnabled(False)
             self._chk_graph.setEnabled(False)
-            self._btn_max_smile.setEnabled(False)
+            self._btn_eval.setEnabled(False)
+            self._jump_to.setEnabled(False)
         else:
             self._btn_backward.setEnabled(True)
             self._btn_play.setEnabled(True)
             self._btn_forward.setEnabled(True)
             self._chk_graph.setEnabled(True)
-            self._btn_max_smile.setEnabled(not self.loading)
+            self._btn_eval.setEnabled(not self.loading)
+            self._jump_to.setEnabled(not self.loading)
 
     def load_image(self, path):
         if path.lower().endswith(".heic"):
@@ -1108,8 +1119,7 @@ gesture you wish to analyze."""
             self._chk_graph.setChecked(True)
         return True
 
-    def find_max_smile(self):
-        print(self._face.measures)
+    def find_max_dental(self):
         measures = [AnalyzeDentalArea()]
         face = AnalyzeFace(measures)
         frames = range(self._frame_begin, self._frame_end, 1)
@@ -1126,11 +1136,56 @@ gesture you wish to analyze."""
 
         return max_smile_idx
 
-    def exec_max_smile(self):
-        idx = self.find_max_smile()
+    def find_max_ocular(self):
+        measures = [AnalyzeEyeArea()]
+        face = AnalyzeFace(measures)
+        frames = range(self._frame_begin, self._frame_end, 1)
+
+        max_eye_idx = max_eye = -1
+        for i in frames:
+            frame = self._frames[i]
+            face.load_state(frame)
+            rec = face.analyze()
+            ea = rec["eye.l"] + rec["eye.l"]
+            if max_eye == -1 or ea > max_eye:
+                max_eye_idx = i
+                max_eye = ea
+
+        return max_eye_idx
+
+    def exec_max_dental(self):
+        idx = self.find_max_dental()
         self._video_slider.setValue(idx)
 
-    def jump_max_smile(self):
-        logger.info("Jump max smile")
-        f = lambda: self.exec_max_smile()
-        dlg_modal.display_please_wait(window=self, f=f, message="Finding max smile")
+    def exec_max_ocular(self):
+        idx = self.find_max_ocular()
+        self._video_slider.setValue(idx)
+
+    def jump_max_dental(self):
+        logger.info("Jump max dental")
+        f = lambda: self.exec_max_dental()
+        dlg_modal.display_please_wait(
+            window=self, f=f, message="Finding max dental display"
+        )
+
+    def jump_max_ocular(self):
+        logger.info("Jump max ocular")
+        f = lambda: self.exec_max_ocular()
+        dlg_modal.display_please_wait(
+            window=self, f=f, message="Finding max ocular area"
+        )
+
+    def jump_option_selected(self, index):
+        if index == 0:
+            pass
+        elif index == 1:
+            self.jump_max_dental()
+        elif index == 2:
+            self.jump_max_ocular()
+
+        # Reset the combo box to the first item
+        self._jump_to.setCurrentIndex(0)
+
+    def action_eval(self):
+        self._window.show_eval()
+        self._window._eval.generate(self)

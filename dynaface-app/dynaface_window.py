@@ -14,6 +14,7 @@ from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenu, QMenuBar, QMessageBox, QTabWidget
 from tab_about import AboutTab
 from tab_analyze_video import AnalyzeVideoTab
+from tab_eval import TabEval
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ class DynafaceWindow(MainWindowJTH):
         super().__init__(app)
         self.running = False
         self.setWindowTitle(app_name)
-        self.setGeometry(100, 100, 1000, 500)
+        self.setGeometry(100, 100, 1100, 500)
 
         self.render_buffer = None
         self.display_buffer = None
@@ -185,6 +186,7 @@ class DynafaceWindow(MainWindowJTH):
         self._background_timer.timeout.connect(self.background_timer)
         self._background_timer.setInterval(1000)  # 1 second
         self._background_timer.start()
+        self._background_queue = []
 
     def background_timer(self):
         try:
@@ -195,6 +197,10 @@ class DynafaceWindow(MainWindowJTH):
                 filename = self.app.file_open_request
                 self.app.file_open_request = None
                 self.open_file(filename)
+
+            if len(self._background_queue) > 0:
+                item = self._background_queue.pop()
+                item()
         except Exception as e:
             logger.error("Error during background timer", exc_info=True)
 
@@ -204,6 +210,14 @@ class DynafaceWindow(MainWindowJTH):
                 self.add_tab(AboutTab(self), "About Dynaface")
         except Exception as e:
             logger.error("Error during about open", exc_info=True)
+
+    def show_eval(self):
+        try:
+            if not self.is_tab_open("Evaluation"):
+                self._eval = TabEval(self)
+                self.add_tab(self._eval, "Evaluation")
+        except Exception as e:
+            logger.error("Error during eval open", exc_info=True)
 
     def show_analyze_video(self, filename):
         try:

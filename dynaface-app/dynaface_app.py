@@ -32,7 +32,7 @@ class AppDynaface(AppJTH):
                 app_name="Dynaface",
                 app_author="HeatonResearch",
                 copyright="Copyright 2024 by Jeff Heaton, released under the <a href='https://opensource.org/license/mit/'>MIT License</a>",
-                version="1.1.0",
+                version="1.1.1",
                 bundle_id="com.heatonresearch.dynaface",
             )
 
@@ -71,8 +71,10 @@ class AppDynaface(AppJTH):
 
             try:
                 facial_analysis.init_models(model_path=self.DATA_DIR, device=device)
-            except Exception as e: 
-                logger.error(f"Error starting AI models on device {device}", exc_info=True)
+            except Exception as e:
+                logger.error(
+                    f"Error starting AI models on device {device}", exc_info=True
+                )
                 if device != "cpu":
                     logger.info("Trying CPU as AI device.")
                 device = "cpu"
