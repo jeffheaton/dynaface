@@ -2,6 +2,7 @@ import numpy as np
 
 import cv2
 import numpy as np
+import math
 from facial_analysis import facial
 
 
@@ -71,6 +72,8 @@ def scale_crop_points(lst, crop_x, crop_y, scale):
 
 
 def crop_stylegan(img, pupils, landmarks):
+
+    # Crop to consistent size
     width, height = img.shape[1], img.shape[0]
 
     if pupils:
@@ -112,3 +115,95 @@ def calc_pd(landmarks):
 
 def get_pupils(landmarks):
     return landmarks[facial.LM_LEFT_PUPIL], landmarks[facial.LM_RIGHT_PUPIL]
+
+
+def calculate_face_rotation(pupil_coords):
+    """
+    Calculate the rotation angle of a face based on the coordinates of the pupils.
+
+    Parameters:
+    pupil_coords (tuple): A tuple containing two tuples, each with the (x, y) coordinates of the pupils.
+                          Example: ((640, 481), (380, 480))
+
+    Returns:
+    float: The rotation angle of the face in radians.
+    """
+    (x1, y1), (x2, y2) = pupil_coords
+    delta_y = y2 - y1
+    delta_x = x2 - x1
+
+    angle = math.atan2(delta_y, delta_x)
+    return angle
+
+
+def calculate_average_rgb(image):
+    """
+    Calculate the average RGB value of an image.
+
+    Parameters:
+    image (numpy.ndarray): The input image in BGR format.
+
+    Returns:
+    tuple: A tuple containing the average RGB values.
+    """
+    average_color_per_row = np.mean(image, axis=0)
+    average_color = np.mean(average_color_per_row, axis=0)
+    return tuple(map(int, average_color))
+
+
+def straighten(image, pupil_coords):
+    """
+    Rotate the image to align the pupils horizontally, crop to original dimensions, and fill dead-space with the average RGB color.
+
+    Parameters:
+    image (numpy.ndarray): The input image in BGR format.
+    pupil_coords (tuple): A tuple containing two tuples, each with the (x, y) coordinates of the pupils.
+                          Example: ((640, 481), (380, 480))
+
+    Returns:
+    numpy.ndarray: The rotated and cropped image.
+    """
+    # Calculate the rotation angle
+    angle_radians = calculate_face_rotation(pupil_coords)
+    angle_degrees = angle_radians * (180 / math.pi)
+
+    # Adjust the angle to avoid upside down rotation
+    if angle_degrees > 45:
+        angle_degrees -= 180
+    elif angle_degrees < -45:
+        angle_degrees += 180
+
+    # Get image dimensions
+    h, w = image.shape[:2]
+
+    # Calculate the center of the image
+    center = (w // 2, h // 2)
+
+    # Get the rotation matrix
+    rotation_matrix = cv2.getRotationMatrix2D(center, angle_degrees, 1.0)
+
+    # Rotate the image
+    rotated_image = cv2.warpAffine(image, rotation_matrix, (w, h))
+
+    # Calculate the average RGB value
+    avg_rgb = calculate_average_rgb(image)
+
+    # Create a new image with the average RGB color
+    result_image = np.full_like(rotated_image, avg_rgb, dtype=np.uint8)
+
+    # Calculate the size of the new image
+    result_center = (result_image.shape[1] // 2, result_image.shape[0] // 2)
+
+    # Calculate the top-left corner of the region to paste the rotated image
+    top_left_x = result_center[0] - center[0]
+    top_left_y = result_center[1] - center[1]
+
+    # Paste the rotated image onto the result image
+    result_image[top_left_y : top_left_y + h, top_left_x : top_left_x + w] = (
+        rotated_image
+    )
+
+    # Crop the result image to the original dimensions
+    cropped_image = result_image[:h, :w]
+
+    return cropped_image

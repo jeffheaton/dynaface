@@ -110,7 +110,7 @@ class ImageAnalysis:
         textSize, baseline = cv2.getTextSize(txt, self.text_font, size, thick)
         return textSize, baseline
 
-    def write_text_sq(self, pos, txt, color=None):
+    def write_text_sq(self, pos, txt, color=None, mark="2", up=5):
         if color is None:
             color = self.text_color
 
@@ -142,8 +142,8 @@ class ImageAnalysis:
 
         cv2.putText(
             self.render_img,
-            "2",
-            (pos[0] + w1 - 5, pos[1] - 5),
+            mark,
+            (pos[0] + w1 - 5, pos[1] - up),
             self.text_font,
             self.text_size,
             (0, 0, 0),
@@ -153,8 +153,8 @@ class ImageAnalysis:
 
         cv2.putText(
             self.render_img,
-            "2",
-            (pos[0] + w1 - 5, pos[1] - 5),
+            mark,
+            (pos[0] + w1 - 5, pos[1] - up),
             self.text_font,
             self.text_size,
             self.text_color,

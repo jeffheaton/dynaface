@@ -7,6 +7,7 @@ from facial_analysis import facial, models, util
 from facial_analysis.facial import load_face_image
 from jth_ui import utl_etc
 from PyQt6.QtCore import QThread, pyqtSignal
+from facial_analysis.facial import AnalyzeFace
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,8 @@ class WorkerLoad(QThread):
         """Find the rectangle outlines of faces in the image."""
         logger.debug("Detecting faces")
         bbox_list, prob = models.mtcnn_model.detect(frames_pass1)
+        face = AnalyzeFace([])
+
         for i in range(len(prob)):
             if (
                 (prob[i] is not None)

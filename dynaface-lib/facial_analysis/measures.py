@@ -1,4 +1,6 @@
 import numpy as np
+import math
+from facial_analysis import util
 
 
 def filter(data, items):
@@ -15,6 +17,7 @@ def all_measures():
         AnalyzeBrows(),
         AnalyzeDentalArea(),
         AnalyzeEyeArea(),
+        AnalyzePosition(),
     ]
 
 
@@ -177,7 +180,7 @@ class AnalyzeDentalArea(MeasureBase):
             contours, face.pix2mm, render=(render & render2)
         )
         if render & render2:
-            txt = f"dental={round(dental_area,2)}mm"
+            txt = f"dental={round(dental_area,2)} mm"
             pos = face.analyze_next_pt(txt)
             face.write_text_sq(pos, txt)
         return filter({"dental_area": dental_area}, self.items)
@@ -248,27 +251,27 @@ class AnalyzeEyeArea(MeasureBase):
         if render & render2_eye_r:
             face.write_text_sq(
                 (face.landmarks[66][0] - 150, face.landmarks[66][1] + 20),
-                f"R={round(right_eye_area,2)}mm",
+                f"R={round(right_eye_area,2)} mm",
             )
 
         if render & render2_eye_l:
             face.write_text_sq(
                 (face.landmarks[74][0] - 50, face.landmarks[74][1] + 20),
-                f"L={round(left_eye_area,2)}mm",
+                f"L={round(left_eye_area,2)} mm",
             )
 
         if render & render2_eye_d:
-            txt = f"d.eye={round(eye_area_diff,2)}mm"
+            txt = f"d.eye={round(eye_area_diff,2)} mm"
             pos = face.analyze_next_pt(txt)
             face.write_text_sq(pos, txt)
 
         if render & render2_eye_rlr:
-            txt = f"rlr.eye={round(eye_ratio_lr,2)}mm"
+            txt = f"rlr.eye={round(eye_ratio_lr,2)} mm"
             pos = face.analyze_next_pt(txt)
             face.write_text_sq(pos, txt)
 
         if render & render2_eye_rrl:
-            txt = f"rrl.eye={round(eye_ratio_rl,2)}mm"
+            txt = f"rrl.eye={round(eye_ratio_rl,2)} mm"
             pos = face.analyze_next_pt(txt)
             face.write_text_sq(pos, txt)
 
@@ -282,3 +285,47 @@ class AnalyzeEyeArea(MeasureBase):
             },
             self.items,
         )
+
+
+class AnalyzePosition(MeasureBase):
+    def __init__(self) -> None:
+        self.enabled = True
+        self.items = [MeasureItem("tilt"), MeasureItem("px2mm"), MeasureItem("pd")]
+
+    def abbrev(self):
+        return "Position"
+
+    def calc(self, face, render=True):
+        render2_tilt = self.is_enabled("tilt")
+        render2_px2mm = self.is_enabled("px2mm")
+        render2_pd = self.is_enabled("pd")
+
+        p = util.get_pupils(face.landmarks)
+
+        if p:
+            landmarks = face.landmarks
+            if render & render2_tilt:
+                r = util.calculate_face_rotation(p)
+                tilt = r * (180 / math.pi)
+                # Adjust the angle to be in a more intuitive range:
+                if tilt > 90:
+                    tilt -= 180
+                elif tilt < -90:
+                    tilt += 180
+                txt = f"tilt={round(tilt,2)}"
+                pos = face.analyze_next_pt(txt)
+                face.write_text_sq(pos, txt, mark="o", up=15)
+
+            pd, pix2mm = util.calc_pd(landmarks=landmarks)
+
+            if render & render2_pd:
+                txt = f"pd={round(pd,2)} px"
+                pos = face.analyze_next_pt(txt)
+                face.write_text(pos, txt)
+
+            if render & render2_px2mm:
+                txt = f"px2mm={round(pix2mm,2)}"
+                pos = face.analyze_next_pt(txt)
+                face.write_text(pos, txt)
+
+        return filter({"tilt": tilt, "px2mm": pix2mm, "pd": pd}, self.items)

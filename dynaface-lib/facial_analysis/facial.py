@@ -66,6 +66,7 @@ class AnalyzeFace(ImageAnalysis):
         self.landmarks = []
         self.pupillary_distance = 0
         self.pix2mm = 1
+        # self.face_rotation = 0
 
     def get_all_items(self):
         return [
@@ -173,13 +174,26 @@ class AnalyzeFace(ImageAnalysis):
         return result
 
     def crop_stylegan(self, pupils=None):
+        pupils = util.get_pupils(self.landmarks) if not pupils else pupils
+
+        # Rotate, if needed
+        if pupils:
+            self.face_rotation = util.calculate_face_rotation(pupils)
+            img2 = util.straighten(self.original_img, pupils)
+            self.landmarks, self._headpose = self._find_landmarks(img2)
+        else:
+            img2 = self.original_img
+            self.face_rotation = 0
+
+        # Crop, if needed
         img2, landmarks2 = util.crop_stylegan(
-            img=self.original_img, pupils=pupils, landmarks=self.landmarks
+            img=img2, pupils=pupils, landmarks=self.landmarks
         )
 
         self.landmarks = landmarks2
+
+        # Reload Image
         super().load_image(img2)
-        self.calc_pd()
 
     def calc_pd(self):
         self.pupillary_distance, self.pix2mm = util.calc_pd(self.landmarks)
