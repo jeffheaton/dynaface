@@ -181,8 +181,12 @@ class AnalyzeFace(ImageAnalysis):
         # Rotate, if needed
         if pupils:
             self.face_rotation = util.calculate_face_rotation(pupils)
-            img2 = util.straighten(self.original_img, pupils)
-            self.landmarks, self._headpose = self._find_landmarks(img2)
+            tilt = measures.to_degrees(self.face_rotation)
+            if abs(self.tilt_threshold) > self.tilt_threshold:
+                img2 = util.straighten(self.original_img, pupils)
+                self.landmarks, self._headpose = self._find_landmarks(img2)
+            else:
+                img2 = self.original_img
         else:
             img2 = self.original_img
             self.face_rotation = 0
@@ -210,6 +214,7 @@ class AnalyzeFace(ImageAnalysis):
             self.landmarks,
             self.pupillary_distance,
             self.pix2mm,
+            self.face_rotation,
         ]
         return copy.copy(result)
 
@@ -223,3 +228,4 @@ class AnalyzeFace(ImageAnalysis):
         self.landmarks = copy.copy(obj[2])
         self.pupillary_distance = obj[3]
         self.pix2mm = obj[4]
+        self.face_rotation = obj[4] if len(obj) > 4 else 0
