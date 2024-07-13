@@ -59,9 +59,7 @@ class SettingsTab(QWidget):
         window.add_tab(self, "Settings")
 
         settings = self._window.app.settings
-        self._text_pd.setText(
-            settings.get(dynaface_app.SETTING_PD, str(STD_PUPIL_DIST))
-        )
+        self._text_pd.setText(str(facial_analysis.facial.AnalyzeFace.pd))
         utl_settings.set_combo(
             self._log_combo_box,
             settings.get(dynaface_app.SETTING_LOG_LEVEL, "INFO"),
@@ -91,11 +89,10 @@ class SettingsTab(QWidget):
         level = settings[dynaface_app.SETTING_LOG_LEVEL]
         logging_level = getattr(logging, level)
         self._window.app.change_log_level(logging_level)
-        pd = settings.get(dynaface_app.SETTING_PD, STD_PUPIL_DIST)
-        facial_analysis.facial.AnalyzeFace.pd = int(pd)
         self._window.app.save_settings()
+        self._window.app.load_dynaface_settings()
 
-        if facial_analysis.models._device != settings[dynaface_app.SETTING_ACC]:
-            self._window.display_message_box(
-                "Changes to accelerator settings will be effective on application restart."
-            )
+        # if facial_analysis.models._device != settings[dynaface_app.SETTING_ACC]:
+        #    self._window.display_message_box(
+        #        "Changes to accelerator settings will be effective on application restart."
+        #    )

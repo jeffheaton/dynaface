@@ -6,11 +6,13 @@ import os
 import sys
 
 import torch
+import version
 from dynaface_window import DynafaceWindow
 from facial_analysis.facial import STD_PUPIL_DIST
 import facial_analysis
 from jth_ui.app_jth import AppJTH, get_library_version
 from pillow_heif import register_heif_opener
+import jth_ui.utl_settings as utl_settings
 
 
 logger = logging.getLogger(__name__)
@@ -32,7 +34,7 @@ class AppDynaface(AppJTH):
                 app_name="Dynaface",
                 app_author="HeatonResearch",
                 copyright="Copyright 2024 by Jeff Heaton, released under the <a href='https://opensource.org/license/mit/'>MIT License</a>",
-                version="1.1.2",
+                version=version.VERSION,
                 bundle_id="com.heatonresearch.dynaface",
             )
 
@@ -42,46 +44,58 @@ class AppDynaface(AppJTH):
             self.main_window = DynafaceWindow(app=self, app_name=self.APP_NAME)
             self.main_window.show()
 
-            has_mps = False
-            if torch.backends.mps.is_available():
-                if torch.backends.mps.is_built():
-                    has_mps = True
-            device = "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
-            logger.info(f"PyTorch Device: {device}")
+            self.load_dynaface_settings()
 
-            # Set logging level
-            level = self.settings.get(SETTING_LOG_LEVEL, "INFO")
-            logging_level = getattr(logging, level)
-            self.change_log_level(logging_level)
-
-            try:
-                pd = self.settings.get(SETTING_PD, STD_PUPIL_DIST)
-                facial_analysis.facial.AnalyzeFace.pd = int(pd)
-            except:
-                facial_analysis.facial.AnalyzeFace.pd = STD_PUPIL_DIST
-
-            if not self.settings.get(SETTING_ACC, True):
-                device = "cpu"
-
-            logging.info(f"Using device: {device}")
+            logging.info(f"Using device: {self.device}")
             v = get_library_version("torch")
             logging.info(f"Torch version: {v}")
             v = get_library_version("facenet-pytorch")
             logging.info(f"Facenet-pytorch version: {v}")
 
-            try:
-                facial_analysis.init_models(model_path=self.DATA_DIR, device=device)
-            except Exception as e:
-                logger.error(
-                    f"Error starting AI models on device {device}", exc_info=True
-                )
-                if device != "cpu":
-                    logger.info("Trying CPU as AI device.")
-                device = "cpu"
-                self.settings[SETTING_ACC] = "cpu"
-                facial_analysis.init_models(model_path=self.DATA_DIR, device=device)
         except Exception as e:
             logger.error("Error running app", exc_info=True)
+
+    def load_dynaface_settings(self):
+        # Set logging level
+        level = utl_settings.get_str(
+            self.settings, key=SETTING_LOG_LEVEL, default="INFO"
+        )
+        logging_level = getattr(logging, level)
+        self.change_log_level(logging_level)
+
+        # Set pupillary distance (PD)
+        facial_analysis.facial.AnalyzeFace.pd = utl_settings.get_int(
+            self.settings, key=SETTING_PD, default=STD_PUPIL_DIST
+        )
+
+        # accelerator device
+        acc = utl_settings.get_bool(self.settings, key=SETTING_ACC, default=True)
+
+        if acc:
+            # Detect CUDA, MPS, or failing that, CPU
+            has_mps = False
+            if torch.backends.mps.is_available():
+                if torch.backends.mps.is_built():
+                    has_mps = True
+            self.device = (
+                "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
+            )
+            logger.info(f"PyTorch Device: {self.device}")
+        else:
+            self.device = "cpu"
+
+        # Use accelerator, if requested
+        try:
+            facial_analysis.init_models(model_path=self.DATA_DIR, device=self.device)
+        except Exception as e:
+            logger.error(
+                f"Error starting AI models on device {self.device}", exc_info=True
+            )
+            if self.device != "cpu":
+                logger.info("Trying CPU as AI device.")
+            self.device = "cpu"
+            self.settings[SETTING_ACC] = "cpu"
+            facial_analysis.init_models(model_path=self.DATA_DIR, device=self.device)
 
     def shutdown(self):
         try:
