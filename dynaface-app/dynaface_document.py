@@ -62,9 +62,11 @@ class DynafaceDocument:
             enabled = measure[DOC_ENABLED]
             source_items = measure[DOC_BODY_MEASURE_ITEMS]
             obj = utl_classes.create_instance_from_full_name(name)
-            obj.enabled = enabled
-            self._sync_items(source_items, obj)
-            result.append(obj)
+            # Make sure we have a class to handle this measure
+            if obj:
+                obj.enabled = enabled
+                self._sync_items(source_items, obj)
+                result.append(obj)
         return result
 
     def _sync_items(self, source_items, obj):

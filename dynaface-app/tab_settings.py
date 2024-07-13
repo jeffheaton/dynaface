@@ -30,7 +30,7 @@ class SettingsTab(QWidget):
         self._text_pd = QLineEdit(self)
         self._text_pd.setValidator(QIntValidator())
 
-        lbl_tilt = QLabel("Correct tilt greater than (deg, 0=disable):", self)
+        lbl_tilt = QLabel("Correct tilt greater than (deg, -1 to disable):", self)
         self._text_tilt = QLineEdit(self)
         self._text_tilt.setValidator(QIntValidator())
 

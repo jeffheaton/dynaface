@@ -4,7 +4,6 @@ from typing import Callable
 
 import cv2
 from facial_analysis import facial, models, util
-from facial_analysis.facial import load_face_image
 from jth_ui import utl_etc
 from PyQt6.QtCore import QThread, pyqtSignal
 from facial_analysis.facial import AnalyzeFace
@@ -61,111 +60,46 @@ class WorkerLoad(QThread):
         self._target = target
         self._total = self._target.frame_count
         self.running = True
-        self.frame_number = 1
-        self.accepted_frame_number = 1
-
-    def detect_faces(self, frames_pass1, frames_pass2):
-        """Find the rectangle outlines of faces in the image."""
-        logger.debug("Detecting faces")
-        bbox_list, prob = models.mtcnn_model.detect(frames_pass1)
-        face = AnalyzeFace([])
-
-        for i in range(len(prob)):
-            if (
-                (prob[i] is not None)
-                and (prob[i][0] is not None)
-                and (prob[i][0] > 0.98)
-            ):
-                bbox = bbox_list[i][0]
-                bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
-                frames_pass2.append((frames_pass1[i], bbox))
-                logger.debug(
-                    f"Actual frame {self.frame_number} -> analyze frame {self.accepted_frame_number}"
-                )
-                self.accepted_frame_number += 1
-
-            self.frame_number += 1
-
-        frames_pass1.clear()
-
-    def detect_landmarks(self, frames_pass2):
-        logger.debug("Detecting landmarks")
-        top = min(BATCH_SIZE, len(frames_pass2))
-
-        for i in range(top):
-            item = frames_pass2[i]
-            bbox = item[1]
-            frame = item[0]
-            landmarks_batch = models.spiga_model.inference(frame, [bbox])
-            landmarks_batch = models.convert_landmarks(landmarks_batch)
-            self.dispatch_frames(landmarks_batch=landmarks_batch, frames=[frame])
-
-        del frames_pass2[0:top]
-
-    def dispatch_frames(self, landmarks_batch, frames):
-        for landmarks, frame in zip(landmarks_batch, frames):
-            # Crop to the eyes
-            frame, landmarks = util.crop_stylegan(
-                img=frame, pupils=None, landmarks=landmarks
-            )
-            # Extract
-            pupillary_distance, pix2mm = util.calc_pd(landmarks)
-            # Build frame-state data
-            frame_state = [
-                frame,
-                None,
-                landmarks,
-                pupillary_distance,
-                pix2mm,
-            ]
-            self._target.add_frame(frame_state)
 
     def run(self):
-        start_time = time.time()
         logger.debug("Running background thread")
         self._target.loading = True
         self._loading_etc = utl_etc.CalcETC(self._total)
         self._face = facial.AnalyzeFace([])
-        frames_available = True
-        frames_pass1 = []
-        frames_pass2 = []
         try:
             i = 0
             while self.running:
-                if frames_available:
-                    i += 1
-                    # left = self._loading_etc.cycle()
-                    msg = self._loading_etc.cycle()
-                    self._update_signal.emit(msg)
-                    logger.debug(f"Read frame {i} of {self._total}")
-                    ret, frame = self._target.video_stream.read()
-                    if not ret:
-                        frames_available = False
-                    else:
-                        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                        frames_pass1.append(frame)
+                i += 1
+                logger.debug(f"Begin frame {i}")
+                ret, frame = self._target.video_stream.read()
 
-                if (len(frames_pass1) >= BATCH_SIZE) or (
-                    (not frames_available) and (len(frames_pass1) > 0)
-                ):
-                    self.detect_faces(frames_pass1, frames_pass2)
+                if not ret:
+                    logger.debug("Thread done")
+                    break
 
-                if (len(frames_pass2) >= BATCH_SIZE) or (
-                    (not frames_available) and (len(frames_pass2) > 0)
-                ):
-                    self.detect_landmarks(frames_pass2)
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
-                if (
-                    (not frames_available)
-                    and (len(frames_pass1) < 1)
-                    and (len(frames_pass2) < 1)
-                ):
-                    self.running = False
+                # Make sure we did not get a request to stop during each of these:
+                if self.running:
+                    self._face.load_image(img=frame, crop=True)
 
-            end_time = time.time()
-            duration = end_time - start_time
-            logger.info(f"Video processing time: {duration}")
-            self._update_signal.emit("****")
+                if self.running:
+                    # Extract
+                    landmarks = self._face.landmarks
+                    pupillary_distance, pix2mm = util.calc_pd(landmarks)
+                    # Build frame-state data
+                    frame_state = [
+                        self._face.original_img,
+                        None,
+                        landmarks,
+                        pupillary_distance,
+                        pix2mm,
+                    ]
+                    self._target.add_frame(frame_state)
+
+                if self.running:
+                    self._update_signal.emit(self._loading_etc.cycle())
+
         except Exception as e:
             logger.error("Error loading video", exc_info=True)
         finally:
