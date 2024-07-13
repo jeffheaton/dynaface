@@ -18,6 +18,7 @@ STYLEGAN_RIGHT_PUPIL = (380, 480)
 STYLEGAN_PUPIL_DIST = STYLEGAN_LEFT_PUPIL[0] - STYLEGAN_RIGHT_PUPIL[0]
 
 STD_PUPIL_DIST = 63
+DEFAULT_TILT_THRESHOLD = 3
 
 LM_LEFT_PUPIL = 97
 LM_RIGHT_PUPIL = 96
@@ -65,8 +66,9 @@ class AnalyzeFace(ImageAnalysis):
         self.headpose = [0, 0, 0]
         self.landmarks = []
         self.pupillary_distance = 0
+        self.tilt_threshold = DEFAULT_TILT_THRESHOLD
         self.pix2mm = 1
-        # self.face_rotation = 0
+        self.face_rotation = None
 
     def get_all_items(self):
         return [

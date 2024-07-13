@@ -42,7 +42,7 @@ def get_int(settings, key, default=1):
         if isinstance(result, int):
             return result
         # Convert to integer if possible, else use default
-        return int(str(result).strip())
+        return parse_int(result)
     except (ValueError, TypeError):
         return default
 
@@ -74,3 +74,28 @@ def set_combo(cb, value):
         cb.setCurrentIndex(idx)
     else:
         cb.setCurrentIndex(0)
+
+
+def parse_int(input_str: str, default: int) -> int:
+    """
+    Tries to parse the input string into an integer. If the input string is
+    missing (None) or malformed (cannot be converted to an integer),
+    it returns the provided default integer.
+
+    Parameters:
+    input_str (str): The string to parse.
+    default (int): The default value to return if parsing fails.
+
+    Returns:
+    int: The parsed integer or the default value.
+    """
+    # Check if the input string is None
+    if input_str is None:
+        return default
+
+    try:
+        # Attempt to convert the string to an integer
+        return int(input_str.strip())
+    except ValueError:
+        # If conversion fails, return the default value
+        return default

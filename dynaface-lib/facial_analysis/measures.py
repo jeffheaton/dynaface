@@ -21,6 +21,22 @@ def all_measures():
     ]
 
 
+def to_degrees(r):
+    # Convert the angle from radians to degrees
+    tilt = r * (180 / math.pi)
+
+    # Adjust the angle to be in a more intuitive range:
+    # If the angle is greater than 90 degrees, subtract 180 degrees
+    if tilt > 90:
+        tilt -= 180
+    # If the angle is less than -90 degrees, add 180 degrees
+    elif tilt < -90:
+        tilt += 180
+
+    # Return the adjusted angle
+    return tilt
+
+
 class MeasureItem:
     def __init__(self, name: str, enabled: bool = True):
         self.name = name
@@ -305,14 +321,12 @@ class AnalyzePosition(MeasureBase):
         if p:
             landmarks = face.landmarks
             if render & render2_tilt:
-                r = util.calculate_face_rotation(p)
-                tilt = r * (180 / math.pi)
-                # Adjust the angle to be in a more intuitive range:
-                if tilt > 90:
-                    tilt -= 180
-                elif tilt < -90:
-                    tilt += 180
-                txt = f"tilt={round(tilt,2)}"
+                tilt = to_degrees(util.calculate_face_rotation(p))
+                if face.face_rotation:
+                    orig = to_degrees(face.face_rotation)
+                    txt = f"tilt={round(orig,2)} -> {round(tilt,2)}"
+                else:
+                    txt = f"tilt={round(tilt,2)}"
                 pos = face.analyze_next_pt(txt)
                 face.write_text_sq(pos, txt, mark="o", up=15)
 

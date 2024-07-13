@@ -8,7 +8,7 @@ import sys
 import torch
 import version
 from dynaface_window import DynafaceWindow
-from facial_analysis.facial import STD_PUPIL_DIST
+from facial_analysis.facial import STD_PUPIL_DIST, DEFAULT_TILT_THRESHOLD
 import facial_analysis
 from jth_ui.app_jth import AppJTH, get_library_version
 from pillow_heif import register_heif_opener
@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 SETTING_PD = "pd"
 SETTING_LOG_LEVEL = "log_level"
 SETTING_ACC = "accelerator"
+SETTING_TILT_THRESHOLD = "tilt"
 
 register_heif_opener()
 
@@ -68,6 +69,11 @@ class AppDynaface(AppJTH):
             self.settings, key=SETTING_PD, default=STD_PUPIL_DIST
         )
 
+        # Set the tilt threshold
+        facial_analysis.facial.AnalyzeFace.tilt_threshold = utl_settings.get_int(
+            self.settings, key=SETTING_TILT_THRESHOLD, default=DEFAULT_TILT_THRESHOLD
+        )
+
         # accelerator device
         acc = utl_settings.get_bool(self.settings, key=SETTING_ACC, default=True)
 
@@ -109,4 +115,5 @@ class AppDynaface(AppJTH):
             SETTING_PD: STD_PUPIL_DIST,
             SETTING_LOG_LEVEL: "INFO",
             SETTING_ACC: True,
+            SETTING_TILT_THRESHOLD: DEFAULT_TILT_THRESHOLD,
         }
