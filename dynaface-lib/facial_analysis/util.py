@@ -71,6 +71,39 @@ def scale_crop_points(lst, crop_x, crop_y, scale):
     return lst2
 
 
+def rotate_crop_points(points, center, angle_degrees):
+    """
+    Rotate the points around the center by the specified angle.
+
+    Parameters:
+    points (list): List of (x, y) coordinates to rotate.
+    center (tuple): The center of rotation (x, y).
+    angle_degrees (float): The rotation angle in degrees.
+
+    Returns:
+    list: List of rotated (x, y) coordinates.
+    """
+    # Convert angle from degrees to radians and adjust the sign
+    angle_radians = -np.deg2rad(
+        angle_degrees
+    )  # Negate the angle for correct rotation direction
+
+    # Calculate the rotation matrix
+    cos_theta = np.cos(angle_radians)
+    sin_theta = np.sin(angle_radians)
+    rotation_matrix = np.array([[cos_theta, -sin_theta], [sin_theta, cos_theta]])
+
+    # Rotate each point
+    rotated_points = []
+    for point in points:
+        vector = np.array(point) - np.array(center)
+        rotated_vector = np.dot(rotation_matrix, vector)
+        rotated_point = rotated_vector + np.array(center)
+        rotated_points.append(rotated_point)
+
+    return rotated_points
+
+
 def calc_pd(landmarks):
     pupillary_distance = abs(
         landmarks[facial.LM_LEFT_PUPIL][0] - landmarks[facial.LM_RIGHT_PUPIL][0]

@@ -175,6 +175,7 @@ class AnalyzeFace(ImageAnalysis):
                 result.update(calc.calc(self))
         return result
 
+    # Usage in crop_stylegan
     def crop_stylegan(self, pupils=None):
         pupils = util.get_pupils(self.landmarks) if pupils is None else pupils
 
@@ -185,9 +186,13 @@ class AnalyzeFace(ImageAnalysis):
             tilt = measures.to_degrees(self.face_rotation)
             if abs(tilt) > self.tilt_threshold:
                 img2 = util.straighten(self.original_img, pupils)
-                self.landmarks, self._headpose = self._find_landmarks(img2)
-        else:
-            self.face_rotation = 0
+                center = (
+                    self.original_img.shape[1] // 2,
+                    self.original_img.shape[0] // 2,
+                )
+                self.landmarks = util.rotate_crop_points(self.landmarks, center, tilt)
+            else:
+                self.face_rotation = 0
 
         width, height = img2.shape[1], img2.shape[0]
 
