@@ -185,7 +185,7 @@ class AnalyzeFace(ImageAnalysis):
             self.face_rotation = util.calculate_face_rotation(pupils)
             tilt = measures.to_degrees(self.face_rotation)
             if abs(tilt) > self.tilt_threshold:
-                img2 = util.straighten(self.original_img, pupils)
+                img2 = util.straighten(self.original_img, self.face_rotation)
                 center = (
                     self.original_img.shape[1] // 2,
                     self.original_img.shape[0] // 2,

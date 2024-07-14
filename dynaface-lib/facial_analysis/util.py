@@ -150,20 +150,18 @@ def calculate_average_rgb(image):
     return tuple(map(int, average_color))
 
 
-def straighten(image, pupil_coords):
+def straighten(image, angle_radians):
     """
     Rotate the image to align the pupils horizontally, crop to original dimensions, and fill dead-space with the average RGB color.
 
     Parameters:
     image (numpy.ndarray): The input image in BGR format.
-    pupil_coords (tuple): A tuple containing two tuples, each with the (x, y) coordinates of the pupils.
-                          Example: ((640, 481), (380, 480))
+    angle_radians (tuple): The amount that the face is rotated.
 
     Returns:
     numpy.ndarray: The rotated and cropped image.
     """
     # Calculate the rotation angle
-    angle_radians = calculate_face_rotation(pupil_coords)
     angle_degrees = angle_radians * (180 / math.pi)
 
     # Adjust the angle to avoid upside down rotation
