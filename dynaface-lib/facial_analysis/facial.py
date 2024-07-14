@@ -176,27 +176,47 @@ class AnalyzeFace(ImageAnalysis):
         return result
 
     def crop_stylegan(self, pupils=None):
-        pupils = util.get_pupils(self.landmarks) if not pupils else pupils
+        pupils = util.get_pupils(self.landmarks) if pupils is None else pupils
 
         # Rotate, if needed
+        img2 = self.original_img
         if pupils:
             self.face_rotation = util.calculate_face_rotation(pupils)
             tilt = measures.to_degrees(self.face_rotation)
-            if abs(self.tilt_threshold) > self.tilt_threshold:
+            if abs(tilt) > self.tilt_threshold:
                 img2 = util.straighten(self.original_img, pupils)
                 self.landmarks, self._headpose = self._find_landmarks(img2)
-            else:
-                img2 = self.original_img
         else:
-            img2 = self.original_img
             self.face_rotation = 0
 
-        # Crop, if needed
-        img2, landmarks2 = util.crop_stylegan(
-            img=img2, pupils=pupils, landmarks=self.landmarks
-        )
+        width, height = img2.shape[1], img2.shape[0]
 
-        self.landmarks = landmarks2
+        if not pupils:
+            pupils = util.get_pupils(landmarks=self.landmarks)
+
+        left_eye, right_eye = pupils
+        d = abs(right_eye[0] - left_eye[0])
+
+        if d:
+            ar = width / height
+            new_width = int(width * (STYLEGAN_PUPIL_DIST / d))
+            new_height = int(new_width / ar)
+            scale = new_width / width
+            img2 = cv2.resize(img2, (new_width, new_height))
+
+            crop_x = int((self.landmarks[96][0] * scale) - STYLEGAN_RIGHT_PUPIL[0])
+            crop_y = int((self.landmarks[96][1] * scale) - STYLEGAN_RIGHT_PUPIL[1])
+            img2, _, _ = util.safe_clip(
+                img2,
+                crop_x,
+                crop_y,
+                STYLEGAN_WIDTH,
+                STYLEGAN_WIDTH,
+                FILL_COLOR,
+            )
+            self.landmarks = util.scale_crop_points(
+                self.landmarks, crop_x, crop_y, scale
+            )
 
         # Reload Image
         super().load_image(img2)

@@ -71,40 +71,6 @@ def scale_crop_points(lst, crop_x, crop_y, scale):
     return lst2
 
 
-def crop_stylegan(img, pupils, landmarks):
-
-    # Crop to consistent size
-    width, height = img.shape[1], img.shape[0]
-
-    if pupils:
-        left_eye, right_eye = pupils
-    else:
-        left_eye, right_eye = get_pupils(landmarks=landmarks)
-
-    d = abs(right_eye[0] - left_eye[0])
-
-    if d == 0:
-        return img, landmarks
-    ar = width / height
-    new_width = int(width * (facial.STYLEGAN_PUPIL_DIST / d))
-    new_height = int(new_width / ar)
-    scale = new_width / width
-    img = cv2.resize(img, (new_width, new_height))
-
-    crop_x = int((landmarks[96][0] * scale) - facial.STYLEGAN_RIGHT_PUPIL[0])
-    crop_y = int((landmarks[96][1] * scale) - facial.STYLEGAN_RIGHT_PUPIL[1])
-    img2, _, _ = safe_clip(
-        img,
-        crop_x,
-        crop_y,
-        facial.STYLEGAN_WIDTH,
-        facial.STYLEGAN_WIDTH,
-        facial.FILL_COLOR,
-    )
-    landmarks2 = scale_crop_points(landmarks, crop_x, crop_y, scale)
-    return img2, landmarks2
-
-
 def calc_pd(landmarks):
     pupillary_distance = abs(
         landmarks[facial.LM_LEFT_PUPIL][0] - landmarks[facial.LM_RIGHT_PUPIL][0]
