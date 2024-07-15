@@ -115,7 +115,7 @@ class AnalyzeFace(ImageAnalysis):
         headpose = np.array(features["headpose"][0])
         return landmarks2, headpose
 
-    def load_image(self, img, crop, eyes=None):
+    def load_image(self, img, crop, pupils=None):
         super().load_image(img)
         logger.debug("Low level-image loaded")
         self.landmarks, self._headpose = self._find_landmarks(img)
@@ -126,7 +126,7 @@ class AnalyzeFace(ImageAnalysis):
 
             if crop:
                 logger.debug("Cropping")
-                self.crop_stylegan(eyes)
+                self.crop_stylegan(pupils=pupils)
         else:
             logger.info("No face detected")
 
@@ -178,6 +178,7 @@ class AnalyzeFace(ImageAnalysis):
     # Usage in crop_stylegan
     def crop_stylegan(self, pupils=None):
         pupils = util.get_pupils(self.landmarks) if pupils is None else pupils
+        print(f"----crop_stylegan {pupils}")
 
         # Rotate, if needed
         img2 = self.original_img
@@ -185,7 +186,6 @@ class AnalyzeFace(ImageAnalysis):
             self.face_rotation = util.calculate_face_rotation(pupils)
             tilt = measures.to_degrees(self.face_rotation)
             if abs(tilt) > self.tilt_threshold:
-                img2 = util.straighten(self.original_img, self.face_rotation)
                 center = (
                     self.original_img.shape[1] // 2,
                     self.original_img.shape[0] // 2,
@@ -194,40 +194,48 @@ class AnalyzeFace(ImageAnalysis):
             else:
                 self.face_rotation = 0
 
-        width, height = img2.shape[1], img2.shape[0]
-
         if not pupils:
             pupils = util.get_pupils(landmarks=self.landmarks)
 
         left_eye, right_eye = pupils
-        d = abs(right_eye[0] - left_eye[0])
+        d = util.calc_pd(self.get_pupils())
+        d = math.sqrt(
+            (right_eye[0] - left_eye[0]) ** 2 + (right_eye[1] - left_eye[1]) ** 2
+        )
+        print(f"pd: {d}")
 
-        if d:
-            ar = width / height
-            new_width = int(width * (STYLEGAN_PUPIL_DIST / d))
-            new_height = int(new_width / ar)
-            scale = new_width / width
-            img2 = cv2.resize(img2, (new_width, new_height))
+        if d == 0:
+            raise ValueError("Can't process face pupils must be in different locations")
 
-            crop_x = int((self.landmarks[96][0] * scale) - STYLEGAN_RIGHT_PUPIL[0])
-            crop_y = int((self.landmarks[96][1] * scale) - STYLEGAN_RIGHT_PUPIL[1])
-            img2, _, _ = util.safe_clip(
-                img2,
-                crop_x,
-                crop_y,
-                STYLEGAN_WIDTH,
-                STYLEGAN_WIDTH,
-                FILL_COLOR,
-            )
-            self.landmarks = util.scale_crop_points(
-                self.landmarks, crop_x, crop_y, scale
-            )
+        if self.face_rotation:
+            img2 = util.straighten(self.original_img, self.face_rotation)
+        width, height = img2.shape[1], img2.shape[0]
+
+        ar = width / height
+        new_width = int(width * (STYLEGAN_PUPIL_DIST / d))
+        new_height = int(new_width / ar)
+        scale = new_width / width
+        print(f"Scale: {scale}")
+        crop_x = int((self.landmarks[96][0] * scale) - STYLEGAN_RIGHT_PUPIL[0])
+        crop_y = int((self.landmarks[96][1] * scale) - STYLEGAN_RIGHT_PUPIL[1])
+
+        img2 = cv2.resize(img2, (new_width, new_height))
+
+        img2, _, _ = util.safe_clip(
+            img2,
+            crop_x,
+            crop_y,
+            STYLEGAN_WIDTH,
+            STYLEGAN_WIDTH,
+            FILL_COLOR,
+        )
+        self.landmarks = util.scale_crop_points(self.landmarks, crop_x, crop_y, scale)
 
         # Reload Image
         super().load_image(img2)
 
     def calc_pd(self):
-        self.pupillary_distance, self.pix2mm = util.calc_pd(self.landmarks)
+        self.pupillary_distance, self.pix2mm = util.calc_pd(self.get_pupils())
 
     def get_pupils(self):
         return util.get_pupils(self.landmarks)
@@ -254,3 +262,6 @@ class AnalyzeFace(ImageAnalysis):
         self.pupillary_distance = obj[3]
         self.pix2mm = obj[4]
         self.face_rotation = obj[4] if len(obj) > 4 else 0
+
+    def find_pupils(self):
+        return util.get_pupils(self.landmarks)

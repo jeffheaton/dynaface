@@ -104,11 +104,19 @@ def rotate_crop_points(points, center, angle_degrees):
     return rotated_points
 
 
-def calc_pd(landmarks):
-    pupillary_distance = abs(
-        landmarks[facial.LM_LEFT_PUPIL][0] - landmarks[facial.LM_RIGHT_PUPIL][0]
-    )
+def calc_pd(pupils):
+    left_pupil, right_pupil = pupils
+    left_pupil = np.array(left_pupil)
+    right_pupil = np.array(right_pupil)
+
+    # Calculate Euclidean distance between the two pupils
+    pupillary_distance = np.linalg.norm(left_pupil - right_pupil)
+
+    # Convert the distance from pixels to millimeters
     pix2mm = facial.AnalyzeFace.pd / pupillary_distance
+
+    print(f"calc_pd: {pupils} - {pupillary_distance}")
+
     return pupillary_distance, pix2mm
 
 

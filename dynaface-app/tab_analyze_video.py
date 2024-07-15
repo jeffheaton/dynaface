@@ -599,7 +599,8 @@ gesture you wish to analyze."""
         if self._chart_view:
             # self.update_chart()
             current_frame = self._video_slider.value() - self._frame_begin
-            self._frame_line.set_xdata(current_frame)
+            print("**", current_frame)
+            self._frame_line.set_xdata([current_frame])
             self.render_chart()
 
     def action_zoom(self, value):

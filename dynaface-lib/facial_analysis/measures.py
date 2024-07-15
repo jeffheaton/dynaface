@@ -1,6 +1,7 @@
 import numpy as np
 import math
 from facial_analysis import util
+from typing import List, Tuple
 
 
 def filter(data, items):
@@ -119,6 +120,20 @@ class AnalyzeBrows(MeasureBase):
     def abbrev(self):
         return "Brow"
 
+    def average_euclidean_distance(
+        self, pupil: Tuple[float, float], brow: List[Tuple[float, float]]
+    ) -> float:
+        def euclidean_distance(
+            point1: Tuple[float, float], point2: Tuple[float, float]
+        ) -> float:
+            return math.sqrt(
+                (point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2
+            )
+
+        distances = [euclidean_distance(pupil, point) for point in brow]
+        average_distance = sum(distances) / len(distances) if distances else 0.0
+        return average_distance
+
     def calc(self, face, render=True):
         render2 = self.is_enabled("brow.d")
 
@@ -131,6 +146,7 @@ class AnalyzeBrows(MeasureBase):
         ]
 
         contours = np.array(contours)
+        left_d = self.average_euclidean_distance(face.landmarks[96], contours)
         x = contours[:, 0]
         y = contours[:, 1]
         left_brow_idx = np.argmin(y)
@@ -148,6 +164,7 @@ class AnalyzeBrows(MeasureBase):
         ]
 
         contours = np.array(contours)
+        right_d = self.average_euclidean_distance(face.landmarks[97], contours)
         x = contours[:, 0]
         y = contours[:, 1]
         right_brow_idx = np.argmin(y)
@@ -155,7 +172,7 @@ class AnalyzeBrows(MeasureBase):
         right_brow_x = x[right_brow_idx]
 
         # Diff
-        diff = abs(left_brow_y - right_brow_y) * face.pix2mm
+        diff = abs(left_d - right_d) * face.pix2mm
         if render & render2:
             face.arrow((right_brow_x, right_brow_y), (1024, right_brow_y), apt2=False)
             txt = f"d.brow={diff:.2f} mm"
@@ -330,7 +347,7 @@ class AnalyzePosition(MeasureBase):
                 pos = face.analyze_next_pt(txt)
                 face.write_text_sq(pos, txt, mark="o", up=15)
 
-            pd, pix2mm = util.calc_pd(landmarks=landmarks)
+            pd, pix2mm = util.calc_pd(util.get_pupils(landmarks))
 
             if render & render2_pd:
                 txt = f"pd={round(pd,2)} px"

@@ -86,13 +86,15 @@ class WorkerLoad(QThread):
                 if self.running:
                     # Extract
                     landmarks = self._face.landmarks
-                    pupillary_distance, pix2mm = util.calc_pd(landmarks)
+                    pupillary_distance, pix2mm = util.calc_pd(
+                        util.get_pupils(landmarks)
+                    )
                     # Build frame-state data
                     frame_state = [
                         self._face.original_img,
                         None,
                         landmarks,
-                        pupillary_distance,
+                        int(pupillary_distance),
                         pix2mm,
                     ]
                     self._target.add_frame(frame_state)
