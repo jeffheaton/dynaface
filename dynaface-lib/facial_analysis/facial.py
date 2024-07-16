@@ -69,6 +69,7 @@ class AnalyzeFace(ImageAnalysis):
         self.tilt_threshold = DEFAULT_TILT_THRESHOLD
         self.pix2mm = 1
         self.face_rotation = None
+        self.orig_pupils = None
 
     def get_all_items(self):
         return [
@@ -178,7 +179,8 @@ class AnalyzeFace(ImageAnalysis):
     # Usage in crop_stylegan
     def crop_stylegan(self, pupils=None):
         pupils = util.get_pupils(self.landmarks) if pupils is None else pupils
-        print(f"----crop_stylegan {pupils}")
+        # Save orig pupils so we can lock the scale, rotate, and crop during a load
+        self.orig_pupils = pupils
 
         # Rotate, if needed
         img2 = self.original_img
@@ -197,12 +199,7 @@ class AnalyzeFace(ImageAnalysis):
         if not pupils:
             pupils = util.get_pupils(landmarks=self.landmarks)
 
-        left_eye, right_eye = pupils
-        d = util.calc_pd(self.get_pupils())
-        d = math.sqrt(
-            (right_eye[0] - left_eye[0]) ** 2 + (right_eye[1] - left_eye[1]) ** 2
-        )
-        print(f"pd: {d}")
+        d, _ = util.calc_pd(pupils)
 
         if d == 0:
             raise ValueError("Can't process face pupils must be in different locations")
@@ -215,7 +212,6 @@ class AnalyzeFace(ImageAnalysis):
         new_width = int(width * (STYLEGAN_PUPIL_DIST / d))
         new_height = int(new_width / ar)
         scale = new_width / width
-        print(f"Scale: {scale}")
         crop_x = int((self.landmarks[96][0] * scale) - STYLEGAN_RIGHT_PUPIL[0])
         crop_y = int((self.landmarks[96][1] * scale) - STYLEGAN_RIGHT_PUPIL[1])
 

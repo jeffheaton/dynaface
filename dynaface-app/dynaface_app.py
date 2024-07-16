@@ -22,6 +22,11 @@ SETTING_PD = "pd"
 SETTING_LOG_LEVEL = "log_level"
 SETTING_ACC = "accelerator"
 SETTING_TILT_THRESHOLD = "tilt"
+SETTING_DYNAMIC_ADJUST = "dynamic"
+SETTING_SMOOTH = "smooth"
+
+DEFAULT_DYNAMIC_ADJUST = 5
+DEFAULT_SMOOTH = 5
 
 register_heif_opener()
 
@@ -38,6 +43,8 @@ class AppDynaface(AppJTH):
                 version=version.VERSION,
                 bundle_id="com.heatonresearch.dynaface",
             )
+            self.dynamic_adjust = DEFAULT_DYNAMIC_ADJUST
+            self.data_smoothing = DEFAULT_SMOOTH
 
             self.BASE_DIR = os.path.dirname(os.path.abspath(__file__))
             self.DATA_DIR = os.path.join(self.BASE_DIR, "data")
@@ -74,6 +81,16 @@ class AppDynaface(AppJTH):
             self.settings, key=SETTING_TILT_THRESHOLD, default=DEFAULT_TILT_THRESHOLD
         )
 
+        # Set the dynamic adjust
+        self.dynamic_adjust = utl_settings.get_int(
+            self.settings, key=SETTING_DYNAMIC_ADJUST, default=DEFAULT_DYNAMIC_ADJUST
+        )
+
+        # Set the data smoothing
+        self.data_smoothing = utl_settings.get_int(
+            self.settings, key=SETTING_SMOOTH, default=DEFAULT_SMOOTH
+        )
+
         # accelerator device
         acc = utl_settings.get_bool(self.settings, key=SETTING_ACC, default=True)
 
@@ -89,6 +106,8 @@ class AppDynaface(AppJTH):
             logger.info(f"PyTorch Device: {self.device}")
         else:
             self.device = "cpu"
+
+        #
 
         # Use accelerator, if requested
         try:
@@ -116,4 +135,6 @@ class AppDynaface(AppJTH):
             SETTING_LOG_LEVEL: "INFO",
             SETTING_ACC: True,
             SETTING_TILT_THRESHOLD: DEFAULT_TILT_THRESHOLD,
+            SETTING_DYNAMIC_ADJUST: DEFAULT_DYNAMIC_ADJUST,
+            SETTING_SMOOTH: DEFAULT_SMOOTH,
         }

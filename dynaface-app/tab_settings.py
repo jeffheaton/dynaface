@@ -1,7 +1,12 @@
 import logging
 
 import dynaface_app
-from facial_analysis.facial import STD_PUPIL_DIST, DEFAULT_TILT_THRESHOLD
+from facial_analysis.facial import (
+    STD_PUPIL_DIST,
+    DEFAULT_TILT_THRESHOLD,
+)
+
+
 import facial_analysis
 from PyQt6.QtGui import QIntValidator
 from jth_ui import utl_settings
@@ -23,6 +28,7 @@ logger = logging.getLogger(__name__)
 class SettingsTab(QWidget):
     def __init__(self, window):
         super().__init__()
+
         self._window = window
 
         # Create widgets
@@ -33,6 +39,14 @@ class SettingsTab(QWidget):
         lbl_tilt = QLabel("Correct tilt greater than (deg, -1 to disable):", self)
         self._text_tilt = QLineEdit(self)
         self._text_tilt.setValidator(QIntValidator())
+
+        lbl_dynamic_adjust = QLabel("Crop/zoom/tilt smoothing (1 to disable):", self)
+        self._text_dynamic_adjust = QLineEdit(self)
+        self._text_dynamic_adjust.setValidator(QIntValidator())
+
+        lbl_data_smooth = QLabel("Data smoothing (1 to disable):", self)
+        self._text_data_smooth = QLineEdit(self)
+        self._text_dynamic_adjust.setValidator(QIntValidator())
 
         log_level_label = QLabel("Log Level:", self)
         self._log_combo_box = QComboBox()
@@ -53,6 +67,8 @@ class SettingsTab(QWidget):
         form_layout = QFormLayout()
         form_layout.addRow(lbl_pd, self._text_pd)
         form_layout.addRow(lbl_tilt, self._text_tilt)
+        form_layout.addRow(lbl_dynamic_adjust, self._text_dynamic_adjust)
+        form_layout.addRow(lbl_data_smooth, self._text_data_smooth)
         form_layout.addRow(log_level_label, self._log_combo_box)
         form_layout.addRow(lbl_acc, self._chk_accelerator)
 
@@ -67,6 +83,10 @@ class SettingsTab(QWidget):
         settings = self._window.app.settings
         self._text_pd.setText(str(facial_analysis.facial.AnalyzeFace.pd))
         self._text_tilt.setText(str(facial_analysis.facial.AnalyzeFace.tilt_threshold))
+
+        self._text_dynamic_adjust.setText(str(self._window.app.dynamic_adjust))
+        self._text_data_smooth.setText(str(self._window.app.data_smoothing))
+
         utl_settings.set_combo(
             self._log_combo_box,
             settings.get(dynaface_app.SETTING_LOG_LEVEL, "INFO"),
@@ -98,6 +118,14 @@ class SettingsTab(QWidget):
         settings[dynaface_app.SETTING_TILT_THRESHOLD] = utl_settings.parse_int(
             self._text_tilt.text(), default=DEFAULT_TILT_THRESHOLD
         )
+        settings[dynaface_app.SETTING_DYNAMIC_ADJUST] = utl_settings.parse_int(
+            self._text_dynamic_adjust.text(),
+            default=dynaface_app.DEFAULT_DYNAMIC_ADJUST,
+        )
+        settings[dynaface_app.SETTING_SMOOTH] = utl_settings.parse_int(
+            self._text_data_smooth.text(), default=dynaface_app.DEFAULT_SMOOTH
+        )
+
         level = settings[dynaface_app.SETTING_LOG_LEVEL]
         logging_level = getattr(logging, level)
         self._window.app.change_log_level(logging_level)

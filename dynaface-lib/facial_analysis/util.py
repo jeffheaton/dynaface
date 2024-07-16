@@ -115,8 +115,6 @@ def calc_pd(pupils):
     # Convert the distance from pixels to millimeters
     pix2mm = facial.AnalyzeFace.pd / pupillary_distance
 
-    print(f"calc_pd: {pupils} - {pupillary_distance}")
-
     return pupillary_distance, pix2mm
 
 
