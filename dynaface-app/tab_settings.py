@@ -82,7 +82,8 @@ class SettingsTab(QWidget):
 
         settings = self._window.app.settings
         self._text_pd.setText(str(facial_analysis.facial.AnalyzeFace.pd))
-        self._text_tilt.setText(str(facial_analysis.facial.AnalyzeFace.tilt_threshold))
+        tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
+        self._text_tilt.setText(str(tilt_threshold))
 
         self._text_dynamic_adjust.setText(str(self._window.app.dynamic_adjust))
         self._text_data_smooth.setText(str(self._window.app.data_smoothing))

@@ -28,6 +28,8 @@ SETTING_SMOOTH = "smooth"
 DEFAULT_DYNAMIC_ADJUST = 5
 DEFAULT_SMOOTH = 5
 
+current_dynaface_app = None
+
 register_heif_opener()
 
 # https://stackoverflow.com/questions/75746637/how-to-suppress-qt-pointer-dispatch-warning
@@ -35,6 +37,7 @@ register_heif_opener()
 
 class AppDynaface(AppJTH):
     def __init__(self):
+        global current_dynaface_app
         try:
             super().__init__(
                 app_name="Dynaface",
@@ -43,6 +46,7 @@ class AppDynaface(AppJTH):
                 version=version.VERSION,
                 bundle_id="com.heatonresearch.dynaface",
             )
+            current_dynaface_app = self
             self.dynamic_adjust = DEFAULT_DYNAMIC_ADJUST
             self.data_smoothing = DEFAULT_SMOOTH
 
@@ -77,10 +81,9 @@ class AppDynaface(AppJTH):
         )
 
         # Set the tilt threshold
-        facial_analysis.facial.AnalyzeFace.tilt_threshold = utl_settings.get_int(
+        self.tilt_threshold = utl_settings.get_int(
             self.settings, key=SETTING_TILT_THRESHOLD, default=DEFAULT_TILT_THRESHOLD
         )
-
         # Set the dynamic adjust
         self.dynamic_adjust = utl_settings.get_int(
             self.settings, key=SETTING_DYNAMIC_ADJUST, default=DEFAULT_DYNAMIC_ADJUST

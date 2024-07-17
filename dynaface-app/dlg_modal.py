@@ -1,6 +1,7 @@
 from typing import Callable
 
 import worker_threads
+import dynaface_app
 from facial_analysis import facial
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
@@ -124,7 +125,10 @@ class VideoExportDialog(QDialog):
             self._update_status.setText(status)
 
     def obtain_data(self):
-        face = facial.AnalyzeFace(self._calcs, data_path=None)
+        tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
+        face = facial.AnalyzeFace(
+            self._calcs, data_path=None, tilt_threshold=tilt_threshold
+        )
         c = len(self._dialog._window._frames)
         for i, frame in enumerate(self._dialog._window._frames):
             self._update_signal.emit(f"Exporting frame {i:,}/{c:,}...")

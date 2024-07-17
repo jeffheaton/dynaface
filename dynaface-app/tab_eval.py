@@ -6,6 +6,7 @@ from facial_analysis.facial import AnalyzeFace
 import facial_analysis
 import logging
 import dlg_modal
+import dynaface_app
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,8 @@ class TabEval(QWidget):
 
     def exec_eval(self, analyze):
         measures = [AnalyzeEyeArea(), AnalyzeDentalArea()]
-        face = AnalyzeFace(measures)
+        tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
+        face = AnalyzeFace(measures, tilt_threshold=tilt_threshold)
         frames = range(analyze._frame_begin, analyze._frame_end, 1)
 
         max_eye_idx = max_eye = -1

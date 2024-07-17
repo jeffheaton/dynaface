@@ -1,5 +1,4 @@
 import pickle
-from facial_analysis.facial import AnalyzeFace, load_face_image
 from jth_ui import utl_classes
 import gzip
 

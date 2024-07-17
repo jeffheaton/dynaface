@@ -7,6 +7,7 @@ import custom_control
 import cv2
 import dlg_modal
 import dynaface_document
+import dynaface_app
 import numpy as np
 import utl_gfx
 import utl_print
@@ -156,7 +157,8 @@ gesture you wish to analyze."""
         logger.info(f"Video length: {self.video_length}")
 
         # Prepare facial analysis
-        self._face = AnalyzeFace(all_measures())
+        tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
+        self._face = AnalyzeFace(all_measures(), tilt_threshold=tilt_threshold)
 
     def init_bottom_horizontal_toolbar(self, layout):
         toolbar = QToolBar()
@@ -599,7 +601,6 @@ gesture you wish to analyze."""
         if self._chart_view:
             # self.update_chart()
             current_frame = self._video_slider.value() - self._frame_begin
-            print("**", current_frame)
             self._frame_line.set_xdata([current_frame])
             self.render_chart()
 
@@ -726,7 +727,8 @@ gesture you wish to analyze."""
             self._window.display_message_box("Unable to save file.")
 
     def collect_data(self, step_size=1):
-        face = AnalyzeFace(self._face.measures)
+        tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
+        face = AnalyzeFace(self._face.measures, tilt_threshold=tilt_threshold)
         stats = face.get_all_items()
         data = {stat: [] for stat in stats}
 
@@ -1025,7 +1027,8 @@ gesture you wish to analyze."""
         doc = dynaface_document.DynafaceDocument()
         f = lambda: doc.load(filename)
         dlg_modal.display_please_wait(window=self, f=f, message="Loading document")
-        self._face = AnalyzeFace(doc.measures)
+        tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
+        self._face = AnalyzeFace(doc.measures, tilt_threshold=tilt_threshold)
         self._frames = doc.frames
         self.filename = filename
         self.frame_count = len(self._frames)
@@ -1090,14 +1093,14 @@ gesture you wish to analyze."""
             self._jump_to.setEnabled(not self.loading)
 
     def load_image(self, path):
+        tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
         if path.lower().endswith(".heic"):
             pil_image = Image.open(path)
             image_np = np.array(pil_image)
-            # image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
-            self._face = AnalyzeFace(all_measures())
+            self._face = AnalyzeFace(all_measures(), tilt_threshold=tilt_threshold)
             self._face.load_image(image_np, crop=True)
         else:
-            self._face = load_face_image(path, crop=True)
+            self._face = load_face_image(path, crop=True, tilt_threshold=tilt_threshold)
 
         self._frame_begin = 0
         self._frame_end = 1
@@ -1122,7 +1125,8 @@ gesture you wish to analyze."""
 
     def find_max_dental(self):
         measures = [AnalyzeDentalArea()]
-        face = AnalyzeFace(measures)
+        tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
+        face = AnalyzeFace(measures, tilt_threshold=tilt_threshold)
         frames = range(self._frame_begin, self._frame_end, 1)
 
         max_smile_idx = max_smile = -1
@@ -1139,7 +1143,8 @@ gesture you wish to analyze."""
 
     def find_max_ocular(self):
         measures = [AnalyzeEyeArea()]
-        face = AnalyzeFace(measures)
+        tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
+        face = AnalyzeFace(measures, tilt_threshold=tilt_threshold)
         frames = range(self._frame_begin, self._frame_end, 1)
 
         max_eye_idx = max_eye = -1

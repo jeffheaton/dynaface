@@ -42,11 +42,13 @@ def init_processor(device=None):
     _processor = SPIGAFramework(config, device=device)
 
 
-def load_face_image(filename, crop=True, stats=None):
+def load_face_image(
+    filename, crop=True, stats=None, tilt_threshold=DEFAULT_TILT_THRESHOLD
+):
     if stats is None:
         stats = measures.all_measures()
     img = load_image(filename)
-    face = AnalyzeFace(stats)
+    face = AnalyzeFace(stats, tilt_threshold=tilt_threshold)
     face.load_image(img, crop)
     return face
 
@@ -54,7 +56,7 @@ def load_face_image(filename, crop=True, stats=None):
 class AnalyzeFace(ImageAnalysis):
     pd = STD_PUPIL_DIST
 
-    def __init__(self, measures=None):
+    def __init__(self, measures=None, tilt_threshold=DEFAULT_TILT_THRESHOLD):
         self.original_img = None
         self.left_eye = None
         self.right_eye = None
@@ -66,7 +68,7 @@ class AnalyzeFace(ImageAnalysis):
         self.headpose = [0, 0, 0]
         self.landmarks = []
         self.pupillary_distance = 0
-        self.tilt_threshold = DEFAULT_TILT_THRESHOLD
+        self.tilt_threshold = tilt_threshold
         self.pix2mm = 1
         self.face_rotation = None
         self.orig_pupils = None
@@ -185,16 +187,21 @@ class AnalyzeFace(ImageAnalysis):
         # Rotate, if needed
         img2 = self.original_img
         if pupils:
-            self.face_rotation = util.calculate_face_rotation(pupils)
-            tilt = measures.to_degrees(self.face_rotation)
-            if abs(tilt) > self.tilt_threshold:
+            r = util.calculate_face_rotation(pupils)
+            tilt = measures.to_degrees(r)
+
+            if (self.tilt_threshold > 0) and (abs(tilt) > self.tilt_threshold):
+                logger.debug(
+                    f"Rotate landmarks: detected tilt={tilt} threshold={self.tilt_threshold}"
+                )
+                self.face_rotation = r
                 center = (
                     self.original_img.shape[1] // 2,
                     self.original_img.shape[0] // 2,
                 )
                 self.landmarks = util.rotate_crop_points(self.landmarks, center, tilt)
             else:
-                self.face_rotation = 0
+                self.face_rotation = None
 
         if not pupils:
             pupils = util.get_pupils(landmarks=self.landmarks)
@@ -205,6 +212,7 @@ class AnalyzeFace(ImageAnalysis):
             raise ValueError("Can't process face pupils must be in different locations")
 
         if self.face_rotation:
+            logger.debug(f"Fix tilt: {self.face_rotation}")
             img2 = util.straighten(self.original_img, self.face_rotation)
         width, height = img2.shape[1], img2.shape[0]
 

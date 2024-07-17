@@ -5,8 +5,10 @@ from typing import Callable
 
 import cv2
 import numpy as np
+import dynaface_app
 from PyQt6.QtCore import QThread, pyqtSignal
 
+import facial_analysis
 from facial_analysis import facial, models, util
 from facial_analysis.facial import AnalyzeFace
 from jth_ui import utl_etc
@@ -38,7 +40,10 @@ class WorkerExport(QThread):
         out = cv2.VideoWriter(
             self._output_file, fourcc, self._dialog._window.frame_rate, (width, height)
         )
-        face = facial.AnalyzeFace(self._dialog._window._face.measures)
+        tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
+        face = facial.AnalyzeFace(
+            self._dialog._window._face.measures, tilt_threshold=tilt_threshold
+        )
         t = self._dialog._window
         c = t._frame_end - t._frame_begin
         for i in range(t._frame_begin, t._frame_end):
@@ -53,7 +58,25 @@ class WorkerExport(QThread):
         self._update_signal.emit("*")
 
 
-def mean_pupils(data):
+def mean_landmarks(data):
+    """
+    Calculate the average of corresponding tuples across multiple lists of tuples.
+
+    Args:
+        data (list of list of tuples): A list where each element is a list of tuples.
+            Each tuple contains two numeric values. For example:
+            data = [ [(1, 2), (3, 4)], [(1, 2), (3, 4)] ]
+
+    Returns:
+        list of tuples: A list of tuples where each tuple contains the average of the corresponding
+            tuples from the input lists. For example:
+            output = [(1.0, 2.0), (3.0, 4.0)]
+
+    Example:
+        data = [ [(1, 2), (3, 4)], [(1, 2), (3, 4)] ]
+        result = average_tuples(data)
+        print(result)  # Output: [(1.0, 2.0), (3.0, 4.0)]
+    """
     # Determine the length of the inner lists
     if not data or not data[0]:
         return []
@@ -73,7 +96,8 @@ def mean_pupils(data):
 
     # Calculate the averages
     averages = [
-        (sum_x / n_outer_lists, sum_y / n_outer_lists) for (sum_x, sum_y) in sums
+        (int(sum_x / n_outer_lists), int(sum_y / n_outer_lists))
+        for (sum_x, sum_y) in sums
     ]
 
     return averages
@@ -84,23 +108,32 @@ class WorkerLoad(QThread):
 
     _update_signal = pyqtSignal(str)
 
-    def __init__(self, target, avg_len=5):
+    def __init__(self, target, avg_crop_len=5, avg_landmark_len=5):
         super().__init__()
         self._target = target
         self._total = self._target.frame_count
         self.running = True
-        self._avg_len = avg_len
+        self._avg_crop_len = avg_crop_len
+        self._avg_landmark_len = avg_landmark_len
 
     def run(self):
+        tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
         logger.debug("Running background thread")
-        logger.debug(f"Averaging buffer size: {self._avg_len}")
+        logger.debug(f"Smoothing crop buffer size: {self._avg_crop_len}")
+        logger.debug(f"Smoothing landmarks buffer size: {self._avg_landmark_len}")
+        logger.debug(f"Head tilt correct threshold: {tilt_threshold}")
+
         self._target.loading = True
         self._loading_etc = utl_etc.CalcETC(self._total)
-        self._face = facial.AnalyzeFace([])
+        self._face = facial.AnalyzeFace([], tilt_threshold=tilt_threshold)
 
         pupils = None
         pupil_queue = deque(
-            maxlen=self._avg_len
+            maxlen=self._avg_crop_len
+        )  # Queue to store the last 5 pupil positions
+
+        landmarks_queue = deque(
+            maxlen=self._avg_landmark_len
         )  # Queue to store the last 5 pupil positions
 
         try:
@@ -121,11 +154,15 @@ class WorkerLoad(QThread):
                     self._face.load_image(img=frame, crop=True, pupils=pupils)
 
                     pupil_queue.append(self._face.orig_pupils)
-                    pupils = mean_pupils(pupil_queue)
+                    pupils = mean_landmarks(pupil_queue)
 
                 if self.running:
                     # Extract
                     landmarks = self._face.landmarks
+                    landmarks_queue.append(landmarks)
+                    if len(landmarks_queue) > 1:
+                        landmarks = mean_landmarks(landmarks_queue)
+
                     pupillary_distance, pix2mm = util.calc_pd(
                         util.get_pupils(landmarks)
                     )
