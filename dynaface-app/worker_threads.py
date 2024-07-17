@@ -9,6 +9,7 @@ import dynaface_app
 from PyQt6.QtCore import QThread, pyqtSignal
 
 import facial_analysis
+import dynaface_app
 from facial_analysis import facial, models, util
 from facial_analysis.facial import AnalyzeFace
 from jth_ui import utl_etc
@@ -108,19 +109,19 @@ class WorkerLoad(QThread):
 
     _update_signal = pyqtSignal(str)
 
-    def __init__(self, target, avg_crop_len=5, avg_landmark_len=5):
+    def __init__(self, target):
         super().__init__()
         self._target = target
         self._total = self._target.frame_count
         self.running = True
-        self._avg_crop_len = avg_crop_len
-        self._avg_landmark_len = avg_landmark_len
 
     def run(self):
+        dynamic_adjust = dynaface_app.current_dynaface_app.dynamic_adjust
+        data_smoothing = dynaface_app.current_dynaface_app.data_smoothing
         tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
         logger.debug("Running background thread")
-        logger.debug(f"Smoothing crop buffer size: {self._avg_crop_len}")
-        logger.debug(f"Smoothing landmarks buffer size: {self._avg_landmark_len}")
+        logger.debug(f"Smoothing crop buffer size: {dynamic_adjust}")
+        logger.debug(f"Smoothing landmarks buffer size: {data_smoothing}")
         logger.debug(f"Head tilt correct threshold: {tilt_threshold}")
 
         self._target.loading = True
@@ -129,11 +130,11 @@ class WorkerLoad(QThread):
 
         pupils = None
         pupil_queue = deque(
-            maxlen=self._avg_crop_len
+            maxlen=dynamic_adjust
         )  # Queue to store the last 5 pupil positions
 
         landmarks_queue = deque(
-            maxlen=self._avg_landmark_len
+            maxlen=data_smoothing
         )  # Queue to store the last 5 pupil positions
 
         try:

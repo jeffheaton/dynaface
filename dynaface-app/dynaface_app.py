@@ -80,6 +80,7 @@ class AppDynaface(AppJTH):
             self.settings, key=SETTING_PD, default=STD_PUPIL_DIST
         )
 
+        print("==set it2")
         # Set the tilt threshold
         self.tilt_threshold = utl_settings.get_int(
             self.settings, key=SETTING_TILT_THRESHOLD, default=DEFAULT_TILT_THRESHOLD
