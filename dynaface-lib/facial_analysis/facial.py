@@ -265,7 +265,7 @@ class AnalyzeFace(ImageAnalysis):
         self.landmarks = copy.copy(obj[2])
         self.pupillary_distance = obj[3]
         self.pix2mm = obj[4]
-        self.face_rotation = obj[4] if len(obj) > 4 else 0
+        self.face_rotation = obj[5] if len(obj) > 5 else 0
 
     def find_pupils(self):
         return util.get_pupils(self.landmarks)
