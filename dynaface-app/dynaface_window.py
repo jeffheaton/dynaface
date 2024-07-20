@@ -3,6 +3,7 @@ import logging.config
 import logging.handlers
 import sys
 import webbrowser
+import os
 
 import dynaface_document
 import tab_settings
@@ -222,7 +223,9 @@ class DynafaceWindow(MainWindowJTH):
     def show_analyze_video(self, filename):
         try:
             self.close_analyze_tabs()
-            self.add_tab(AnalyzeVideoTab(self, filename), "Analyze")
+            basename = os.path.basename(filename)
+            tab_name = f"Analyze: {basename}"
+            self.add_tab(AnalyzeVideoTab(self, filename), tab_name)
         except Exception as e:
             logger.error("Error during video open", exc_info=True)
             self.display_message_box(f"Unable to open video. {e}")
