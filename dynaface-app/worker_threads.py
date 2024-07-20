@@ -153,7 +153,6 @@ class WorkerLoad(QThread):
                 # Make sure we did not get a request to stop during each of these:
                 if self.running:
                     self._face.load_image(img=frame, crop=True, pupils=pupils)
-
                     pupil_queue.append(self._face.orig_pupils)
                     pupils = mean_landmarks(pupil_queue)
 
@@ -167,14 +166,14 @@ class WorkerLoad(QThread):
                     pupillary_distance, pix2mm = util.calc_pd(
                         util.get_pupils(landmarks)
                     )
+
+                    # Update remaining face properties
+                    self._face.landmarks = landmarks
+                    self._face.pupillary_distance = pupillary_distance
+                    self._face.pix2mm = pix2mm
+
                     # Build frame-state data
-                    frame_state = [
-                        self._face.original_img,
-                        None,
-                        landmarks,
-                        int(pupillary_distance),
-                        pix2mm,
-                    ]
+                    frame_state = self._face.dump_state()
                     self._target.add_frame(frame_state)
 
                 if self.running:

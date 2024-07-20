@@ -180,17 +180,16 @@ class AnalyzeFace(ImageAnalysis):
 
     # Usage in crop_stylegan
     def crop_stylegan(self, pupils=None):
-        pupils = util.get_pupils(self.landmarks) if pupils is None else pupils
         # Save orig pupils so we can lock the scale, rotate, and crop during a load
-        self.orig_pupils = pupils
+        self.orig_pupils = util.get_pupils(self.landmarks)
 
+        pupils = self.orig_pupils if pupils is None else pupils
         # Rotate, if needed
         img2 = self.original_img
         if pupils:
             r = util.calculate_face_rotation(pupils)
             tilt = measures.to_degrees(r)
-
-            if (self.tilt_threshold > 0) and (abs(tilt) > self.tilt_threshold):
+            if (self.tilt_threshold >= 0) and (abs(tilt) > self.tilt_threshold):
                 logger.debug(
                     f"Rotate landmarks: detected tilt={tilt} threshold={self.tilt_threshold}"
                 )
@@ -265,7 +264,14 @@ class AnalyzeFace(ImageAnalysis):
         self.landmarks = copy.copy(obj[2])
         self.pupillary_distance = obj[3]
         self.pix2mm = obj[4]
-        self.face_rotation = obj[5] if len(obj) > 5 else 0
+
+        self.face_rotation = obj[5]
+        try:
+            self.face_rotation = obj[5]
+        except IndexError:
+            self.face_rotation = 0
+        except TypeError:
+            self.face_rotation = 0
 
     def find_pupils(self):
         return util.get_pupils(self.landmarks)

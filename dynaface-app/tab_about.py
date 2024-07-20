@@ -2,6 +2,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from jth_ui.app_jth import get_library_version
 import facial_analysis
+from version import BUILD_DATE
 
 
 class AboutTab(QWidget):
@@ -23,6 +24,7 @@ This program is for education and research purposes only.
 This program implements the algorithms described in the paper:<br>
 [insert actual paper cite]
 <hr>
+Build Date: {BUILD_DATE} <br>
 Log path: {self._window.app.LOG_DIR} <br>
 Torch version: {v1}<br>
 Facenet-pytorch version: {v2}<br>

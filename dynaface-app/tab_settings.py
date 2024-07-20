@@ -57,10 +57,13 @@ class SettingsTab(QWidget):
         # Create button layout
         save_button = QPushButton("Save", self)
         save_button.clicked.connect(self.action_save)
+        reset_button = QPushButton("Reset", self)
+        reset_button.clicked.connect(self.action_reset)
         cancel_button = QPushButton("Cancel", self)
         cancel_button.clicked.connect(lambda: self.action_cancel())
         button_layout = QHBoxLayout()
         button_layout.addWidget(save_button)
+        button_layout.addWidget(reset_button)
         button_layout.addWidget(cancel_button)
 
         # Form layout for the options
@@ -101,6 +104,13 @@ class SettingsTab(QWidget):
     def action_save(self):
         self.save_values()
         self._window.close_current_tab()
+
+    def action_reset(self):
+        self._text_pd.setText(str(facial_analysis.facial.STD_PUPIL_DIST))
+        self._text_tilt.setText(str(facial_analysis.facial.DEFAULT_TILT_THRESHOLD))
+        self._text_dynamic_adjust.setText(str(dynaface_app.DEFAULT_DYNAMIC_ADJUST))
+        self._text_data_smooth.setText(str(dynaface_app.DEFAULT_SMOOTH))
+        utl_settings.set_combo(self._log_combo_box, "INFO")
 
     def action_cancel(self):
         self._window.close_current_tab()
