@@ -124,13 +124,23 @@ class SettingsTab(QWidget):
         settings[dynaface_app.SETTING_TILT_THRESHOLD] = utl_settings.parse_int(
             self._text_tilt.text(), default=DEFAULT_TILT_THRESHOLD
         )
-        settings[dynaface_app.SETTING_DYNAMIC_ADJUST] = utl_settings.parse_int(
+
+        dynamic_adjust = utl_settings.parse_int(
             self._text_dynamic_adjust.text(),
             default=dynaface_app.DEFAULT_DYNAMIC_ADJUST,
         )
-        settings[dynaface_app.SETTING_SMOOTH] = utl_settings.parse_int(
+
+        data_smoothing = utl_settings.parse_int(
             self._text_data_smooth.text(), default=dynaface_app.DEFAULT_SMOOTH
         )
+
+        if dynamic_adjust < 1:
+            dynamic_adjust = 1
+        if data_smoothing < 1:
+            data_smoothing = 1
+
+        settings[dynaface_app.SETTING_DYNAMIC_ADJUST] = dynamic_adjust
+        settings[dynaface_app.SETTING_SMOOTH] = data_smoothing
 
         level = settings[dynaface_app.SETTING_LOG_LEVEL]
         logging_level = getattr(logging, level)

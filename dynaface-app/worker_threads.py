@@ -114,6 +114,15 @@ class WorkerLoad(QThread):
         dynamic_adjust = dynaface_app.current_dynaface_app.dynamic_adjust
         data_smoothing = dynaface_app.current_dynaface_app.data_smoothing
         tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
+
+        if dynamic_adjust < 1:
+            dynamic_adjust = 1
+        if data_smoothing < 1:
+            data_smoothing = 1
+
+        if tilt_threshold < 0:
+            tilt_threshold = 0
+
         logger.debug("Running background thread")
         logger.debug(f"Smoothing crop buffer size: {dynamic_adjust}")
         logger.debug(f"Smoothing landmarks buffer size: {data_smoothing}")
