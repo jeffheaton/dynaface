@@ -1,16 +1,12 @@
 import logging
 
 import dynaface_app
-from facial_analysis.facial import (
-    STD_PUPIL_DIST,
-    DEFAULT_TILT_THRESHOLD,
-)
-
-
 import facial_analysis
-from PyQt6.QtGui import QIntValidator
+from facial_analysis.facial import DEFAULT_TILT_THRESHOLD, STD_PUPIL_DIST
 from jth_ui import utl_settings
+from PyQt6.QtGui import QIntValidator
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFormLayout,
     QHBoxLayout,
@@ -19,7 +15,6 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QVBoxLayout,
     QWidget,
-    QCheckBox,
 )
 
 logger = logging.getLogger(__name__)

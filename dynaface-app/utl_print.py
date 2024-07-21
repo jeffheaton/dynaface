@@ -1,7 +1,5 @@
-import sys
-from PyQt6.QtGui import QPixmap, QPainter, QAction
+from PyQt6.QtGui import QPainter
 from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
-from PyQt6.QtCore import Qt
 
 
 def print_pixmap(window, pixmap, text=[]):

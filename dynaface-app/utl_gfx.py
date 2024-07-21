@@ -1,7 +1,7 @@
 import sys
+
+from PyQt6.QtGui import QClipboard, QImage, QPixmap
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtGui import QImage, QClipboard, QPixmap
-from PIL import Image
 
 
 def opencv_img_to_qimage(opencv_img):
@@ -28,8 +28,8 @@ def copy_image_to_clipboard(opencv_img):
     clipboard.setImage(image, mode=QClipboard.Mode.Clipboard)
 
 
-from PyQt6.QtGui import QPixmap, QColor
 from PyQt6.QtCore import QRect
+from PyQt6.QtGui import QColor, QPixmap
 
 
 def crop_pixmap(pixmap: QPixmap, pad_px: int) -> QPixmap:

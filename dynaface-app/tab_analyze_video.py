@@ -6,14 +6,14 @@ import cmds
 import custom_control
 import cv2
 import dlg_modal
-import dynaface_document
 import dynaface_app
+import dynaface_document
 import numpy as np
 import utl_gfx
 import utl_print
 import worker_threads
 from facial_analysis.facial import AnalyzeFace, load_face_image
-from facial_analysis.measures import all_measures, AnalyzeDentalArea, AnalyzeEyeArea
+from facial_analysis.measures import AnalyzeDentalArea, AnalyzeEyeArea, all_measures
 from jth_ui import app_jth, utl_etc
 from jth_ui.tab_graphic import TabGraphic
 from matplotlib.figure import Figure
@@ -22,6 +22,7 @@ from PyQt6.QtCore import QEvent, Qt, QTimer
 from PyQt6.QtGui import QColor, QPixmap, QUndoStack
 from PyQt6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QGestureEvent,
     QGraphicsScene,
@@ -40,7 +41,6 @@ from PyQt6.QtWidgets import (
     QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
-    QComboBox,
 )
 
 logger = logging.getLogger(__name__)

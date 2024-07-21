@@ -5,15 +5,14 @@ import logging.handlers
 import os
 import sys
 
+import facial_analysis
+import jth_ui.utl_settings as utl_settings
 import torch
 import version
 from dynaface_window import DynafaceWindow
-from facial_analysis.facial import STD_PUPIL_DIST, DEFAULT_TILT_THRESHOLD
-import facial_analysis
+from facial_analysis.facial import DEFAULT_TILT_THRESHOLD, STD_PUPIL_DIST
 from jth_ui.app_jth import AppJTH, get_library_version
 from pillow_heif import register_heif_opener
-import jth_ui.utl_settings as utl_settings
-
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +24,7 @@ SETTING_TILT_THRESHOLD = "tilt"
 SETTING_DYNAMIC_ADJUST = "dynamic"
 SETTING_SMOOTH = "smooth"
 
-DEFAULT_DYNAMIC_ADJUST = 0
+DEFAULT_DYNAMIC_ADJUST = 5
 DEFAULT_SMOOTH = 5
 
 current_dynaface_app = None

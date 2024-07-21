@@ -1,7 +1,7 @@
+import facial_analysis
+from jth_ui.app_jth import get_library_version
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
-from jth_ui.app_jth import get_library_version
-import facial_analysis
 from version import BUILD_DATE
 
 

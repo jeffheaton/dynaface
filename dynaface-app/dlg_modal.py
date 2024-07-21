@@ -1,7 +1,7 @@
 from typing import Callable
 
-import worker_threads
 import dynaface_app
+import worker_threads
 from facial_analysis import facial
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (

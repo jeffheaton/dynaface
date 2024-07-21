@@ -1,12 +1,12 @@
-from PyQt6.QtWidgets import QTextEdit, QVBoxLayout, QWidget, QPushButton
-from PyQt6.QtCore import Qt
-from jth_ui.app_jth import get_library_version
-from facial_analysis.measures import all_measures, AnalyzeDentalArea, AnalyzeEyeArea
-from facial_analysis.facial import AnalyzeFace
-import facial_analysis
 import logging
+
 import dlg_modal
 import dynaface_app
+from facial_analysis.facial import AnalyzeFace
+from facial_analysis.measures import AnalyzeDentalArea, AnalyzeEyeArea, all_measures
+from jth_ui.app_jth import get_library_version
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QPushButton, QTextEdit, QVBoxLayout, QWidget
 
 logger = logging.getLogger(__name__)
 

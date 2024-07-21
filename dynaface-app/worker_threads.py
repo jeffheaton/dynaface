@@ -4,15 +4,10 @@ from collections import deque
 from typing import Callable
 
 import cv2
-import numpy as np
 import dynaface_app
-from PyQt6.QtCore import QThread, pyqtSignal
-
-import facial_analysis
-import dynaface_app
-from facial_analysis import facial, models, util
-from facial_analysis.facial import AnalyzeFace
+from facial_analysis import facial, util
 from jth_ui import utl_etc
+from PyQt6.QtCore import QThread, pyqtSignal
 
 logger = logging.getLogger(__name__)
 

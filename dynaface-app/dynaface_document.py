@@ -1,6 +1,7 @@
-import pickle
-from jth_ui import utl_classes
 import gzip
+import pickle
+
+from jth_ui import utl_classes
 
 DOC_HEADER = "header"
 DOC_HEADER_VERSION = "version"

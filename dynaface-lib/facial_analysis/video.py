@@ -7,8 +7,6 @@ import tempfile
 
 import cv2
 
-# import plotly.graph_objects as go
-# import plotly.io as pio
 from facial_analysis.facial import AnalyzeFace
 
 SAMPLE_RATE = 44100

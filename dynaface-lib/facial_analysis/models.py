@@ -8,6 +8,7 @@ from facenet_pytorch.models.mtcnn import ONet, PNet, RNet
 from facial_analysis.spiga.inference.config import ModelConfig
 from facial_analysis.spiga.inference.framework import SPIGAFramework
 from torch import nn
+import platform
 
 # Mac M1 issue - hope to remove some day
 # RuntimeError: Adaptive pool MPS: input sizes must be divisible by output sizes.
@@ -122,8 +123,12 @@ def are_models_init() -> bool:
 
 
 def detect_device() -> str:
-    has_mps = torch.backends.mps.is_built()
-    return "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
+    if platform.system() == "Darwin" and platform.machine() in {"arm64", "x86_64"}:
+        if torch.backends.mps.is_built() and torch.backends.mps.is_available():
+            return "mps"
+    if torch.cuda.is_available():
+        return "gpu"
+    return "cpu"
 
 
 def convert_landmarks(landmarks):

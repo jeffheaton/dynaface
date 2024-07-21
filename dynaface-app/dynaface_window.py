@@ -1,9 +1,8 @@
 import logging
 import logging.config
 import logging.handlers
-import sys
-import webbrowser
 import os
+import webbrowser
 
 import dynaface_document
 import tab_settings

@@ -6,11 +6,10 @@ import time
 import cv2
 import numpy as np
 import torch
-from facial_analysis import measures, models
+from facial_analysis import measures, models, util
 from facial_analysis.image import ImageAnalysis, load_image
 from facial_analysis.spiga.inference.config import ModelConfig
 from facial_analysis.spiga.inference.framework import SPIGAFramework
-from facial_analysis import util
 
 STYLEGAN_WIDTH = 1024
 STYLEGAN_LEFT_PUPIL = (640, 480)
@@ -18,7 +17,7 @@ STYLEGAN_RIGHT_PUPIL = (380, 480)
 STYLEGAN_PUPIL_DIST = STYLEGAN_LEFT_PUPIL[0] - STYLEGAN_RIGHT_PUPIL[0]
 
 STD_PUPIL_DIST = 63
-DEFAULT_TILT_THRESHOLD = 3
+DEFAULT_TILT_THRESHOLD = 0
 
 LM_LEFT_PUPIL = 97
 LM_RIGHT_PUPIL = 96

@@ -1,7 +1,8 @@
-import numpy as np
 import math
-from facial_analysis import util
 from typing import List, Tuple
+
+import numpy as np
+from facial_analysis import util
 
 
 def filter(data, items):
