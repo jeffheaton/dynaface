@@ -235,9 +235,9 @@ class AnalyzeDentalArea(MeasureBase):
             face.write_text(pos, txt)
 
         if render & render2_diff:
-            txt = f"dental.diff={round(dental_diff,2)}"
+            txt = f"dental.diff={round(dental_diff,2)} mm"
             pos = face.analyze_next_pt(txt)
-            face.write_text(pos, txt)
+            face.write_text_sq(pos, txt)
 
         return filter(
             {
@@ -255,22 +255,20 @@ class AnalyzeEyeArea(MeasureBase):
     def __init__(self) -> None:
         self.enabled = True
         self.items = [
-            MeasureItem("eye.l"),
-            MeasureItem("eye.r"),
-            MeasureItem("eye.d"),
-            MeasureItem("eye.rlr"),
-            MeasureItem("eye.rrl"),
+            MeasureItem("eye.left"),
+            MeasureItem("eye.right"),
+            MeasureItem("eye.diff"),
+            MeasureItem("eye.ratio"),
         ]
 
     def abbrev(self):
         return "Eye Area"
 
     def calc(self, face, render=True):
-        render2_eye_l = self.is_enabled("eye.l")
-        render2_eye_r = self.is_enabled("eye.r")
-        render2_eye_d = self.is_enabled("eye.d")
-        render2_eye_rlr = self.is_enabled("eye.rlr")
-        render2_eye_rrl = self.is_enabled("eye.rrl")
+        render2_eye_l = self.is_enabled("eye.left")
+        render2_eye_r = self.is_enabled("eye.right")
+        render2_eye_diff = self.is_enabled("eye.diff")
+        render2_eye_ratio = self.is_enabled("eye.ratio")
 
         right_eye_area = face.measure_polygon(
             [
@@ -303,15 +301,7 @@ class AnalyzeEyeArea(MeasureBase):
         )
 
         eye_area_diff = round(abs(right_eye_area - left_eye_area), 2)
-        if right_eye_area == 0:
-            eye_ratio_lr = 0
-        else:
-            eye_ratio_lr = round(left_eye_area / right_eye_area, 2)
-
-        if left_eye_area == 0:
-            eye_ratio_rl = 0
-        else:
-            eye_ratio_rl = round(right_eye_area / left_eye_area, 2)
+        eye_area_ratio = util.symmetry_ratio(right_eye_area, left_eye_area)
 
         if render & render2_eye_r:
             face.write_text_sq(
@@ -325,28 +315,22 @@ class AnalyzeEyeArea(MeasureBase):
                 f"L={round(left_eye_area,2)} mm",
             )
 
-        if render & render2_eye_d:
-            txt = f"d.eye={round(eye_area_diff,2)} mm"
+        if render & render2_eye_diff:
+            txt = f"eye.diff={round(eye_area_diff,2)} mm"
             pos = face.analyze_next_pt(txt)
             face.write_text_sq(pos, txt)
 
-        if render & render2_eye_rlr:
-            txt = f"rlr.eye={round(eye_ratio_lr,2)}"
-            pos = face.analyze_next_pt(txt)
-            face.write_text(pos, txt)
-
-        if render & render2_eye_rrl:
-            txt = f"rrl.eye={round(eye_ratio_rl,2)}"
+        if render & render2_eye_ratio:
+            txt = f"eye.ratio={round(eye_area_ratio,2)}"
             pos = face.analyze_next_pt(txt)
             face.write_text(pos, txt)
 
         return filter(
             {
-                "eye.l": left_eye_area,
-                "eye.r": right_eye_area,
-                "eye.d": eye_area_diff,
-                "eye.rlr": eye_ratio_lr,
-                "eye.rrl": eye_ratio_rl,
+                "eye.left": left_eye_area,
+                "eye.right": right_eye_area,
+                "eye.diff": eye_area_diff,
+                "eye.ratio": eye_area_ratio,
             },
             self.items,
         )
