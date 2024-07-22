@@ -209,3 +209,179 @@ def straighten(image, angle_radians):
     cropped_image = result_image[:h, :w]
 
     return cropped_image
+
+
+def symmetry_ratio(a, b):
+    """
+    Calculate the symmetry ratio between two numbers.
+
+    Parameters:
+    a (float): The size of the first object.
+    b (float): The size of the second object.
+
+    Returns:
+    float: The symmetry ratio, a value between 0 and 1.
+    """
+    if a == 0 and b == 0:
+        return 1.0  # If both sizes are zero, they are perfectly symmetric.
+    return min(a, b) / max(a, b)
+
+
+def line_intersection(line, contour):
+    intersections = []
+    for i in range(len(contour)):
+        p1 = contour[i]
+        p2 = contour[(i + 1) % len(contour)]
+        intersection = compute_intersection(line, (p1, p2))
+        if intersection is not None:
+            intersections.append((intersection, i))
+    return intersections
+
+
+def compute_intersection(line1, line2):
+    xdiff = (line1[0][0] - line1[1][0], line2[0][0] - line2[1][0])
+    ydiff = (line1[0][1] - line1[1][1], line2[0][1] - line2[1][1])
+
+    def det(a, b):
+        return a[0] * b[1] - a[1] * b[0]
+
+    div = det(xdiff, ydiff)
+    if div == 0:
+        return None  # Lines do not intersect
+
+    d = (det(*line1), det(*line2))
+    x = det(d, xdiff) / div
+    y = det(d, ydiff) / div
+
+    # Check if the intersection point is within the bounds of the polygon edge segment
+    if min(line2[0][0], line2[1][0]) <= x <= max(line2[0][0], line2[1][0]) and min(
+        line2[0][1], line2[1][1]
+    ) <= y <= max(line2[0][1], line2[1][1]):
+        return x, y
+    return None
+
+
+def split_polygon(polygon, line):
+    intersections = line_intersection(line, polygon)
+
+    if len(intersections) != 2:
+        raise ValueError("The line does not properly bisect the polygon.")
+
+    intersections = sorted(intersections, key=lambda x: x[1])
+
+    intersection1, idx1 = intersections[0]
+    intersection2, idx2 = intersections[1]
+
+    if idx1 > idx2:
+        idx1, idx2 = idx2, idx1
+        intersection1, intersection2 = intersection2, intersection1
+
+    poly1 = polygon[: idx1 + 1].tolist()
+    poly1.append(intersection1)
+    poly1.append(intersection2)
+    poly1.extend(polygon[idx2 + 1 :])
+
+    poly2 = polygon[idx1 + 1 : idx2 + 1].tolist()
+    poly2.append(intersection2)
+    poly2.append(intersection1)
+
+    return np.array(poly1), np.array(poly2)
+
+
+def bisecting_line_coordinates(img_size, pupils):
+    # Unpack pupil coordinates
+    (x1, y1), (x2, y2) = pupils
+
+    # Calculate midpoint between the pupils
+    mid_x = (x1 + x2) / 2
+    mid_y = (y1 + y2) / 2
+
+    # Calculate the angle of the line
+    if x1 == x2:
+        # Vertical line case (no tilt)
+        angle = np.pi / 2
+    else:
+        angle = np.arctan2((y2 - y1), (x2 - x1))
+
+    # Determine the slope of the perpendicular bisecting line
+    perp_slope = np.tan(angle + np.pi / 2)
+
+    # Function to get y coordinate given x
+    def get_y(x, mid_x, mid_y, slope):
+        return slope * (x - mid_x) + mid_y
+
+    # Function to get x coordinate given y
+    def get_x(y, mid_x, mid_y, slope):
+        return (y - mid_y) / slope + mid_x
+
+    # Calculate intersection points with the edges of the image
+    x0, x1 = 0, img_size
+    y0, y1 = get_y(x0, mid_x, mid_y, perp_slope), get_y(x1, mid_x, mid_y, perp_slope)
+
+    if y0 < 0:
+        y0 = 0
+        x0 = get_x(y0, mid_x, mid_y, perp_slope)
+    elif y0 > img_size:
+        y0 = img_size
+        x0 = get_x(y0, mid_x, mid_y, perp_slope)
+
+    if y1 < 0:
+        y1 = 0
+        x1 = get_x(y1, mid_x, mid_y, perp_slope)
+    elif y1 > img_size:
+        y1 = img_size
+        x1 = get_x(y1, mid_x, mid_y, perp_slope)
+
+    return (int(x0), int(y0)), (int(x1), int(y1))
+
+
+def line_to_edge(img_size, start_point, angle):
+    # Unpack start point
+    x0, y0 = start_point
+
+    # Calculate the slope of the line
+    slope = np.tan(angle)
+
+    # Determine the possible intersections with the image boundaries
+    possible_endpoints = []
+
+    # Intersection with the right edge (x = img_size)
+    if slope != 0:
+        x_right = img_size
+        y_right = slope * (x_right - x0) + y0
+        if 0 <= y_right <= img_size:
+            possible_endpoints.append((x_right, y_right))
+
+    # Intersection with the left edge (x = 0)
+    if slope != 0:
+        x_left = 0
+        y_left = slope * (x_left - x0) + y0
+        if 0 <= y_left <= img_size:
+            possible_endpoints.append((x_left, y_left))
+
+    # Intersection with the top edge (y = 0)
+    if slope != np.inf:
+        y_top = 0
+        x_top = (y_top - y0) / slope + x0
+        if 0 <= x_top <= img_size:
+            possible_endpoints.append((x_top, y_top))
+
+    # Intersection with the bottom edge (y = img_size)
+    if slope != np.inf:
+        y_bottom = img_size
+        x_bottom = (y_bottom - y0) / slope + x0
+        if 0 <= x_bottom <= img_size:
+            possible_endpoints.append((x_bottom, y_bottom))
+
+    if not possible_endpoints:
+        raise ValueError("No valid endpoint found on the image boundaries.")
+
+    # Choose the first valid endpoint (the one closest to the starting point)
+    endpoint = possible_endpoints[0]
+
+    return (int(endpoint[0]), int(endpoint[1]))
+
+
+def normalize_angle(angle):
+    # Use the modulus operator to normalize the angle
+    return angle % (2 * math.pi)

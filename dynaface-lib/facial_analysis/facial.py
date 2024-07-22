@@ -17,7 +17,7 @@ STYLEGAN_RIGHT_PUPIL = (380, 480)
 STYLEGAN_PUPIL_DIST = STYLEGAN_LEFT_PUPIL[0] - STYLEGAN_RIGHT_PUPIL[0]
 
 STD_PUPIL_DIST = 63
-DEFAULT_TILT_THRESHOLD = 0
+DEFAULT_TILT_THRESHOLD = 2
 
 LM_LEFT_PUPIL = 97
 LM_RIGHT_PUPIL = 96
@@ -264,7 +264,6 @@ class AnalyzeFace(ImageAnalysis):
         self.pupillary_distance = obj[3]
         self.pix2mm = obj[4]
 
-        self.face_rotation = obj[5]
         try:
             self.face_rotation = obj[5]
         except IndexError:
@@ -274,3 +273,6 @@ class AnalyzeFace(ImageAnalysis):
 
     def find_pupils(self):
         return util.get_pupils(self.landmarks)
+
+    def calc_bisect(self):
+        return util.bisecting_line_coordinates(img_size=1024, pupils=self.find_pupils())

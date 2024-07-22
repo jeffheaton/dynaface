@@ -87,7 +87,7 @@ class AnalyzeFAI(MeasureBase):
             fai = d2 - d1
 
         if render & render2:
-            txt = f"FAI={fai:.2f} mm"
+            txt = f"FAI={fai:.2f}"
             pos = face.analyze_next_pt(txt)
             face.write_text(pos, txt)
         return filter({"fai": fai}, (self.items))
@@ -121,66 +121,31 @@ class AnalyzeBrows(MeasureBase):
     def abbrev(self):
         return "Brow"
 
-    def average_euclidean_distance(
-        self, pupil: Tuple[float, float], brow: List[Tuple[float, float]]
-    ) -> float:
-        def euclidean_distance(
-            point1: Tuple[float, float], point2: Tuple[float, float]
-        ) -> float:
-            return math.sqrt(
-                (point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2
-            )
-
-        distances = [euclidean_distance(pupil, point) for point in brow]
-        average_distance = sum(distances) / len(distances) if distances else 0.0
-        return average_distance
-
     def calc(self, face, render=True):
         render2 = self.is_enabled("brow.d")
 
-        # left brow
-        contours = [
-            face.landmarks[34],
-            face.landmarks[35],
-            face.landmarks[36],
-            face.landmarks[37],
-        ]
+        p = util.get_pupils(face.landmarks)
+        tilt = util.normalize_angle(util.calculate_face_rotation(p))
 
-        contours = np.array(contours)
-        left_d = self.average_euclidean_distance(face.landmarks[96], contours)
-        x = contours[:, 0]
-        y = contours[:, 1]
-        left_brow_idx = np.argmin(y)
-        left_brow_y = y[left_brow_idx]
-        left_brow_x = x[left_brow_idx]
         if render & render2:
-            face.arrow((left_brow_x, left_brow_y), (1024, left_brow_y), apt2=False)
-
-        # right brow
-        contours = [
-            face.landmarks[42],
-            face.landmarks[43],
-            face.landmarks[44],
-            face.landmarks[45],
-        ]
-
-        contours = np.array(contours)
-        right_d = self.average_euclidean_distance(face.landmarks[97], contours)
-        x = contours[:, 0]
-        y = contours[:, 1]
-        right_brow_idx = np.argmin(y)
-        right_brow_y = y[right_brow_idx]
-        right_brow_x = x[right_brow_idx]
+            right_brow = util.line_to_edge(
+                img_size=1024, start_point=face.landmarks[35], angle=tilt
+            )
+            face.arrow(face.landmarks[36], right_brow, apt2=False)
 
         # Diff
-        diff = abs(left_d - right_d) * face.pix2mm
+
         if render & render2:
-            face.arrow((right_brow_x, right_brow_y), (1024, right_brow_y), apt2=False)
+            left_brow = util.line_to_edge(
+                img_size=1024, start_point=face.landmarks[44], angle=tilt
+            )
+            face.arrow(face.landmarks[44], left_brow, apt2=False)
+            diff = abs(left_brow[1] - right_brow[1]) * face.pix2mm
             txt = f"d.brow={diff:.2f} mm"
             m = face.calc_text_size(txt)
 
             face.write_text(
-                (face.width - (m[0][0] + 5), min(left_brow_y, right_brow_y) - 10),
+                (face.width - (m[0][0] + 5), min(left_brow[1], right_brow[1]) - 10),
                 txt,
             )
 
@@ -190,15 +155,25 @@ class AnalyzeBrows(MeasureBase):
 class AnalyzeDentalArea(MeasureBase):
     def __init__(self) -> None:
         self.enabled = True
-        self.items = [MeasureItem("dental_area")]
+        self.items = [
+            MeasureItem("dental_area"),
+            MeasureItem("dental_left"),
+            MeasureItem("dental_right"),
+            MeasureItem("dental_ratio"),
+            MeasureItem("dental_diff"),
+        ]
 
     def abbrev(self):
         return "Dental Display"
 
     def calc(self, face, render=True):
-        render2 = self.is_enabled("dental_area")
+        render2_area = self.is_enabled("dental_area")
+        render2_left = self.is_enabled("dental_left")
+        render2_right = self.is_enabled("dental_right")
+        render2_ratio = self.is_enabled("dental_ratio")
+        render2_diff = self.is_enabled("dental_diff")
 
-        contours = [
+        contours_area = [
             face.landmarks[88],
             face.landmarks[89],
             face.landmarks[90],
@@ -209,15 +184,71 @@ class AnalyzeDentalArea(MeasureBase):
             face.landmarks[95],
         ]
 
-        contours = np.array(contours)  # contours = contours*face.pix2mm
-        dental_area = face.measure_polygon(
-            contours, face.pix2mm, render=(render & render2)
+        p1, p2 = face.calc_bisect()
+
+        contours_area = np.array(contours_area)
+
+        contours_area_left, contours_area_right = util.split_polygon(
+            contours_area, [p1, p2]
         )
-        if render & render2:
+
+        contours_area_left = np.array(contours_area_left, dtype=int)
+        contours_area_right = np.array(contours_area_right, dtype=int)
+
+        dental_area_right = face.measure_polygon(
+            contours_area_right,
+            face.pix2mm,
+            render=(render & render2_right),
+            color=(255, 0, 0),
+        )
+
+        dental_area_left = face.measure_polygon(
+            contours_area_left,
+            face.pix2mm,
+            render=(render & render2_left),
+            color=(0, 0, 255),
+        )
+
+        dental_area = dental_area_right + dental_area_left
+
+        dental_ratio = util.symmetry_ratio(dental_area_left, dental_area_right)
+        dental_diff = abs(dental_area_left - dental_area_right)
+
+        if render & render2_area:
             txt = f"dental={round(dental_area,2)} mm"
             pos = face.analyze_next_pt(txt)
             face.write_text_sq(pos, txt)
-        return filter({"dental_area": dental_area}, self.items)
+
+        if render & render2_left:
+            txt = f"dental.left={round(dental_area_left,2)} mm"
+            pos = face.analyze_next_pt(txt)
+            face.write_text_sq(pos, txt)
+
+        if render & render2_right:
+            txt = f"dental.right={round(dental_area_right,2)} mm"
+            pos = face.analyze_next_pt(txt)
+            face.write_text_sq(pos, txt)
+
+        if render & render2_ratio:
+            txt = f"dental.ratio={round(dental_ratio,2)}"
+            pos = face.analyze_next_pt(txt)
+            face.write_text(pos, txt)
+
+        if render & render2_diff:
+            txt = f"dental.diff={round(dental_diff,2)}"
+            pos = face.analyze_next_pt(txt)
+            face.write_text(pos, txt)
+
+        return filter(
+            {
+                "dental_area": dental_area,
+                "dental_left": dental_area_left,
+                "dental_right": dental_area_right,
+                "dental_ratio": dental_ratio,
+                "dental_diff": dental_diff,
+            },
+            self.items,
+        )
 
 
 class AnalyzeEyeArea(MeasureBase):
@@ -300,14 +331,14 @@ class AnalyzeEyeArea(MeasureBase):
             face.write_text_sq(pos, txt)
 
         if render & render2_eye_rlr:
-            txt = f"rlr.eye={round(eye_ratio_lr,2)} mm"
+            txt = f"rlr.eye={round(eye_ratio_lr,2)}"
             pos = face.analyze_next_pt(txt)
-            face.write_text_sq(pos, txt)
+            face.write_text(pos, txt)
 
         if render & render2_eye_rrl:
-            txt = f"rrl.eye={round(eye_ratio_rl,2)} mm"
+            txt = f"rrl.eye={round(eye_ratio_rl,2)}"
             pos = face.analyze_next_pt(txt)
-            face.write_text_sq(pos, txt)
+            face.write_text(pos, txt)
 
         return filter(
             {
@@ -347,6 +378,8 @@ class AnalyzePosition(MeasureBase):
                     txt = f"tilt={round(tilt,2)}"
                 pos = face.analyze_next_pt(txt)
                 face.write_text_sq(pos, txt, mark="o", up=15)
+                p1, p2 = face.calc_bisect()
+                face.line(p1, p2)
 
             pd, pix2mm = util.calc_pd(util.get_pupils(landmarks))
 
