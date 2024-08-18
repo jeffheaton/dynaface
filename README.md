@@ -16,3 +16,7 @@ Dynaface is a computer application and Python library that measures facial symme
 - Prados-Torreblanca, Andrés, José M. Buenaposada, and Luis Baumela. "[Shape preserving facial landmarks with graph attention networks.](https://arxiv.org/abs/2210.07233)" _arXiv preprint arXiv:2210.07233_ (2022).
 
 - Wu, Wayne, et al. "[Look at boundary: A boundary-aware face alignment algorithm](https://openaccess.thecvf.com/content_cvpr_2018/papers/Wu_Look_at_Boundary_CVPR_2018_paper.pdf)." _Proceedings of the IEEE conference on computer vision and pattern recognition._ 2018.
+
+# License
+
+This application and Python library are licensed under the [The MIT License](https://github.com/jeffheaton/dynaface/blob/main/LICENSE.txt).
