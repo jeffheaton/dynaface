@@ -154,34 +154,37 @@ class WorkerLoad(QThread):
 
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
-                # Make sure we did not get a request to stop during each of these:
-                if self.running:
-                    self._face.load_image(img=frame, crop=True, pupils=pupils)
-                    pupil_queue.append(self._face.orig_pupils)
-                    pupils = mean_landmarks(pupil_queue)
+                try:
+                    # Make sure we did not get a request to stop during each of these:
+                    if self.running:
+                        self._face.load_image(img=frame, crop=True, pupils=pupils)
+                        pupil_queue.append(self._face.orig_pupils)
+                        pupils = mean_landmarks(pupil_queue)
 
-                if self.running:
-                    # Extract
-                    landmarks = self._face.landmarks
-                    landmarks_queue.append(landmarks)
-                    if len(landmarks_queue) > 1:
-                        landmarks = mean_landmarks(landmarks_queue)
+                    if self.running:
+                        # Extract
+                        landmarks = self._face.landmarks
+                        landmarks_queue.append(landmarks)
+                        if len(landmarks_queue) > 1:
+                            landmarks = mean_landmarks(landmarks_queue)
 
-                    pupillary_distance, pix2mm = util.calc_pd(
-                        util.get_pupils(landmarks)
-                    )
+                        pupillary_distance, pix2mm = util.calc_pd(
+                            util.get_pupils(landmarks)
+                        )
 
-                    # Update remaining face properties
-                    self._face.landmarks = landmarks
-                    self._face.pupillary_distance = pupillary_distance
-                    self._face.pix2mm = pix2mm
+                        # Update remaining face properties
+                        self._face.landmarks = landmarks
+                        self._face.pupillary_distance = pupillary_distance
+                        self._face.pix2mm = pix2mm
 
-                    # Build frame-state data
-                    frame_state = self._face.dump_state()
-                    self._target.add_frame(frame_state)
+                        # Build frame-state data
+                        frame_state = self._face.dump_state()
+                        self._target.add_frame(frame_state)
 
-                if self.running:
-                    self._update_signal.emit(self._loading_etc.cycle())
+                    if self.running:
+                        self._update_signal.emit(self._loading_etc.cycle())
+                except Exception as e:
+                    logger.error("Error frame #{i}", exc_info=True)
 
         except Exception as e:
             logger.error("Error loading video", exc_info=True)
