@@ -606,8 +606,9 @@ gesture you wish to analyze."""
                 self.render_chart()
         except Exception as e:
             current_frame = self._video_slider.value() - self._frame_begin
-            print(f"Error on: {current_frame}")
-            logger.error("Error moving to new video frame", exc_info=True)
+            logger.error(
+                f"Error moving to new video frame: {current_frame}", exc_info=True
+            )
 
     def action_zoom(self, value):
         z = value / 100
