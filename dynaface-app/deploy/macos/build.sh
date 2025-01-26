@@ -39,8 +39,19 @@ cp -r ../../jth_ui ./working/jth_ui
 
 cd ./working
 echo "** Force PyTorch Upgrade **"
-pip install /Users/jeff/output/wheel/torch-2.4.0a0+git1cd4199-cp312-cp312-macosx_14_0_arm64.whl
-pip install /Users/jeff/output/wheel/torchvision-0.9.0a0+761d09f-cp312-cp312-macosx_14_0_arm64.whl
+
+if [[ "$arch" == "x86_64" ]]; then
+    echo "Detected MacOS Intel (x86_64)"
+    pip install /Users/jeff/output/wheel/torch-2.4.0a0+git1cd4199-cp312-cp312-macosx_14_0_x86_64.whl
+    pip install /Users/jeff/output/wheel/torchvision-0.9.0a0+761d09f-cp312-cp312-macosx_14_0_x86_64.whl
+elif [[ "$arch" == "arm64" ]]; then
+    echo "Detected MacOS ARM (arm64)"
+    pip install /Users/jeff/output/wheel/torch-2.4.0a0+git1cd4199-cp312-cp312-macosx_14_0_arm64.whl
+    pip install /Users/jeff/output/wheel/torchvision-0.9.0a0+761d09f-cp312-cp312-macosx_14_0_arm64.whl
+else
+    echo "Using existing PyTorch install"
+fi
+
 echo "** Pyinstaller **"
 pyinstaller --clean --noconfirm --distpath dist --workpath build dynaface-macos.spec
 
