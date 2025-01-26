@@ -140,49 +140,57 @@ class AppJTH(QApplication):
             if (current_time - creation_time).days > retention_period:
                 os.remove(file)
 
-    # Define the logging configuration
     def setup_logging(self, level=logging.INFO):
         os.makedirs(self.LOG_DIR, exist_ok=True)
 
-        # Create the directory if it doesn't exist
-        if not os.path.exists(self.LOG_DIR):
-            os.makedirs(self.LOG_DIR)
+        log_filename = os.path.join(
+            self.LOG_DIR, f"{datetime.datetime.now().strftime('%Y-%m-%d')}.log"
+        )
 
-            # Create the directory if it doesn't exist
-        if not os.path.exists(self.SETTING_DIR):
-            os.makedirs(self.SETTING_DIR)
+        # Get the root logger
+        root_logger = logging.getLogger()
+        root_logger.setLevel(level)
 
-        # Get the current date to append to the log filename
-        date_str = datetime.datetime.now().strftime("%Y-%m-%d")
-        log_filename = os.path.join(self.LOG_DIR, f"{date_str}.log")
+        # Remove existing handlers to prevent duplication
+        for handler in root_logger.handlers[:]:
+            root_logger.removeHandler(handler)
 
-        # Set up logging
-        self._logger = logging.getLogger()
-        self._logger.setLevel(level)
-
-        # Create a file handler to write log messages to the file
-        self._file_handler = logging.handlers.TimedRotatingFileHandler(
+        # File Handler
+        file_handler = logging.handlers.TimedRotatingFileHandler(
             log_filename, when="midnight", interval=1, backupCount=7
         )
-        self._file_handler.setLevel(level)
+        file_handler.setLevel(level)
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        )
+        file_handler.flush = sys.stdout.flush  # Ensure immediate flush
 
-        # Create a formatter to format the log messages
-        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-        self._file_handler.setFormatter(formatter)
+        # Console Handler
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(level)
+        console_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        )
 
-        # Add the handler to the logger
-        logger.addHandler(self._file_handler)
+        # Attach handlers to the root logger
+        root_logger.addHandler(file_handler)
+        root_logger.addHandler(console_handler)
 
-        # Add a stream handler (console handler) for console output
-        self._console_handler = logging.StreamHandler()
-        self._console_handler.setLevel(level)
-        self._console_handler.setFormatter(formatter)
-        logger.addHandler(self._console_handler)
+        # Set `logger` to reference the root logger
+        global logger
+        logger = root_logger
+
+        logger.info("Logging initialized.")
 
     def change_log_level(self, level):
-        self._console_handler.setLevel(level)
-        self._logger.setLevel(level)
-        self._file_handler.setLevel(level)
+        if hasattr(self, "_console_handler"):
+            self._console_handler.setLevel(level)
+        if hasattr(self, "_file_handler"):
+            self._file_handler.setLevel(level)
+        if hasattr(self, "_logger"):
+            self._logger.setLevel(level)
+
+        logging.info(f"Log level changed to {level}")
 
     def shutdown(self):
         self.save_state()

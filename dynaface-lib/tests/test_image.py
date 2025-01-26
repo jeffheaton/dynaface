@@ -1,5 +1,6 @@
 import unittest
-from facial_analysis.image import *
+import numpy as np
+from facial_analysis.image import load_image
 from facial_analysis.facial import safe_clip
 
 

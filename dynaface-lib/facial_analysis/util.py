@@ -227,7 +227,9 @@ def symmetry_ratio(a, b):
     return min(a, b) / max(a, b)
 
 
-def line_intersection(line, contour):
+def line_intersection(line, contour, tol=1e-7):
+    """Return a list of (intersection_point, edge_index) for all edges in 'contour'
+    that intersect with 'line'. Deduplicate near-identical points."""
     intersections = []
     for i in range(len(contour)):
         p1 = contour[i]
@@ -235,7 +237,17 @@ def line_intersection(line, contour):
         intersection = compute_intersection(line, (p1, p2))
         if intersection is not None:
             intersections.append((intersection, i))
-    return intersections
+
+    # Deduplicate intersection points that are effectively the same
+    unique_intersections = []
+    for pt, idx in intersections:
+        if not any(
+            np.linalg.norm(np.array(pt) - np.array(u_pt)) < tol
+            for (u_pt, _) in unique_intersections
+        ):
+            unique_intersections.append((pt, idx))
+
+    return unique_intersections
 
 
 def compute_intersection(line1, line2):
@@ -265,7 +277,9 @@ def split_polygon(polygon, line):
     intersections = line_intersection(line, polygon)
 
     if len(intersections) != 2:
-        raise ValueError("The line does not properly bisect the polygon.")
+        raise ValueError(
+            f"The line does not properly bisect the polygon. line={line}, polygon={polygon}"
+        )
 
     intersections = sorted(intersections, key=lambda x: x[1])
 

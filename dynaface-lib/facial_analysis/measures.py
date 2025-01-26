@@ -188,31 +188,38 @@ class AnalyzeDentalArea(MeasureBase):
 
         contours_area = np.array(contours_area)
 
-        contours_area_left, contours_area_right = util.split_polygon(
-            contours_area, [p1, p2]
-        )
+        try:
+            contours_area_left, contours_area_right = util.split_polygon(
+                contours_area, [p1, p2]
+            )
 
-        contours_area_left = np.array(contours_area_left, dtype=int)
-        contours_area_right = np.array(contours_area_right, dtype=int)
+            contours_area_left = np.array(contours_area_left, dtype=int)
+            contours_area_right = np.array(contours_area_right, dtype=int)
 
-        dental_area_right = face.measure_polygon(
-            contours_area_right,
-            face.pix2mm,
-            render=(render & render2_right),
-            color=(255, 0, 0),
-        )
+            dental_area_right = face.measure_polygon(
+                contours_area_right,
+                face.pix2mm,
+                render=(render & render2_right),
+                color=(255, 0, 0),
+            )
 
-        dental_area_left = face.measure_polygon(
-            contours_area_left,
-            face.pix2mm,
-            render=(render & render2_left),
-            color=(0, 0, 255),
-        )
+            dental_area_left = face.measure_polygon(
+                contours_area_left,
+                face.pix2mm,
+                render=(render & render2_left),
+                color=(0, 0, 255),
+            )
 
-        dental_area = dental_area_right + dental_area_left
+            dental_area = dental_area_right + dental_area_left
 
-        dental_ratio = util.symmetry_ratio(dental_area_left, dental_area_right)
-        dental_diff = abs(dental_area_left - dental_area_right)
+            dental_ratio = util.symmetry_ratio(dental_area_left, dental_area_right)
+            dental_diff = abs(dental_area_left - dental_area_right)
+        except ValueError:
+            dental_area = 0
+            dental_area_left = 0
+            dental_area_right = 0
+            dental_ratio = 1
+            dental_diff = 0
 
         if render & render2_area:
             txt = f"dental={round(dental_area,2)} mm"
