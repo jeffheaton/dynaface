@@ -131,6 +131,8 @@ class AnalyzeFace(ImageAnalysis):
                 self.crop_stylegan(pupils=pupils)
         else:
             logger.info("No face detected")
+            return False
+        return True
 
     def draw_landmarks(self, size=0.25, color=[0, 255, 255], numbers=False):
         if self.landmarks is None:
