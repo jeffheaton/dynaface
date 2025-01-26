@@ -596,13 +596,18 @@ gesture you wish to analyze."""
         self.forward_action()
 
     def action_video_seek(self, _):
-        self.open_frame()
-        self.lbl_status.setText(self.status())
-        if self._chart_view:
-            # self.update_chart()
+        try:
+            self.open_frame()
+            self.lbl_status.setText(self.status())
+            if self._chart_view:
+                # self.update_chart()
+                current_frame = self._video_slider.value() - self._frame_begin
+                self._frame_line.set_xdata([current_frame])
+                self.render_chart()
+        except Exception as e:
             current_frame = self._video_slider.value() - self._frame_begin
-            self._frame_line.set_xdata([current_frame])
-            self.render_chart()
+            print(f"Error on: {current_frame}")
+            logger.error("Error moving to new video frame", exc_info=True)
 
     def action_zoom(self, value):
         z = value / 100
