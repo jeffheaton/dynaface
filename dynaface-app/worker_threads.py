@@ -161,7 +161,7 @@ class WorkerLoad(QThread):
                 success = self._face.load_image(img=frame, crop=True, pupils=pupils)
                 if not success:
                     logger.info(f"No face found on frame {i}")
-                    # continue
+                    continue
 
                 pupil_queue.append(self._face.orig_pupils)
                 pupils = mean_landmarks(pupil_queue)
