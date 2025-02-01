@@ -18,7 +18,7 @@ fi
 # Environment
 cd ../..
 rm -rf ./venv || true
-python3 -m venv venv
+python3.12 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 pip install facial_analysis -f ./wheels
