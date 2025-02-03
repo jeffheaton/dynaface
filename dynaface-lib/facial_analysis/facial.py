@@ -67,6 +67,7 @@ class AnalyzeFace(ImageAnalysis):
         self.headpose = [0, 0, 0]
         self.landmarks = []
         self.pupillary_distance = 0
+        logger.debug(f"===INIT: t={tilt_threshold}")
         self.tilt_threshold = tilt_threshold
         self.pix2mm = 1
         self.face_rotation = None
@@ -95,7 +96,7 @@ class AnalyzeFace(ImageAnalysis):
 
         if bbox is None:
             bbox = [0, 0, img.shape[1], img.shape[0]]
-            logging.info("Could not detect face area")
+            logging.info("MTCNN could not detect face area")
         else:
             bbox = bbox[0]
         # bbox to spiga is x,y,w,h; however, facenet_pytorch deals in x1,y1,x2,y2.
@@ -179,7 +180,6 @@ class AnalyzeFace(ImageAnalysis):
                 result.update(calc.calc(self))
         return result
 
-    # Usage in crop_stylegan
     def crop_stylegan(self, pupils=None):
         # Save orig pupils so we can lock the scale, rotate, and crop during a load
         self.orig_pupils = util.get_pupils(self.landmarks)
@@ -190,6 +190,7 @@ class AnalyzeFace(ImageAnalysis):
         if pupils:
             r = util.calculate_face_rotation(pupils)
             tilt = measures.to_degrees(r)
+            logger.debug(f"=={self.tilt_threshold}, {tilt}, {self.tilt_threshold}")
             if (self.tilt_threshold >= 0) and (abs(tilt) > self.tilt_threshold):
                 logger.debug(
                     f"Rotate landmarks: detected tilt={tilt} threshold={self.tilt_threshold}"

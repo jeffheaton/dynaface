@@ -115,14 +115,6 @@ class WorkerLoad(QThread):
         data_smoothing = dynaface_app.current_dynaface_app.data_smoothing
         tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
 
-        if dynamic_adjust < 1:
-            dynamic_adjust = 1
-        if data_smoothing < 1:
-            data_smoothing = 1
-
-        if tilt_threshold < 0:
-            tilt_threshold = 0
-
         logger.debug("Running background thread")
         logger.debug(f"Smoothing crop buffer size: {dynamic_adjust}")
         logger.debug(f"Smoothing landmarks buffer size: {data_smoothing}")
@@ -165,12 +157,13 @@ class WorkerLoad(QThread):
 
                 pupil_queue.append(self._face.orig_pupils)
                 pupils = mean_landmarks(pupil_queue)
+                pupils = self._face.orig_pupils
 
                 # Extract
                 landmarks = self._face.landmarks
-                landmarks_queue.append(landmarks)
-                if len(landmarks_queue) > 1:
-                    landmarks = mean_landmarks(landmarks_queue)
+                # landmarks_queue.append(landmarks)
+                # if len(landmarks_queue) > 1:
+                #    landmarks = mean_landmarks(landmarks_queue)
 
                 pupillary_distance, pix2mm = util.calc_pd(util.get_pupils(landmarks))
 

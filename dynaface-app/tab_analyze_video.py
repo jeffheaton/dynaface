@@ -134,6 +134,11 @@ class AnalyzeVideoTab(TabGraphic):
         if not self.video_stream.isOpened():
             raise ValueError("Unknown video format")
 
+        # Get video width and height
+        width = int(self.video_stream.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(self.video_stream.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        logger.info(f"Video dimensions: width={width}, height={height}")
+
         # Get the frame rate of the video
         self.frame_rate = int(self.video_stream.get(cv2.CAP_PROP_FPS))
         self.frame_count = int(self.video_stream.get(cv2.CAP_PROP_FRAME_COUNT))

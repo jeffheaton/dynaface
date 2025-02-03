@@ -140,7 +140,7 @@ class AppJTH(QApplication):
             if (current_time - creation_time).days > retention_period:
                 os.remove(file)
 
-    def setup_logging(self, level=logging.INFO):
+    def setup_logging(self, level=logging.DEBUG):
         os.makedirs(self.LOG_DIR, exist_ok=True)
 
         log_filename = os.path.join(
@@ -156,25 +156,25 @@ class AppJTH(QApplication):
             root_logger.removeHandler(handler)
 
         # File Handler
-        file_handler = logging.handlers.TimedRotatingFileHandler(
+        self._file_handler = logging.handlers.TimedRotatingFileHandler(
             log_filename, when="midnight", interval=1, backupCount=7
         )
-        file_handler.setLevel(level)
-        file_handler.setFormatter(
+        self._file_handler.setLevel(level)
+        self._file_handler.setFormatter(
             logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         )
-        file_handler.flush = sys.stdout.flush  # Ensure immediate flush
+        self._file_handler.flush = sys.stdout.flush  # Ensure immediate flush
 
         # Console Handler
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(level)
-        console_handler.setFormatter(
+        self._console_handler = logging.StreamHandler()
+        self._console_handler.setLevel(level)
+        self._console_handler.setFormatter(
             logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         )
 
         # Attach handlers to the root logger
-        root_logger.addHandler(file_handler)
-        root_logger.addHandler(console_handler)
+        root_logger.addHandler(self._file_handler)
+        root_logger.addHandler(self._console_handler)
 
         # Set `logger` to reference the root logger
         global logger
@@ -183,14 +183,24 @@ class AppJTH(QApplication):
         logger.info("Logging initialized.")
 
     def change_log_level(self, level):
+        """Change the log level of the logger and its handlers."""
+
+        if not isinstance(level, int):
+            raise ValueError("Log level must be an integer (e.g., logging.INFO)")
+
         if hasattr(self, "_console_handler"):
             self._console_handler.setLevel(level)
         if hasattr(self, "_file_handler"):
             self._file_handler.setLevel(level)
         if hasattr(self, "_logger"):
             self._logger.setLevel(level)
-
-        logging.info(f"Log level changed to {level}")
+            self._logger.info(
+                f"Log level changed to {logging.getLevelName(level)} ({level})"
+            )
+        else:
+            logging.info(
+                f"Log level changed to {logging.getLevelName(level)} ({level})"
+            )
 
     def shutdown(self):
         self.save_state()

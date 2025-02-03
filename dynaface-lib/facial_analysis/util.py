@@ -350,6 +350,18 @@ def bisecting_line_coordinates(img_size, pupils):
 
 
 def line_to_edge(img_size, start_point, angle):
+    """
+    Computes the intersection point where a line, originating from a given start point
+    and extending at a specified angle, meets the boundary of a square image.
+
+    Parameters:
+    - img_size (int): The size (width/height) of the square image.
+    - start_point (tuple): The (x, y) coordinates of the starting point.
+    - angle (float): The angle (in radians) of the line measured counterclockwise from the x-axis.
+
+    Returns:
+    - (int, int): The (x, y) coordinates of the intersection point on the image boundary.
+    """
     # Unpack start point
     x0, y0 = start_point
 
@@ -383,12 +395,16 @@ def line_to_edge(img_size, start_point, angle):
     # Intersection with the bottom edge (y = img_size)
     if slope != np.inf:
         y_bottom = img_size
+        if (slope + x0) < 1e-10:
+            # Prevent div by zero
+            return None
         x_bottom = (y_bottom - y0) / slope + x0
         if 0 <= x_bottom <= img_size:
             possible_endpoints.append((x_bottom, y_bottom))
 
     if not possible_endpoints:
-        raise ValueError("No valid endpoint found on the image boundaries.")
+        # No valid endpoint found on the image boundaries.
+        return None
 
     # Choose the first valid endpoint (the one closest to the starting point)
     endpoint = possible_endpoints[0]

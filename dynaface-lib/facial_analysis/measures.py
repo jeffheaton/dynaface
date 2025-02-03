@@ -131,6 +131,8 @@ class AnalyzeBrows(MeasureBase):
             right_brow = util.line_to_edge(
                 img_size=1024, start_point=face.landmarks[35], angle=tilt
             )
+            if not right_brow:
+                return None
             face.arrow(face.landmarks[36], right_brow, apt2=False)
 
         # Diff
@@ -139,6 +141,8 @@ class AnalyzeBrows(MeasureBase):
             left_brow = util.line_to_edge(
                 img_size=1024, start_point=face.landmarks[44], angle=tilt
             )
+            if not left_brow:
+                return None
             face.arrow(face.landmarks[44], left_brow, apt2=False)
             diff = abs(left_brow[1] - right_brow[1]) * face.pix2mm
             txt = f"d.brow={diff:.2f} mm"

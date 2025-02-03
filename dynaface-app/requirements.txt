@@ -7,3 +7,4 @@ opencv-python-headless==4.11.0.86
 pillow==10.2.0
 appdirs==1.4.4
 pillow-heif==0.21.0
+
