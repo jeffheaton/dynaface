@@ -128,6 +128,7 @@ class AnalyzeVideoTab(TabGraphic):
 
     def begin_load_video(self, path):
         # Open the video file
+        self.base_rotation = None
         self.video_stream = cv2.VideoCapture(path)
 
         # Check if video file opened successfully

@@ -5,7 +5,7 @@ from typing import Callable
 
 import cv2
 import dynaface_app
-from facial_analysis import facial, util
+from facial_analysis import facial, util, measures
 from jth_ui import utl_etc
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -110,6 +110,18 @@ class WorkerLoad(QThread):
         self._total = self._target.frame_count
         self.running = True
 
+    def preprocess_frame(self, frame, pupils, color=True):
+        if self._target.base_rotation is not None:
+            frame = cv2.rotate(frame, self._target.base_rotation)
+        if color:
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+        success = self._face.load_image(img=frame, crop=True, pupils=pupils)
+        if not success:
+            return None
+
+        return frame
+
     def run(self):
         dynamic_adjust = dynaface_app.current_dynaface_app.dynamic_adjust
         data_smoothing = dynaface_app.current_dynaface_app.data_smoothing
@@ -144,16 +156,23 @@ class WorkerLoad(QThread):
                     logger.debug("Thread done")
                     break
 
-                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-
                 # Make sure we did not get a request to stop during each of these:
                 if not self.running:
                     break
 
-                success = self._face.load_image(img=frame, crop=True, pupils=pupils)
-                if not success:
+                frame = self.preprocess_frame(frame, pupils=pupils)
+                if frame is None:
                     logger.info(f"No face found on frame {i}")
                     continue
+
+                tilt = self._face.calculate_face_rotation()
+                if abs(tilt) > 70 and self._target.base_rotation is None:
+                    if tilt < 0:
+                        self._target.base_rotation = cv2.ROTATE_90_CLOCKWISE
+                    else:
+                        self._target.base_rotation = cv2.ROTATE_90_COUNTERCLOCKWISE
+
+                    frame = self.preprocess_frame(frame, pupils=pupils, color=False)
 
                 pupil_queue.append(self._face.orig_pupils)
                 pupils = mean_landmarks(pupil_queue)
