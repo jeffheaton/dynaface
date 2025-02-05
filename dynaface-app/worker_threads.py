@@ -160,11 +160,22 @@ class WorkerLoad(QThread):
                 if not self.running:
                     break
 
+                # Handle frames where we fail to find a face
+                frame2 = frame
                 frame = self.preprocess_frame(frame, pupils=pupils)
                 if frame is None:
-                    logger.info(f"No face found on frame {i}")
-                    continue
+                    # See if a rotation fixes this
+                    self._target.base_rotation = cv2.ROTATE_90_CLOCKWISE
+                    frame = self.preprocess_frame(frame2, pupils=pupils)
+                    if frame is None:
+                        self._target.base_rotation = cv2.ROTATE_90_COUNTERCLOCKWISE
+                        frame = self.preprocess_frame(frame2, pupils=pupils)
+                        if frame is None:
+                            self._target.base_rotation = None
+                            logger.info(f"No face found on frame {i}")
+                            continue
 
+                # See if we have a considerable tilt, and try to resolve
                 tilt = self._face.calculate_face_rotation()
                 if abs(tilt) > 70 and self._target.base_rotation is None:
                     if tilt < 0:
@@ -174,6 +185,7 @@ class WorkerLoad(QThread):
 
                     frame = self.preprocess_frame(frame, pupils=pupils, color=False)
 
+                #
                 pupil_queue.append(self._face.orig_pupils)
                 pupils = mean_landmarks(pupil_queue)
                 pupils = self._face.orig_pupils
