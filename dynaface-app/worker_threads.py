@@ -188,13 +188,12 @@ class WorkerLoad(QThread):
                 #
                 pupil_queue.append(self._face.orig_pupils)
                 pupils = mean_landmarks(pupil_queue)
-                pupils = self._face.orig_pupils
 
                 # Extract
                 landmarks = self._face.landmarks
-                # landmarks_queue.append(landmarks)
-                # if len(landmarks_queue) > 1:
-                #    landmarks = mean_landmarks(landmarks_queue)
+                landmarks_queue.append(landmarks)
+                if len(landmarks_queue) > 1:
+                    landmarks = mean_landmarks(landmarks_queue)
 
                 pupillary_distance, pix2mm = util.calc_pd(util.get_pupils(landmarks))
 
