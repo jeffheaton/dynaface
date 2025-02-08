@@ -176,6 +176,7 @@ class WorkerLoad(QThread):
                             continue
 
                 # See if we have a considerable tilt, and try to resolve
+                # This is likely due to an iphone held vertically but video stored horizontally
                 tilt = self._face.calculate_face_rotation()
                 if abs(tilt) > 70 and self._target.base_rotation is None:
                     if tilt < 0:
