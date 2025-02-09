@@ -10,12 +10,12 @@ if [ -z "${app_certificate}" ]; then
 fi
 # Baseline utilities to build package
 rm -rf ./venv || true
-python3.12 -m venv venv   
+python3.11 -m venv venv   
 source venv/bin/activate   
 pip install setuptools wheel
 # Build it
 cd ./dynaface-lib
-python3.12 setup.py bdist_wheel
+python3.11 setup.py bdist_wheel
 mkdir -p ../dynaface-app/wheels/
 cp ./dist/*.whl ../dynaface-app/wheels/
 cd ../dynaface-app
@@ -24,10 +24,10 @@ cp $models/pnet.pt ./data
 cp $models/rnet.pt ./data
 cp $models/spiga_wflw.pt ./data
 rm -rf ./venv || true
-python3.12 -m venv venv
+python3.11 -m venv venv
 source venv/bin/activate
-pip3.12 install -r requirements.txt -f /Users/jeff/output/pytorch
-pip3.12 install facial_analysis -f ./wheels -f /Users/jeff/output/PyTorch
+pip3.11 install -r requirements.txt -f /Users/jeff/output/pytorch
+pip3.11 install facial_analysis -f ./wheels -f /Users/jeff/output/PyTorch
 cd deploy/macos
 rm -rf ./working || true
 ./build.sh
