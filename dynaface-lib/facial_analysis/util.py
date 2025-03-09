@@ -440,7 +440,7 @@ def cv2_to_pil(cv_image):
 
 def convert_matplotlib_to_opencv(ax):
     """
-    Convert a Matplotlib axis (ax) to an OpenCV image.
+    Convert a Matplotlib axis (ax) to an OpenCV image without extra whitespace.
 
     Args:
         ax (matplotlib.axes.Axes): The Matplotlib axis containing the plot.
@@ -448,8 +448,9 @@ def convert_matplotlib_to_opencv(ax):
     Returns:
         np.ndarray: The plot converted to an OpenCV image (BGR format).
     """
-    # Get the figure from the axis
+    # Get the figure and remove padding
     fig = ax.figure
+    fig.subplots_adjust(left=0, right=1, top=1, bottom=0)  # Manually remove margins
 
     # Draw the canvas
     canvas = FigureCanvas(fig)
@@ -458,14 +459,15 @@ def convert_matplotlib_to_opencv(ax):
     # Convert to numpy array
     image = np.array(canvas.renderer.buffer_rgba())
 
+    # Get the bounding box of the axes to remove extra space
+    bbox = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+    bbox = [int(coord * fig.dpi) for coord in bbox.extents]  # Convert to pixels
+    image = image[bbox[1] : bbox[3], bbox[0] : bbox[2], :]
+
     # Convert RGBA to BGR (OpenCV format)
     image = cv2.cvtColor(image, cv2.COLOR_RGBA2BGR)
 
     return image
-
-
-import cv2
-import numpy as np
 
 
 def trim_sides(image: np.ndarray) -> np.ndarray:

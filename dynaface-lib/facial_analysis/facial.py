@@ -23,7 +23,8 @@ DEFAULT_TILT_THRESHOLD = -1
 LM_LEFT_PUPIL = 97
 LM_RIGHT_PUPIL = 96
 
-FILL_COLOR = [128, 128, 128]
+FILL_COLOR = [255, 255, 255]
+
 
 SPIGA_MODEL = "wflw"
 
@@ -138,12 +139,24 @@ class AnalyzeFace(ImageAnalysis):
         # Scale 'c' to a height of 1024 while maintaining aspect ratio
         c_height, c_width = c.shape[:2]
         scale_factor = 1024 / c_height
+        print(f"Height x width: {c_height} {c_width}")
+        print(f"Scale Factor: {scale_factor}")
+
         new_width = int(c_width * scale_factor)
         c_resized = cv2.resize(c, (new_width, 1024))
+        print(f"New width (before limiting to MAX_INSERT_WIDTH): {new_width}")
+
+        MAX_INSERT_WIDTH = 1024  # Disabled currently, as 1024 is max
+
+        # Limit width to a maximum of MAX_INSERT_WIDTH
+        if new_width > MAX_INSERT_WIDTH:
+            new_width = MAX_INSERT_WIDTH  # Crop to MAX_INSERT_WIDTH max width
+            c_resized = c_resized[:, :MAX_INSERT_WIDTH]  # Keep the left side
+
+        print(f"Final new width: {new_width}")
 
         # Overlay the resized image onto self.render_img at the top-right corner
         render_h, render_w = self.render_img.shape[:2]
-        new_width = min(new_width, render_w)  # Ensure it fits within self.render_img
 
         # Define the position at the top-right corner
         x_offset = render_w - new_width
@@ -178,7 +191,7 @@ class AnalyzeFace(ImageAnalysis):
             p = util.cv2_to_pil(self.render_img)
             c = analyze_lateral(p)
             c = util.trim_sides(c)
-            cv2.imwrite("/Users/jeff/output.png", c)
+            cv2.imwrite("debug_overlay.png", c)
             self._overlay_lateral_analysis(c)
 
         return True
@@ -269,7 +282,7 @@ class AnalyzeFace(ImageAnalysis):
 
         img2 = cv2.resize(self.render_img, (new_width, new_height))
 
-        crop_x = int((self.landmarks[96][0] * scale) - STYLEGAN_RIGHT_PUPIL[0])
+        crop_x = int((self.landmarks[96][0] * scale) - (STYLEGAN_WIDTH * 0.25))
         crop_y = int((self.landmarks[96][1] * scale) - STYLEGAN_RIGHT_PUPIL[1])
 
         img2, _, _ = util.safe_clip(
