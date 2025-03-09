@@ -189,9 +189,9 @@ class AnalyzeFace(ImageAnalysis):
         if self.is_lateral():
             ## MODIFY this part
             p = util.cv2_to_pil(self.render_img)
-            c = analyze_lateral(p)
+            c, self.lateral_landmarks = analyze_lateral(p)
             c = util.trim_sides(c)
-            cv2.imwrite("debug_overlay.png", c)
+            # cv2.imwrite("debug_overlay.png", c)
             self._overlay_lateral_analysis(c)
 
         return True
