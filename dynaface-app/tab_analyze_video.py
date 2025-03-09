@@ -165,6 +165,14 @@ gesture you wish to analyze."""
         # Prepare facial analysis
         tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
         self._face = AnalyzeFace(all_measures(), tilt_threshold=tilt_threshold)
+        self._face.measures = self.get_init_measures()
+
+    def get_init_measures(self):
+        measures = all_measures()
+        lateral = self._face.is_lateral()
+        for measure in measures:
+            measure.update_for_type(lateral)
+        return measures
 
     def init_bottom_horizontal_toolbar(self, layout):
         toolbar = QToolBar()
@@ -1110,9 +1118,16 @@ gesture you wish to analyze."""
             pil_image = Image.open(path)
             image_np = np.array(pil_image)
             self._face = AnalyzeFace(all_measures(), tilt_threshold=tilt_threshold)
+            self._face.measures = self.get_init_measures()
             self._face.load_image(image_np, crop=True)
         else:
-            self._face = load_face_image(path, crop=True, tilt_threshold=tilt_threshold)
+            self._face = load_face_image(
+                path,
+                crop=True,
+                tilt_threshold=tilt_threshold,
+                stats=all_measures(),
+            )
+            self._face.measures = self.get_init_measures()
 
         self._frame_begin = 0
         self._frame_end = 1

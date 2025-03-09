@@ -3,6 +3,8 @@ import math
 import cv2
 import numpy as np
 from facial_analysis import facial
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from PIL import Image
 
 
 # Shoelace, https://stackoverflow.com/questions/24467972/calculate-area-of-polygon-given-x-y-coordinates
@@ -415,3 +417,82 @@ def line_to_edge(img_size, start_point, angle):
 def normalize_angle(angle):
     # Use the modulus operator to normalize the angle
     return angle % (2 * math.pi)
+
+
+def cv2_to_pil(cv_image):
+    """
+    Convert an OpenCV image (NumPy array) to a PIL image.
+
+    Args:
+        cv_image (numpy.ndarray): OpenCV image.
+
+    Returns:
+        PIL.Image.Image: Converted PIL image.
+    """
+    if len(cv_image.shape) == 2:  # Grayscale image
+        return Image.fromarray(cv_image)
+    elif len(cv_image.shape) == 3 and cv_image.shape[2] == 3:  # Color image
+        rgb_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
+        return Image.fromarray(rgb_image)
+    else:
+        raise ValueError("Unsupported image format")
+
+
+def convert_matplotlib_to_opencv(ax):
+    """
+    Convert a Matplotlib axis (ax) to an OpenCV image.
+
+    Args:
+        ax (matplotlib.axes.Axes): The Matplotlib axis containing the plot.
+
+    Returns:
+        np.ndarray: The plot converted to an OpenCV image (BGR format).
+    """
+    # Get the figure from the axis
+    fig = ax.figure
+
+    # Draw the canvas
+    canvas = FigureCanvas(fig)
+    canvas.draw()
+
+    # Convert to numpy array
+    image = np.array(canvas.renderer.buffer_rgba())
+
+    # Convert RGBA to BGR (OpenCV format)
+    image = cv2.cvtColor(image, cv2.COLOR_RGBA2BGR)
+
+    return image
+
+
+import cv2
+import numpy as np
+
+
+def trim_sides(image: np.ndarray) -> np.ndarray:
+    """
+    Trims space from the left and right sides of the image based on the background color sampled
+    from the upper-left pixel, while maintaining the original height.
+
+    :param image: Input image as a NumPy array.
+    :return: Cropped image with the same height but reduced width.
+    """
+    # Get background color from the upper-left pixel
+    background_color = image[0, 0]
+
+    # Convert image to grayscale if it has multiple channels
+    if len(image.shape) == 3:
+        mask = np.all(image == background_color, axis=-1).astype(np.uint8)
+    else:
+        mask = (image == background_color).astype(np.uint8)
+
+    # Sum along rows to determine where content starts and ends horizontally
+    col_sum = mask.sum(axis=0)
+
+    # Find the first and last column that is not entirely background
+    left_trim = np.argmax(col_sum < image.shape[0])
+    right_trim = len(col_sum) - np.argmax(col_sum[::-1] < image.shape[0])
+
+    # Crop the image
+    cropped = image[:, left_trim:right_trim]
+
+    return cropped

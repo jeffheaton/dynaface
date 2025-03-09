@@ -227,7 +227,7 @@ class DynafaceWindow(MainWindowJTH):
             self.add_tab(AnalyzeVideoTab(self, filename), tab_name)
         except Exception as e:
             logger.error("Error during video open", exc_info=True)
-            self.display_message_box(f"Unable to open video. {e}")
+            self.display_message_box(f"Unable to open file. {e}")
 
     def close_analyze_tabs(self):
         try:

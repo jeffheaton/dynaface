@@ -52,6 +52,15 @@ class MeasureBase:
     def __init__(self):
         self.enabled = True
         self.items = []
+        self.is_lateral = False
+        self.is_frontal = False
+
+    def update_for_type(self, lateral):
+        for item in self.items:
+            if lateral:
+                self.enabled = self.is_lateral
+            else:
+                self.enabled = self.is_frontal
 
     def set_item_enabled(self, name, enabled):
         for item in self.items:
@@ -67,8 +76,10 @@ class MeasureBase:
 
 class AnalyzeFAI(MeasureBase):
     def __init__(self) -> None:
+        super().__init__()
         self.enabled = True
         self.items = [MeasureItem("fai")]
+        self.is_frontal = True
 
     def abbrev(self):
         return "FAI"
@@ -95,8 +106,10 @@ class AnalyzeFAI(MeasureBase):
 
 class AnalyzeOralCommissureExcursion(MeasureBase):
     def __init__(self) -> None:
+        super().__init__()
         self.enabled = True
         self.items = [MeasureItem("oce.l"), MeasureItem("oce.r")]
+        self.is_frontal = True
 
     def abbrev(self):
         return "Oral CE"
@@ -115,8 +128,10 @@ class AnalyzeOralCommissureExcursion(MeasureBase):
 
 class AnalyzeBrows(MeasureBase):
     def __init__(self) -> None:
+        super().__init__()
         self.enabled = True
         self.items = [MeasureItem("brow.d")]
+        self.is_frontal = True
 
     def abbrev(self):
         return "Brow"
@@ -136,6 +151,7 @@ class AnalyzeBrows(MeasureBase):
             face.arrow(face.landmarks[36], right_brow, apt2=False)
 
         # Diff
+        diff = 0
 
         if render & render2:
             left_brow = util.line_to_edge(
@@ -158,6 +174,7 @@ class AnalyzeBrows(MeasureBase):
 
 class AnalyzeDentalArea(MeasureBase):
     def __init__(self) -> None:
+        super().__init__()
         self.enabled = True
         self.items = [
             MeasureItem("dental_area"),
@@ -166,6 +183,7 @@ class AnalyzeDentalArea(MeasureBase):
             MeasureItem("dental_ratio"),
             MeasureItem("dental_diff"),
         ]
+        self.is_frontal = True
 
     def abbrev(self):
         return "Dental Display"
@@ -264,6 +282,7 @@ class AnalyzeDentalArea(MeasureBase):
 
 class AnalyzeEyeArea(MeasureBase):
     def __init__(self) -> None:
+        super().__init__()
         self.enabled = True
         self.items = [
             MeasureItem("eye.left"),
@@ -271,6 +290,7 @@ class AnalyzeEyeArea(MeasureBase):
             MeasureItem("eye.diff"),
             MeasureItem("eye.ratio"),
         ]
+        self.is_frontal = True
 
     def abbrev(self):
         return "Eye Area"
@@ -349,8 +369,10 @@ class AnalyzeEyeArea(MeasureBase):
 
 class AnalyzePosition(MeasureBase):
     def __init__(self) -> None:
+        super().__init__()
         self.enabled = True
         self.items = [MeasureItem("tilt"), MeasureItem("px2mm"), MeasureItem("pd")]
+        self.is_frontal = True
 
     def abbrev(self):
         return "Position"
@@ -361,6 +383,7 @@ class AnalyzePosition(MeasureBase):
         render2_pd = self.is_enabled("pd")
 
         p = util.get_pupils(face.landmarks)
+        tilt = 0
 
         if p:
             landmarks = face.landmarks

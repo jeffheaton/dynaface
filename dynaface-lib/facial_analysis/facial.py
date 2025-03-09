@@ -10,6 +10,7 @@ from facial_analysis import measures, models, util
 from facial_analysis.image import ImageAnalysis, load_image
 from facial_analysis.spiga.inference.config import ModelConfig
 from facial_analysis.spiga.inference.framework import SPIGAFramework
+from facial_analysis.lateral import analyze_lateral
 
 STYLEGAN_WIDTH = 1024
 STYLEGAN_LEFT_PUPIL = (640, 480)
@@ -42,7 +43,10 @@ def init_processor(device=None):
 
 
 def load_face_image(
-    filename, crop=True, stats=None, tilt_threshold=DEFAULT_TILT_THRESHOLD
+    filename,
+    crop=True,
+    stats=None,
+    tilt_threshold=DEFAULT_TILT_THRESHOLD,
 ):
     if stats is None:
         stats = measures.all_measures()
@@ -60,6 +64,7 @@ class AnalyzeFace(ImageAnalysis):
         self.left_eye = None
         self.right_eye = None
         self.nose = None
+        self._headpose = None
         if measures is None:
             self.measures = measures.all_measures()
         else:
@@ -118,12 +123,46 @@ class AnalyzeFace(ImageAnalysis):
         headpose = np.array(features["headpose"][0])
         return landmarks2, headpose
 
+    def is_lateral(self):
+        if self._headpose is None:
+            return False
+        yaw, pitch, roll = self._headpose[:3]
+        logger.debug(f"Headpose: yaw:{yaw}, pitch:{pitch}, roll:{roll}")
+        return abs(yaw) > 15
+
+    def _overlay_lateral_analysis(self, c):
+        """Scales and overlays the lateral analysis image onto self.render_img at the top-right."""
+        if c is None:
+            return
+
+        # Scale 'c' to a height of 1024 while maintaining aspect ratio
+        c_height, c_width = c.shape[:2]
+        scale_factor = 1024 / c_height
+        new_width = int(c_width * scale_factor)
+        c_resized = cv2.resize(c, (new_width, 1024))
+
+        # Overlay the resized image onto self.render_img at the top-right corner
+        render_h, render_w = self.render_img.shape[:2]
+        new_width = min(new_width, render_w)  # Ensure it fits within self.render_img
+
+        # Define the position at the top-right corner
+        x_offset = render_w - new_width
+        y_offset = 0
+
+        # Blend the images
+        self.render_img[y_offset : y_offset + 1024, x_offset : x_offset + new_width] = (
+            c_resized
+        )
+        super().load_image(self.render_img)
+
     def load_image(self, img, crop, pupils=None):
         super().load_image(img)
         logger.debug("Low level-image loaded")
         self.landmarks, self._headpose = self._find_landmarks(img)
 
-        if self.landmarks is not None:
+        if self.is_lateral() and self.landmarks:
+            self.crop_lateral()
+        elif self.landmarks is not None:
             logger.debug("Landmarks located")
             self.calc_pd()
 
@@ -133,6 +172,15 @@ class AnalyzeFace(ImageAnalysis):
         else:
             logger.info("No face detected")
             return False
+
+        if self.is_lateral():
+            ## MODIFY this part
+            p = util.cv2_to_pil(self.render_img)
+            c = analyze_lateral(p)
+            c = util.trim_sides(c)
+            cv2.imwrite("/Users/jeff/output.png", c)
+            self._overlay_lateral_analysis(c)
+
         return True
 
     def draw_landmarks(self, size=0.25, color=[0, 255, 255], numbers=False):
@@ -183,6 +231,59 @@ class AnalyzeFace(ImageAnalysis):
     def calculate_face_rotation(self):
         p = util.get_pupils(self.landmarks)
         return measures.to_degrees(util.calculate_face_rotation(p))
+
+    def crop_lateral(self):
+        INFLATE_LATERAL_TOP = 0.1  # Increase top by 10%
+        INFLATE_LATERAL_BOTTOM = 0.1  # Increase bottom by 10%
+
+        bbox, _ = models.mtcnn_model.detect(self.render_img)
+        bbox = bbox[0]
+
+        crop_x, crop_y, w, h = (
+            int(bbox[0]),  # x-min
+            int(bbox[1]),  # y-min
+            int(bbox[2] - bbox[0]),  # width
+            int(bbox[3] - bbox[1]),  # height
+        )
+
+        print("Before expansion:", crop_x, crop_y, w, h)
+
+        # Compute vertical expansion amounts
+        expand_top = int(h * INFLATE_LATERAL_TOP)
+        expand_bottom = int(h * INFLATE_LATERAL_BOTTOM)
+
+        # Ensure new crop_y does not go out of bounds
+        crop_y = max(0, crop_y - expand_top)  # Move up by expand_top
+
+        # Adjust height
+        h = h + expand_top + expand_bottom
+
+        print("After expansion:", crop_x, crop_y, w, h)
+
+        # Compute aspect ratio and scale to match STYLEGAN_WIDTH
+        width, height = self.render_img.shape[1], self.render_img.shape[0]
+        ar = width / height
+        new_width = STYLEGAN_WIDTH
+        new_height = int(new_width / ar)
+        scale = new_width / width
+
+        img2 = cv2.resize(self.render_img, (new_width, new_height))
+
+        crop_x = int((self.landmarks[96][0] * scale) - STYLEGAN_RIGHT_PUPIL[0])
+        crop_y = int((self.landmarks[96][1] * scale) - STYLEGAN_RIGHT_PUPIL[1])
+
+        img2, _, _ = util.safe_clip(
+            img2,
+            crop_x,
+            crop_y,
+            STYLEGAN_WIDTH,
+            STYLEGAN_WIDTH,
+            FILL_COLOR,
+        )
+        self.landmarks = util.scale_crop_points(self.landmarks, crop_x, crop_y, scale)
+
+        # Reload Image
+        super().load_image(img2)
 
     def crop_stylegan(self, pupils=None):
         # Save orig pupils so we can lock the scale, rotate, and crop during a load
