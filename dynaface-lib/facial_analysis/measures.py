@@ -19,6 +19,10 @@ def all_measures():
         AnalyzeBrows(),
         AnalyzeDentalArea(),
         AnalyzeEyeArea(),
+        AnalyzeIntercanthalDistance(),
+        AnalyzeMouthLength(),
+        AnalyzeNasalWidth(),
+        AnalyzeOuterEyeCorners(),
         AnalyzePosition(),
     ]
 
@@ -412,3 +416,184 @@ class AnalyzePosition(MeasureBase):
                 face.write_text(pos, txt)
 
         return filter({"tilt": tilt, "px2mm": pix2mm, "pd": pd}, self.items)
+
+
+from typing import Dict, Any
+
+
+class AnalyzeIntercanthalDistance(MeasureBase):
+    """
+    Class to analyze intercanthal distance (ID), which is the distance between the inner corners of the eyes.
+    """
+
+    def __init__(self) -> None:
+        """
+        Initializes the measurement with default settings.
+        """
+        self.enabled: bool = True
+        self.items: list[MeasureItem] = [MeasureItem("id")]
+        self.is_frontal: bool = True
+        self.is_lateral: bool = False
+
+    def abbrev(self) -> str:
+        """
+        Returns the abbreviation of the measurement.
+        """
+        return "Intercanthal Distance"
+
+    def calc(self, face: Any, render: bool = True) -> Dict[str, float]:
+        """
+        Calculates the intercanthal distance (ID) using the landmarks at indices 88 and 92.
+
+        Parameters:
+        - `face`: A face object containing landmarks.
+        - `render`: Whether to render the measurement visually.
+
+        Returns:
+        - A dictionary containing the intercanthal distance measurement.
+        """
+        render1: bool = self.is_enabled("id")
+
+        # Measure the distance between landmarks 64 and 68
+        d1: float = face.measure(
+            face.landmarks[64], face.landmarks[68], render=(render and render1), dir="r"
+        )
+
+        # Return the filtered measurement result
+        return filter({"id": d1}, self.items)
+
+
+class AnalyzeMouthLength(MeasureBase):
+    """
+    Class to analyze ML (Mouth Length), the horizontal distance between the corners of the mouth
+    """
+
+    def __init__(self) -> None:
+        """
+        Initializes the measurement with default settings.
+        """
+        self.enabled: bool = True
+        self.items: list[MeasureItem] = [MeasureItem("ml")]
+        self.is_frontal: bool = True
+        self.is_lateral: bool = False
+
+    def abbrev(self) -> str:
+        """
+        Returns the abbreviation of the measurement.
+        """
+        return "Mouth Length"
+
+    def calc(self, face: Any, render: bool = True) -> Dict[str, float]:
+        """
+        Calculates the intercanthal distance (ID) using the landmarks at indices 88 and 92.
+
+        Parameters:
+        - `face`: A face object containing landmarks.
+        - `render`: Whether to render the measurement visually.
+
+        Returns:
+        - A dictionary containing the intercanthal distance measurement.
+        """
+        render1: bool = self.is_enabled("ml")
+
+        # Measure the distance between landmarks 88 and 92
+        d1: float = face.measure(
+            face.landmarks[88], face.landmarks[92], render=(render and render1), dir="r"
+        )
+
+        # Return the filtered measurement result
+        return filter({"ml": d1}, self.items)
+
+
+class AnalyzeNasalWidth(MeasureBase):
+    """
+    Class to analyze NW (Nasal Width), the horizontal width of the nose at its widest point.
+    """
+
+    def __init__(self) -> None:
+        """
+        Initializes the measurement with default settings.
+        """
+        self.enabled: bool = True
+        self.items: list[MeasureItem] = [MeasureItem("nw")]
+        self.is_frontal: bool = True
+        self.is_lateral: bool = False
+
+    def abbrev(self) -> str:
+        """
+        Returns the abbreviation of the measurement.
+        """
+        return "Nasal Width"
+
+    def calc(self, face: Any, render: bool = True) -> Dict[str, float]:
+        """
+        Calculates the nasal width.
+
+        Parameters:
+        - `face`: A face object containing landmarks.
+        - `render`: Whether to render the measurement visually.
+
+        Returns:
+        - A dictionary containing the intercanthal distance measurement.
+        """
+        render1: bool = self.is_enabled("nw")
+
+        # Measure the distance between landmarks 55 and 59
+        d1: float = face.measure(
+            face.landmarks[55], face.landmarks[59], render=(render and render1), dir="r"
+        )
+
+        # Return the filtered measurement result
+        return filter({"nw": d1}, self.items)
+
+
+class AnalyzeOuterEyeCorners(MeasureBase):
+    """
+    OE (Distance Between Outer Eye Corners): The horizontal distance between the outermost points of
+    the eyes (lateral canthi).
+    """
+
+    def __init__(self) -> None:
+        """
+        Initializes the measurement with default settings.
+        """
+        self.enabled: bool = True
+        self.items: list[MeasureItem] = [MeasureItem("oe")]
+        self.is_frontal: bool = True
+        self.is_lateral: bool = False
+
+    def abbrev(self) -> str:
+        """
+        Returns the abbreviation of the measurement.
+        """
+        return "Outer Eye Corners"
+
+    def calc(self, face: Any, render: bool = True) -> Dict[str, float]:
+        """
+        Calculates the OE.
+
+        Parameters:
+        - `face`: A face object containing landmarks.
+        - `render`: Whether to render the measurement visually.
+
+        Returns:
+        - A dictionary containing the intercanthal distance measurement.
+        """
+        render1: bool = self.is_enabled("oe")
+
+        # Measure the distance between landmarks 60 and 72
+        d1: float = face.measure(
+            face.landmarks[60], face.landmarks[72], render=(render and render1), dir="r"
+        )
+
+        # Return the filtered measurement result
+        return filter({"oe": d1}, self.items)
+
+
+# ID intercanthal distance
+# ML mouth length
+# NW nasal width
+# OE distance between outer eye corners
+# NN distance soft tissue nasion to subnasal point
+# NM distance subnasal point to mentolabial point
+# NP distance subnasal point to soft tissue pogonion

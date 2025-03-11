@@ -2,7 +2,7 @@ import copy
 import logging
 import math
 import time
-from typing import Tuple
+from typing import List, Tuple
 
 import cv2
 import numpy as np
@@ -237,21 +237,59 @@ class AnalyzeFace(ImageAnalysis):
         self.circle(self.left_eye, color=color)
         self.circle(self.right_eye, color=color)
 
-    def measure(self, pt1, pt2, color=(255, 0, 0), thickness=3, render=True, dir="r"):
+    def measure(
+        self,
+        pt1: Tuple[int, int],
+        pt2: Tuple[int, int],
+        color: Tuple[int, int, int] = (255, 0, 0),
+        thickness: int = 3,
+        render: bool = True,
+        dir: str = "r",
+    ) -> float:
+        """
+        Measures the Euclidean distance between two points (pt1 and pt2) and optionally renders an arrow and text.
+
+        Parameters:
+        - `pt1` (Tuple[int, int]): First point (x, y).
+        - `pt2` (Tuple[int, int]): Second point (x, y).
+        - `color` (Tuple[int, int, int], optional): Color of the rendered arrow. Default is red (255, 0, 0).
+        - `thickness` (int, optional): Thickness of the arrow line. Default is 3.
+        - `render` (bool, optional): Whether to render the measurement visually. Default is True.
+        - `dir` (str, optional): Direction for placing the text label ('r' for right, else left). Default is 'r'.
+
+        Returns:
+        - `float`: The measured distance in millimeters.
+        """
+
+        # If rendering is enabled, draw an arrow between the two points
         if render:
             self.arrow(pt1, pt2, color, thickness)
-        d = math.dist(pt1, pt2) * self.pix2mm
-        txt = f"{d:.2f}mm"
-        m = self.calc_text_size(txt)
+
+        # Compute Euclidean distance and convert pixels to millimeters
+        d: float = math.dist(pt1, pt2) * self.pix2mm
+
+        # Format measurement text
+        txt: str = f"{d:.2f}mm"
+
+        # Calculate text size for positioning
+        m: Tuple[Tuple[int, int], int] = self.calc_text_size(txt)
+
+        # Compute the midpoint for displaying text
         if dir == "r":
-            mp = [int((pt1[0] + pt2[0]) // 2) + 15, int((pt1[1] + pt2[1]) // 2)]
+            mp: List[int] = [
+                int((pt1[0] + pt2[0]) // 2) + 15,
+                int((pt1[1] + pt2[1]) // 2),
+            ]
         else:
-            mp = [
+            mp: List[int] = [
                 int((pt1[0] + pt2[0]) // 2) - (m[0][0] + 15),
                 int((pt1[1] + pt2[1]) // 2),
             ]
+
+        # Render text if enabled
         if render:
             self.write_text(mp, txt)
+
         return d
 
     def analyze_next_pt(self, txt):
@@ -427,3 +465,8 @@ class AnalyzeFace(ImageAnalysis):
 
     def calc_bisect(self):
         return util.bisecting_line_coordinates(img_size=1024, pupils=self.find_pupils())
+
+    def draw_static(self):
+        if self.lateral:
+            str = "Lateral (right)" if self.flipped else "Lateral (left)"
+            self.write_text((10, self.height - 20), str, size=2)
