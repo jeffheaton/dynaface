@@ -2,15 +2,16 @@ import copy
 import logging
 import math
 import time
+from typing import Tuple
 
 import cv2
 import numpy as np
 import torch
 from facial_analysis import measures, models, util
 from facial_analysis.image import ImageAnalysis, load_image
+from facial_analysis.lateral import analyze_lateral
 from facial_analysis.spiga.inference.config import ModelConfig
 from facial_analysis.spiga.inference.framework import SPIGAFramework
-from facial_analysis.lateral import analyze_lateral
 
 STYLEGAN_WIDTH = 1024
 STYLEGAN_LEFT_PUPIL = (640, 480)
@@ -66,6 +67,7 @@ class AnalyzeFace(ImageAnalysis):
         self.right_eye = None
         self.nose = None
         self._headpose = None
+        self.flipped = False
         if measures is None:
             self.measures = measures.all_measures()
         else:
@@ -124,12 +126,29 @@ class AnalyzeFace(ImageAnalysis):
         headpose = np.array(features["headpose"][0])
         return landmarks2, headpose
 
-    def is_lateral(self):
+    def is_lateral(self) -> Tuple[bool, bool]:
+        """
+        Determines whether the head pose is lateral and whether the head is facing left.
+
+        Returns:
+            Tuple[bool, bool]:
+            - First value (bool): True if the head is in a lateral pose (yaw angle beyond ±15 degrees), False otherwise.
+            - Second value (bool): True if the head is facing left (yaw < 0), False if facing right or frontal.
+
+        If `_headpose` is None, it defaults to (False, False).
+        """
         if self._headpose is None:
-            return False
-        yaw, pitch, roll = self._headpose[:3]
-        logger.debug(f"Headpose: yaw:{yaw}, pitch:{pitch}, roll:{roll}")
-        return abs(yaw) > 15
+            return False, False  # Default when head pose data is unavailable
+
+        yaw, pitch, roll = self._headpose[:3]  # Extract yaw, pitch, and roll values
+        logger.info(f"Headpose: yaw:{yaw}, pitch:{pitch}, roll:{roll}")
+
+        is_lateral: bool = abs(yaw) > 15  # Lateral if yaw exceeds ±15 degrees
+        is_facing_left: bool = (
+            yaw < 0
+        )  # True if facing left, False if facing right or frontal
+
+        return is_lateral, is_facing_left
 
     def _overlay_lateral_analysis(self, c):
         """Scales and overlays the lateral analysis image onto self.render_img at the top-right."""
@@ -173,11 +192,24 @@ class AnalyzeFace(ImageAnalysis):
         logger.debug("Low level-image loaded")
         self.landmarks, self._headpose = self._find_landmarks(img)
 
-        if self.is_lateral() and self.landmarks:
+        lateral_pos, facing_left = self.is_lateral()
+
+        if lateral_pos and self.landmarks:
+            self.lateral = True
+            if not facing_left:
+                self.flipped = True
+                flipped = cv2.flip(self.original_img, 1)
+                super().load_image(flipped)
+                self.landmarks, self._headpose = self._find_landmarks(flipped)
+            else:
+                self.flipped = False
+
             self.crop_lateral()
         elif self.landmarks is not None:
             logger.debug("Landmarks located")
             self.calc_pd()
+            self.lateral = False
+            self.lateral = False
 
             if crop:
                 logger.debug("Cropping")
@@ -186,8 +218,7 @@ class AnalyzeFace(ImageAnalysis):
             logger.info("No face detected")
             return False
 
-        if self.is_lateral():
-            ## MODIFY this part
+        if lateral_pos:
             p = util.cv2_to_pil(self.render_img)
             c, self.lateral_landmarks = analyze_lateral(p)
             c = util.trim_sides(c)

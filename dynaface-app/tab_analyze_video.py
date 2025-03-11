@@ -435,6 +435,7 @@ gesture you wish to analyze."""
             self._face.analyze()
         if self._chk_landmarks.isChecked():
             self._face.draw_landmarks(numbers=True)
+        self._face.draw_static()
 
         if self._face.render_img is not None and self._render_buffer is not None:
             self._render_buffer[:, :] = self._face.render_img
