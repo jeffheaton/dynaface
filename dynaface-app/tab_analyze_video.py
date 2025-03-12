@@ -351,8 +351,6 @@ gesture you wish to analyze."""
 
     def check_measure(self, item):
         measure = item.data(0, Qt.ItemDataRole.UserRole)
-        print(measure)
-        print(self._face.lateral, measure.is_lateral, measure.is_frontal)
         if self._face.lateral and not measure.is_lateral:
             self._window.display_message_box("Measure requires frontal view of face.")
             return False

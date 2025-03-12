@@ -3,7 +3,7 @@ import math
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
-from facial_analysis import util
+from facial_analysis import lateral, util
 
 logger = logging.getLogger(__name__)
 
@@ -627,10 +627,15 @@ class AnalyzeLateral(MeasureBase):
         """
         Initializes the measurement with default settings.
         """
-        self.enabled: bool = True
-        self.items: list[MeasureItem] = [MeasureItem("nn")]
-        self.is_frontal: bool = False
-        self.is_lateral: bool = True
+        super().__init__()
+        self.enabled = True
+        self.items = [
+            MeasureItem("nn"),
+            MeasureItem("nm"),
+            MeasureItem("np"),
+        ]
+        self.is_frontal = False
+        self.is_lateral = True
         self.sync_items()
 
     def abbrev(self) -> str:
@@ -648,23 +653,39 @@ class AnalyzeLateral(MeasureBase):
         - `render`: Whether to render the measurement visually.
 
         Returns:
-        - A dictionary containing the intercanthal distance measurement.
+        - A dictionary containing the lateral measurements.
         """
-        render1: bool = self.is_enabled("nn")
+        render_nn = self.is_enabled("nn")
+        render_nm = self.is_enabled("nm")
+        render_np = self.is_enabled("np")
 
         if not face.lateral:
             return {}
 
         landmarks = face.lateral_landmarks
-        p1 = landmarks[0]
-        p2 = landmarks[1]
-        # Measure the distance between landmarks 60 and 72
-        d1: float = face.measure(
-            landmarks[0], landmarks[1], render=(render and render1), dir="r"
+
+        # Measure the distance between landmarks for NN, NM, and NP
+        nn = face.measure(
+            landmarks[lateral.LATERAL_LM_SOFT_TISSUE_NASION],
+            landmarks[lateral.LATERAL_LM_SUBNASAL_POINT],
+            render=(render and render_nn),
+            dir="r",
+        )
+        nm = face.measure(
+            landmarks[lateral.LATERAL_LM_SUBNASAL_POINT],
+            landmarks[lateral.LATERAL_LM_MENTO_LABIAL_POINT],
+            render=(render and render_nm),
+            dir="r",
+        )
+        np = face.measure(
+            landmarks[lateral.LATERAL_LM_SUBNASAL_POINT],
+            landmarks[lateral.LATERAL_LM_SOFT_TISSUE_POGONION],
+            render=(render and render_np),
+            dir="r",
         )
 
         # Return the filtered measurement result
-        return filter_measurements({"nn": d1}, self.items)
+        return filter_measurements({"nn": nn, "nm": nm, "np": np}, self.items)
 
 
 # ID intercanthal distance
