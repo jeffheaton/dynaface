@@ -75,6 +75,17 @@ class MeasureBase:
                 return item.enabled
         return True
 
+    def set_enabled(self, enabled: bool):
+        """
+        Enable or disable the MeasureBase derived class and its items.
+
+        Args:
+            enabled (bool): True to enable, False to disable.
+        """
+        self.enabled = enabled
+        for item in self.items:
+            item.enabled = enabled
+
 
 class AnalyzeFAI(MeasureBase):
     def __init__(self) -> None:

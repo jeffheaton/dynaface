@@ -169,9 +169,8 @@ gesture you wish to analyze."""
 
     def get_init_measures(self):
         measures = all_measures()
-        lateral = self._face.is_lateral()
         for measure in measures:
-            measure.update_for_type(lateral)
+            measure.set_enabled(False)
         return measures
 
     def init_bottom_horizontal_toolbar(self, layout):
