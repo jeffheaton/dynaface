@@ -48,6 +48,8 @@ class MeasureItem:
     def __init__(self, name: str, enabled: bool = True):
         self.name = name
         self.enabled = enabled
+        self.is_lateral = False
+        self.is_frontal = False
 
     def __str__(self):
         return f"(name={self.name},enabled={self.enabled})"
@@ -86,6 +88,11 @@ class MeasureBase:
         for item in self.items:
             item.enabled = enabled
 
+    def sync_items(self):
+        for item in self.items:
+            item.is_lateral = self.is_lateral
+            item.is_frontal = self.is_frontal
+
 
 class AnalyzeFAI(MeasureBase):
     def __init__(self) -> None:
@@ -93,6 +100,7 @@ class AnalyzeFAI(MeasureBase):
         self.enabled = True
         self.items = [MeasureItem("fai")]
         self.is_frontal = True
+        self.sync_items()
 
     def abbrev(self):
         return "FAI"
@@ -123,6 +131,7 @@ class AnalyzeOralCommissureExcursion(MeasureBase):
         self.enabled = True
         self.items = [MeasureItem("oce.l"), MeasureItem("oce.r")]
         self.is_frontal = True
+        self.sync_items()
 
     def abbrev(self):
         return "Oral CE"
@@ -145,6 +154,7 @@ class AnalyzeBrows(MeasureBase):
         self.enabled = True
         self.items = [MeasureItem("brow.d")]
         self.is_frontal = True
+        self.sync_items()
 
     def abbrev(self):
         return "Brow"
@@ -197,6 +207,7 @@ class AnalyzeDentalArea(MeasureBase):
             MeasureItem("dental_diff"),
         ]
         self.is_frontal = True
+        self.sync_items()
 
     def abbrev(self):
         return "Dental Display"
@@ -303,6 +314,7 @@ class AnalyzeEyeArea(MeasureBase):
             MeasureItem("eye.ratio"),
         ]
         self.is_frontal = True
+        self.sync_items()
 
     def abbrev(self):
         return "Eye Area"
@@ -385,6 +397,8 @@ class AnalyzePosition(MeasureBase):
         self.enabled = True
         self.items = [MeasureItem("tilt"), MeasureItem("px2mm"), MeasureItem("pd")]
         self.is_frontal = True
+        self.is_lateral = True
+        self.sync_items()
 
     def abbrev(self):
         return "Position"
@@ -441,6 +455,7 @@ class AnalyzeIntercanthalDistance(MeasureBase):
         self.items: List[MeasureItem] = [MeasureItem("id")]
         self.is_frontal: bool = True
         self.is_lateral: bool = False
+        self.sync_items()
 
     def abbrev(self) -> str:
         """
@@ -483,6 +498,7 @@ class AnalyzeMouthLength(MeasureBase):
         self.items: list[MeasureItem] = [MeasureItem("ml")]
         self.is_frontal: bool = True
         self.is_lateral: bool = False
+        self.sync_items()
 
     def abbrev(self) -> str:
         """
@@ -525,6 +541,7 @@ class AnalyzeNasalWidth(MeasureBase):
         self.items: list[MeasureItem] = [MeasureItem("nw")]
         self.is_frontal: bool = True
         self.is_lateral: bool = False
+        self.sync_items()
 
     def abbrev(self) -> str:
         """
@@ -568,6 +585,7 @@ class AnalyzeOuterEyeCorners(MeasureBase):
         self.items: list[MeasureItem] = [MeasureItem("oe")]
         self.is_frontal: bool = True
         self.is_lateral: bool = False
+        self.sync_items()
 
     def abbrev(self) -> str:
         """
@@ -611,8 +629,9 @@ class AnalyzeLateral(MeasureBase):
         """
         self.enabled: bool = True
         self.items: list[MeasureItem] = [MeasureItem("nn")]
-        self.is_frontal: bool = True
-        self.is_lateral: bool = False
+        self.is_frontal: bool = False
+        self.is_lateral: bool = True
+        self.sync_items()
 
     def abbrev(self) -> str:
         """
@@ -633,11 +652,12 @@ class AnalyzeLateral(MeasureBase):
         """
         render1: bool = self.is_enabled("nn")
 
+        if not face.lateral:
+            return {}
+
         landmarks = face.lateral_landmarks
         p1 = landmarks[0]
         p2 = landmarks[1]
-        print(f"p1 type: {type(p1)}, value: {p1}")
-        print(f"p2 type: {type(p2)}, value: {p2}")
         # Measure the distance between landmarks 60 and 72
         d1: float = face.measure(
             landmarks[0], landmarks[1], render=(render and render1), dir="r"

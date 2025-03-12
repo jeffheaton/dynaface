@@ -74,6 +74,7 @@ class AnalyzeFace(ImageAnalysis):
             self.measures = measures
         self.headpose = [0, 0, 0]
         self.landmarks = []
+        self.lateral_landmarks = np.full((6, 2), -1.0)
         self.pupillary_distance = 0
         logger.debug(f"===INIT: t={tilt_threshold}")
         self.tilt_threshold = tilt_threshold
@@ -203,7 +204,6 @@ class AnalyzeFace(ImageAnalysis):
         elif self.landmarks is not None:
             logger.debug("Landmarks located")
             self.calc_pd()
-            self.lateral = False
             self.lateral = False
 
             if crop:
