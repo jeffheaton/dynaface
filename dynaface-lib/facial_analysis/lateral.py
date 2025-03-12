@@ -68,7 +68,7 @@ def shift_sagittal_profile(sagittal_x: np.ndarray) -> np.ndarray:
     Shift the sagittal profile so that the lowest x-coordinate becomes 0.
     """
     min_x = np.min(sagittal_x)
-    return sagittal_x - min_x
+    return sagittal_x - min_x, min_x
 
 
 def extract_sagittal_profile(binary_np: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -358,6 +358,7 @@ def find_lateral_landmarks(
     sagittal_y: np.ndarray,
     max_indices: np.ndarray,
     min_indices: np.ndarray,
+    shift_x: int,
 ) -> np.ndarray:
     """
     Using the local extrema, compute the 6 lateral landmarks.
@@ -411,7 +412,10 @@ def find_lateral_landmarks(
         sagittal_x, sagittal_y, max_indices, pogonion[1], q3
     )
 
-    return landmarks
+    # Shift all x-coordinates to the left by shift_x
+    landmarks[:, 0] += shift_x
+
+    return [tuple(map(int, point)) for point in landmarks]
 
 
 def plot_sagittal_minmax(
@@ -465,9 +469,9 @@ def plot_sagittal_minmax(
         )
 
 
-def plot_lateral_landmarks(ax: Axes, landmarks: np.ndarray) -> None:
+def plot_lateral_landmarks(ax: Axes, landmarks: np.ndarray, shift_x: int) -> None:
     """
-    Plot the 6 lateral landmarks on the sagittal profile.
+    Plot the 6 lateral landmarks on the sagittal profile, shifted to the left by shift_x.
     """
     landmark_names = [
         "Soft Tissue Glabella",
@@ -483,6 +487,7 @@ def plot_lateral_landmarks(ax: Axes, landmarks: np.ndarray) -> None:
 
         # Only plot if a valid point was found.
         if x != -1 and y != -1:
+            x -= shift_x  # Shift x-coordinate to the left by shift_x
             ax.scatter(x, y, color="green", s=80, zorder=3)
             ax.annotate(
                 name,
@@ -523,13 +528,13 @@ def analyze_lateral(input_image: Image.Image) -> np.ndarray:
     """
     # Process the image: remove background, threshold, and clean up.
     processed_image, binary_np, _, _ = process_image(input_image)
-    processed_image.save("debug_image1.png")
-    cv2.imwrite("debug_image2.png", binary_np)
+    # processed_image.save("debug_image1.png")
+    # cv2.imwrite("debug_image2.png", binary_np)
 
     # Extract the sagittal profile.
     sagittal_x, sagittal_y = extract_sagittal_profile(binary_np)
-    sagittal_x = shift_sagittal_profile(sagittal_x)
-    save_debug_plot(sagittal_x, sagittal_y, "debug_image3.png")
+    sagittal_x, shift_x = shift_sagittal_profile(sagittal_x)
+    # save_debug_plot(sagittal_x, sagittal_y, "debug_image3.png")
 
     # Compute derivatives on the sagittal profile.
     dx, ddx, dx_scaled, ddx_scaled = compute_derivatives(sagittal_x)
@@ -546,8 +551,10 @@ def analyze_lateral(input_image: Image.Image) -> np.ndarray:
         plot_sagittal_minmax(ax2, sagittal_x, sagittal_y, max_indices, min_indices)
 
     # Compute and plot lateral landmarks.
-    landmarks = find_lateral_landmarks(sagittal_x, sagittal_y, max_indices, min_indices)
-    plot_lateral_landmarks(ax2, landmarks)
+    landmarks = find_lateral_landmarks(
+        sagittal_x, sagittal_y, max_indices, min_indices, shift_x
+    )
+    plot_lateral_landmarks(ax2, landmarks, shift_x)
     if DEBUG:
         print("Lateral Landmarks (x, y):")
         print(landmarks)

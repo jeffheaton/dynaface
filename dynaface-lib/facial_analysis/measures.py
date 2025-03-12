@@ -1,15 +1,15 @@
+import logging
 import math
-from typing import List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 from facial_analysis import util
 
+logger = logging.getLogger(__name__)
 
-def filter(data, items):
-    result = {}
-    for item in items:
-        result[item.name] = data[item.name]
-    return result
+
+def filter_measurements(data, items):
+    return {item.name: data.get(item.name, None) for item in items}
 
 
 def all_measures():
@@ -23,6 +23,7 @@ def all_measures():
         AnalyzeMouthLength(),
         AnalyzeNasalWidth(),
         AnalyzeOuterEyeCorners(),
+        AnalyzeLateral(),
         AnalyzePosition(),
     ]
 
@@ -61,10 +62,7 @@ class MeasureBase:
 
     def update_for_type(self, lateral):
         for item in self.items:
-            if lateral:
-                self.enabled = self.is_lateral
-            else:
-                self.enabled = self.is_frontal
+            item.enabled = self.is_lateral if lateral else self.is_frontal
 
     def set_item_enabled(self, name, enabled):
         for item in self.items:
@@ -105,7 +103,7 @@ class AnalyzeFAI(MeasureBase):
             txt = f"FAI={fai:.2f}"
             pos = face.analyze_next_pt(txt)
             face.write_text(pos, txt)
-        return filter({"fai": fai}, (self.items))
+        return filter_measurements({"fai": fai}, (self.items))
 
 
 class AnalyzeOralCommissureExcursion(MeasureBase):
@@ -127,7 +125,7 @@ class AnalyzeOralCommissureExcursion(MeasureBase):
         oce_l = face.measure(
             face.landmarks[82], face.landmarks[85], render=(render & render2_l), dir="r"
         )
-        return filter({"oce.l": oce_l, "oce.r": oce_r}, self.items)
+        return filter_measurements({"oce.l": oce_l, "oce.r": oce_r}, self.items)
 
 
 class AnalyzeBrows(MeasureBase):
@@ -173,7 +171,7 @@ class AnalyzeBrows(MeasureBase):
                 txt,
             )
 
-        return filter({"brow.d": diff}, self.items)
+        return filter_measurements({"brow.d": diff}, self.items)
 
 
 class AnalyzeDentalArea(MeasureBase):
@@ -240,10 +238,9 @@ class AnalyzeDentalArea(MeasureBase):
 
             dental_ratio = util.symmetry_ratio(dental_area_left, dental_area_right)
             dental_diff = abs(dental_area_left - dental_area_right)
-        except ValueError:
-            dental_area = 0
-            dental_area_left = 0
-            dental_area_right = 0
+        except Exception as e:
+            logger.error(f"Error in AnalyzeDentalArea.calc(): {e}")
+            dental_area = dental_area_left = dental_area_right = 0
             dental_ratio = 1
             dental_diff = 0
 
@@ -272,7 +269,7 @@ class AnalyzeDentalArea(MeasureBase):
             pos = face.analyze_next_pt(txt)
             face.write_text_sq(pos, txt)
 
-        return filter(
+        return filter_measurements(
             {
                 "dental_area": dental_area,
                 "dental_left": dental_area_left,
@@ -360,7 +357,7 @@ class AnalyzeEyeArea(MeasureBase):
             pos = face.analyze_next_pt(txt)
             face.write_text(pos, txt)
 
-        return filter(
+        return filter_measurements(
             {
                 "eye.left": left_eye_area,
                 "eye.right": right_eye_area,
@@ -415,10 +412,9 @@ class AnalyzePosition(MeasureBase):
                 pos = face.analyze_next_pt(txt)
                 face.write_text(pos, txt)
 
-        return filter({"tilt": tilt, "px2mm": pix2mm, "pd": pd}, self.items)
-
-
-from typing import Dict, Any
+        return filter_measurements(
+            {"tilt": tilt, "px2mm": pix2mm, "pd": pd}, self.items
+        )
 
 
 class AnalyzeIntercanthalDistance(MeasureBase):
@@ -431,7 +427,7 @@ class AnalyzeIntercanthalDistance(MeasureBase):
         Initializes the measurement with default settings.
         """
         self.enabled: bool = True
-        self.items: list[MeasureItem] = [MeasureItem("id")]
+        self.items: List[MeasureItem] = [MeasureItem("id")]
         self.is_frontal: bool = True
         self.is_lateral: bool = False
 
@@ -460,7 +456,7 @@ class AnalyzeIntercanthalDistance(MeasureBase):
         )
 
         # Return the filtered measurement result
-        return filter({"id": d1}, self.items)
+        return filter_measurements({"id": d1}, self.items)
 
 
 class AnalyzeMouthLength(MeasureBase):
@@ -485,7 +481,7 @@ class AnalyzeMouthLength(MeasureBase):
 
     def calc(self, face: Any, render: bool = True) -> Dict[str, float]:
         """
-        Calculates the intercanthal distance (ID) using the landmarks at indices 88 and 92.
+        Calculates the mouth length (ML) using the landmarks at indices 88 and 92.
 
         Parameters:
         - `face`: A face object containing landmarks.
@@ -502,7 +498,7 @@ class AnalyzeMouthLength(MeasureBase):
         )
 
         # Return the filtered measurement result
-        return filter({"ml": d1}, self.items)
+        return filter_measurements({"ml": d1}, self.items)
 
 
 class AnalyzeNasalWidth(MeasureBase):
@@ -544,7 +540,7 @@ class AnalyzeNasalWidth(MeasureBase):
         )
 
         # Return the filtered measurement result
-        return filter({"nw": d1}, self.items)
+        return filter_measurements({"nw": d1}, self.items)
 
 
 class AnalyzeOuterEyeCorners(MeasureBase):
@@ -587,7 +583,57 @@ class AnalyzeOuterEyeCorners(MeasureBase):
         )
 
         # Return the filtered measurement result
-        return filter({"oe": d1}, self.items)
+        return filter_measurements({"oe": d1}, self.items)
+
+
+class AnalyzeLateral(MeasureBase):
+    """
+    Analyze several measurements in lateral view.
+    NN distance soft tissue nasion to subnasal point
+    NM distance subnasal point to mentolabial point
+    NP distance subnasal point to soft tissue pogonion
+    """
+
+    def __init__(self) -> None:
+        """
+        Initializes the measurement with default settings.
+        """
+        self.enabled: bool = True
+        self.items: list[MeasureItem] = [MeasureItem("nn")]
+        self.is_frontal: bool = True
+        self.is_lateral: bool = False
+
+    def abbrev(self) -> str:
+        """
+        Returns the abbreviation of the measurement.
+        """
+        return "Lateral Measures"
+
+    def calc(self, face: Any, render: bool = True) -> Dict[str, float]:
+        """
+        Calculates lateral measures.
+
+        Parameters:
+        - `face`: A face object containing landmarks.
+        - `render`: Whether to render the measurement visually.
+
+        Returns:
+        - A dictionary containing the intercanthal distance measurement.
+        """
+        render1: bool = self.is_enabled("nn")
+
+        landmarks = face.lateral_landmarks
+        p1 = landmarks[0]
+        p2 = landmarks[1]
+        print(f"p1 type: {type(p1)}, value: {p1}")
+        print(f"p2 type: {type(p2)}, value: {p2}")
+        # Measure the distance between landmarks 60 and 72
+        d1: float = face.measure(
+            landmarks[0], landmarks[1], render=(render and render1), dir="r"
+        )
+
+        # Return the filtered measurement result
+        return filter_measurements({"nn": d1}, self.items)
 
 
 # ID intercanthal distance

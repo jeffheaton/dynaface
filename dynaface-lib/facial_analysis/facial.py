@@ -158,12 +158,9 @@ class AnalyzeFace(ImageAnalysis):
         # Scale 'c' to a height of 1024 while maintaining aspect ratio
         c_height, c_width = c.shape[:2]
         scale_factor = 1024 / c_height
-        print(f"Height x width: {c_height} {c_width}")
-        print(f"Scale Factor: {scale_factor}")
 
         new_width = int(c_width * scale_factor)
         c_resized = cv2.resize(c, (new_width, 1024))
-        print(f"New width (before limiting to MAX_INSERT_WIDTH): {new_width}")
 
         MAX_INSERT_WIDTH = 1024  # Disabled currently, as 1024 is max
 
@@ -171,8 +168,6 @@ class AnalyzeFace(ImageAnalysis):
         if new_width > MAX_INSERT_WIDTH:
             new_width = MAX_INSERT_WIDTH  # Crop to MAX_INSERT_WIDTH max width
             c_resized = c_resized[:, :MAX_INSERT_WIDTH]  # Keep the left side
-
-        print(f"Final new width: {new_width}")
 
         # Overlay the resized image onto self.render_img at the top-right corner
         render_h, render_w = self.render_img.shape[:2]
@@ -328,8 +323,6 @@ class AnalyzeFace(ImageAnalysis):
             int(bbox[3] - bbox[1]),  # height
         )
 
-        print("Before expansion:", crop_x, crop_y, w, h)
-
         # Compute vertical expansion amounts
         expand_top = int(h * INFLATE_LATERAL_TOP)
         expand_bottom = int(h * INFLATE_LATERAL_BOTTOM)
@@ -339,8 +332,6 @@ class AnalyzeFace(ImageAnalysis):
 
         # Adjust height
         h = h + expand_top + expand_bottom
-
-        print("After expansion:", crop_x, crop_y, w, h)
 
         # Compute aspect ratio and scale to match STYLEGAN_WIDTH
         width, height = self.render_img.shape[1], self.render_img.shape[0]
