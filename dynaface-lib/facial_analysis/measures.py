@@ -425,7 +425,10 @@ class AnalyzePosition(MeasureBase):
                 p1, p2 = face.calc_bisect()
                 face.line(p1, p2)
 
-            pd, pix2mm = util.calc_pd(util.get_pupils(landmarks))
+            if face.lateral:
+                pd, pix2mm = 260, 0.24
+            else:
+                pd, pix2mm = util.calc_pd(util.get_pupils(landmarks))
 
             if render & render2_pd:
                 txt = f"pd={round(pd,2)} px"
@@ -564,7 +567,7 @@ class AnalyzeNasalWidth(MeasureBase):
 
         # Measure the distance between landmarks 55 and 59
         d1: float = face.measure(
-            face.landmarks[55], face.landmarks[59], render=(render and render1), dir="r"
+            face.landmarks[55], face.landmarks[59], render=(render and render1), dir="a"
         )
 
         # Return the filtered measurement result
@@ -665,24 +668,46 @@ class AnalyzeLateral(MeasureBase):
         landmarks = face.lateral_landmarks
 
         # Measure the distance between landmarks for NN, NM, and NP
-        nn = face.measure(
+        nn = face.measure_curve(
             landmarks[lateral.LATERAL_LM_SOFT_TISSUE_NASION],
             landmarks[lateral.LATERAL_LM_SUBNASAL_POINT],
+            face.sagittal_x,
+            face.sagittal_y,
             render=(render and render_nn),
             dir="r",
         )
-        nm = face.measure(
+        nm = face.measure_curve(
             landmarks[lateral.LATERAL_LM_SUBNASAL_POINT],
             landmarks[lateral.LATERAL_LM_MENTO_LABIAL_POINT],
+            face.sagittal_x,
+            face.sagittal_y,
             render=(render and render_nm),
             dir="r",
         )
-        np = face.measure(
+        np = face.measure_curve(
             landmarks[lateral.LATERAL_LM_SUBNASAL_POINT],
             landmarks[lateral.LATERAL_LM_SOFT_TISSUE_POGONION],
+            face.sagittal_x,
+            face.sagittal_y,
             render=(render and render_np),
             dir="r",
         )
+
+        # Add text output for each measure
+        if render and render_nn:
+            txt_nn = f"NN={nn:.2f} mm"
+            pos_nn = face.analyze_next_pt(txt_nn)
+            face.write_text(pos_nn, txt_nn)
+
+        if render and render_nm:
+            txt_nm = f"NM={nm:.2f} mm"
+            pos_nm = face.analyze_next_pt(txt_nm)
+            face.write_text(pos_nm, txt_nm)
+
+        if render and render_np:
+            txt_np = f"NP={np:.2f} mm"
+            pos_np = face.analyze_next_pt(txt_np)
+            face.write_text(pos_np, txt_np)
 
         # Return the filtered measurement result
         return filter_measurements({"nn": nn, "nm": nm, "np": np}, self.items)

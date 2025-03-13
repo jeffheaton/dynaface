@@ -192,6 +192,7 @@ class AnalyzeFace(ImageAnalysis):
 
         if lateral_pos and self.landmarks:
             self.lateral = True
+            self.pix2mm = 0.24
             if not facing_left:
                 self.flipped = True
                 flipped = cv2.flip(self.original_img, 1)
@@ -215,7 +216,9 @@ class AnalyzeFace(ImageAnalysis):
 
         if lateral_pos:
             p = util.cv2_to_pil(self.render_img)
-            c, self.lateral_landmarks = analyze_lateral(p)
+            c, self.lateral_landmarks, self.sagittal_x, self.sagittal_y = (
+                analyze_lateral(p)
+            )
             c = util.trim_sides(c)
             # cv2.imwrite("debug_overlay.png", c)
             self._overlay_lateral_analysis(c)
@@ -275,9 +278,14 @@ class AnalyzeFace(ImageAnalysis):
                 int((pt1[0] + pt2[0]) // 2) + 15,
                 int((pt1[1] + pt2[1]) // 2),
             ]
+        elif dir == "a":
+            mp: List[int] = [
+                int(min(pt1[0], pt2[0]) + 15),
+                int((pt1[1] + pt2[1]) // 2) - 20,
+            ]
         else:
             mp: List[int] = [
-                int((pt1[0] + pt2[0]) // 2) - (m[0][0] + 15),
+                int(pt1[0] + 15),
                 int((pt1[1] + pt2[1]) // 2),
             ]
 
@@ -286,6 +294,104 @@ class AnalyzeFace(ImageAnalysis):
             self.write_text(mp, txt)
 
         return d
+
+    def measure_curve(
+        self,
+        pt1: Tuple[int, int],
+        pt2: Tuple[int, int],
+        sagittal_x: np.ndarray,
+        sagittal_y: np.ndarray,
+        color: Tuple[int, int, int] = (255, 0, 0),
+        thickness: int = 3,
+        render: bool = True,
+        dir: str = "r",
+    ) -> float:
+        """
+        Measures the curved distance along a sagittal line between two points (pt1 and pt2) and optionally renders the curve and text.
+
+        Parameters:
+        - `pt1` (Tuple[int, int]): First point (x, y).
+        - `pt2` (Tuple[int, int]): Second point (x, y).
+        - `sagittal_x` (np.ndarray): Array of x-coordinates forming the curve.
+        - `sagittal_y` (np.ndarray): Array of y-coordinates forming the curve.
+        - `color` (Tuple[int, int, int], optional): Color of the rendered curve. Default is red (255, 0, 0).
+        - `thickness` (int, optional): Thickness of the curve line. Default is 3.
+        - `render` (bool, optional): Whether to render the measurement visually. Default is True.
+        - `dir` (str, optional): Direction for placing the text label ('r' for right, else left). Default is 'r'.
+
+        Returns:
+        - `float`: The measured curved distance in millimeters.
+        """
+
+        # Combine sagittal_x and sagittal_y into a NumPy array of (x, y) points
+        sagittal_line = np.column_stack((sagittal_x, sagittal_y))
+
+        # Function to find closest index for a given point
+        def find_closest_index(point, line):
+            distances = np.linalg.norm(line - np.array(point), axis=1)
+            return np.argmin(distances)
+
+        # Find the closest indices in the sagittal line for pt1 and pt2
+        idx1 = find_closest_index(pt1, sagittal_line)
+        idx2 = find_closest_index(pt2, sagittal_line)
+
+        # Ensure correct ordering
+        if idx1 > idx2:
+            idx1, idx2 = idx2, idx1
+
+        # Extract the segment of the curve between pt1 and pt2
+        segment = sagittal_line[idx1 : idx2 + 1]
+
+        # Compute total curved distance along the segment
+        d = (
+            sum(math.dist(segment[i], segment[i + 1]) for i in range(len(segment) - 1))
+            * self.pix2mm
+        )
+
+        # Format measurement text
+        txt = f"{d:.2f}mm"
+
+        # Compute the midpoint for displaying text
+        mid_idx = len(segment) // 2
+        mp = (
+            (segment[mid_idx][0] + 15, segment[mid_idx][1])
+            if dir == "r"
+            else (segment[mid_idx][0] - 15, segment[mid_idx][1])
+        )
+
+        # Render curve and text if enabled
+        if render:
+            self.draw_curve(segment, color, thickness)
+            if hasattr(self, "write_text"):
+                self.write_text(mp, txt)
+
+        return d
+
+    def draw_curve(
+        self, segment: np.ndarray, color: Tuple[int, int, int], thickness: int
+    ) -> None:
+        """
+        Draws a curve connecting a segment of points.
+
+        Parameters:
+        - `segment` (np.ndarray): List of (x, y) points to draw.
+        - `color` (Tuple[int, int, int]): Color of the curve.
+        - `thickness` (int): Thickness of the curve line.
+        """
+        if len(segment) < 2:
+            return  # Not enough points to draw a curve
+
+        # Convert points to integer format required for OpenCV
+        curve_pts = segment.astype(np.int32)
+
+        # Draw polyline on the image (assuming `self.image` exists as the frame to draw on)
+        cv2.polylines(
+            self.render_img,
+            [curve_pts],
+            isClosed=False,
+            color=color,
+            thickness=thickness,
+        )
 
     def analyze_next_pt(self, txt):
         result = (self.analyze_x, self.analyze_y)

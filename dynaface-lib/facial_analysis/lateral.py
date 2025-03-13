@@ -573,4 +573,9 @@ def analyze_lateral(input_image: Image.Image) -> np.ndarray:
     legend.get_frame().set_alpha(0.8)
 
     # Convert the plot to OpenCV format.
-    return util.convert_matplotlib_to_opencv(ax2), landmarks
+    return (
+        util.convert_matplotlib_to_opencv(ax2),
+        landmarks,
+        sagittal_x + shift_x,
+        sagittal_y,
+    )
