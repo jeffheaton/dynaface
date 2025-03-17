@@ -74,6 +74,7 @@ class AnalyzeFace(ImageAnalysis):
             self.measures = measures
         self.headpose = [0, 0, 0]
         self.landmarks = []
+        self.lateral = False
         self.lateral_landmarks = np.full((6, 2), -1.0)
         self.pupillary_distance = 0
         logger.debug(f"===INIT: t={tilt_threshold}")
