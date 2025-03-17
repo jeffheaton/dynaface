@@ -1,3 +1,4 @@
+*.onnx
 venv/
 working/
 *.pt
