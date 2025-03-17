@@ -14,6 +14,8 @@ if [ -z "${arch}" ]; then
     exit 1  # Exit with a non-zero value to indicate an error
 fi
 
+# Upgrade PIP
+python3.12 -m pip install --upgrade pip
 
 # Environment
 cd ../..
