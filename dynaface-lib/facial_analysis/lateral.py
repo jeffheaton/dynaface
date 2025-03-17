@@ -4,7 +4,7 @@ from typing import Optional, Tuple, Union
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from facial_analysis import util
+from facial_analysis import models, util
 from matplotlib.axes import Axes
 from PIL import Image
 from rembg import remove
@@ -40,7 +40,7 @@ def process_image(input_image: Image.Image) -> Tuple[Image.Image, np.ndarray, in
     applying morphological closing, and inverting the binary image.
     """
     # Remove background
-    output_image: Image.Image = remove(input_image)
+    output_image: Image.Image = remove(input_image, session=models.rembg_model)
 
     # Convert to grayscale
     grayscale: Image.Image = output_image.convert("L")

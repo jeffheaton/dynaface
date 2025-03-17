@@ -1,14 +1,15 @@
 import os
+import platform
 
 import facenet_pytorch
 import numpy as np
+import rembg
 import torch
 from facenet_pytorch import MTCNN
 from facenet_pytorch.models.mtcnn import ONet, PNet, RNet
 from facial_analysis.spiga.inference.config import ModelConfig
 from facial_analysis.spiga.inference.framework import SPIGAFramework
 from torch import nn
-import platform
 
 # Mac M1 issue - hope to remove some day
 # RuntimeError: Adaptive pool MPS: input sizes must be divisible by output sizes.
@@ -21,6 +22,7 @@ _model_path = None
 _device = None
 mtcnn_model = None
 spiga_model = None
+rembg_model = None
 
 SPIGA_MODEL = "wflw"
 
@@ -107,6 +109,12 @@ def _init_spiga() -> None:
     spiga_model = SPIGAFramework(config, device=_device)
 
 
+def _init_rembg() -> None:
+    global rembg_model
+    model_path = os.path.join(_model_path, "u2net.onnx")
+    rembg_model = rembg.new_session(model_name=_model_path)
+
+
 def init_models(model_path: str, device: str) -> None:
     global _model_path, _device
 
@@ -115,6 +123,7 @@ def init_models(model_path: str, device: str) -> None:
 
     _init_mtcnn()
     _init_spiga()
+    _init_rembg()
 
 
 def are_models_init() -> bool:
