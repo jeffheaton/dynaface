@@ -55,7 +55,7 @@ pipeline {
         always {
             script {
                 // Clean up virtual environment
-                sh 'rm -rf $VENV_DIR'
+                
             }
         }
     }
