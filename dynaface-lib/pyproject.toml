@@ -14,7 +14,7 @@ include = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.8,<3.12"
+python = "3.11"
 opencv-python = ">=4.9.0.80"
 Pillow = ">=10.2.0"
 matplotlib = ">=3.9.0"
