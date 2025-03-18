@@ -18,8 +18,11 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 script {
-                    // Install dependencies using Poetry
-                    sh 'poetry install'
+                    // Change to the correct directory before running Poetry commands
+                    sh '''
+                    cd dynaface-lib
+                    poetry install
+                    '''
                 }
             }
         }
@@ -27,8 +30,11 @@ pipeline {
         stage('Run Tests') {
             steps {
                 script {
-                    // Run tests using Poetry
-                    sh 'poetry run pytest dynaface-lib/tests'
+                    // Run tests from the correct directory
+                    sh '''
+                    cd dynaface-lib
+                    poetry run pytest tests
+                    '''
                 }
             }
         }
@@ -36,8 +42,11 @@ pipeline {
         stage('Build Package') {
             steps {
                 script {
-                    // Build the package with Poetry
-                    sh 'poetry build'
+                    // Build the package from the correct directory
+                    sh '''
+                    cd dynaface-lib
+                    poetry build
+                    '''
                 }
             }
         }
@@ -53,7 +62,10 @@ pipeline {
         always {
             script {
                 // Clean up Poetry's cache (optional)
-                sh 'poetry cache clear pypi --all'
+                sh '''
+                cd dynaface-lib
+                poetry cache clear pypi --all
+                '''
             }
         }
     }
