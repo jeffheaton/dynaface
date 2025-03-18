@@ -40,7 +40,7 @@ def process_image(input_image: Image.Image) -> Tuple[Image.Image, np.ndarray, in
     applying morphological closing, and inverting the binary image.
     """
     # Remove background
-    output_image: Image.Image = remove(input_image, session=models.rembg_model)
+    output_image: Image.Image = remove(input_image, session=models.rembg_session)
 
     # Convert to grayscale
     grayscale: Image.Image = output_image.convert("L")

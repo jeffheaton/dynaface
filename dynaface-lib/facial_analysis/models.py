@@ -22,7 +22,7 @@ _model_path = None
 _device = None
 mtcnn_model = None
 spiga_model = None
-rembg_model = None
+rembg_session = None
 
 SPIGA_MODEL = "wflw"
 
@@ -110,9 +110,9 @@ def _init_spiga() -> None:
 
 
 def _init_rembg() -> None:
-    global rembg_model
-    model_path = os.path.join(_model_path, "u2net.onnx")
-    rembg_model = rembg.new_session(model_name=_model_path)
+    global rembg_session
+    os.environ["U2NET_HOME"] = _model_path
+    rembg_session = rembg.new_session(model_name="u2net")
 
 
 def init_models(model_path: str, device: str) -> None:
