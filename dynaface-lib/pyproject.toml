@@ -18,10 +18,13 @@ facenet-pytorch = "==2.5.3"
 rembg = ">=2.0.0"
 onnxruntime = ">=1.19.0"
 
+# ✅ Corrected section
 [tool.poetry.include]
-"spiga/data/annotations/**/*" = {}
-"spiga/models/weights/**/*" = {}
-"spiga/data/models3D/*.txt" = {}
+files = [
+    "spiga/data/annotations/**/*",
+    "spiga/models/weights/**/*",
+    "spiga/data/models3D/*.txt"
+]
 
 [build-system]
 requires = ["poetry-core"]
