@@ -1,0 +1,34 @@
+[tool.poetry]
+name = "facial_analysis"
+version = "0.1.0"
+description = "Facial symmetry analysis package."
+authors = ["Jeff Heaton <jeff@jeffheaton.com>"]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/jeffheaton/facial-analysis"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+opencv-python = ">=4.9.0.80"
+Pillow = ">=10.2.0"
+matplotlib = ">=3.9.0"
+scikit-learn = ">=1.5.0"
+facenet-pytorch = "==2.5.3"
+rembg = ">=2.0.0"
+onnxruntime = ">=1.19.0"
+
+[tool.poetry.packages]
+include = ["facial_analysis"]
+
+[tool.poetry.include]
+"spiga/data/annotations/**/*" = {}
+"spiga/models/weights/**/*" = {}
+"spiga/data/models3D/*.txt" = {}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pyinstaller]
+hook-dirs = ["facial_analysis.__pyinstaller:get_hook_dirs"]
+tests = ["facial_analysis.__pyinstaller:get_PyInstaller_tests"]
