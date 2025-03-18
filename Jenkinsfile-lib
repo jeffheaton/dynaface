@@ -1,0 +1,62 @@
+pipeline {
+    agent any
+
+    environment {
+        PYTHON_VERSION = '3.12'
+        VENV_DIR = 'venv'
+    }
+
+    stages {
+        stage('Setup Python Environment') {
+            steps {
+                script {
+                    // Install Python and create a virtual environment
+                    sh 'python3 -m venv $VENV_DIR'
+                    sh 'source $VENV_DIR/bin/activate && pip install --upgrade pip setuptools wheel'
+                }
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                script {
+                    // Install dependencies from setup.py
+                    sh 'source $VENV_DIR/bin/activate && pip install -e dynaface-lib'
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                script {
+                    // Run tests (ensure tests exist in dynaface-lib/tests)
+                    sh 'source $VENV_DIR/bin/activate && pytest dynaface-lib/tests'
+                }
+            }
+        }
+
+        stage('Build Package') {
+            steps {
+                script {
+                    // Build the Python package
+                    sh 'source $VENV_DIR/bin/activate && cd dynaface-lib && python setup.py sdist bdist_wheel'
+                }
+            }
+        }
+
+        stage('Archive Artifacts') {
+            steps {
+                archiveArtifacts artifacts: 'dynaface-lib/dist/*.whl', fingerprint: true
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                // Clean up virtual environment
+                sh 'rm -rf $VENV_DIR'
+            }
+        }
+    }
+}
