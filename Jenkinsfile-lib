@@ -10,6 +10,8 @@ pipeline {
         stage('Setup Python Environment') {
             steps {
                 script {
+                    export TMPDIR=$HOME/tmp
+                    mkdir -p $TMPDIR
                     // Install Python and create a virtual environment
                     sh 'python3 -m venv $VENV_DIR'
                     sh 'source $VENV_DIR/bin/activate && pip install --upgrade pip setuptools wheel'
