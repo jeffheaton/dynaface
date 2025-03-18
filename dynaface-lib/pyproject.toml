@@ -18,7 +18,7 @@ rembg = ">=2.0.0"
 onnxruntime = ">=1.19.0"
 
 [tool.poetry.packages]
-include = ["facial_analysis"]
+include = [{include = "dynaface"}]  # ✅ Corrected
 
 [tool.poetry.include]
 "spiga/data/annotations/**/*" = {}
