@@ -6,7 +6,12 @@ authors = ["Jeff Heaton <jeff@jeffheaton.com>"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/jeffheaton/facial-analysis"
-packages = [{include = "dynaface"}]  
+packages = [{include = "dynaface"}]
+include = [
+    "spiga/data/annotations/**/*",
+    "spiga/models/weights/**/*",
+    "spiga/data/models3D/*.txt"
+]
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -17,14 +22,6 @@ scikit-learn = ">=1.5.0"
 facenet-pytorch = "==2.5.3"
 rembg = ">=2.0.0"
 onnxruntime = ">=1.19.0"
-
-# ✅ Corrected section
-[tool.poetry.include]
-files = [
-    "spiga/data/annotations/**/*",
-    "spiga/models/weights/**/*",
-    "spiga/data/models3D/*.txt"
-]
 
 [build-system]
 requires = ["poetry-core"]
