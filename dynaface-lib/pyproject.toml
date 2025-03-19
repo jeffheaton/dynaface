@@ -6,7 +6,7 @@ authors = ["Jeff Heaton <jeff@jeffheaton.com>"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/jeffheaton/facial-analysis"
-packages = [{include = "dynaface"}]
+packages = [{include = "facial_analysis"}]
 include = [
     "spiga/data/annotations/**/*",
     "spiga/models/weights/**/*",
