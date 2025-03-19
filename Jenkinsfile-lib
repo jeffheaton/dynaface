@@ -3,8 +3,6 @@ pipeline {
 
     environment {
         PYTHON_VERSION = '3.11'
-        SESSION_NAME = "autograder-session"
-        REGION = "us-east-1"
     }
     stages {
         stage('Setup Python Environment') {
@@ -84,31 +82,6 @@ pipeline {
                     archiveArtifacts artifacts: 'dynaface-lib/dist/*.whl', fingerprint: true
                     archiveArtifacts artifacts: 'dynaface-lib/coverage.xml', allowEmptyArchive: true  // Archive coverage XML
                     archiveArtifacts artifacts: 'dynaface-lib/htmlcov/**', allowEmptyArchive: true  // Archive HTML coverage
-                }
-            }
-        }
-        stage('Assume AWS Role') {
-            steps {
-                withCredentials([
-                    string(credentialsId: 'jenkins-role-build-autograder', variable: 'ROLE_ARN')
-                ]) {
-                    script {
-                        def assumeRoleOutput = sh(
-                            script: """
-                            aws sts assume-role \
-                              --role-arn "$ROLE_ARN" \
-                              --role-session-name "$SESSION_NAME" \
-                              --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
-                              --output text
-                            """,
-                            returnStdout: true
-                        ).trim()
-                        
-                        def creds = assumeRoleOutput.split()
-                        env.AWS_ACCESS_KEY_ID = creds[0]
-                        env.AWS_SECRET_ACCESS_KEY = creds[1]
-                        env.AWS_SESSION_TOKEN = creds[2]
-                    }
                 }
             }
         }
