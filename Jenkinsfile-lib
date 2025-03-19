@@ -45,6 +45,7 @@ pipeline {
                 }
             }
         }
+
         stage('Run Tests & Generate Coverage') {
             steps {
                 script {
@@ -58,6 +59,7 @@ pipeline {
                 }
             }
         }
+
         stage('Build Package') {
             steps {
                 script {
@@ -79,8 +81,8 @@ pipeline {
                         mkdir -p dist  # Ensure dist exists
                     '''
                     archiveArtifacts artifacts: 'dynaface-lib/dist/*.whl', fingerprint: true
-                    archiveArtifacts artifacts: 'dynaface-lib/coverage.xml'  // Archive coverage XML for reporting
-                    archiveArtifacts artifacts: 'dynaface-lib/htmlcov/**'  // Archive HTML coverage for viewing
+                    archiveArtifacts artifacts: 'dynaface-lib/coverage.xml', allowEmptyArchive: true  // Archive coverage XML
+                    archiveArtifacts artifacts: 'dynaface-lib/htmlcov/**', allowEmptyArchive: true  // Archive HTML coverage
                 }
             }
         }
@@ -95,6 +97,18 @@ pipeline {
                     poetry cache clear pypi --all
                 '''
             }
+            // Archive test and coverage results
+            junit 'dynaface-lib/unit_test_results.xml'
+            recordCoverage(
+                tools: [[parser: 'COBERTURA', pattern: 'dynaface-lib/coverage.xml']],
+                id: 'pytest-coverage',
+                name: 'Pytest Coverage',
+                sourceCodeRetention: 'EVERY_BUILD',
+                qualityGates: [
+                    [threshold: 60.0, metric: 'LINE', baseline: 'PROJECT', unstable: true],
+                    [threshold: 60.0, metric: 'BRANCH', baseline: 'PROJECT', unstable: true]
+                ]
+            )
         }
     }
 }
