@@ -44,6 +44,24 @@ def init_processor(device=None):
     _processor = SPIGAFramework(config, device=device)
 
 
+def calc_pd(pupils):
+    left_pupil, right_pupil = pupils
+    left_pupil = np.array(left_pupil)
+    right_pupil = np.array(right_pupil)
+
+    # Calculate Euclidean distance between the two pupils
+    pupillary_distance = np.linalg.norm(left_pupil - right_pupil)
+
+    # Convert the distance from pixels to millimeters
+    pix2mm = AnalyzeFace.pd / pupillary_distance
+
+    return pupillary_distance, pix2mm
+
+
+def get_pupils(landmarks):
+    return landmarks[LM_LEFT_PUPIL], landmarks[LM_RIGHT_PUPIL]
+
+
 def load_face_image(
     filename,
     crop=True,

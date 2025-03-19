@@ -3,7 +3,7 @@ import math
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
-from facial_analysis import lateral, util
+from facial_analysis import lateral, util, facial
 
 logger = logging.getLogger(__name__)
 
@@ -428,7 +428,7 @@ class AnalyzePosition(MeasureBase):
             if face.lateral:
                 pd, pix2mm = 260, 0.24
             else:
-                pd, pix2mm = util.calc_pd(util.get_pupils(landmarks))
+                pd, pix2mm = facial.calc_pd(util.get_pupils(landmarks))
 
             if render & render2_pd:
                 txt = f"pd={round(pd,2)} px"

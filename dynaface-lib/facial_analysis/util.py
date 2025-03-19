@@ -2,7 +2,6 @@ import math
 
 import cv2
 import numpy as np
-from facial_analysis import facial
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from PIL import Image
 
@@ -103,24 +102,6 @@ def rotate_crop_points(points, center, angle_degrees):
         rotated_points.append(rotated_point)
 
     return rotated_points
-
-
-def calc_pd(pupils):
-    left_pupil, right_pupil = pupils
-    left_pupil = np.array(left_pupil)
-    right_pupil = np.array(right_pupil)
-
-    # Calculate Euclidean distance between the two pupils
-    pupillary_distance = np.linalg.norm(left_pupil - right_pupil)
-
-    # Convert the distance from pixels to millimeters
-    pix2mm = facial.AnalyzeFace.pd / pupillary_distance
-
-    return pupillary_distance, pix2mm
-
-
-def get_pupils(landmarks):
-    return landmarks[facial.LM_LEFT_PUPIL], landmarks[facial.LM_RIGHT_PUPIL]
 
 
 def calculate_face_rotation(pupil_coords):

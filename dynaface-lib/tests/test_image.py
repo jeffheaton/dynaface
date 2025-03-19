@@ -1,7 +1,12 @@
+import sys
 import unittest
+import os
+
 import numpy as np
+from facial_analysis.util import safe_clip
 from facial_analysis.image import load_image
-from facial_analysis.facial import safe_clip
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
 class TestImage(unittest.TestCase):
@@ -18,7 +23,7 @@ class TestImage(unittest.TestCase):
 
         assert clipped_image.shape[0] == 1024
         assert clipped_image.shape[1] == 1024
-        assert clipped_image.shape[2] == 1024
+        assert clipped_image.shape[2] == 3
         assert x_offset == 100
         assert y_offset == 100
 
