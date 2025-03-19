@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        PYTHON_VERSION = '3.12'
+        PYTHON_VERSION = '3.11'
     }
 
     stages {
@@ -11,6 +11,18 @@ pipeline {
                 script {
                     // Install Poetry
                     sh 'pip install --user poetry'
+                    
+                    // Ensure Python 3.11 is available, fail if not
+                    sh '''
+                        if ! command -v python3.11 &> /dev/null; then
+                            echo "Error: Python 3.11 is not installed or not in PATH."
+                            exit 1
+                        fi
+                        poetry env use python3.11
+                    '''
+                    
+                    // Confirm the active Python version inside Poetry
+                    sh 'poetry run python --version'
                 }
             }
         }
