@@ -23,6 +23,12 @@ facenet-pytorch = "==2.5.3"
 rembg = ">=2.0.0"
 onnxruntime = ">=1.19.0"
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2.0"
+pytest-cov = "^5.0.0"  # Optional, for test coverage reports
+mypy = "^1.10.0"       # Optional, for type checking
+flake8 = "^7.0.0"      # Optional, for linting
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
