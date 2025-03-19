@@ -18,11 +18,14 @@ pipeline {
                             echo "Error: Python 3.11 is not installed or not in PATH."
                             exit 1
                         fi
-                        poetry env use python3.11
                     '''
                     
-                    // Confirm the active Python version inside Poetry
-                    sh 'poetry run python --version'
+                    // Change to the correct directory before setting up Poetry
+                    sh '''
+                        cd dynaface-lib
+                        poetry env use python3.11
+                        poetry run python --version
+                    '''
                 }
             }
         }
@@ -32,8 +35,8 @@ pipeline {
                 script {
                     // Change to the correct directory before running Poetry commands
                     sh '''
-                    cd dynaface-lib
-                    poetry install
+                        cd dynaface-lib
+                        poetry install
                     '''
                 }
             }
@@ -44,8 +47,8 @@ pipeline {
                 script {
                     // Run tests from the correct directory
                     sh '''
-                    cd dynaface-lib
-                    poetry run pytest tests
+                        cd dynaface-lib
+                        poetry run pytest tests
                     '''
                 }
             }
@@ -56,8 +59,8 @@ pipeline {
                 script {
                     // Build the package from the correct directory
                     sh '''
-                    cd dynaface-lib
-                    poetry build
+                        cd dynaface-lib
+                        poetry build
                     '''
                 }
             }
@@ -65,7 +68,14 @@ pipeline {
 
         stage('Archive Artifacts') {
             steps {
-                archiveArtifacts artifacts: 'dynaface-lib/dist/*.whl', fingerprint: true
+                script {
+                    // Ensure archive path is correct
+                    sh '''
+                        cd dynaface-lib
+                        mkdir -p dist  # Ensure dist exists
+                    '''
+                    archiveArtifacts artifacts: 'dynaface-lib/dist/*.whl', fingerprint: true
+                }
             }
         }
     }
@@ -75,8 +85,8 @@ pipeline {
             script {
                 // Clean up Poetry's cache (optional)
                 sh '''
-                cd dynaface-lib
-                poetry cache clear pypi --all
+                    cd dynaface-lib
+                    poetry cache clear pypi --all
                 '''
             }
         }
