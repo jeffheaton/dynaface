@@ -6,6 +6,11 @@ pipeline {
     }
 
     stages {
+        stage('Cleanup Workspace') {
+            steps {
+                cleanWs() // Cleans the workspace before running the build
+            }
+        }
         stage('Setup Python Environment') {
             steps {
                 script {
