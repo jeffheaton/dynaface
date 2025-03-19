@@ -20,10 +20,13 @@ pipeline {
                         fi
                     '''
                     
-                    // Change to the correct directory before setting up Poetry
+                    // Get the actual Python 3.11 binary path
                     sh '''
+                        PYTHON_PATH=$(command -v python3.11)
+                        echo "Using Python at: $PYTHON_PATH"
+
                         cd dynaface-lib
-                        poetry env use python3.11
+                        poetry env use "$PYTHON_PATH"
                         poetry run python --version
                     '''
                 }
