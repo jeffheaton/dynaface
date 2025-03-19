@@ -45,19 +45,19 @@ pipeline {
                 }
             }
         }
-
-        stage('Run Tests') {
+        stage('Run Tests & Generate Coverage') {
             steps {
                 script {
-                    // Run tests from the correct directory
                     sh '''
                         cd dynaface-lib
-                        poetry run pytest tests --junitxml=unit_test_results.xml
+                        export PATH="$HOME/.pyenv/bin:$PATH"
+                        eval "$(pyenv init --path)"
+                        eval "$(pyenv virtualenv-init -)"
+                        poetry run pytest tests --junitxml=unit_test_results.xml --cov=./ --cov-report=xml:coverage.xml --cov-report=html
                     '''
                 }
             }
         }
-
         stage('Build Package') {
             steps {
                 script {
@@ -73,12 +73,14 @@ pipeline {
         stage('Archive Artifacts') {
             steps {
                 script {
-                    // Ensure archive path is correct
+                    // Ensure the necessary paths exist before archiving
                     sh '''
                         cd dynaface-lib
                         mkdir -p dist  # Ensure dist exists
                     '''
                     archiveArtifacts artifacts: 'dynaface-lib/dist/*.whl', fingerprint: true
+                    archiveArtifacts artifacts: 'dynaface-lib/coverage.xml'  // Archive coverage XML for reporting
+                    archiveArtifacts artifacts: 'dynaface-lib/htmlcov/**'  // Archive HTML coverage for viewing
                 }
             }
         }

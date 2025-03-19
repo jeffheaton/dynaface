@@ -196,7 +196,7 @@ class WorkerLoad(QThread):
                 if len(landmarks_queue) > 1:
                     landmarks = mean_landmarks(landmarks_queue)
 
-                pupillary_distance, pix2mm = util.calc_pd(util.get_pupils(landmarks))
+                pupillary_distance, pix2mm = facial.calc_pd(util.get_pupils(landmarks))
 
                 # Update remaining face properties
                 self._face.landmarks = landmarks
