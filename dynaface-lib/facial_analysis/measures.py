@@ -162,7 +162,7 @@ class AnalyzeBrows(MeasureBase):
     def calc(self, face, render=True):
         render2 = self.is_enabled("brow.d")
 
-        p = util.get_pupils(face.landmarks)
+        p = facial.util_get_pupils(face.landmarks)
         tilt = util.normalize_angle(util.calculate_face_rotation(p))
 
         if render & render2:
@@ -408,7 +408,7 @@ class AnalyzePosition(MeasureBase):
         render2_px2mm = self.is_enabled("px2mm")
         render2_pd = self.is_enabled("pd")
 
-        p = util.get_pupils(face.landmarks)
+        p = facial.util_get_pupils(face.landmarks)
         tilt = 0
 
         if p:
@@ -428,7 +428,7 @@ class AnalyzePosition(MeasureBase):
             if face.lateral:
                 pd, pix2mm = 260, 0.24
             else:
-                pd, pix2mm = facial.util_calc_pd(util.get_pupils(landmarks))
+                pd, pix2mm = facial.util_calc_pd(facial.util_get_pupils(landmarks))
 
             if render & render2_pd:
                 txt = f"pd={round(pd,2)} px"
