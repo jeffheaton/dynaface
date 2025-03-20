@@ -65,6 +65,8 @@ pipeline {
                     // Build the package from the correct directory
                     sh '''
                         cd dynaface-lib
+                        echo "Cleaning up old .whl files..."
+                        rm -rf dist/*  # Deletes old .whl files before building
                         poetry build
                     '''
                 }
