@@ -58,7 +58,7 @@ def util_calc_pd(pupils):
     return pupillary_distance, pix2mm
 
 
-def get_pupils(landmarks):
+def util_get_pupils(landmarks):
     return landmarks[LM_LEFT_PUPIL], landmarks[LM_RIGHT_PUPIL]
 
 
@@ -545,7 +545,7 @@ class AnalyzeFace(ImageAnalysis):
         self.pupillary_distance, self.pix2mm = util_calc_pd(self.get_pupils())
 
     def get_pupils(self):
-        return util.get_pupils(self.landmarks)
+        return util_get_pupils(self.landmarks)
 
     def dump_state(self):
         result = [
