@@ -431,7 +431,7 @@ class AnalyzeFace(ImageAnalysis):
         return result
 
     def calculate_face_rotation(self):
-        p = util.get_pupils(self.landmarks)
+        p = util_get_pupils(self.landmarks)
         return measures.to_degrees(util.calculate_face_rotation(p))
 
     def crop_lateral(self):
@@ -485,7 +485,7 @@ class AnalyzeFace(ImageAnalysis):
 
     def crop_stylegan(self, pupils=None):
         # Save orig pupils so we can lock the scale, rotate, and crop during a load
-        self.orig_pupils = util.get_pupils(self.landmarks)
+        self.orig_pupils = util_get_pupils(self.landmarks)
 
         pupils = self.orig_pupils if pupils is None else pupils
         # Rotate, if needed
@@ -507,7 +507,7 @@ class AnalyzeFace(ImageAnalysis):
                 self.face_rotation = None
 
         if not pupils:
-            pupils = util.get_pupils(landmarks=self.landmarks)
+            pupils = util_get_pupils(landmarks=self.landmarks)
 
         d, _ = util_calc_pd(pupils)
 
@@ -577,7 +577,7 @@ class AnalyzeFace(ImageAnalysis):
             self.face_rotation = 0
 
     def find_pupils(self):
-        return util.get_pupils(self.landmarks)
+        return util_get_pupils(self.landmarks)
 
     def calc_bisect(self):
         return util.bisecting_line_coordinates(img_size=1024, pupils=self.find_pupils())
