@@ -17,10 +17,10 @@ fi
 # Environment
 cd ../..
 rm -rf ./venv || true
-python3.12 -m venv venv
+python3.11 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-pip install dynaface -f ./wheels
+pip install --upgrade https://data.heatonresearch.com/library/dynaface-0.1.5-py3-none-any.whl
 cd deploy/macos
 
 # Build it
