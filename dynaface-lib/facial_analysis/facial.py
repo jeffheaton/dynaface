@@ -44,7 +44,7 @@ def init_processor(device=None):
     _processor = SPIGAFramework(config, device=device)
 
 
-def calc_pd(pupils):
+def util_calc_pd(pupils):
     left_pupil, right_pupil = pupils
     left_pupil = np.array(left_pupil)
     right_pupil = np.array(right_pupil)
@@ -509,7 +509,7 @@ class AnalyzeFace(ImageAnalysis):
         if not pupils:
             pupils = util.get_pupils(landmarks=self.landmarks)
 
-        d, _ = util.calc_pd(pupils)
+        d, _ = util_calc_pd(pupils)
 
         if d == 0:
             raise ValueError("Can't process face pupils must be in different locations")
@@ -542,7 +542,7 @@ class AnalyzeFace(ImageAnalysis):
         super().load_image(img2)
 
     def calc_pd(self):
-        self.pupillary_distance, self.pix2mm = util.calc_pd(self.get_pupils())
+        self.pupillary_distance, self.pix2mm = util_calc_pd(self.get_pupils())
 
     def get_pupils(self):
         return util.get_pupils(self.landmarks)
