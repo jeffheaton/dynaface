@@ -8,16 +8,22 @@ pipeline {
         stage('Setup Python Environment') {
             steps {
                 script {
+                    // Install Poetry
                     sh 'pip install --user poetry'
+                    
+                    // Ensure Python 3.11 is available, fail if not
                     sh '''
                         if ! command -v python3.11 &> /dev/null; then
                             echo "Error: Python 3.11 is not installed or not in PATH."
                             exit 1
                         fi
                     '''
+                    
+                    // Get the actual Python 3.11 binary path
                     sh '''
                         PYTHON_PATH=$(command -v python3.11)
                         echo "Using Python at: $PYTHON_PATH"
+
                         cd dynaface-lib
                         poetry env use "$PYTHON_PATH"
                         poetry run python --version
@@ -29,6 +35,7 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 script {
+                    // Change to the correct directory before running Poetry commands
                     sh '''
                         cd dynaface-lib
                         poetry install
@@ -55,14 +62,10 @@ pipeline {
         stage('Build Package') {
             steps {
                 script {
+                    // Build the package from the correct directory
                     sh '''
                         cd dynaface-lib
                         poetry build
-                        WHEEL_FILE=$(ls dist/*.whl | head -n 1)
-                        WHEEL_BASENAME=$(basename "$WHEEL_FILE" .whl)
-                        NEW_WHEEL_FILENAME="${WHEEL_BASENAME}-${BUILD_NUMBER}.whl"
-                        mv "$WHEEL_FILE" "dist/$NEW_WHEEL_FILENAME"
-                        echo "Renamed wheel file to: $NEW_WHEEL_FILENAME"
                     '''
                 }
             }
@@ -71,23 +74,28 @@ pipeline {
         stage('Archive Artifacts') {
             steps {
                 script {
+                    // Ensure the necessary paths exist before archiving
+                    sh '''
+                        cd dynaface-lib
+                        mkdir -p dist  # Ensure dist exists
+                    '''
                     archiveArtifacts artifacts: 'dynaface-lib/dist/*.whl', fingerprint: true
-                    archiveArtifacts artifacts: 'dynaface-lib/coverage.xml', allowEmptyArchive: true
-                    archiveArtifacts artifacts: 'dynaface-lib/htmlcov/**', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'dynaface-lib/coverage.xml', allowEmptyArchive: true  // Archive coverage XML
+                    archiveArtifacts artifacts: 'dynaface-lib/htmlcov/**', allowEmptyArchive: true  // Archive HTML coverage
                 }
             }
         }
-        
         stage('Upload to S3') {
             steps {
                 script {
                     sh '''
                         AWS_BUCKET_NAME="data.heatonresearch.com"
                         AWS_BUCKET_PATH="library/"
+
+                        echo "Uploading built package to S3 at s3://$AWS_BUCKET_NAME/$AWS_BUCKET_PATH..."
+
                         cd dynaface-lib/dist
-                        WHEEL_FILE=$(ls *.whl | head -n 1)
-                        echo "Uploading $WHEEL_FILE to S3..."
-                        aws s3 cp "$WHEEL_FILE" s3://$AWS_BUCKET_NAME/$AWS_BUCKET_PATH --acl public-read
+                        aws s3 cp *.whl s3://$AWS_BUCKET_NAME/$AWS_BUCKET_PATH --acl public-read
                     '''
                 }
             }
@@ -97,11 +105,13 @@ pipeline {
     post {
         always {
             script {
+                // Clean up Poetry's cache (optional)
                 sh '''
                     cd dynaface-lib
                     poetry cache clear pypi --all
                 '''
             }
+            // Archive test and coverage results
             junit 'dynaface-lib/unit_test_results.xml'
             recordCoverage(
                 tools: [[parser: 'COBERTURA', pattern: 'dynaface-lib/coverage.xml']],
