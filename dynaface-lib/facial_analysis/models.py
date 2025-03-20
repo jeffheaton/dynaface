@@ -1,9 +1,12 @@
 import os
 import platform
+import zipfile
+from pathlib import Path
 
 import facenet_pytorch
 import numpy as np
 import rembg
+import requests
 import torch
 from facenet_pytorch import MTCNN
 from facenet_pytorch.models.mtcnn import ONet, PNet, RNet
@@ -113,6 +116,39 @@ def _init_rembg() -> None:
     global rembg_session
     os.environ["U2NET_HOME"] = _model_path
     rembg_session = rembg.new_session(model_name="u2net")
+
+
+def download_models(path: str = None) -> str:
+    # Set default path if none provided
+    if path is None:
+        path = Path.home() / ".dynaface" / "models"
+    else:
+        path = Path(path)
+
+    path.mkdir(parents=True, exist_ok=True)  # Ensure directory exists
+    model_file = path / "spiga_wflw.pt"  # Check for this file
+
+    if model_file.exists():
+        return str(path)
+
+    zip_url = "https://data.heatonresearch.com/dynaface/model/1/dynaface_models.zip"
+    zip_path = path / "dynaface_models.zip"
+
+    # Download the ZIP file
+    response = requests.get(zip_url, stream=True)
+    response.raise_for_status()
+    with open(zip_path, "wb") as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+
+    # Extract the ZIP file
+    with zipfile.ZipFile(zip_path, "r") as zip_ref:
+        zip_ref.extractall(path)
+
+    # Remove the ZIP file after extraction
+    zip_path.unlink()
+
+    return str(path)
 
 
 def init_models(model_path: str, device: str) -> None:
