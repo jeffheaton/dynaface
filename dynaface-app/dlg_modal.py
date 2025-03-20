@@ -1,10 +1,9 @@
 from typing import Callable
 
-import dynaface_app
 import worker_threads
-from facial_analysis import facial
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
+    QApplication,
     QDialog,
     QFileDialog,
     QLabel,
@@ -13,6 +12,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from dynaface import facial
 
 
 class SaveVideoDialog(QDialog):
@@ -125,7 +126,9 @@ class VideoExportDialog(QDialog):
             self._update_status.setText(status)
 
     def obtain_data(self):
-        tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
+        app = QApplication.instance()
+
+        tilt_threshold = app.tilt_threshold
         face = facial.AnalyzeFace(
             self._calcs, data_path=None, tilt_threshold=tilt_threshold
         )

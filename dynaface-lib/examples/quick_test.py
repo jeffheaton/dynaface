@@ -1,4 +1,4 @@
-from facial_analysis.facial import load_face_image
+from dynaface.facial import load_face_image
 
 
 SOURCE_IMG = "/Users/jeff/data/facial/samples/2021-8-19.png"

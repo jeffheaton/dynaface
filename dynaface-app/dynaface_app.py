@@ -1,18 +1,29 @@
-import json
+import os
+
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["MKL_DYNAMIC"] = "FALSE"
+os.environ["MKL_THREADING_LAYER"] = "GNU"
+
+# Need the above thread setting because of this issue:
+# https://github.com/numpy/numpy/issues/654
+# See note in spgia.augmentors.utils
+
 import logging
 import logging.config
 import logging.handlers
-import os
 import sys
 
-import facial_analysis
 import jth_ui.utl_settings as utl_settings
 import torch
 import version
+from dynaface.facial import DEFAULT_TILT_THRESHOLD, STD_PUPIL_DIST
 from dynaface_window import DynafaceWindow
-from facial_analysis.facial import DEFAULT_TILT_THRESHOLD, STD_PUPIL_DIST
 from jth_ui.app_jth import AppJTH, get_library_version
 from pillow_heif import register_heif_opener
+
+import dynaface
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +38,6 @@ SETTING_SMOOTH = "smooth"
 DEFAULT_DYNAMIC_ADJUST = 2
 DEFAULT_SMOOTH = 2
 
-current_dynaface_app = None
-
 register_heif_opener()
 
 # https://stackoverflow.com/questions/75746637/how-to-suppress-qt-pointer-dispatch-warning
@@ -36,7 +45,6 @@ register_heif_opener()
 
 class AppDynaface(AppJTH):
     def __init__(self):
-        global current_dynaface_app
         try:
             super().__init__(
                 app_name="Dynaface",
@@ -45,9 +53,9 @@ class AppDynaface(AppJTH):
                 version=version.VERSION,
                 bundle_id="com.heatonresearch.dynaface",
             )
-            current_dynaface_app = self
             self.dynamic_adjust = DEFAULT_DYNAMIC_ADJUST
             self.data_smoothing = DEFAULT_SMOOTH
+            self.tilt_threshold = DEFAULT_TILT_THRESHOLD
 
             self.BASE_DIR = os.path.dirname(os.path.abspath(__file__))
             self.DATA_DIR = os.path.join(self.BASE_DIR, "data")
@@ -75,7 +83,7 @@ class AppDynaface(AppJTH):
         self.change_log_level(logging_level)
 
         # Set pupillary distance (PD)
-        facial_analysis.facial.AnalyzeFace.pd = utl_settings.get_int(
+        dynaface.facial.AnalyzeFace.pd = utl_settings.get_int(
             self.settings, key=SETTING_PD, default=STD_PUPIL_DIST
         )
 
@@ -113,7 +121,7 @@ class AppDynaface(AppJTH):
 
         # Use accelerator, if requested
         try:
-            facial_analysis.init_models(model_path=self.DATA_DIR, device=self.device)
+            dynaface.init_models(model_path=self.DATA_DIR, device=self.device)
         except Exception as e:
             logger.error(
                 f"Error starting AI models on device {self.device}", exc_info=True
@@ -122,7 +130,7 @@ class AppDynaface(AppJTH):
                 logger.info("Trying CPU as AI device.")
             self.device = "cpu"
             self.settings[SETTING_ACC] = "cpu"
-            facial_analysis.init_models(model_path=self.DATA_DIR, device=self.device)
+            dynaface.init_models(model_path=self.DATA_DIR, device=self.device)
 
     def shutdown(self):
         try:
@@ -140,3 +148,10 @@ class AppDynaface(AppJTH):
             SETTING_DYNAMIC_ADJUST: DEFAULT_DYNAMIC_ADJUST,
             SETTING_SMOOTH: DEFAULT_SMOOTH,
         }
+
+
+if __name__ == "__main__":
+    print("1")
+    app = AppDynaface()
+    app.exec()
+    app.shutdown()

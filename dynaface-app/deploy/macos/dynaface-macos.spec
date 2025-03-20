@@ -23,7 +23,7 @@ added_files = [
 ]
 
 a = Analysis(
-    ["dynaface.py"],
+    ["dynaface_app.py"],
     pathex=["."],
     binaries=[],
     datas=added_files,

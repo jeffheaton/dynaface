@@ -7,7 +7,7 @@ pip install -e .
 
 pip install PyQtWebEngine
 
-pip install facial_analysis -f ./wheels
+pip install dynaface -f ./wheels
 
 C:\Users\jeffh\AppData\Local\Programs\Python\Python312
 

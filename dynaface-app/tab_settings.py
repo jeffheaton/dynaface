@@ -1,11 +1,10 @@
 import logging
 
-import dynaface_app
-import facial_analysis
-from facial_analysis.facial import DEFAULT_TILT_THRESHOLD, STD_PUPIL_DIST
+from dynaface.facial import DEFAULT_TILT_THRESHOLD, STD_PUPIL_DIST
 from jth_ui import utl_settings
 from PyQt6.QtGui import QIntValidator
 from PyQt6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QFormLayout,
@@ -17,12 +16,15 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+import dynaface
+
 logger = logging.getLogger(__name__)
 
 
 class SettingsTab(QWidget):
     def __init__(self, window):
         super().__init__()
+        app = QApplication.instance()
 
         self._window = window
 
@@ -79,8 +81,8 @@ class SettingsTab(QWidget):
         window.add_tab(self, "Settings")
 
         settings = self._window.app.settings
-        self._text_pd.setText(str(facial_analysis.facial.AnalyzeFace.pd))
-        tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
+        self._text_pd.setText(str(dynaface.facial.AnalyzeFace.pd))
+        tilt_threshold = app.tilt_threshold
         self._text_tilt.setText(str(tilt_threshold))
 
         self._text_dynamic_adjust.setText(str(self._window.app.dynamic_adjust))
@@ -101,8 +103,10 @@ class SettingsTab(QWidget):
         self._window.close_current_tab()
 
     def action_reset(self):
-        self._text_pd.setText(str(facial_analysis.facial.STD_PUPIL_DIST))
-        self._text_tilt.setText(str(facial_analysis.facial.DEFAULT_TILT_THRESHOLD))
+        import dynaface_app
+
+        self._text_pd.setText(str(dynaface.facial.STD_PUPIL_DIST))
+        self._text_tilt.setText(str(dynaface.facial.DEFAULT_TILT_THRESHOLD))
         self._text_dynamic_adjust.setText(str(dynaface_app.DEFAULT_DYNAMIC_ADJUST))
         self._text_data_smooth.setText(str(dynaface_app.DEFAULT_SMOOTH))
         utl_settings.set_combo(self._log_combo_box, "INFO")
@@ -114,6 +118,8 @@ class SettingsTab(QWidget):
         pass
 
     def save_values(self):
+        import dynaface_app
+
         settings = self._window.app.settings
 
         settings[dynaface_app.SETTING_PD] = utl_settings.parse_int(
@@ -148,7 +154,7 @@ class SettingsTab(QWidget):
         self._window.app.save_settings()
         self._window.app.load_dynaface_settings()
 
-        # if facial_analysis.models._device != settings[dynaface_app.SETTING_ACC]:
+        # if dynaface.models._device != settings[dynaface_app.SETTING_ACC]:
         #    self._window.display_message_box(
         #        "Changes to accelerator settings will be effective on application restart."
         #    )

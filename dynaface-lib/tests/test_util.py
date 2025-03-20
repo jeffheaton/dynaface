@@ -4,13 +4,11 @@ import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
-import cv2
 import numpy as np
-from facial_analysis import facial
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from facial_analysis.util import (
+from dynaface.util import (
     PolyArea,
     bisecting_line_coordinates,
     calculate_average_rgb,

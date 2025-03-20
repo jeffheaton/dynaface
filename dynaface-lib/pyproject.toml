@@ -1,12 +1,12 @@
 [tool.poetry]
 name = "dynaface"
-version = "0.1.2"
+version = "0.1.3"
 description = "Facial symmetry analysis package."
 authors = ["Jeff Heaton <jeff@jeffheaton.com>"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/jeffheaton/facial-analysis"
-packages = [{include = "facial_analysis"}]
+packages = [{include = "dynaface"}]
 include = [
     "spiga/data/annotations/**/*",
     "spiga/models/weights/**/*",
@@ -34,5 +34,5 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.pyinstaller]
-hook-dirs = ["facial_analysis.__pyinstaller:get_hook_dirs"]
-tests = ["facial_analysis.__pyinstaller:get_PyInstaller_tests"]
+hook-dirs = ["dynaface.__pyinstaller:get_hook_dirs"]
+tests = ["dynaface.__pyinstaller:get_PyInstaller_tests"]

@@ -27,7 +27,7 @@ rm -rf ./venv || true
 python3.12 -m venv venv
 source venv/bin/activate
 pip3.12 install -r requirements.txt -f /Users/jeff/output/pytorch
-pip3.12 install facial_analysis -f ./wheels -f /Users/jeff/output/PyTorch
+pip3.12 install dynaface -f ./wheels -f /Users/jeff/output/PyTorch
 cd deploy/macos
 rm -rf ./working || true
 ./build.sh

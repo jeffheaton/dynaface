@@ -2,8 +2,8 @@ import sys
 import unittest
 import os
 
-from facial_analysis.image import load_image
-from facial_analysis import facial, measures, models
+from dynaface.image import load_image
+from dynaface import facial, measures, models
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 

@@ -3,8 +3,8 @@ import unittest
 import os
 
 import numpy as np
-from facial_analysis.util import safe_clip
-from facial_analysis.image import load_image
+from dynaface.util import safe_clip
+from dynaface.image import load_image
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 

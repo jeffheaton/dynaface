@@ -20,7 +20,7 @@ rm -rf ./venv || true
 python3.12 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-pip install facial_analysis -f ./wheels
+pip install dynaface -f ./wheels
 cd deploy/macos
 
 # Build it

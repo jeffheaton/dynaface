@@ -2,7 +2,7 @@ import gzip
 import pickle
 
 from jth_ui import utl_classes
-import facial_analysis
+import dynaface
 
 DOC_HEADER = "header"
 DOC_HEADER_VERSION = "version"
@@ -51,7 +51,7 @@ class DynafaceDocument:
 
         # load
         measures = self._load_measures(doc[DOC_BODY][DOC_BODY_MEASURES])
-        self._add_missing_measures(measures, facial_analysis.measures.all_measures())
+        self._add_missing_measures(measures, dynaface.measures.all_measures())
 
         self.fps = doc[DOC_HEADER][DOC_HEADER_FPS]
         self.frames = doc[DOC_BODY][DOC_BODY_FRAMES]

@@ -1,4 +1,5 @@
 # facial-analysis
+
 pip install --upgrade pip
 
 python3 -m venv venv
@@ -23,7 +24,7 @@ ipython kernel install --user --name=venv
 
 python setup.py sdist bdist_wheel
 
-cp -R /content/drive/MyDrive/facial_analysis/ /content
+cp -R /content/drive/MyDrive/dynaface/ /content
 
 python ./examples/process_media.py /Users/jeff/data/facial/samples/tracy-ref-blink.mp4
 

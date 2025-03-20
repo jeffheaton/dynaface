@@ -1,4 +1,4 @@
-import facial_analysis
+import dynaface
 from jth_ui.app_jth import get_library_version
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
@@ -9,8 +9,8 @@ class AboutTab(QWidget):
     def __init__(self, window):
         super().__init__()
         self._window = window
-        device = facial_analysis.detect_device()
-        current_device = facial_analysis.models._device
+        device = dynaface.detect_device()
+        current_device = dynaface.models._device
         v1 = get_library_version("torch")
         v2 = get_library_version("facenet-pytorch")
         text = f"""

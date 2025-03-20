@@ -4,10 +4,11 @@ from collections import deque
 from typing import Callable
 
 import cv2
-import dynaface_app
-from facial_analysis import facial, util, measures
 from jth_ui import utl_etc
 from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtWidgets import QApplication
+
+from dynaface import facial, measures, util
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,8 @@ class WorkerExport(QThread):
         self._output_file = output_file
 
     def run(self):
+        app = QApplication.instance()
+
         if self._dialog._window.loading:
             self._update_signal.emit("Waiting for load to complete.")
             while self._dialog._window.loading:
@@ -36,7 +39,7 @@ class WorkerExport(QThread):
         out = cv2.VideoWriter(
             self._output_file, fourcc, self._dialog._window.frame_rate, (width, height)
         )
-        tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
+        tilt_threshold = app.tilt_threshold
         face = facial.AnalyzeFace(
             self._dialog._window._face.measures, tilt_threshold=tilt_threshold
         )
@@ -123,9 +126,11 @@ class WorkerLoad(QThread):
         return frame
 
     def run(self):
-        dynamic_adjust = dynaface_app.current_dynaface_app.dynamic_adjust
-        data_smoothing = dynaface_app.current_dynaface_app.data_smoothing
-        tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
+        app = QApplication.instance()
+
+        dynamic_adjust = app.dynamic_adjust
+        data_smoothing = app.data_smoothing
+        tilt_threshold = app.tilt_threshold
 
         logger.debug("Running background thread")
         logger.debug(f"Smoothing crop buffer size: {dynamic_adjust}")
@@ -197,7 +202,7 @@ class WorkerLoad(QThread):
                     landmarks = mean_landmarks(landmarks_queue)
 
                 pupillary_distance, pix2mm = facial.util_calc_pd(
-                    util.get_pupils(landmarks)
+                    facial.util_get_pupils(landmarks)
                 )
 
                 # Update remaining face properties

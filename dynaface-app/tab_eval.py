@@ -1,9 +1,8 @@
 import logging
 
 import dlg_modal
-import dynaface_app
-from facial_analysis.facial import AnalyzeFace
-from facial_analysis.measures import AnalyzeDentalArea, AnalyzeEyeArea, all_measures
+from dynaface.facial import AnalyzeFace
+from dynaface.measures import AnalyzeDentalArea, AnalyzeEyeArea, all_measures
 from jth_ui.app_jth import get_library_version
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QPushButton, QTextEdit, QVBoxLayout, QWidget
@@ -43,8 +42,10 @@ class TabEval(QWidget):
         pass
 
     def exec_eval(self, analyze):
+        import dynaface_app
+
         measures = [AnalyzeEyeArea(), AnalyzeDentalArea()]
-        tilt_threshold = dynaface_app.current_dynaface_app.tilt_threshold
+        tilt_threshold = app.tilt_threshold
         face = AnalyzeFace(measures, tilt_threshold=tilt_threshold)
         frames = range(analyze._frame_begin, analyze._frame_end, 1)
 

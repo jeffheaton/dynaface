@@ -1,18 +1,16 @@
-import facial_analysis
-from facial_analysis.facial import load_face_image
-from facial_analysis.calc import (
+import dynaface
+from dynaface.facial import load_face_image
+from dynaface.calc import (
     AnalyzeFAI,
     AnalyzeOralCommissureExcursion,
     AnalyzeBrows,
     AnalyzeDentalArea,
     AnalyzeEyeArea,
 )
-from facial_analysis.video import VideoToVideo
+from dynaface.video import VideoToVideo
 import time
 import argparse
 import os
-import logging
-import torch
 
 
 def process_image(input_file, output_file, points, crop):
@@ -77,10 +75,10 @@ args = parser.parse_args()
 
 device = args.device
 if device == "detect":
-    device = facial_analysis.detect_device()
+    device = dynaface.detect_device()
     print(f"Detecting compute device")
 print(f"Using device: {device}")
-facial_analysis.init_models(model_path=None, device=device)
+dynaface.init_models(model_path=None, device=device)
 
 input_file = args.input_file
 if args.output_file:
