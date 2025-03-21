@@ -1,8 +1,9 @@
-import dynaface
 from jth_ui.app_jth import get_library_version
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from version import BUILD_DATE
+
+import dynaface
 
 
 class AboutTab(QWidget):
@@ -27,6 +28,7 @@ This program implements the algorithms described in the paper:<br>
 Build Date: {BUILD_DATE} <br>
 Log path: {self._window.app.LOG_DIR} <br>
 Torch version: {v1}<br>
+Dynaface Library Version: {dynaface.__version__}<br>
 Facenet-pytorch version: {v2}<br>
 Processor in use: {current_device} (detected: {device})
 """

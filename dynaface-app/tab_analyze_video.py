@@ -391,7 +391,7 @@ gesture you wish to analyze."""
 
                         if all_unchecked:
                             parent.setCheckState(0, Qt.CheckState.Unchecked)
-                        elif all_checked:
+                        else:
                             parent.setCheckState(0, Qt.CheckState.Checked)
         except Exception as e:
             logger.error("Error updating measures", exc_info=True)
@@ -1201,7 +1201,10 @@ gesture you wish to analyze."""
             frame = self._frames[i]
             face.load_state(frame)
             rec = face.analyze()
-            ea = rec["eye.l"] + rec["eye.l"]
+            if "eye.left" not in rec or "eye.right" not in rec:
+                logger.info("Jump to max ocular, can't find ocular information")
+                return -1
+            ea = rec["eye.left"] + rec["eye.right"]
             if max_eye == -1 or ea > max_eye:
                 max_eye_idx = i
                 max_eye = ea
@@ -1214,7 +1217,8 @@ gesture you wish to analyze."""
 
     def exec_max_ocular(self):
         idx = self.find_max_ocular()
-        self._video_slider.setValue(idx)
+        if idx > 0:
+            self._video_slider.setValue(idx)
 
     def jump_max_dental(self):
         logger.info("Jump max dental")
