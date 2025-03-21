@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dynaface"
-version = "0.1.9"
+version = "0.1.10"
 description = "Facial symmetry analysis package."
 authors = ["Jeff Heaton <jeff@jeffheaton.com>"]
 license = "MIT"
@@ -33,6 +33,7 @@ flake8 = "^7.0.0"      # Optional, for linting
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.pyinstaller]
-hook-dirs = ["dynaface.__pyinstaller:get_hook_dirs"]
-tests = ["dynaface.__pyinstaller:get_PyInstaller_tests"]
+[project.entry-points."pyinstaller40"]
+hook-dirs = "facial_analysis.__pyinstaller:get_hook_dirs"
+tests = "facial_analysis.__pyinstaller:get_PyInstaller_tests"
+
