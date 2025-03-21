@@ -1,5 +1,7 @@
 from PyInstaller.utils.hooks import collect_data_files
 
+print(">>> PyInstaller: loading hook-dynaface.py")
+
 # Collect data files from the specified subdirectories
 datas = collect_data_files(
     "dynaface", subdir="spiga/data/annotations", excludes=["__pyinstaller"]
