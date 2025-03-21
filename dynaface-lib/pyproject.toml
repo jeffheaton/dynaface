@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dynaface"
-version = "0.1.8"
+version = "0.1.9"
 description = "Facial symmetry analysis package."
 authors = ["Jeff Heaton <jeff@jeffheaton.com>"]
 license = "MIT"
