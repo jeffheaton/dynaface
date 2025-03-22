@@ -110,7 +110,7 @@ pipeline {
                 // Clean up build artifacts
                 sh '''
                     cd dynaface-lib
-                    rm -rf build dist facial_analysis.egg-info
+                    rm -rf build dist dynaface.egg-info
                 '''
             }
             // Archive test and coverage results
