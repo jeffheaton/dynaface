@@ -3,7 +3,7 @@ import unittest
 import os
 
 from dynaface.image import load_image
-from dynaface import facial, measures, models
+from dynaface import facial, measures, models, lateral
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -13,6 +13,7 @@ class TestFaceAnalysis(unittest.TestCase):
     def test_frontal(self):
         img = load_image("./tests_data/img1-512.jpg")
 
+        lateral.DEBUG = True
         # Initialize models
         device = models.detect_device()
         path = models.download_models()
@@ -23,6 +24,7 @@ class TestFaceAnalysis(unittest.TestCase):
         face.load_image(img, crop=True)
         stats = face.analyze()
         face.draw_static()
+        face.draw_landmarks()
 
         # Expected values (rounded to 2 decimals)
         expected_values = {
@@ -57,6 +59,7 @@ class TestFaceAnalysis(unittest.TestCase):
                 places=2,
                 msg=f"{key}: expected {expected}, got {actual}",
             )
+        lateral.DEBUG = False
 
     def test_right_lateral(self):
         img = load_image("./tests_data/img2-1024-right-lateral.jpg")
@@ -71,6 +74,7 @@ class TestFaceAnalysis(unittest.TestCase):
         face.load_image(img, crop=True)
         stats = face.analyze()
         face.draw_static()
+        face.draw_landmarks()
 
         # Expected values (rounded to 2 decimals)
         expected_values = {
@@ -118,8 +122,10 @@ class TestFaceAnalysis(unittest.TestCase):
         models.init_models(path, device)
 
         # Analyze face
-        face = facial.AnalyzeFace(measures=measures.all_measures())
+        face = facial.AnalyzeFace()
         face.load_image(img, crop=True)
+        face.draw_static()
+        face.draw_landmarks()
         stats = face.analyze()
 
         # Expected values (rounded to 2 decimals)

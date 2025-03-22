@@ -7,11 +7,13 @@ from typing import List, Tuple
 import cv2
 import numpy as np
 import torch
-from dynaface import measures, models, util
-from dynaface.image import ImageAnalysis, load_image
+from dynaface.image import ImageAnalysis
 from dynaface.lateral import analyze_lateral
 from dynaface.spiga.inference.config import ModelConfig
 from dynaface.spiga.inference.framework import SPIGAFramework
+
+import dynaface
+from dynaface import measures, models, util
 
 STYLEGAN_WIDTH = 1024
 STYLEGAN_LEFT_PUPIL = (640, 480)
@@ -30,18 +32,6 @@ FILL_COLOR = [255, 255, 255]
 SPIGA_MODEL = "wflw"
 
 logger = logging.getLogger(__name__)
-
-
-def init_processor(device=None):
-    global _processor
-
-    if not device:
-        has_mps = torch.backends.mps.is_built()
-        device = "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
-        # device = "cpu"
-
-    config = ModelConfig(dataset_name=SPIGA_MODEL, load_model_url=False)
-    _processor = SPIGAFramework(config, device=device)
 
 
 def util_calc_pd(pupils):
@@ -73,7 +63,7 @@ class AnalyzeFace(ImageAnalysis):
         self._headpose = None
         self.flipped = False
         if measures is None:
-            self.measures = measures.all_measures()
+            self.measures = dynaface.measures.all_measures()
         else:
             self.measures = measures
         self.headpose = [0, 0, 0]
