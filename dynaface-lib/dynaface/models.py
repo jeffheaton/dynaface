@@ -1,3 +1,5 @@
+import hashlib
+import logging
 import os
 import platform
 import zipfile
@@ -7,10 +9,10 @@ import numpy as np
 import rembg
 import requests
 import torch
-from facenet_pytorch import MTCNN
-from facenet_pytorch.models.mtcnn import ONet, PNet, RNet
 from dynaface.spiga.inference.config import ModelConfig
 from dynaface.spiga.inference.framework import SPIGAFramework
+from facenet_pytorch import MTCNN
+from facenet_pytorch.models.mtcnn import ONet, PNet, RNet
 from torch import nn
 
 # Mac M1 issue - hope to remove some day
@@ -18,6 +20,13 @@ from torch import nn
 # https://github.com/pytorch/pytorch/issues/96056#issuecomment-1457633408
 # https://github.com/pytorch/pytorch/issues/97109
 FIX_MPS_ISSUE = True
+
+# Download Constants
+MODEL_VERSION = "1"
+REDIRECT_URL = "https://data.heatonresearch.com/dynaface/model-loc.json"
+FALLBACK_URL = f"https://data.heatonresearch.com/dynaface/model/{MODEL_VERSION}/dynaface_models.zip"
+EXPECTED_SHA256 = "c18f9c038b65d7486e7f9e081506bc69cbbc5719680eb31b1bafa8235ca6aa4d"
+
 
 # Other values
 _model_path = None
@@ -29,6 +38,8 @@ rembg_session = None
 SPIGA_MODEL = "wflw"
 
 from torch.nn.functional import interpolate
+
+logger = logging.getLogger(__name__)
 
 
 def imresample_mps(img, sz):
@@ -117,7 +128,28 @@ def _init_rembg() -> None:
     rembg_session = rembg.new_session(model_name="u2net")
 
 
-def download_models(path: str = None) -> str:
+def download_models(path: str = None, verify_hash: bool = True) -> str:
+    """
+    Downloads and extracts the DynaFace model files.
+
+    The function attempts to retrieve the download URL from a redirect JSON file
+    (REDIRECT_URL). If that fails or the download fails, it falls back to a fixed URL
+    (FALLBACK_URL). After downloading, it optionally verifies the SHA-256 checksum and
+    extracts the contents of the zip file to the specified directory.
+
+    Parameters:
+        path (str, optional): Target directory to store model files.
+                              Defaults to ~/.dynaface/models.
+        verify_hash (bool, optional): Whether to verify the SHA-256 checksum.
+                                      Defaults to True.
+
+    Returns:
+        str: Path to the directory containing the extracted model files.
+
+    Raises:
+        ValueError: If the checksum does not match and `verify_hash` is True.
+        requests.HTTPError: If both redirect and fallback downloads fail.
+    """
     # Set default path if none provided
     if path is None:
         path = Path.home() / ".dynaface" / "models"
@@ -130,15 +162,50 @@ def download_models(path: str = None) -> str:
     if model_file.exists():
         return str(path)
 
-    zip_url = "https://data.heatonresearch.com/dynaface/model/1/dynaface_models.zip"
     zip_path = path / "dynaface_models.zip"
 
-    # Download the ZIP file
-    response = requests.get(zip_url, stream=True)
-    response.raise_for_status()
-    with open(zip_path, "wb") as f:
-        for chunk in response.iter_content(chunk_size=8192):
-            f.write(chunk)
+    # Try to fetch redirected URL
+    try:
+        response = requests.get(REDIRECT_URL, timeout=10)
+        response.raise_for_status()
+        model_info = response.json()
+        zip_url = model_info[MODEL_VERSION]["url"]
+    except Exception:
+        zip_url = FALLBACK_URL  # Fallback if redirect fails
+
+    # Try to download ZIP
+    try:
+        logger.info(f"Downloading DynaFace model files from {zip_url}...")
+        response = requests.get(zip_url, stream=True, timeout=30)
+        response.raise_for_status()
+        with open(zip_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+    except Exception:
+        # Try fallback if original download fails
+        if zip_url != FALLBACK_URL:
+            response = requests.get(FALLBACK_URL, stream=True, timeout=30)
+            response.raise_for_status()
+            with open(zip_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        else:
+            raise  # No fallback possible
+
+    # Verify SHA-256 checksum
+    if verify_hash:
+        sha256 = hashlib.sha256()
+        with open(zip_path, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                sha256.update(chunk)
+        file_hash = sha256.hexdigest()
+
+        if file_hash != EXPECTED_SHA256:
+            zip_path.unlink()  # Clean up
+            raise ValueError(
+                f"SHA-256 mismatch: expected {EXPECTED_SHA256}, got {file_hash}. "
+                f"Set verify_hash=False to skip this check (not recommended)."
+            )
 
     # Extract the ZIP file
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
