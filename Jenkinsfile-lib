@@ -34,11 +34,12 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 script {
-                    // Install the package in editable mode and upgrade setuptools
+                    // Change to dynaface-lib and install your package along with testing dependencies
                     sh '''
                         cd dynaface-lib
                         pip install -e .
                         pip install --upgrade setuptools
+                        pip install pytest pytest-cov
                     '''
                 }
             }
@@ -106,10 +107,10 @@ pipeline {
     post {
         always {
             script {
-                // Optionally clean up build artifacts (cache clean-up)
+                // Clean up build artifacts
                 sh '''
                     cd dynaface-lib
-                    rm -rf build dist *.egg-info
+                    rm -rf build dist facial_analysis.egg-info
                 '''
             }
             // Archive test and coverage results
