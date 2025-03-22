@@ -62,20 +62,6 @@ def util_get_pupils(landmarks):
     return landmarks[LM_LEFT_PUPIL], landmarks[LM_RIGHT_PUPIL]
 
 
-def load_face_image(
-    filename,
-    crop=True,
-    stats=None,
-    tilt_threshold=DEFAULT_TILT_THRESHOLD,
-):
-    if stats is None:
-        stats = measures.all_measures()
-    img = load_image(filename)
-    face = AnalyzeFace(stats, tilt_threshold=tilt_threshold)
-    face.load_image(img, crop)
-    return face
-
-
 class AnalyzeFace(ImageAnalysis):
     pd = STD_PUPIL_DIST
 
