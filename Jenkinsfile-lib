@@ -8,9 +8,9 @@ pipeline {
         stage('Setup Python Environment') {
             steps {
                 script {
-                    // Install Poetry
-                    sh 'pip install --user poetry'
-                    
+                    sh '''
+                    pip install build wheel
+                    '''
                     // Ensure Python 3.11 is available, fail if not
                     sh '''
                         if ! command -v python3.11 &> /dev/null; then
@@ -19,14 +19,13 @@ pipeline {
                         fi
                     '''
                     
-                    // Get the actual Python 3.11 binary path
+                    // Get the actual Python 3.11 binary path and check version in dynaface-lib
                     sh '''
                         PYTHON_PATH=$(command -v python3.11)
                         echo "Using Python at: $PYTHON_PATH"
 
                         cd dynaface-lib
-                        poetry env use "$PYTHON_PATH"
-                        poetry run python --version
+                        $PYTHON_PATH --version
                     '''
                 }
             }
@@ -35,11 +34,11 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 script {
-                    // Change to the correct directory before running Poetry commands
+                    // Install the package in editable mode and upgrade setuptools
                     sh '''
                         cd dynaface-lib
-                        poetry install
-                        poetry run pip install --upgrade setuptools
+                        pip install -e .
+                        pip install --upgrade setuptools
                     '''
                 }
             }
@@ -53,7 +52,7 @@ pipeline {
                         export PATH="$HOME/.pyenv/bin:$PATH"
                         eval "$(pyenv init --path)"
                         eval "$(pyenv virtualenv-init -)"
-                        poetry run pytest tests --junitxml=unit_test_results.xml --cov=./ --cov-report=xml:coverage.xml --cov-report=html
+                        python3.11 -m pytest tests --junitxml=unit_test_results.xml --cov=. --cov-report=xml:coverage.xml --cov-report=html
                     '''
                 }
             }
@@ -62,12 +61,12 @@ pipeline {
         stage('Build Package') {
             steps {
                 script {
-                    // Build the package from the correct directory
+                    // Build the package with setuptools via the build module
                     sh '''
                         cd dynaface-lib
                         echo "Cleaning up old .whl files..."
                         rm -rf dist/*  # Deletes old .whl files before building
-                        poetry build
+                        python3.11 -m build --wheel
                     '''
                 }
             }
@@ -107,10 +106,10 @@ pipeline {
     post {
         always {
             script {
-                // Clean up Poetry's cache (optional)
+                // Optionally clean up build artifacts (cache clean-up)
                 sh '''
                     cd dynaface-lib
-                    poetry cache clear pypi --all
+                    rm -rf build dist *.egg-info
                 '''
             }
             // Archive test and coverage results
