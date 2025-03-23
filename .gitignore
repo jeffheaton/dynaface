@@ -1,4 +1,7 @@
 *.onnx
+output.jpg
+output.png
+output.mp4
 venv/
 working/
 *.pt

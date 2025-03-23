@@ -1,44 +1,47 @@
-from dynaface.facial import load_face_image
-from dynaface.calc import (
-    AnalyzeFAI,
-    AnalyzeOralCommissureExcursion,
-    AnalyzeBrows,
-    AnalyzeDentalArea,
-    AnalyzeEyeArea,
-)
-
-import torch
-
 import argparse
+import os
+from dynaface.facial import load_face_image
+from dynaface.measures import AnalyzeFAI, AnalyzeOralCommissureExcursion
+from dynaface import models
 
-parser = argparse.ArgumentParser(description="Process an image.")
+# Sample usage:
+# python process_image.py --no-points https://data.heatonresearch.com/dynaface/sample/img4-1024-frontal.jpg output.jpg
 
-# Define the -points option. You can specify its type, in this case, int.
+parser = argparse.ArgumentParser(description="Process an image with facial analysis.")
+
+# Boolean flag: show points by default, suppress with --no-points
 parser.add_argument(
-    "-points", type=int, default=0, help="Number of points for the operation."
+    "--no-points",
+    action="store_false",
+    dest="show_points",
+    help="Disable display of facial landmarks.",
 )
+parser.set_defaults(show_points=True)
 
-# Define positional arguments for the input and output files.
 parser.add_argument("input_file", type=str, help="Path to the input image file.")
 parser.add_argument(
     "output_file",
     type=str,
     nargs="?",
     default=None,
-    help="Path to the output image file.",
+    help="Path to the output image file (optional).",
 )
 
 args = parser.parse_args()
-print(args)
+output_path = args.output_file or os.path.splitext(args.input_file)[0] + "_output.jpg"
 
-# subject = "/content/drive/MyDrive/projects/tracy/samples/after.jpg"
-subject = "/Users/jeff/data/facial/samples/2021-8-19.png"
-# subject = "/content/drive/MyDrive/projects/tracy/samples/mark_ruffalo.jpg"
-# 60 - 67
+device = models.detect_device()
+print(f"Detected device: {device}")
+path = models.download_models()
+models.init_models(path, device)
 
-face = load_face_image(subject)
+face = load_face_image(
+    args.input_file, measures=[AnalyzeFAI(), AnalyzeOralCommissureExcursion()]
+)
 face.analyze()
-face.draw_landmarks(numbers=True)
-print(subject)
-face.save("/Users/jeff/data/facial/samples/test.png")
-# display_image(face.render_img, scale=1)
+
+if args.show_points:
+    face.draw_landmarks(numbers=True)
+
+face.save(output_path)
+print(f"Saved annotated image to {output_path}")

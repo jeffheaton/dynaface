@@ -121,7 +121,7 @@ class AppDynaface(AppJTH):
 
         # Use accelerator, if requested
         try:
-            dynaface.init_models(model_path=self.DATA_DIR, device=self.device)
+            dynaface.models.init_models(model_path=self.DATA_DIR, device=self.device)
         except Exception as e:
             logger.error(
                 f"Error starting AI models on device {self.device}", exc_info=True
@@ -130,7 +130,7 @@ class AppDynaface(AppJTH):
                 logger.info("Trying CPU as AI device.")
             self.device = "cpu"
             self.settings[SETTING_ACC] = "cpu"
-            dynaface.init_models(model_path=self.DATA_DIR, device=self.device)
+            dynaface.models.init_models(model_path=self.DATA_DIR, device=self.device)
 
     def shutdown(self):
         try:

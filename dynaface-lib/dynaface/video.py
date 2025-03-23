@@ -13,6 +13,7 @@ SAMPLE_RATE = 44100
 
 
 class ProcessVideoFFMPEG:
+
     def __init__(self):
         # Create a temporary directory
         self.temp_path = tempfile.mkdtemp()
@@ -190,7 +191,7 @@ class VideoToVideo:
         face = AnalyzeFace(stats)
         face.load_image(image, self._crop)
 
-        self.stats = face.get_all_stats()
+        self.stats = face.get_all_items()
         self.data = {stat: [] for stat in self.stats}
 
         out_idx = 1

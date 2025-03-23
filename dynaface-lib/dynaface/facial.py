@@ -2,15 +2,16 @@ import copy
 import logging
 import math
 import time
-from typing import List, Tuple
+from io import BytesIO
+from typing import List, Optional, Tuple
+from urllib.parse import urlparse
 
 import cv2
 import numpy as np
-import torch
+import requests
 from dynaface.image import ImageAnalysis
 from dynaface.lateral import analyze_lateral
-from dynaface.spiga.inference.config import ModelConfig
-from dynaface.spiga.inference.framework import SPIGAFramework
+from PIL import Image
 
 import dynaface
 from dynaface import measures, models, util
@@ -89,6 +90,12 @@ class AnalyzeFace(ImageAnalysis):
     def _find_landmarks(self, img):
         logger.debug("Called _find_landmarks")
         start_time = time.time()
+
+        if dynaface.models.are_models_init() == False:
+            raise ValueError(
+                "Models not initialized, please call dynaface.models.init_models()"
+            )
+
         bbox, prob = models.mtcnn_model.detect(img)
 
         if prob[0] == None or prob[0] < 0.9:
@@ -562,3 +569,53 @@ class AnalyzeFace(ImageAnalysis):
         if self.lateral:
             str = "Lateral (right)" if self.flipped else "Lateral (left)"
             self.write_text((10, self.height - 20), str, size=2)
+
+
+import cv2
+import numpy as np
+import requests
+from urllib.parse import urlparse
+from io import BytesIO
+from typing import Optional, List
+from dynaface.facial import AnalyzeFace, DEFAULT_TILT_THRESHOLD
+import dynaface.measures
+import dynaface.image
+
+
+def load_face_image(
+    filename: str,
+    crop: bool = True,
+    measures: Optional[List[str]] = None,
+    tilt_threshold: float = DEFAULT_TILT_THRESHOLD,
+) -> AnalyzeFace:
+    """
+    Load and analyze a face image from a local file or URL.
+
+    Args:
+        filename (str): Path to the image file or an HTTP/HTTPS URL.
+        crop (bool, optional): Whether to crop the face image to the face bounding box. Defaults to True.
+        measures (Optional[List[str]], optional): List of facial statistics to analyze.
+            If None, all default measures will be used. Defaults to None.
+        tilt_threshold (float, optional): Maximum allowable tilt in degrees before analysis fails. Defaults to dynaface.facial.DEFAULT_TILT_THRESHOLD.
+
+    Returns:
+        dynaface.facial.AnalyzeFace: The analyzed face object.
+    """
+    if measures is None:
+        measures = dynaface.measures.all_measures()
+
+    # Load image from URL or local path
+    parsed = urlparse(filename)
+    if parsed.scheme in ("http", "https"):
+        response = requests.get(filename)
+        response.raise_for_status()
+        img_array = np.asarray(bytearray(response.content), dtype=np.uint8)
+        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)  # BGR format
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    else:
+        img = dynaface.image.load_image(filename)
+
+    face = AnalyzeFace(measures, tilt_threshold=tilt_threshold)
+    face.load_image(img, crop)
+
+    return face

@@ -1,16 +1,22 @@
-import dynaface
+import argparse
+import os
+import time
+
 from dynaface.facial import load_face_image
-from dynaface.calc import (
-    AnalyzeFAI,
-    AnalyzeOralCommissureExcursion,
+from dynaface.measures import (
     AnalyzeBrows,
     AnalyzeDentalArea,
     AnalyzeEyeArea,
+    AnalyzeFAI,
+    AnalyzeOralCommissureExcursion,
 )
 from dynaface.video import VideoToVideo
-import time
-import argparse
-import os
+
+import dynaface
+from dynaface import models
+
+# Sample usage:
+# python process_media.py /Users/jeff/data/facial/samples/tracy-blink-single.mp4
 
 
 def process_image(input_file, output_file, points, crop):
@@ -71,14 +77,15 @@ parser.add_argument(
     help="Path to the output image file.",
 )
 
-args = parser.parse_args()
 
-device = args.device
-if device == "detect":
-    device = dynaface.detect_device()
-    print(f"Detecting compute device")
-print(f"Using device: {device}")
-dynaface.init_models(model_path=None, device=device)
+# Detect device and download models
+device = models.detect_device()
+print(f"Detected device: {device}")
+path = models.download_models()
+models.init_models(path, device)
+
+# process arguments
+args = parser.parse_args()
 
 input_file = args.input_file
 if args.output_file:
