@@ -54,47 +54,44 @@ class TestProcessVideoOpenCV(unittest.TestCase):
         self.assertEqual(pvo.frames, 150)
 
 
-@patch("dynaface.video.ProcessVideoOpenCV")
-@patch("dynaface.video.AnalyzeFace")
-@patch("cv2.cvtColor")
-@patch("cv2.imread")
-def test_process_video(
-    self, mock_imread, mock_cvt, mock_analyzeface, mock_process_video
-):
-    # Mock image with shape attribute
-    mock_image = MagicMock()
-    mock_image.shape = (100, 100, 3)
-    mock_imread.return_value = mock_image
-    mock_cvt.return_value = mock_image
+class TestVideoToVideo(unittest.TestCase):
+    @patch("dynaface.video.ProcessVideoOpenCV")
+    @patch("dynaface.video.AnalyzeFace")
+    @patch("cv2.cvtColor")
+    @patch("cv2.imread")
+    def test_process_video(
+        self, mock_imread, mock_cvt, mock_analyzeface, mock_process_video
+    ):
+        # Mock image with shape attribute
+        mock_image = MagicMock()
+        mock_image.shape = (100, 100, 3)
+        mock_imread.return_value = mock_image
+        mock_cvt.return_value = mock_image
 
-    # Mock ProcessVideoOpenCV instance
-    mock_proc = MagicMock()
-    mock_proc.extract.return_value = True
-    mock_proc.temp_path = "/tmp/fake"
-    mock_proc.frame_rate = 30
-    mock_proc.build.return_value = None
-    mock_proc.cleanup.return_value = None
-    mock_process_video.return_value = mock_proc
+        # Mock ProcessVideoOpenCV instance
+        mock_proc = MagicMock()
+        mock_proc.extract.return_value = True
+        mock_proc.temp_path = "/tmp/fake"
+        mock_proc.frame_rate = 30
+        mock_proc.build.return_value = None
+        mock_proc.cleanup.return_value = None
+        mock_process_video.return_value = mock_proc
 
-    # Simulate two image frames exist
-    def exists_side_effect(path):
-        return "input-1.jpg" in path or "input-2.jpg" in path
+        # Simulate two image frames exist
+        def exists_side_effect(path):
+            return "input-1.jpg" in path or "input-2.jpg" in path
 
-    with patch("os.path.exists", side_effect=exists_side_effect):
-        # Mock AnalyzeFace behavior
-        mock_af_instance = MagicMock()
-        mock_af_instance.get_all_items.return_value = ["eye_distance"]
-        mock_af_instance.get_pupils.return_value = (1, 2)
-        mock_af_instance.analyze.return_value = {"eye_distance": 42}
-        mock_analyzeface.return_value = mock_af_instance
+        with patch("os.path.exists", side_effect=exists_side_effect):
+            # Mock AnalyzeFace behavior
+            mock_af_instance = MagicMock()
+            mock_af_instance.get_all_items.return_value = ["eye_distance"]
+            mock_af_instance.get_pupils.return_value = (1, 2)
+            mock_af_instance.analyze.return_value = {"eye_distance": 42}
+            mock_analyzeface.return_value = mock_af_instance
 
-        vtv = VideoToVideo(points=True, crop=(0, 0, 100, 100))
-        result = vtv.process("input.mp4", "output.mp4", stats=["eye_distance"])
+            vtv = VideoToVideo(points=True, crop=(0, 0, 100, 100))
+            result = vtv.process("input.mp4", "output.mp4", stats=["eye_distance"])
 
-        self.assertTrue(result)
-        self.assertIn("eye_distance", vtv.data)
-        self.assertEqual(vtv.data["eye_distance"], [42, 42])
-
-
-if __name__ == "__main__":
-    unittest.main()
+            self.assertTrue(result)
+            self.assertIn("eye_distance", vtv.data)
+            self.assertEqual(vtv.data["eye_distance"], [42, 42])
