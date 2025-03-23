@@ -11,7 +11,7 @@ import numpy as np
 import utl_gfx
 import utl_print
 import worker_threads
-from dynaface.facial import AnalyzeFace, load_face_image
+from dynaface.facial import AnalyzeFace
 from dynaface.measures import AnalyzeDentalArea, AnalyzeEyeArea, all_measures
 from jth_ui import app_jth, utl_etc
 from jth_ui.tab_graphic import TabGraphic
@@ -1139,7 +1139,7 @@ gesture you wish to analyze."""
             self._face.measures = self.get_init_measures()
             self._face.load_image(image_np, crop=True)
         else:
-            self._face = load_face_image(
+            self._face = utl_gfx.load_face_image(
                 path,
                 crop=True,
                 tilt_threshold=tilt_threshold,

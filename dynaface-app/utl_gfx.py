@@ -2,6 +2,7 @@ import sys
 
 from PyQt6.QtGui import QClipboard, QImage, QPixmap
 from PyQt6.QtWidgets import QApplication
+import dynaface
 
 
 def opencv_img_to_qimage(opencv_img):
@@ -69,3 +70,17 @@ def crop_pixmap(pixmap: QPixmap, pad_px: int) -> QPixmap:
     # Crop and return the pixmap
     rect = QRect(left, top, right - left + 1, bottom - top + 1)
     return pixmap.copy(rect)
+
+
+def load_face_image(
+    filename,
+    crop=True,
+    stats=None,
+    tilt_threshold=dynaface.facial.DEFAULT_TILT_THRESHOLD,
+):
+    if stats is None:
+        stats = dynaface.measures.all_measures()
+    img = dynaface.facial.load_image(filename)
+    face = dynaface.facial.AnalyzeFace(stats, tilt_threshold=tilt_threshold)
+    face.load_image(img, crop)
+    return face

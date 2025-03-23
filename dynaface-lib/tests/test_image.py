@@ -26,7 +26,3 @@ class TestImage(unittest.TestCase):
         assert clipped_image.shape[2] == 3
         assert x_offset == 100
         assert y_offset == 100
-
-
-if __name__ == "__main__":
-    unittest.main()

@@ -139,7 +139,7 @@ class AnalyzeFace(ImageAnalysis):
         yaw, pitch, roll = self._headpose[:3]  # Extract yaw, pitch, and roll values
         logger.info(f"Headpose: yaw:{yaw}, pitch:{pitch}, roll:{roll}")
 
-        is_lateral: bool = abs(yaw) > 15  # Lateral if yaw exceeds ±15 degrees
+        is_lateral: bool = abs(yaw) > 20  # Lateral if yaw exceeds ±20 degrees
         is_facing_left: bool = (
             yaw < 0
         )  # True if facing left, False if facing right or frontal

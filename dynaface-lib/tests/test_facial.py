@@ -164,7 +164,3 @@ class TestFaceAnalysis(unittest.TestCase):
                 places=2,
                 msg=f"{key}: expected {expected}, got {actual}",
             )
-
-
-if __name__ == "__main__":
-    unittest.main()

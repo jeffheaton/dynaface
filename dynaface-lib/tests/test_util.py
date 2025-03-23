@@ -198,7 +198,3 @@ class TestFunctions(unittest.TestCase):
         # 2*pi + 0.5 => 0.5
         val = normalize_angle(2 * math.pi + 0.5)
         self.assertAlmostEqual(val, 0.5, places=5)
-
-
-if __name__ == "__main__":
-    unittest.main()
