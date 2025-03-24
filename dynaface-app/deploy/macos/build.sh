@@ -36,8 +36,9 @@ TEMP_ZIP=$(mktemp)
 curl -L "$MODEL_BINARY_URL" -o "$TEMP_ZIP"
 
 echo "** Extracting model binaries to ./working/data **"
-mkdir -p ./working/data/data
-unzip -o "$TEMP_ZIP" -d ./working/data/data
+mkdir -p ./working/data
+cp -r ../../data/. ./working/data
+unzip -o "$TEMP_ZIP" -d ./working/data
 
 echo "** Cleaning up temporary zip **"
 rm "$TEMP_ZIP"
@@ -50,7 +51,6 @@ cp ./dynaface_doc_icon.icns ./working
 cp ./dynaface-macos.spec ./working
 cp ./build.sh ./working
 cp ../../*.py ./working
-cp -r ../../data ./working/data
 cp -r ../../jth_ui ./working/jth_ui
 
 cd ./working
