@@ -14,6 +14,9 @@ if [ -z "${arch}" ]; then
     exit 1  # Exit with a non-zero value to indicate an error
 fi
 
+# Constants
+MODEL_BINARY_URL="https://github.com/jeffheaton/dynaface-models/releases/download/v1/dynaface_models.zip"
+
 # Environment
 cd ../..
 rm -rf ./venv || true
@@ -26,6 +29,19 @@ cd deploy/macos
 # Build it
 rm -rf ./working
 mkdir ./working
+
+# Download and extract model binary
+echo "** Downloading model binaries **"
+TEMP_ZIP=$(mktemp)
+curl -L "$MODEL_BINARY_URL" -o "$TEMP_ZIP"
+
+echo "** Extracting model binaries to ./working/data **"
+unzip -o "$TEMP_ZIP" -d ./data
+
+echo "** Cleaning up temporary zip **"
+rm "$TEMP_ZIP"
+
+# Copy other files
 cp ./entitlements.plist ./working
 cp ./entitlements-nest.plist ./working
 cp ./dynaface_icon.icns ./working
