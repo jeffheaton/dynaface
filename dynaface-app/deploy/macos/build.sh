@@ -36,7 +36,8 @@ TEMP_ZIP=$(mktemp)
 curl -L "$MODEL_BINARY_URL" -o "$TEMP_ZIP"
 
 echo "** Extracting model binaries to ./working/data **"
-unzip -o "$TEMP_ZIP" -d ./data
+mkdir -p ./working/data
+unzip -o "$TEMP_ZIP" -d ./working/data
 
 echo "** Cleaning up temporary zip **"
 rm "$TEMP_ZIP"
