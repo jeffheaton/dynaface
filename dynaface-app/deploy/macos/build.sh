@@ -58,7 +58,8 @@ echo "** Force PyTorch Upgrade **"
 
 if [[ "$arch" == "x86_64" ]]; then
     echo "Detected MacOS Intel (x86_64)"
-    pip install /Users/jeff/output/wheel/torch-2.4.0a0+git1cd4199-cp311-cp311-macosx_15_0_x86_64.whl
+
+    pip install /Users/jeff/output/wheel/torch-2.4.0a0+git1cd4199-cp311-cp311-macosx_14_0_x86_64.whl
     pip install /Users/jeff/output/wheel/torchvision-0.9.0a0+761d09f-cp311-cp311-macosx_14_0_x86_64.whl
 elif [[ "$arch" == "arm64" ]]; then
     echo "Detected MacOS ARM (arm64)"
