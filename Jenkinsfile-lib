@@ -73,6 +73,16 @@ pipeline {
             }
         }
 
+        stage('Validate Package with Twine') {
+            steps {
+                sh '''
+                    cd dynaface-lib
+                    pip install --upgrade twine
+                    twine check dist/*
+                '''
+            }
+        }
+
         stage('Archive Artifacts') {
             steps {
                 script {

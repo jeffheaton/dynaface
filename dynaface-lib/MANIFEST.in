@@ -1,0 +1,5 @@
+include README.md
+include LICENSE
+recursive-include dynaface/spiga/data *
+recursive-include dynaface/spiga/models *
+recursive-include dynaface/spiga/data/models3D *.txt
