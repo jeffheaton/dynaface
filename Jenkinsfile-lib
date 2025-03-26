@@ -44,7 +44,30 @@ pipeline {
                 }
             }
         }
+        stage('Static Code Analysis') {
+            steps {
+                sh '''
+                    cd dynaface-lib
 
+                    pip install flake8 mypy bandit black isort
+
+                    echo "Running flake8..."
+                    flake8 dynaface
+
+                    echo "Running mypy..."
+                    mypy dynaface
+
+                    echo "Running bandit..."
+                    bandit -r dynaface
+
+                    echo "Checking formatting with black..."
+                    black --check dynaface
+
+                    echo "Checking imports with isort..."
+                    isort dynaface --check-only
+                '''
+            }
+        }
         stage('Run Tests & Generate Coverage') {
             steps {
                 script {
