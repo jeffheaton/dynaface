@@ -174,15 +174,15 @@ pipeline {
 
             // Record issues for static analysis tools
             recordIssues(
-            tools: [
-                flake8(pattern: 'dynaface-lib/flake8-report.txt'),
-                mypy(pattern: 'dynaface-lib/mypy-report.txt'),
-                bandit(pattern: 'dynaface-lib/bandit-report.txt'),
-                genericTool(pattern: 'dynaface-lib/black-report.txt', name: 'Black'),
-                genericTool(pattern: 'dynaface-lib/isort-report.txt', name: 'isort')
-            ],
-            enabledForFailure: true
-        )
+                tools: [
+                    flake8(pattern: '**/flake8-report.txt'),
+                    genericTool(pattern: '**/mypy-report.txt', name: 'mypy'),
+                    genericTool(pattern: '**/bandit-report.txt', name: 'bandit'),
+                    genericTool(pattern: '**/black-report.txt', name: 'black'),
+                    genericTool(pattern: '**/isort-report.txt', name: 'isort')
+                ],
+                enabledForFailure: true
+            )
         }
     }
 }
