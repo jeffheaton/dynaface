@@ -178,8 +178,7 @@ pipeline {
                 flake8(pattern: '**/flake8-report.txt'),    // Flake8 reports
                 myPy(pattern: '**/mypy-report.txt'),        // Mypy reports
                 bandit(pattern: '**/bandit-report.txt')     // Bandit reports
-                ]
-            enabledForFailure: true
+            ]
         )
         }
     }
