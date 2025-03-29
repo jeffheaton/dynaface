@@ -7,6 +7,8 @@ from typing import List, Optional, Tuple
 from urllib.parse import urlparse
 
 import cv2
+import dynaface.image
+import dynaface.measures
 import numpy as np
 import requests
 from dynaface.image import ImageAnalysis
@@ -569,17 +571,6 @@ class AnalyzeFace(ImageAnalysis):
         if self.lateral:
             str = "Lateral (right)" if self.flipped else "Lateral (left)"
             self.write_text((10, self.height - 20), str, size=2)
-
-
-import cv2
-import numpy as np
-import requests
-from urllib.parse import urlparse
-from io import BytesIO
-from typing import Optional, List
-from dynaface.facial import AnalyzeFace, DEFAULT_TILT_THRESHOLD
-import dynaface.measures
-import dynaface.image
 
 
 def load_face_image(

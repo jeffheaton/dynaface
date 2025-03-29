@@ -26,6 +26,11 @@ class TestFaceAnalysis(unittest.TestCase):
         face.draw_static()
         face.draw_landmarks()
 
+        # test all items
+        items = face.get_all_items()
+        assert "fai" in items
+        assert isinstance(items, list), "Expected a list"
+
         # Expected values (rounded to 2 decimals)
         expected_values = {
             "fai": 2.01,
@@ -164,3 +169,62 @@ class TestFaceAnalysis(unittest.TestCase):
                 places=2,
                 msg=f"{key}: expected {expected}, got {actual}",
             )
+
+    def test_load_image_local(self):
+        # Initialize models
+        device = models.detect_device()
+        path = models.download_models()
+        models.init_models(path, device)
+
+        # Load image
+        face = facial.load_face_image("./tests_data/img1-512.jpg")
+        assert face.width == 1024
+        assert face.height == 1024
+        assert face.render_img is not None
+        assert face.render_img.shape == (1024, 1024, 3)
+
+    def test_load_image_local(self):
+        # Initialize models
+        device = models.detect_device()
+        path = models.download_models()
+        models.init_models(path, device)
+
+        # Load image
+        face = facial.load_face_image("./tests_data/img1-512.jpg")
+        assert face.width == 1024
+        assert face.height == 1024
+        assert face.render_img is not None
+        assert face.render_img.shape == (1024, 1024, 3)
+
+    def test_load_image_url(self):
+        # Initialize models
+        device = models.detect_device()
+        path = models.download_models()
+        models.init_models(path, device)
+
+        # Load image
+        face = facial.load_face_image(
+            "https://www.heatonresearch.com/images/jeff/about-jeff-heaton-2020.jpg"
+        )
+        assert face.width == 1024
+        assert face.height == 1024
+        assert face.render_img is not None
+        assert face.render_img.shape == (1024, 1024, 3)
+
+    def test_fail_init_models(self):
+        models.unload_models()
+        with self.assertRaises(ValueError) as context:
+            _ = facial.load_face_image("./tests_data/img1-512.jpg")
+
+        self.assertIn("Models not initialized", str(context.exception))
+
+    def test_face_rotation(self):
+        # Initialize models
+        device = models.detect_device()
+        path = models.download_models()
+        models.init_models(path, device)
+
+        # Load image
+        face = facial.load_face_image("./tests_data/img1-512.jpg")
+        print(face.calculate_face_rotation())
+        assert face.calculate_face_rotation() == 0.0

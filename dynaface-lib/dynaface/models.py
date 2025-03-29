@@ -228,6 +228,16 @@ def init_models(model_path: str, device: str) -> None:
     _init_rembg()
 
 
+def unload_models() -> None:
+    global _model_path, _device, mtcnn_model, spiga_model, rembg_session
+    _model_path = None
+    _device = None
+    mtcnn_model = None
+    spiga_model = None
+    rembg_session = None
+    torch.cuda.empty_cache()
+
+
 def are_models_init() -> bool:
     global _device
     return _device is not None
