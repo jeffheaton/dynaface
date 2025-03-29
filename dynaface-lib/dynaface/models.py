@@ -14,6 +14,7 @@ from dynaface.spiga.inference.framework import SPIGAFramework
 from facenet_pytorch import MTCNN
 from facenet_pytorch.models.mtcnn import ONet, PNet, RNet
 from torch import nn
+from torch.nn.functional import interpolate
 
 # Mac M1 issue - hope to remove some day
 # RuntimeError: Adaptive pool MPS: input sizes must be divisible by output sizes.
@@ -36,8 +37,6 @@ spiga_model = None
 rembg_session = None
 
 SPIGA_MODEL = "wflw"
-
-from torch.nn.functional import interpolate
 
 logger = logging.getLogger(__name__)
 
@@ -98,15 +97,12 @@ class MTCNN2(MTCNN):
 
 
 def _init_mtcnn() -> None:
-    global mtcnn_model
+    global mtcnn_model, _device
 
     if _device == "mps" and FIX_MPS_ISSUE:
         device = "cpu"
     else:
         device = _device
-        # print(facenet_pytorch.models.utils.imresample)
-        # facenet_pytorch.models.utils.detect_face.imresample = imresample_mps
-        # print(facenet_pytorch.models.utils.detect_face.imresample)
 
     if _model_path is None:
         mtcnn_model = MTCNN(keep_all=True, device=device)
@@ -115,7 +111,7 @@ def _init_mtcnn() -> None:
 
 
 def _init_spiga() -> None:
-    global spiga_model
+    global spiga_model, _device
 
     config = ModelConfig(dataset_name=SPIGA_MODEL, load_model_url=False)
     config.model_weights_path = _model_path

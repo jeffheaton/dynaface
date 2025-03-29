@@ -5,8 +5,6 @@ from typing import List, Optional, Tuple
 import cv2
 import numpy as np
 from dynaface.util import PolyArea
-from matplotlib import pyplot as plt
-from PIL import Image
 
 COLORS = np.array(
     [
@@ -197,7 +195,7 @@ class ImageAnalysis:
             self.text_thick,
             cv2.LINE_AA,
         )
-        w2 = cv2.getTextSize(txt, self.text_font, self.text_size, self.text_thick)[0][0]
+        cv2.getTextSize(txt, self.text_font, self.text_size, self.text_thick)[0][0]
 
         cv2.putText(
             self.render_img,
@@ -267,9 +265,6 @@ class ImageAnalysis:
         if not y2:
             y2 = self.render_img.shape[1]
         cv2.line(self.render_img, (x, y1), (x, y2), color, width)
-
-    def line(self, pt1, pt2, color=(0, 255, 255), width=5):
-        cv2.line(self.render_img, pt1, pt2, color, width)
 
     def circle(
         self,

@@ -105,10 +105,10 @@ class ProcessVideoOpenCV:
         # Get the frame rate of the video
         self.frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
         self.frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-        l = round(self.frames / self.frame_rate, 2)
+        data_length = round(self.frames / self.frame_rate, 2)
         logger.info(f"Frame rate: {self.frame_rate} FPS")
         logger.info(f"Frames: {self.frames}")
-        logger.debug(f"Video length (sec): {l}")
+        logger.debug(f"Video length (sec): {data_length}")
 
         frame_num = 0
 
@@ -185,7 +185,7 @@ class VideoToVideo:
             return False
 
         # sample 1st
-        filename = os.path.join(p.temp_path, f"input-1.jpg")
+        filename = os.path.join(p.temp_path, "input-1.jpg")
         logger.debug(filename)
         image = cv2.imread(filename)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -239,10 +239,10 @@ class VideoToVideo:
             writer = csv.writer(f)
             cols = list(self.data.keys())
             writer.writerow(["frame", "time"] + cols)
-            l = len(self.data[self.stats[0]])
+            data_length = len(self.data[self.stats[0]])
             lst_time = [x * self.rate for x in range(l)]
 
-            for i in range(l):
+            for i in range(data_length):
                 row = [str(i), lst_time[i]]
                 for col in cols:
                     row.append(self.data[col][i])

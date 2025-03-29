@@ -1,5 +1,4 @@
-import io
-from typing import Optional, Tuple, Union
+from typing import Tuple
 
 import cv2
 import matplotlib.pyplot as plt

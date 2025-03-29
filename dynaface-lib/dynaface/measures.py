@@ -1,6 +1,6 @@
 import logging
 import math
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 import numpy as np
 from dynaface import lateral, util, facial
