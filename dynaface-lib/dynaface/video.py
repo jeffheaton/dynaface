@@ -1,4 +1,5 @@
 import csv
+import logging
 import os
 import re
 import shutil
@@ -6,8 +7,9 @@ import subprocess
 import tempfile
 
 import cv2
-
 from dynaface.facial import AnalyzeFace
+
+logger = logging.getLogger(__name__)
 
 SAMPLE_RATE = 44100
 
@@ -31,9 +33,8 @@ class ProcessVideoFFMPEG:
         with open(self.temp_output, "r") as fp:
             result = fp.read()
 
-        print(f"Executed command: {cmd}, result:")
-        print(result)
-        print("---------\n")
+        logger.debug(f"Executed command: {cmd}, result:")
+        logger.debug(result)
         return result.split("\n")
 
     def cleanup(self):
@@ -56,7 +57,7 @@ class ProcessVideoFFMPEG:
 
         # Second call to ffmpeg extracts the audio.  We also attempt to get the FPS from
         # this call.
-        print(
+        logger.debug(
             f"ffmpeg -i {input_file} -ab 160k -ac 2 -ar {SAMPLE_RATE} -vn {input_file} 2>&1"
         )
         results = self.execute_command(
@@ -68,11 +69,11 @@ class ProcessVideoFFMPEG:
             m = re.search("Stream #.*Video.* ([0-9]*) fps", line)
             if m is not None:
                 self.frame_rate = float(m.group(1))
-                print(f"Detected framerate of {self.frame_rate}")
+                logger.info(f"Detected framerate of {self.frame_rate}")
 
         # Report on the frame rate and attempt to obtain audio sample rate.
-        print(f"Frame rate used: {self.frame_rate}")
-        print(self.temp_path)
+        logging.info(f"Frame rate used: {self.frame_rate}")
+        logging.debug(self.temp_path)
         return True
 
     def build(self, output_path, frame_rate):
@@ -98,16 +99,16 @@ class ProcessVideoOpenCV:
 
         # Check if video file opened successfully
         if not cap.isOpened():
-            print("Error: Couldn't open the video file.")
-            exit()
+            logger.error("Error: Couldn't open the video file.")
+            return False
 
         # Get the frame rate of the video
         self.frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
         self.frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
         l = round(self.frames / self.frame_rate, 2)
-        print(f"Frame rate: {self.frame_rate} FPS")
-        print(f"Frames: {self.frames}")
-        print(f"Video length (sec): {l}")
+        logger.info(f"Frame rate: {self.frame_rate} FPS")
+        logger.info(f"Frames: {self.frames}")
+        logger.debug(f"Video length (sec): {l}")
 
         frame_num = 0
 
@@ -120,7 +121,7 @@ class ProcessVideoOpenCV:
 
             frame_num += 1
             output_filename = os.path.join(self.temp_path, f"input-{frame_num}.jpg")
-            print(output_filename)
+            logger.debug(output_filename)
             # Save the frame as an image
             cv2.imwrite(output_filename, frame)
 
@@ -153,7 +154,7 @@ class ProcessVideoOpenCV:
         # Add images to the video
         for file in files:
             path = os.path.join(self.temp_path, file)
-            print(f"Output: {path}")
+            logger.debug(f"Output: {path}")
             img = cv2.imread(path)
 
             # Resize image to match the frame size
@@ -180,12 +181,12 @@ class VideoToVideo:
         # p = ProcessVideoFFMPEG()
         p = ProcessVideoOpenCV()
         if not p.extract(input_video):
-            print("Failed to execute ffmpeg")
+            logger.error("Failed to execute ffmpeg")
             return False
 
         # sample 1st
         filename = os.path.join(p.temp_path, f"input-1.jpg")
-        print(filename)
+        logger.debug(filename)
         image = cv2.imread(filename)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         face = AnalyzeFace(stats)
@@ -203,7 +204,7 @@ class VideoToVideo:
             filename = os.path.join(p.temp_path, f"input-{idx}.jpg")
             if not os.path.exists(filename):
                 break
-            print(filename)
+            logger.debug(filename)
             # Load frame and crop/size
             image = cv2.imread(filename)
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -227,7 +228,7 @@ class VideoToVideo:
 
         p.build(output_video, p.frame_rate)
         p.cleanup()
-        print(p.temp_path)
+        logger.debug(p.temp_path)
         return True
 
     def plot_chart(self, filename, plot_stats=None):

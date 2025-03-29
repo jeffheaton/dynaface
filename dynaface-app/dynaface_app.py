@@ -151,7 +151,6 @@ class AppDynaface(AppJTH):
 
 
 if __name__ == "__main__":
-    print("1")
     app = AppDynaface()
     app.exec()
     app.shutdown()
