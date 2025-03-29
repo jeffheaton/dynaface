@@ -226,5 +226,4 @@ class TestFaceAnalysis(unittest.TestCase):
 
         # Load image
         face = facial.load_face_image("./tests_data/img1-512.jpg")
-        print(face.calculate_face_rotation())
         assert face.calculate_face_rotation() == 0.0
