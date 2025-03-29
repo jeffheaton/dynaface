@@ -98,7 +98,7 @@ class AnalyzeFace(ImageAnalysis):
 
         bbox, prob = models.mtcnn_model.detect(img)
 
-        if prob[0] == None or prob[0] < 0.9:
+        if prob[0] is None or prob[0] < 0.9:
             return None, None
 
         end_time = time.time()
@@ -131,19 +131,23 @@ class AnalyzeFace(ImageAnalysis):
 
     def is_lateral(self) -> Tuple[bool, bool]:
         """
-        Determines whether the head pose is lateral and whether the head is facing left.
+        Determines whether the head pose is lateral and whether the head is
+        facing left.
 
         Returns:
             Tuple[bool, bool]:
-            - First value (bool): True if the head is in a lateral pose (yaw angle beyond ±15 degrees), False otherwise.
-            - Second value (bool): True if the head is facing left (yaw < 0), False if facing right or frontal.
+            - First value (bool): True if the head is in a lateral pose
+              (yaw angle beyond ±15 degrees), False otherwise.
+            - Second value (bool): True if the head is facing left
+              (yaw < 0), False if facing right or frontal.
 
         If `_headpose` is None, it defaults to (False, False).
         """
         if self._headpose is None:
             return False, False  # Default when head pose data is unavailable
 
-        yaw, pitch, roll = self._headpose[:3]  # Extract yaw, pitch, and roll values
+        # Extract yaw, pitch, and roll values
+        yaw, pitch, roll = self._headpose[:3]
         logger.info(f"Headpose: yaw:{yaw}, pitch:{pitch}, roll:{roll}")
 
         is_lateral: bool = abs(yaw) > 20  # Lateral if yaw exceeds ±20 degrees
@@ -154,7 +158,8 @@ class AnalyzeFace(ImageAnalysis):
         return is_lateral, is_facing_left
 
     def _overlay_lateral_analysis(self, c):
-        """Scales and overlays the lateral analysis image onto self.render_img at the top-right."""
+        """Scales and overlays the lateral analysis image onto self.render_img
+        at the top-right."""
         if c is None:
             return
 
@@ -247,15 +252,19 @@ class AnalyzeFace(ImageAnalysis):
         dir: str = "r",
     ) -> float:
         """
-        Measures the Euclidean distance between two points (pt1 and pt2) and optionally renders an arrow and text.
+        Measures the Euclidean distance between two points (pt1 and pt2) and
+        optionally renders an arrow and text.
 
         Parameters:
         - `pt1` (Tuple[int, int]): First point (x, y).
         - `pt2` (Tuple[int, int]): Second point (x, y).
-        - `color` (Tuple[int, int, int], optional): Color of the rendered arrow. Default is red (255, 0, 0).
+        - `color` (Tuple[int, int, int], optional): Color of the rendered
+           arrow. Default is red (255, 0, 0).
         - `thickness` (int, optional): Thickness of the arrow line. Default is 3.
-        - `render` (bool, optional): Whether to render the measurement visually. Default is True.
-        - `dir` (str, optional): Direction for placing the text label ('r' for right, else left). Default is 'r'.
+        - `render` (bool, optional): Whether to render the measurement visually.
+           Default is True.
+        - `dir` (str, optional): Direction for placing the text label ('r' for
+           right, else left). Default is 'r'.
 
         Returns:
         - `float`: The measured distance in millimeters.
@@ -309,17 +318,21 @@ class AnalyzeFace(ImageAnalysis):
         dir: str = "r",
     ) -> float:
         """
-        Measures the curved distance along a sagittal line between two points (pt1 and pt2) and optionally renders the curve and text.
+        Measures the curved distance along a sagittal line between two
+        points (pt1 and pt2) and optionally renders the curve and text.
 
         Parameters:
         - `pt1` (Tuple[int, int]): First point (x, y).
         - `pt2` (Tuple[int, int]): Second point (x, y).
         - `sagittal_x` (np.ndarray): Array of x-coordinates forming the curve.
         - `sagittal_y` (np.ndarray): Array of y-coordinates forming the curve.
-        - `color` (Tuple[int, int, int], optional): Color of the rendered curve. Default is red (255, 0, 0).
+        - `color` (Tuple[int, int, int], optional): Color of the rendered curve.
+           Default is red (255, 0, 0).
         - `thickness` (int, optional): Thickness of the curve line. Default is 3.
-        - `render` (bool, optional): Whether to render the measurement visually. Default is True.
-        - `dir` (str, optional): Direction for placing the text label ('r' for right, else left). Default is 'r'.
+        - `render` (bool, optional): Whether to render the measurement visually.
+           Default is True.
+        - `dir` (str, optional): Direction for placing the text label ('r' for
+          right, else left). Default is 'r'.
 
         Returns:
         - `float`: The measured curved distance in millimeters.
@@ -386,7 +399,8 @@ class AnalyzeFace(ImageAnalysis):
         # Convert points to integer format required for OpenCV
         curve_pts = segment.astype(np.int32)
 
-        # Draw polyline on the image (assuming `self.image` exists as the frame to draw on)
+        # Draw polyline on the image (assuming `self.image` exists as the
+        # frame to draw on)
         cv2.polylines(
             self.render_img,
             [curve_pts],
@@ -478,7 +492,8 @@ class AnalyzeFace(ImageAnalysis):
             tilt = measures.to_degrees(r)
             if (self.tilt_threshold >= 0) and (abs(tilt) > self.tilt_threshold):
                 logger.debug(
-                    f"Rotate landmarks: detected tilt={tilt} threshold={self.tilt_threshold}"
+                    f"Rotate landmarks: detected tilt={tilt} "
+                    f"threshold={self.tilt_threshold}"
                 )
                 self.face_rotation = r
                 center = (
@@ -495,7 +510,9 @@ class AnalyzeFace(ImageAnalysis):
         d, _ = util_calc_pd(pupils)
 
         if d == 0:
-            raise ValueError("Can't process face pupils must be in different locations")
+            raise ValueError(
+                "Can't process face pupils must " "be in different locations"
+            )
 
         if self.face_rotation:
             logger.debug(f"Fix tilt: {self.face_rotation}")
@@ -582,10 +599,14 @@ def load_face_image(
 
     Args:
         filename (str): Path to the image file or an HTTP/HTTPS URL.
-        crop (bool, optional): Whether to crop the face image to the face bounding box. Defaults to True.
-        measures (Optional[List[str]], optional): List of facial statistics to analyze.
+        crop (bool, optional): Whether to crop the face image to the
+        face bounding box. Defaults to True.
+        measures (Optional[List[str]], optional): List of facial statistics
+        to analyze.
             If None, all default measures will be used. Defaults to None.
-        tilt_threshold (float, optional): Maximum allowable tilt in degrees before analysis fails. Defaults to dynaface.facial.DEFAULT_TILT_THRESHOLD.
+        tilt_threshold (float, optional): Maximum allowable tilt in degrees
+        before analysis fails.
+        Defaults to dynaface.facial.DEFAULT_TILT_THRESHOLD.
 
     Returns:
         dynaface.facial.AnalyzeFace: The analyzed face object.
