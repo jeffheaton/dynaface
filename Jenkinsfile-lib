@@ -52,7 +52,7 @@ pipeline {
                     pip install flake8 mypy bandit black isort
 
                     echo "Running flake8..."
-                    flake8 dynaface --config .flake8 --output-file=flake8-report.txt || true
+                    flake8 dynaface --config ../.flake8 --output-file=flake8-report.txt || true
 
                     echo "Running mypy..."
                     mypy dynaface --show-error-codes --no-color-output --no-error-summary > mypy-report.txt || true
