@@ -1,2 +1,31 @@
 [flake8]
+# Max line length to match Black's default (88)
 max-line-length = 88
+
+# Ignore rules that conflict with Black
+ignore = 
+    E203,  # Whitespace before ':', conflicts with Black in slices
+    W503,  # Line break before binary operator, conflicts with PEP 8 (Black follows PEP 8 update)
+    W504,  # Line break after binary operator (redundant with W503 ignored)
+    E231,  # Missing whitespace after ',', handled by Black
+    E501,  # Line too long, Black handles line length properly
+    E711,  # Comparison to None should be 'if cond is None'
+    E712   # Comparison to True should be 'if cond'
+    
+# Exclude some folders (optional, update as needed)
+exclude = 
+    .git,
+    __pycache__,
+    venv,
+    .venv,
+    build,
+    dist
+
+# Enable some useful checks not enforced by default
+select = B,C,E,F,W,T4,B9
+
+# Show source of the error
+show-source = True
+
+# Display error codes
+format = pylint

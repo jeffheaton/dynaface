@@ -1,6 +1,6 @@
 try:
-    from importlib.metadata import version
+    from importlib.metadata import version, PackageNotFoundError
 
     __version__ = version("dynaface")
-except:
+except PackageNotFoundError:
     __version__ = "unknown"
