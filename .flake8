@@ -3,14 +3,21 @@
 max-line-length = 88
 
 # Ignore rules that conflict with Black
+# E203 - Whitespace before ':', conflicts with Black in slices
+# W503 - Line break before binary operator
+# W504 - Line break after binary operator
+# E231 - Missing whitespace after ',', handled by Black
+# E501 - Line too long, handled by Black
+# E711 - Comparison to None should be 'if cond is None'
+# E712 - Comparison to True should be 'if cond'
 ignore =
-    E203  # Whitespace before ':', conflicts with Black in slices
-    W503  # Line break before binary operator
-    W504  # Line break after binary operator
-    E231  # Missing whitespace after ',', handled by Black
-    E501  # Line too long, handled by Black
-    E711  # Comparison to None should be 'if cond is None'
-    E712  # Comparison to True should be 'if cond'
+    E203,
+    W503,
+    W504,
+    E231,
+    E501,
+    E711,
+    E712
 
 # Exclude some folders (optional, update as needed)
 exclude =
@@ -29,4 +36,3 @@ show-source = True
 
 # Display error codes
 format = pylint
-
