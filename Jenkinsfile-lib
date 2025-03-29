@@ -175,14 +175,12 @@ pipeline {
             // Record issues for static analysis tools
             recordIssues(
                 tools: [
-                    flake8(pattern: '**/flake8-report.txt'),
-                    genericTool(pattern: '**/mypy-report.txt', name: 'mypy'),
-                    genericTool(pattern: '**/bandit-report.txt', name: 'bandit'),
-                    genericTool(pattern: '**/black-report.txt', name: 'black'),
-                    genericTool(pattern: '**/isort-report.txt', name: 'isort')
-                ],
-                enabledForFailure: true
-            )
+                flake8(pattern: '**/flake8-report.txt'),    // Flake8 reports
+                myPy(pattern: '**/mypy-report.txt'),        // Mypy reports
+                bandit(pattern: '**/bandit-report.txt')     // Bandit reports
+                ]
+            enabledForFailure: true
+        )
         }
     }
 }
