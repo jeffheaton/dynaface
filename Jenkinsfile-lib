@@ -18,7 +18,7 @@ pipeline {
                             exit 1
                         fi
                     '''
-                    
+
                     // Get the actual Python 3.11 binary path and check version in dynaface-lib
                     sh '''
                         PYTHON_PATH=$(command -v python3.11)
@@ -52,20 +52,25 @@ pipeline {
                     pip install flake8 mypy bandit black isort
 
                     echo "Running flake8..."
-                    flake8 dynaface || true
+                    flake8 dynaface --output-file=flake8-report.txt || true
 
                     echo "Running mypy..."
-                    mypy dynaface || true
+                    mypy dynaface --show-error-codes --no-color-output --no-error-summary > mypy-report.txt || true
 
                     echo "Running bandit..."
-                    bandit -r dynaface || true
+                    bandit -r dynaface -f txt -o bandit-report.txt || true
 
                     echo "Checking formatting with black..."
-                    black --check dynaface || true
+                    black --check dynaface > black-report.txt 2>&1 || true
 
                     echo "Checking imports with isort..."
-                    isort dynaface --check-only || true
+                    isort dynaface --check-only > isort-report.txt || true
                 '''
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'dynaface-lib/*.txt', allowEmptyArchive: true
+                }
             }
         }
         stage('Run Tests & Generate Coverage') {
@@ -76,7 +81,11 @@ pipeline {
                         export PATH="$HOME/.pyenv/bin:$PATH"
                         eval "$(pyenv init --path)"
                         eval "$(pyenv virtualenv-init -)"
-                        python3.11 -m pytest tests --junitxml=unit_test_results.xml --cov=. --cov-report=xml:coverage.xml --cov-report=html
+                        python3.11 -m pytest tests \
+                            --junitxml=unit_test_results.xml \
+                            --cov=. \
+                            --cov-report=xml:coverage.xml \
+                            --cov-report=html
                     '''
                 }
             }
@@ -115,8 +124,10 @@ pipeline {
                         mkdir -p dist  # Ensure dist exists
                     '''
                     archiveArtifacts artifacts: 'dynaface-lib/dist/*.whl', fingerprint: true
-                    archiveArtifacts artifacts: 'dynaface-lib/coverage.xml', allowEmptyArchive: true  // Archive coverage XML
-                    archiveArtifacts artifacts: 'dynaface-lib/htmlcov/**', allowEmptyArchive: true  // Archive HTML coverage
+                    archiveArtifacts artifacts: 'dynaface-lib/coverage.xml',
+                                      allowEmptyArchive: true  // Archive coverage XML
+                    archiveArtifacts artifacts: 'dynaface-lib/htmlcov/**',
+                                      allowEmptyArchive: true  // Archive HTML coverage
                 }
             }
         }
@@ -142,22 +153,36 @@ pipeline {
             script {
                 // Clean up build artifacts
                 sh '''
-                    cd dynaface-lib
-                    rm -rf build dist dynaface.egg-info
-                '''
+                cd dynaface-lib
+                rm -rf build dist dynaface.egg-info
+            '''
             }
+
             // Archive test and coverage results
             junit 'dynaface-lib/unit_test_results.xml'
+
             recordCoverage(
-                tools: [[parser: 'COBERTURA', pattern: 'dynaface-lib/coverage.xml']],
-                id: 'pytest-coverage',
-                name: 'Pytest Coverage',
-                sourceCodeRetention: 'EVERY_BUILD',
-                qualityGates: [
-                    [threshold: 60.0, metric: 'LINE', baseline: 'PROJECT', unstable: true],
-                    [threshold: 60.0, metric: 'BRANCH', baseline: 'PROJECT', unstable: true]
-                ]
-            )
+            tools: [[parser: 'COBERTURA', pattern: 'dynaface-lib/coverage.xml']],
+            id: 'pytest-coverage',
+            name: 'Pytest Coverage',
+            sourceCodeRetention: 'EVERY_BUILD',
+            qualityGates: [
+                [threshold: 60.0, metric: 'LINE', baseline: 'PROJECT', unstable: true],
+                [threshold: 60.0, metric: 'BRANCH', baseline: 'PROJECT', unstable: true]
+            ]
+        )
+
+            // Record issues for static analysis tools
+            recordIssues(
+            tools: [
+                flake8(pattern: 'dynaface-lib/flake8-report.txt'),
+                mypy(pattern: 'dynaface-lib/mypy-report.txt'),
+                bandit(pattern: 'dynaface-lib/bandit-report.txt'),
+                genericTool(pattern: 'dynaface-lib/black-report.txt', name: 'Black'),
+                genericTool(pattern: 'dynaface-lib/isort-report.txt', name: 'isort')
+            ],
+            enabledForFailure: true
+        )
         }
     }
 }
