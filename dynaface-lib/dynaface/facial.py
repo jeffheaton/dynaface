@@ -2,7 +2,6 @@ import copy
 import logging
 import math
 import time
-from io import BytesIO
 from typing import List, Optional, Tuple
 from urllib.parse import urlparse
 
@@ -13,7 +12,6 @@ import numpy as np
 import requests
 from dynaface.image import ImageAnalysis
 from dynaface.lateral import analyze_lateral
-from PIL import Image
 
 import dynaface
 from dynaface import measures, models, util
@@ -93,7 +91,7 @@ class AnalyzeFace(ImageAnalysis):
         logger.debug("Called _find_landmarks")
         start_time = time.time()
 
-        if dynaface.models.are_models_init() == False:
+        if not dynaface.models.are_models_init():
             raise ValueError(
                 "Models not initialized, please call dynaface.models.init_models()"
             )

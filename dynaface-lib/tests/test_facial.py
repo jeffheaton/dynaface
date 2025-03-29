@@ -183,19 +183,6 @@ class TestFaceAnalysis(unittest.TestCase):
         assert face.render_img is not None
         assert face.render_img.shape == (1024, 1024, 3)
 
-    def test_load_image_local(self):
-        # Initialize models
-        device = models.detect_device()
-        path = models.download_models()
-        models.init_models(path, device)
-
-        # Load image
-        face = facial.load_face_image("./tests_data/img1-512.jpg")
-        assert face.width == 1024
-        assert face.height == 1024
-        assert face.render_img is not None
-        assert face.render_img.shape == (1024, 1024, 3)
-
     def test_load_image_url(self):
         # Initialize models
         device = models.detect_device()
