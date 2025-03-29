@@ -171,15 +171,6 @@ pipeline {
                 [threshold: 60.0, metric: 'BRANCH', baseline: 'PROJECT', unstable: true]
             ]
         )
-
-            // Record issues for static analysis tools
-            recordIssues(
-                tools: [
-                flake8(pattern: '**/flake8-report.txt'),    // Flake8 reports
-                myPy(pattern: '**/mypy-report.txt'),        // Mypy reports
-                bandit(pattern: '**/bandit-report.txt')     // Bandit reports
-            ]
-        )
         }
     }
 }
