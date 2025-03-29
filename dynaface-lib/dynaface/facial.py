@@ -281,7 +281,7 @@ class AnalyzeFace(ImageAnalysis):
         txt: str = f"{d:.2f}mm"
 
         # Calculate text size for positioning
-        m: Tuple[Tuple[int, int], int] = self.calc_text_size(txt)
+        # m: Tuple[Tuple[int, int], int] = self.calc_text_size(txt)
 
         # Compute the midpoint for displaying text
         if dir == "r":
@@ -438,10 +438,10 @@ class AnalyzeFace(ImageAnalysis):
         bbox, _ = models.mtcnn_model.detect(self.render_img)
         bbox = bbox[0]
 
-        crop_x, crop_y, w, h = (
+        crop_x, crop_y, h = (
             int(bbox[0]),  # x-min
             int(bbox[1]),  # y-min
-            int(bbox[2] - bbox[0]),  # width
+            # int(bbox[2] - bbox[0]),  # width
             int(bbox[3] - bbox[1]),  # height
         )
 
