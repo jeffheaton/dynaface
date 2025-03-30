@@ -1,7 +1,8 @@
 import os
-import pkg_resources
-import numpy as np
+
 import cv2
+import numpy as np
+import pkg_resources
 
 # My libs
 from dynaface.spiga.data.loaders.augmentors.utils import rotation_matrix_to_euler

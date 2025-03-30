@@ -1,7 +1,8 @@
-import os
 import json
-import pkg_resources
+import os
 from collections import OrderedDict
+
+import pkg_resources
 
 # Default data paths
 # db_img_path = pkg_resources.resource_filename('dynaface.spiga', 'data/databases')

@@ -1,18 +1,17 @@
 import cv2
 import numpy as np
 import torch
-
-from dynaface.spiga.data.loaders.augmentors.modern_posit import PositPose
-from dynaface.spiga.data.loaders.augmentors.heatmaps import Heatmaps
 from dynaface.spiga.data.loaders.augmentors.boundary import AddBoundary
+from dynaface.spiga.data.loaders.augmentors.heatmaps import Heatmaps
 from dynaface.spiga.data.loaders.augmentors.landmarks import (
-    HorizontalFlipAug,
-    RSTAug,
-    OcclusionAug,
-    LightingAug,
     BlurAug,
+    HorizontalFlipAug,
+    LightingAug,
+    OcclusionAug,
+    RSTAug,
     TargetCropAug,
 )
+from dynaface.spiga.data.loaders.augmentors.modern_posit import PositPose
 
 
 def get_transformers(data_config):

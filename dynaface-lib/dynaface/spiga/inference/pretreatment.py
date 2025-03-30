@@ -1,13 +1,8 @@
-from torchvision import transforms
-import numpy as np
-from PIL import Image
 import cv2
-
-from dynaface.spiga.data.loaders.transforms import (
-    TargetCrop,
-    ToOpencv,
-    AddModel3D,
-)
+import numpy as np
+from dynaface.spiga.data.loaders.transforms import AddModel3D, TargetCrop, ToOpencv
+from PIL import Image
+from torchvision import transforms
 
 
 def get_transformers(data_config):

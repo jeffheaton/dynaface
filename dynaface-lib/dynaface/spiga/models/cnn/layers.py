@@ -5,7 +5,14 @@ class Conv(nn.Module):
     def __init__(self, inp_dim, out_dim, kernel_size=3, stride=1, bn=False, relu=True):
         super(Conv, self).__init__()
         self.inp_dim = inp_dim
-        self.conv = nn.Conv2d(inp_dim, out_dim, kernel_size, stride, padding=(kernel_size - 1) // 2, bias=False)
+        self.conv = nn.Conv2d(
+            inp_dim,
+            out_dim,
+            kernel_size,
+            stride,
+            padding=(kernel_size - 1) // 2,
+            bias=False,
+        )
         self.relu = None
         self.bn = None
         if relu:
@@ -27,7 +34,9 @@ class Deconv(nn.Module):
     def __init__(self, inp_dim, out_dim, kernel_size=3, stride=1, bn=False, relu=True):
         super(Deconv, self).__init__()
         self.inp_dim = inp_dim
-        self.deconv = nn.ConvTranspose2d(inp_dim, out_dim, kernel_size=kernel_size, stride=stride, bias=False)
+        self.deconv = nn.ConvTranspose2d(
+            inp_dim, out_dim, kernel_size=kernel_size, stride=stride, bias=False
+        )
         self.relu = None
         self.bn = None
         if relu:

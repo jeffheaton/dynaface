@@ -1,8 +1,8 @@
-from torch import nn
-from dynaface.spiga.models.cnn.layers import Conv, Residual
-from dynaface.spiga.models.cnn.hourglass import HourglassCore
 from dynaface.spiga.models.cnn.coord_conv import AddCoordsTh
+from dynaface.spiga.models.cnn.hourglass import HourglassCore
+from dynaface.spiga.models.cnn.layers import Conv, Residual
 from dynaface.spiga.models.cnn.transform_e2p import E2Ptransform
+from torch import nn
 
 
 class MultitaskCNN(nn.Module):

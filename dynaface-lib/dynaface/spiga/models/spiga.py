@@ -1,12 +1,11 @@
+import dynaface.spiga.models.gnn.pose_proj as pproj
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import dynaface.spiga.models.gnn.pose_proj as pproj
 from dynaface.spiga.models.cnn.cnn_multitask import MultitaskCNN
 from dynaface.spiga.models.gnn.step_regressor import (
-    StepRegressor,
     RelativePositionEncoder,
+    StepRegressor,
 )
 
 

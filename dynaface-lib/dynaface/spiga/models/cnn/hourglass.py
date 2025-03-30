@@ -1,5 +1,4 @@
 import torch.nn as nn
-
 from dynaface.spiga.models.cnn.layers import Conv, Deconv, Residual
 
 

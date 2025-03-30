@@ -1,17 +1,18 @@
-import torch
 import math
+
+import torch
 
 
 def euler_to_rotation_matrix(euler):
     # http://euclideanspace.com/maths/geometry/rotations/conversions/eulerToMatrix/index.htm
     # Change coordinates system
 
-    euler[:, 0] = -(euler[:, 0]-90)
+    euler[:, 0] = -(euler[:, 0] - 90)
     euler[:, 1] = -euler[:, 1]
-    euler[:, 2] = -(euler[:, 2]+90)
+    euler[:, 2] = -(euler[:, 2] + 90)
 
     # Convert to radians
-    rad = euler*(math.pi/180.0)
+    rad = euler * (math.pi / 180.0)
     cy = torch.cos(rad[:, 0])
     sy = torch.sin(rad[:, 0])
     cp = torch.cos(rad[:, 1])
@@ -20,13 +21,13 @@ def euler_to_rotation_matrix(euler):
     sr = torch.sin(rad[:, 2])
 
     # Init R matrix tensors
-    #working_device = None
-    #if euler.is_cuda:
+    # working_device = None
+    # if euler.is_cuda:
     #    working_device = euler.device
-    
+
     # JTH
     working_device = euler.device
-    
+
     Ry = torch.zeros((euler.shape[0], 3, 3), device=working_device)
     Rp = torch.zeros((euler.shape[0], 3, 3), device=working_device)
     Rr = torch.zeros((euler.shape[0], 3, 3), device=working_device)
@@ -34,7 +35,7 @@ def euler_to_rotation_matrix(euler):
     # Yaw
     Ry[:, 0, 0] = cy
     Ry[:, 0, 2] = sy
-    Ry[:, 1, 1] = 1.
+    Ry[:, 1, 1] = 1.0
     Ry[:, 2, 0] = -sy
     Ry[:, 2, 2] = cy
 
@@ -43,10 +44,10 @@ def euler_to_rotation_matrix(euler):
     Rp[:, 0, 1] = -sp
     Rp[:, 1, 0] = sp
     Rp[:, 1, 1] = cp
-    Rp[:, 2, 2] = 1.
+    Rp[:, 2, 2] = 1.0
 
     # Roll
-    Rr[:, 0, 0] = 1.
+    Rr[:, 0, 0] = 1.0
     Rr[:, 1, 1] = cr
     Rr[:, 1, 2] = -sr
     Rr[:, 2, 1] = sr
@@ -58,10 +59,10 @@ def euler_to_rotation_matrix(euler):
 def projectPoints(pts, rot, trl, cam_matrix):
 
     # Get working device
-    #working_device = None
-    #if pts.is_cuda:
+    # working_device = None
+    # if pts.is_cuda:
     #    working_device = pts.device
-    working_device = pts.device # JTH
+    working_device = pts.device  # JTH
 
     # Perspective projection model
     trl = trl.unsqueeze(2)
@@ -69,14 +70,16 @@ def projectPoints(pts, rot, trl, cam_matrix):
     proj_matrix = torch.matmul(cam_matrix, extrinsics)
 
     # Homogeneous landmarks
-    ones = torch.ones(pts.shape[:2], device=working_device, requires_grad=trl.requires_grad)
+    ones = torch.ones(
+        pts.shape[:2], device=working_device, requires_grad=trl.requires_grad
+    )
     ones = ones.unsqueeze(2)
     pts_hom = torch.cat((pts, ones), 2)
 
     # Project landmarks
-    pts_proj = pts_hom.permute((0, 2, 1))         # Transpose
+    pts_proj = pts_hom.permute((0, 2, 1))  # Transpose
     pts_proj = torch.matmul(proj_matrix, pts_proj)
     pts_proj = pts_proj.permute((0, 2, 1))
-    pts_proj = pts_proj/pts_proj[:, :, 2].unsqueeze(2)    # Lambda = 1
+    pts_proj = pts_proj / pts_proj[:, :, 2].unsqueeze(2)  # Lambda = 1
 
     return pts_proj[:, :, :-1]

@@ -6,7 +6,7 @@ class Heatmaps:
     def __init__(self, num_maps, map_size, sigma, stride=1, norm=True):
         self.num_maps = num_maps
         self.sigma = sigma
-        self.double_sigma_pw2 = 2*sigma*sigma
+        self.double_sigma_pw2 = 2 * sigma * sigma
         self.doublepi_sigma_pw2 = self.double_sigma_pw2 * np.pi
         self.stride = stride
         self.norm = norm
@@ -24,16 +24,25 @@ class Heatmaps:
         self.grid_y = np.repeat(grid_y.reshape(1, self.height), self.num_maps, axis=0)
 
     def __call__(self, sample):
-        landmarks = sample['landmarks']
-        landmarks = landmarks[-self.num_maps:]
+        landmarks = sample["landmarks"]
+        landmarks = landmarks[-self.num_maps :]
 
         # Heatmap generation
-        exp_x = np.exp(-(self.grid_x - landmarks[:, 0].reshape(-1, 1)) ** 2 / self.double_sigma_pw2)
-        exp_y = np.exp(-(self.grid_y - landmarks[:, 1].reshape(-1, 1)) ** 2 / self.double_sigma_pw2)
-        heatmaps = np.matmul(exp_y.reshape(self.num_maps, self.height, 1), exp_x.reshape(self.num_maps, 1, self.width))
+        exp_x = np.exp(
+            -((self.grid_x - landmarks[:, 0].reshape(-1, 1)) ** 2)
+            / self.double_sigma_pw2
+        )
+        exp_y = np.exp(
+            -((self.grid_y - landmarks[:, 1].reshape(-1, 1)) ** 2)
+            / self.double_sigma_pw2
+        )
+        heatmaps = np.matmul(
+            exp_y.reshape(self.num_maps, self.height, 1),
+            exp_x.reshape(self.num_maps, 1, self.width),
+        )
 
         if self.norm:
-            heatmaps = heatmaps/self.doublepi_sigma_pw2
+            heatmaps = heatmaps / self.doublepi_sigma_pw2
 
-        sample['heatmap2D'] = heatmaps
+        sample["heatmap2D"] = heatmaps
         return sample

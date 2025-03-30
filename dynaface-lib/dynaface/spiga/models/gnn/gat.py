@@ -1,9 +1,9 @@
 from copy import deepcopy
-import torch
-from torch import nn
-import torch.nn.functional as F
 
+import torch
+import torch.nn.functional as F
 from dynaface.spiga.models.gnn.layers import MLP
+from torch import nn
 
 
 class GAT(nn.Module):

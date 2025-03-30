@@ -1,7 +1,6 @@
 import torch.nn as nn
-
-from dynaface.spiga.models.gnn.layers import MLP
 from dynaface.spiga.models.gnn.gat import GAT
+from dynaface.spiga.models.gnn.layers import MLP
 
 
 class StepRegressor(nn.Module):
