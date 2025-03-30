@@ -9,40 +9,6 @@ from PIL import Image
 from torchvision import transforms
 
 
-class HorizontalFlipAug:
-    def __init__(self, ldm_flip_order, prob=0.5):
-        self.prob = prob
-        self.ldm_flip_order = ldm_flip_order
-
-    def __call__(self, sample):
-        img = sample["image"]
-        landmarks = sample["landmarks"]
-        mask = sample["mask_ldm"]
-        vis = sample["visible"]
-        bbox = sample["bbox"]
-
-        if random.random() < self.prob:
-            new_img = transforms.functional.hflip(img)
-
-            lm_new_order = self.ldm_flip_order
-            new_landmarks = landmarks[lm_new_order]
-            new_landmarks = (new_landmarks - (img.size[0], 0)) * (-1, 1)
-            new_mask = mask[lm_new_order]
-            new_vis = vis[lm_new_order]
-
-            x, y, w, h = bbox
-            new_x = img.size[0] - x - w
-            new_bbox = np.array((new_x, y, w, h))
-
-            sample["image"] = new_img
-            sample["landmarks"] = new_landmarks
-            sample["mask_ldm"] = new_mask
-            sample["visible"] = new_vis
-            sample["bbox"] = new_bbox
-
-        return sample
-
-
 class GeometryBaseAug:
     def __call__(self, sample):
         raise NotImplementedError("Inheritance __call__ not defined")
@@ -99,37 +65,6 @@ class GeometryBaseAug:
         homog_landmarks = dlu.affine2homogeneous(landmarks)
         new_landmarks = affine_transf.dot(homog_landmarks.T).T
         return new_landmarks
-
-
-class RSTAug(GeometryBaseAug):
-    def __init__(
-        self, angle_range=45.0, scale_min=-0.15, scale_max=0.15, trl_ratio=0.05
-    ):
-        self.scale_max = scale_max
-        self.scale_min = scale_min
-        self.angle_range = angle_range
-        self.trl_ratio = trl_ratio
-
-    def __call__(self, sample):
-        x, y, w, h = sample["bbox"]
-
-        x0, y0 = (
-            x + w / 2,
-            y + h / 2,
-        )  # center of the face, which will be the center of the rotation
-
-        # Bbox translation
-        rnd_Tx = np.random.uniform(-self.trl_ratio, self.trl_ratio) * w
-        rnd_Ty = np.random.uniform(-self.trl_ratio, self.trl_ratio) * h
-        sample["bbox"][0] += rnd_Tx
-        sample["bbox"][1] += rnd_Ty
-
-        scale = 1 + np.random.uniform(self.scale_min, self.scale_max)
-        angle = np.random.uniform(-self.angle_range, self.angle_range)
-
-        similarity = dlu.get_similarity_matrix(angle, scale, center=(x0, y0))
-        new_sample = self.map_affine_transformation(sample, similarity)
-        return new_sample
 
 
 class TargetCropAug(GeometryBaseAug):
@@ -218,92 +153,4 @@ class TargetCropAug(GeometryBaseAug):
         sample["landmarks_float"] = lnd_float
         sample["landmarks"] = new_lnd
         sample["img2map_scale"] = [self.map_scale_x, self.map_scale_y]
-        return sample
-
-
-class OcclusionAug:
-    def __init__(self, min_length=0.1, max_length=0.4, num_maps=1):
-        self.min_length = min_length
-        self.max_length = max_length
-        self.num_maps = num_maps
-
-    def __call__(self, sample):
-        x, y, w, h = sample["bbox"]
-        image = sample["image"]
-        landmarks = sample["landmarks"]
-        vis = sample["visible"]
-
-        min_ratio = self.min_length
-        max_ratio = self.max_length
-        rnd_width = np.random.randint(int(w * min_ratio), int(w * max_ratio))
-        rnd_height = np.random.randint(int(h * min_ratio), int(h * max_ratio))
-
-        # (xi, yi) and (xf, yf) are, respectively, the lower left points of the
-        # occlusion rectangle and the upper right point.
-        xi = int(x + np.random.randint(0, w - rnd_width))
-        xf = int(xi + rnd_width)
-        yi = int(y + np.random.randint(0, h - rnd_height))
-        yf = int(yi + rnd_height)
-
-        pixels = np.array(image)
-        pixels[yi:yf, xi:xf, :] = np.random.uniform(0, 255, size=3)
-        image = Image.fromarray(pixels)
-        sample["image"] = image
-
-        # Update visibilities
-        filter_x1 = landmarks[:, 0] >= xi
-        filter_x2 = landmarks[:, 0] < xf
-        filter_x = np.logical_and(filter_x1, filter_x2)
-
-        filter_y1 = landmarks[:, 1] >= yi
-        filter_y2 = landmarks[:, 1] < yf
-        filter_y = np.logical_and(filter_y1, filter_y2)
-
-        filter_novis = np.logical_and(filter_x, filter_y)
-        filter_vis = np.logical_not(filter_novis)
-        sample["visible"] = vis * filter_vis
-        return sample
-
-
-class LightingAug:
-    def __init__(self, hsv_range_min=(-0.5, -0.5, -0.5), hsv_range_max=(0.5, 0.5, 0.5)):
-        self.hsv_range_min = hsv_range_min
-        self.hsv_range_max = hsv_range_max
-
-    def __call__(self, sample):
-        # Convert to HSV colorspace from RGB colorspace
-        image = np.array(sample["image"])
-        hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-
-        # Generate new random values
-        H = 1 + np.random.uniform(self.hsv_range_min[0], self.hsv_range_max[0])
-        S = 1 + np.random.uniform(self.hsv_range_min[1], self.hsv_range_max[1])
-        V = 1 + np.random.uniform(self.hsv_range_min[2], self.hsv_range_max[2])
-        hsv[:, :, 0] = np.clip(H * hsv[:, :, 0], 0, 179)
-        hsv[:, :, 1] = np.clip(S * hsv[:, :, 1], 0, 255)
-        hsv[:, :, 2] = np.clip(V * hsv[:, :, 2], 0, 255)
-        # Convert back to BGR colorspace
-        image = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
-        sample["image"] = Image.fromarray(image)
-
-        return sample
-
-
-class BlurAug:
-    def __init__(self, blur_prob=0.5, blur_kernel_range=(0, 2)):
-        self.blur_prob = blur_prob
-        self.kernel_range = blur_kernel_range
-
-    def __call__(self, sample):
-        # Smooth image
-        image = np.array(sample["image"])
-        if np.random.uniform(0.0, 1.0) < self.blur_prob:
-            kernel = (
-                np.random.random_integers(self.kernel_range[0], self.kernel_range[1])
-                * 2
-                + 1
-            )
-            image = cv2.GaussianBlur(image, (kernel, kernel), 0, 0)
-        sample["image"] = Image.fromarray(image)
-
         return sample
