@@ -80,7 +80,7 @@ def load_face_image(
 ):
     if stats is None:
         stats = dynaface.measures.all_measures()
-    img = dynaface.facial.load_image(filename)
+    img = dynaface.image.load_image(filename)
     face = dynaface.facial.AnalyzeFace(stats, tilt_threshold=tilt_threshold)
     face.load_image(img, crop)
     return face
