@@ -617,7 +617,7 @@ def load_face_image(
     # Load image from URL or local path
     parsed = urlparse(filename)
     if parsed.scheme in ("http", "https"):
-        response = requests.get(filename)
+        response = requests.get(filename, timeout=10)  # Add timeout here
         response.raise_for_status()
         img_array = np.asarray(bytearray(response.content), dtype=np.uint8)
         img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)  # BGR format

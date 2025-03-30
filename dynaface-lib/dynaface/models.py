@@ -92,8 +92,11 @@ class MTCNN2(MTCNN):
             self.selection_method = "largest" if self.select_largest else "probability"
 
     def load_weights(self, net, filename):
-        state_dict = torch.load(filename)
-        net.load_state_dict(state_dict)
+        try:
+            state_dict = torch.load(filename, pickle_module=torch.serialization.pickle)
+            net.load_state_dict(state_dict)
+        except Exception as e:
+            raise ValueError(f"Error loading model weights from {filename}: {str(e)}")
 
 
 def _init_mtcnn() -> None:
