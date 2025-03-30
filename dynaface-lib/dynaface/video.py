@@ -240,7 +240,7 @@ class VideoToVideo:
             cols = list(self.data.keys())
             writer.writerow(["frame", "time"] + cols)
             data_length = len(self.data[self.stats[0]])
-            lst_time = [x * self.rate for x in range(l)]
+            lst_time = [x * self.rate for x in range(data_length)]
 
             for i in range(data_length):
                 row = [str(i), lst_time[i]]
