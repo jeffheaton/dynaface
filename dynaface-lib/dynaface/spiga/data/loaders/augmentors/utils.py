@@ -97,9 +97,9 @@ def image2vect(image):
 
 def rotation_matrix_to_euler(rot_matrix):
     # http://euclideanspace.com/maths/geometry/rotations/conversions/matrixToEuler/index.htm
-    a00, a01, a02 = rot_matrix[0, 0], rot_matrix[0, 1], rot_matrix[0, 2]
+    a00, _, a02 = rot_matrix[0, 0], rot_matrix[0, 1], rot_matrix[0, 2]
     a10, a11, a12 = rot_matrix[1, 0], rot_matrix[1, 1], rot_matrix[1, 2]
-    a20, a21, a22 = rot_matrix[2, 0], rot_matrix[2, 1], rot_matrix[2, 2]
+    a20, _, a22 = rot_matrix[2, 0], rot_matrix[2, 1], rot_matrix[2, 2]
     if (
         abs(1.0 - a10) <= np.finfo(float).eps
     ):  # singularity at north pole / special case a10 == 1

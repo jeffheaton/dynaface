@@ -2,18 +2,17 @@ import copy
 import logging
 import os
 
+import dynaface.spiga.inference.pretreatment as pretreat
 import numpy as np
 import pkg_resources
 import torch
+from dynaface.spiga.inference.config import ModelConfig
+from dynaface.spiga.models.spiga import SPIGA
 
 logger = logging.getLogger(__name__)
 
 # Paths
 weights_path_dft = pkg_resources.resource_filename("dynaface.spiga", "models/weights")
-
-import dynaface.spiga.inference.pretreatment as pretreat
-from dynaface.spiga.inference.config import ModelConfig
-from dynaface.spiga.models.spiga import SPIGA
 
 
 class SPIGAFramework:

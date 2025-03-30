@@ -51,8 +51,8 @@ class Attention(nn.Module):
     def forward(self, query, key, value):
         batch_dim = query.size(0)
         query, key, value = [
-            l(x).view(batch_dim, self.dim, self.num_heads, -1)
-            for l, x in zip(self.proj, (query, key, value))
+            v(x).view(batch_dim, self.dim, self.num_heads, -1)
+            for v, x in zip(self.proj, (query, key, value))
         ]
         x, prob = self.attention(query, key, value)
         return (

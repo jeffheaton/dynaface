@@ -170,68 +170,105 @@ def load_world_shape(db_landmarks, model_file=model_file_dft):
     return np.array(world_all), np.array(index_all)
 
 
-def modern_posit(world_pts, image_pts, cam_matrix, max_iters):
-    # Homogeneous world points
-    num_landmarks = image_pts.shape[0]
-    one = np.ones((num_landmarks, 1))
-    A = np.concatenate((world_pts, one), axis=1)
-    B = np.linalg.pinv(A)
+import numpy as np
+import cv2
+from typing import Tuple
 
-    # Normalize image points
-    focal_length = cam_matrix[0, 0]
-    img_center = (cam_matrix[0, 2], cam_matrix[1, 2])
-    centered_pts = np.zeros((num_landmarks, 2))
-    centered_pts[:, 0] = (image_pts[:, 0] - img_center[0]) / focal_length
-    centered_pts[:, 1] = (image_pts[:, 1] - img_center[1]) / focal_length
-    Ui = centered_pts[:, 0]
-    Vi = centered_pts[:, 1]
 
-    # POSIT loop
-    Tx, Ty, Tz = 0.0, 0.0, 0.0
-    r1, r2, r3 = [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]
-    for iter in range(0, max_iters):
-        I = np.dot(B, Ui)
-        J = np.dot(B, Vi)
+def modern_posit(
+    world_pts: np.ndarray, image_pts: np.ndarray, cam_matrix: np.ndarray, max_iters: int
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Estimate rotation and translation matrices using the POSIT algorithm.
 
-        # Estimate translation vector and rotation matrix
-        normI = 1.0 / np.sqrt(I[0] * I[0] + I[1] * I[1] + I[2] * I[2])
-        normJ = 1.0 / np.sqrt(J[0] * J[0] + J[1] * J[1] + J[2] * J[2])
-        Tz = np.sqrt(
-            normI * normJ
-        )  # geometric average instead of arithmetic average of classicPosit
-        r1N = I * Tz
-        r2N = J * Tz
-        r1 = r1N[0:3]
-        r2 = r2N[0:3]
-        r1 = np.clip(r1, -1, 1)
-        r2 = np.clip(r2, -1, 1)
-        r3 = np.cross(r1, r2)
-        r3T = np.concatenate((r3, [Tz]), axis=0)
-        Tx = r1N[3]
-        Ty = r2N[3]
+    Args:
+        world_pts (np.ndarray): 3D world points (num_landmarks, 3).
+        image_pts (np.ndarray): 2D image points (num_landmarks, 2).
+        cam_matrix (np.ndarray): Camera intrinsic matrix (3x3).
+        max_iters (int): Maximum number of POSIT iterations.
 
-        # Compute epsilon, update Ui and Vi and check convergence
-        eps = np.dot(A, r3T) / Tz
-        oldUi = Ui
-        oldVi = Vi
-        Ui = np.multiply(eps, centered_pts[:, 0])
-        Vi = np.multiply(eps, centered_pts[:, 1])
-        deltaUi = Ui - oldUi
-        deltaVi = Vi - oldVi
-        delta = (
-            focal_length
-            * focal_length
-            * (
-                np.dot(np.transpose(deltaUi), deltaUi)
-                + np.dot(np.transpose(deltaVi), deltaVi)
-            )
+    Returns:
+        Tuple[np.ndarray, np.ndarray]:
+            - rot_matrix: Estimated 3x3 rotation matrix.
+            - trl_matrix: Estimated translation vector (Tx, Ty, Tz).
+    """
+
+    # Number of landmarks and homogeneous world points
+    num_landmarks: int = image_pts.shape[0]
+    ones_column: np.ndarray = np.ones((num_landmarks, 1))
+    homogeneous_world_pts: np.ndarray = np.concatenate((world_pts, ones_column), axis=1)
+
+    # Compute pseudo-inverse of homogeneous world points
+    pseudo_inverse: np.ndarray = np.linalg.pinv(homogeneous_world_pts)
+
+    # Normalize image points based on camera matrix
+    focal_length: float = cam_matrix[0, 0]
+    img_center_x: float = cam_matrix[0, 2]
+    img_center_y: float = cam_matrix[1, 2]
+    centered_pts: np.ndarray = np.zeros((num_landmarks, 2))
+    centered_pts[:, 0] = (image_pts[:, 0] - img_center_x) / focal_length
+    centered_pts[:, 1] = (image_pts[:, 1] - img_center_y) / focal_length
+
+    # Initial projections for POSIT loop
+    proj_x: np.ndarray = centered_pts[:, 0]
+    proj_y: np.ndarray = centered_pts[:, 1]
+
+    # Initialize translation and rotation vectors
+    trans_x, trans_y, trans_z = 0.0, 0.0, 0.0
+    rot_vec1, rot_vec2, rot_vec3 = (
+        np.zeros(3),
+        np.zeros(3),
+        np.zeros(3),
+    )
+
+    # POSIT iteration loop
+    for iteration in range(max_iters):
+        # Project 3D points to normalized image space
+        proj_x_world: np.ndarray = np.dot(pseudo_inverse, proj_x)
+        proj_y_world: np.ndarray = np.dot(pseudo_inverse, proj_y)
+
+        # Estimate translation and scale
+        norm_proj_x: float = 1.0 / np.linalg.norm(proj_x_world[:3])
+        norm_proj_y: float = 1.0 / np.linalg.norm(proj_y_world[:3])
+        trans_z: float = np.sqrt(norm_proj_x * norm_proj_y)
+
+        # Scale and normalize rotation vectors
+        rot_vec1_norm: np.ndarray = proj_x_world * trans_z
+        rot_vec2_norm: np.ndarray = proj_y_world * trans_z
+        rot_vec1 = np.clip(rot_vec1_norm[:3], -1, 1)
+        rot_vec2 = np.clip(rot_vec2_norm[:3], -1, 1)
+        rot_vec3 = np.cross(rot_vec1, rot_vec2)
+
+        # Update translation values
+        trans_x, trans_y = rot_vec1_norm[3], rot_vec2_norm[3]
+        rot_vec3_with_trans_z: np.ndarray = np.concatenate((rot_vec3, [trans_z]))
+
+        # Compute epsilon and update projections
+        epsilon: np.ndarray = (
+            np.dot(homogeneous_world_pts, rot_vec3_with_trans_z) / trans_z
         )
-        if iter > 0 and delta < 0.01:  # converged
+        prev_proj_x, prev_proj_y = proj_x, proj_y
+        proj_x = epsilon * centered_pts[:, 0]
+        proj_y = epsilon * centered_pts[:, 1]
+
+        # Check for convergence
+        delta_proj_x: np.ndarray = proj_x - prev_proj_x
+        delta_proj_y: np.ndarray = proj_y - prev_proj_y
+        delta: float = focal_length**2 * (
+            np.dot(delta_proj_x.T, delta_proj_x) + np.dot(delta_proj_y.T, delta_proj_y)
+        )
+
+        if iteration > 0 and delta < 0.01:  # Converged
             break
 
-    rot_matrix = np.array([np.transpose(r1), np.transpose(r2), np.transpose(r3)])
-    trl_matrix = np.array([Tx, Ty, Tz])
-    # Convert to the nearest orthogonal rotation matrix
-    w, u, vt = cv2.SVDecomp(rot_matrix)  # R = U*D*Vt
-    rot_matrix = np.matmul(np.matmul(u, np.eye(3, dtype=float)), vt)
+    # Create rotation matrix and translation vector
+    rot_matrix: np.ndarray = np.array(
+        [rot_vec1, rot_vec2, rot_vec3]
+    ).T  # Transpose for correct orientation
+    trl_matrix: np.ndarray = np.array([trans_x, trans_y, trans_z])
+
+    # Convert to nearest orthogonal rotation matrix using SVD
+    _, u_matrix, vt_matrix = cv2.SVDecomp(rot_matrix)
+    rot_matrix = np.matmul(u_matrix, vt_matrix)
+
     return rot_matrix, trl_matrix
