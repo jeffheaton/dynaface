@@ -4,9 +4,6 @@ from collections import OrderedDict
 
 import pkg_resources
 
-# Default data paths
-# db_img_path = pkg_resources.resource_filename('dynaface.spiga', 'data/databases')
-# db_anns_path = pkg_resources.resource_filename('dynaface.spiga', 'data/annotations') + "/{database}/{file_name}.json"
 db_img_path = pkg_resources.resource_filename("dynaface", "spiga/data/databases")
 db_anns_path = (
     pkg_resources.resource_filename("dynaface", "spiga/data/annotations")

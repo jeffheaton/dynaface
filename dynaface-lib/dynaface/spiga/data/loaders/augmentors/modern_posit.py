@@ -1,4 +1,5 @@
 import os
+from typing import Tuple
 
 import cv2
 import numpy as np
@@ -168,11 +169,6 @@ def load_world_shape(db_landmarks, model_file=model_file_dft):
         index_all[lnd_idx] = posit_landmarks[cont]
 
     return np.array(world_all), np.array(index_all)
-
-
-import numpy as np
-import cv2
-from typing import Tuple
 
 
 def modern_posit(
