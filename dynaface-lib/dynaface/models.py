@@ -97,7 +97,10 @@ class MTCNN2(MTCNN):
 
 
 def _init_mtcnn() -> None:
-    global mtcnn_model, _device
+    global mtcnn_model
+
+    if _device is None:
+        raise ValueError("Device not initialized. Call init_models() first.")
 
     if _device == "mps" and FIX_MPS_ISSUE:
         device = "cpu"
@@ -111,7 +114,7 @@ def _init_mtcnn() -> None:
 
 
 def _init_spiga() -> None:
-    global spiga_model, _device
+    global spiga_model
 
     config = ModelConfig(dataset_name=SPIGA_MODEL, load_model_url=False)
     config.model_weights_path = _model_path
@@ -235,7 +238,6 @@ def unload_models() -> None:
 
 
 def are_models_init() -> bool:
-    global _device
     return _device is not None
 
 
