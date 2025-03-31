@@ -1,12 +1,7 @@
-import random
-
-import cv2
-
 # My libs
 import dynaface.spiga.data.loaders.augmentors.utils as dlu
 import numpy as np
 from PIL import Image
-from torchvision import transforms
 
 
 class GeometryBaseAug:

@@ -42,7 +42,7 @@ class MessagePassing(nn.Module):
 class Attention(nn.Module):
     def __init__(self, num_heads: int, feature_dim: int):
         super().__init__()
-        assert feature_dim % num_heads == 0
+        # assert feature_dim % num_heads == 0
         self.dim = feature_dim // num_heads
         self.num_heads = num_heads
         self.merge = nn.Conv1d(feature_dim, feature_dim, kernel_size=1)

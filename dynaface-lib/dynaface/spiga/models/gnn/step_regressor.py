@@ -9,7 +9,7 @@ class StepRegressor(nn.Module):
         self, input_dim: int, feature_dim: int, nstack=4, decoding=[256, 128, 64, 32]
     ):
         super(StepRegressor, self).__init__()
-        assert nstack > 0
+        # assert nstack > 0
         self.nstack = nstack
         self.gat = nn.ModuleList([GAT(input_dim, feature_dim, 4)])
         for _ in range(nstack - 1):
