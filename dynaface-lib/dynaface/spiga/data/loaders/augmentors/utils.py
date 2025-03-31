@@ -120,7 +120,19 @@ def rotation_matrix_to_euler(rot_matrix: np.ndarray) -> np.ndarray:
 def euler_to_rotation_matrix(
     headpose: Union[np.ndarray, Tuple[float, float, float]],
 ) -> np.ndarray:
-    """Converts Euler angles to a rotation matrix."""
+    """
+    Converts Euler angles (yaw, pitch, roll) to a rotation matrix.
+
+    Arguments:
+    ---------
+    headpose: Union[np.ndarray, Tuple[float, float, float]]
+        Euler angles in degrees, given as (yaw, pitch, roll).
+
+    Returns:
+    -------
+    np.ndarray
+        A 3x3 rotation matrix corresponding to the input Euler angles.
+    """
     euler = np.array([-(headpose[0] - 90), -headpose[1], -(headpose[2] + 90)])
     rad = euler * (np.pi / 180.0)
     cy, sy = np.cos(rad[0]), np.sin(rad[0])
