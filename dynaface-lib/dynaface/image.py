@@ -148,7 +148,7 @@ class ImageAnalysis:
         size = self.text_size * size
         thick = int(self.text_thick * thick)
         textSize, baseline = cv2.getTextSize(txt, self.text_font, size, thick)
-        return textSize, baseline
+        return (tuple(textSize), baseline)
 
     def write_text_sq(
         self,
@@ -358,17 +358,20 @@ class ImageAnalysis:
         :param render: If True, renders the polygon overlay.
         :return: The computed area of the polygon.
         """
-        contours = np.array(contours)
+        # Create a numpy array from the list with a specified dtype.
+        contours_arr = np.array(contours, dtype=np.int32)
         if render:
             overlay = self.render_img.copy()
-            cv2.fillPoly(overlay, pts=[contours], color=color)
+            cv2.fillPoly(overlay, pts=[contours_arr], color=color)
             self.render_img[:, :] = cv2.addWeighted(
                 overlay, alpha, self.render_img, 1 - alpha, 0
             )
-        contours = contours * pix2mm
-        x = contours[:, 0]
-        y = contours[:, 1]
-        return PolyArea(x, y)
+        # Multiply the array by pix2mm and extract columns.
+        contours_arr = contours_arr * pix2mm
+        x = contours_arr[:, 0]
+        y = contours_arr[:, 1]
+        # Cast the result of PolyArea to float.
+        return float(PolyArea(x, y))
 
     def line(
         self,
