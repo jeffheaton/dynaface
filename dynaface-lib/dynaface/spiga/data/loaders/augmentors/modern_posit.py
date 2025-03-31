@@ -1,5 +1,5 @@
 import os
-from typing import Tuple, Dict, Any, Optional
+from typing import Tuple, Dict, Any, Optional, List
 
 import cv2
 import numpy as np
@@ -18,9 +18,9 @@ model_file_dft: str = (
 class PositPose:
     def __init__(
         self,
-        ldm_ids: list[int],
+        ldm_ids: List[int],
         focal_ratio: float = 1.0,
-        selected_ids: Optional[list[int]] = None,
+        selected_ids: Optional[List[int]] = None,
         max_iter: int = 100,
         fix_bbox: bool = True,
         model_file: str = model_file_dft,
@@ -37,7 +37,7 @@ class PositPose:
                 if posit_id in selected_ids:
                     model3d_mask[index] = True
 
-        self.ldm_ids: list[int] = ldm_ids  # Ids from the database
+        self.ldm_ids: List[int] = ldm_ids  # Ids from the database
         self.model3d_world: np.ndarray = model3d_world  # Model data
         self.model3d_ids: np.ndarray = model3d_ids  # Model ids
         self.model3d_mask: np.ndarray = model3d_mask  # Model mask ids
@@ -74,7 +74,8 @@ class PositPose:
 
         if image_pts.shape[0] < 4:
             print("POSIT does not work without landmarks")
-            rot_matrix, trl_matrix = np.eye(3, dtype=float), np.array([0.0, 0.0, 0.0])
+            rot_matrix: np.ndarray = np.eye(3, dtype=float)
+            trl_matrix: np.ndarray = np.array([0.0, 0.0, 0.0])
         else:
             rot_matrix, trl_matrix = self._modern_posit(
                 world_pts, image_pts, cam_matrix
@@ -90,11 +91,11 @@ class PositPose:
         return sample
 
     def _load_world_shape(
-        self, ldm_ids: list[int], model_file: str
+        self, ldm_ids: List[int], model_file: str
     ) -> Tuple[np.ndarray, np.ndarray]:
         return load_world_shape(ldm_ids, model_file=model_file)
 
-    def _camera_matrix(self, bbox: list[float]) -> np.ndarray:
+    def _camera_matrix(self, bbox: List[float]) -> np.ndarray:
         focal_length_x: float = bbox[2] * self.focal_ratio
         focal_length_y: float = bbox[3] * self.focal_ratio
         face_center: Tuple[float, float] = (
@@ -156,25 +157,25 @@ class PositPose:
 
 
 def load_world_shape(
-    db_landmarks: list[int], model_file: str = model_file_dft
+    db_landmarks: List[int], model_file: str = model_file_dft
 ) -> Tuple[np.ndarray, np.ndarray]:
     # Load 3D mean face coordinates
     num_ldm = len(db_landmarks)
     filename = model_file.format(num_ldm=num_ldm)
     if not os.path.exists(filename):
-        raise ValueError("No 3D model find for %i landmarks" % num_ldm)
+        raise ValueError("No 3D model found for %i landmarks" % num_ldm)
 
     posit_landmarks = np.genfromtxt(
-        filename, delimiter="|", dtype=int, usecols=0
+        filename, delimiter="|", dtype=np.int32, usecols=0
     ).tolist()
     mean_face_3D = np.genfromtxt(
-        filename, delimiter="|", dtype=(float, float, float), usecols=(1, 2, 3)
+        filename, delimiter="|", dtype=float, usecols=(1, 2, 3)
     ).tolist()
-    world_all = len(mean_face_3D) * [None]
-    index_all = len(mean_face_3D) * [None]
+    world_all: List[List[float]] = [None] * len(mean_face_3D)
+    index_all: List[int] = [None] * len(mean_face_3D)
 
     for cont, elem in enumerate(mean_face_3D):
-        pt3d = [elem[2], -elem[0], -elem[1]]
+        pt3d: List[float] = [elem[2], -elem[0], -elem[1]]
         lnd_idx = db_landmarks.index(posit_landmarks[cont])
         world_all[lnd_idx] = pt3d
         index_all[lnd_idx] = posit_landmarks[cont]
