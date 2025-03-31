@@ -1,4 +1,4 @@
-from PyInstaller.utils.hooks import collect_data_files  # type: ignore
+from PyInstaller.utils.hooks import collect_data_files
 
 print(">>> PyInstaller: loading hook-dynaface.py")
 
