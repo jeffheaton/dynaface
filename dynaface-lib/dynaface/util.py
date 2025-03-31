@@ -1,10 +1,11 @@
 import math
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, cast
 
 import cv2
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from matplotlib.figure import Figure
 from PIL import Image
 
 
@@ -19,7 +20,8 @@ def PolyArea(x: np.ndarray, y: np.ndarray) -> float:
     Returns:
         float: The computed area of the polygon.
     """
-    return 0.5 * np.abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)))
+    # Explicitly cast the result to float to avoid mypy returning Any.
+    return float(0.5 * np.abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1))))
 
 
 def safe_clip(
@@ -32,22 +34,6 @@ def safe_clip(
 ) -> Tuple[np.ndarray, int, int]:
     """
     Clips a region from an OpenCV image, adjusting for boundaries and filling missing areas with a specified color.
-
-    If the specified region extends beyond the image boundaries, the function adjusts the coordinates and size
-    to fit within the image. If the region is partially or completely outside the image, it fills the missing
-    areas with the specified background color.
-
-    Parameters:
-        cv2_image (np.ndarray): The source image in OpenCV format.
-        x (int): The x-coordinate of the top-left corner of the clipping region.
-        y (int): The y-coordinate of the top-left corner of the clipping region.
-        width (int): The width of the clipping region.
-        height (int): The height of the clipping region.
-        background (Tuple[int, int, int]): A tuple (R, G, B) specifying the fill color for missing areas.
-
-    Returns:
-        Tuple[np.ndarray, int, int]: A tuple containing the clipped image, x offset, and y offset.
-            The x and y offsets indicate how much the origin of the clipped image has shifted relative to the original image.
     """
     img_height, img_width = cv2_image.shape[:2]
 
@@ -84,15 +70,6 @@ def scale_crop_points(
 ) -> List[Tuple[int, int]]:
     """
     Scales and crops a list of points.
-
-    Parameters:
-        lst (List[Tuple[float, float]]): List of (x, y) coordinates.
-        crop_x (int): The x offset for cropping.
-        crop_y (int): The y offset for cropping.
-        scale (float): The scaling factor.
-
-    Returns:
-        List[Tuple[int, int]]: The list of scaled and cropped points as integer coordinates.
     """
     lst2: List[Tuple[int, int]] = []
     for pt in lst:
@@ -105,24 +82,12 @@ def rotate_crop_points(
 ) -> List[np.ndarray]:
     """
     Rotate the points around the center by the specified angle.
-
-    Parameters:
-        points (List[Tuple[float, float]]): List of (x, y) coordinates to rotate.
-        center (Tuple[float, float]): The center of rotation (x, y).
-        angle_degrees (float): The rotation angle in degrees.
-
-    Returns:
-        List[np.ndarray]: List of rotated (x, y) coordinates as numpy arrays.
     """
-    # Convert angle from degrees to radians and adjust the sign
     angle_radians = -np.deg2rad(angle_degrees)  # Negate for correct rotation direction
-
-    # Calculate the rotation matrix
     cos_theta = np.cos(angle_radians)
     sin_theta = np.sin(angle_radians)
     rotation_matrix = np.array([[cos_theta, -sin_theta], [sin_theta, cos_theta]])
 
-    # Rotate each point
     rotated_points: List[np.ndarray] = []
     for point in points:
         vector = np.array(point) - np.array(center)
@@ -138,13 +103,6 @@ def calculate_face_rotation(
 ) -> float:
     """
     Calculate the rotation angle of a face based on the coordinates of the pupils.
-
-    Parameters:
-        pupil_coords (Tuple[Tuple[float, float], Tuple[float, float]]): A tuple containing two tuples,
-            each with the (x, y) coordinates of the pupils (e.g., ((640, 481), (380, 480))).
-
-    Returns:
-        float: The rotation angle of the face in radians.
     """
     (x1, y1), (x2, y2) = pupil_coords
     delta_y = y2 - y1
@@ -157,31 +115,19 @@ def calculate_face_rotation(
 def calculate_average_rgb(image: np.ndarray) -> Tuple[int, int, int]:
     """
     Calculate the average RGB value of an image.
-
-    Parameters:
-        image (np.ndarray): The input image in BGR format.
-
-    Returns:
-        Tuple[int, int, int]: A tuple containing the average RGB values.
     """
     average_color_per_row = np.mean(image, axis=0)
     average_color = np.mean(average_color_per_row, axis=0)
-    return tuple(map(int, average_color))
+    # Unpack exactly three channels to match the declared return type.
+    r, g, b = average_color
+    return int(r), int(g), int(b)
 
 
 def straighten(image: np.ndarray, angle_radians: float) -> np.ndarray:
     """
     Rotate the image to align the pupils horizontally, crop to original dimensions,
     and fill dead-space with the average RGB color.
-
-    Parameters:
-        image (np.ndarray): The input image in BGR format.
-        angle_radians (float): The rotation angle in radians.
-
-    Returns:
-        np.ndarray: The rotated and cropped image.
     """
-    # Calculate the rotation angle in degrees
     angle_degrees = angle_radians * (180 / math.pi)
 
     # Adjust the angle to avoid upside down rotation
@@ -190,19 +136,15 @@ def straighten(image: np.ndarray, angle_radians: float) -> np.ndarray:
     elif angle_degrees < -45:
         angle_degrees += 180
 
-    # Get image dimensions and calculate the center
     h, w = image.shape[:2]
     center = (w // 2, h // 2)
 
-    # Get the rotation matrix and rotate the image
     rotation_matrix = cv2.getRotationMatrix2D(center, angle_degrees, 1.0)
     rotated_image = cv2.warpAffine(image, rotation_matrix, (w, h))
 
-    # Calculate the average RGB value and create a background image
     avg_rgb = calculate_average_rgb(image)
     result_image = np.full_like(rotated_image, avg_rgb, dtype=np.uint8)
 
-    # Paste the rotated image onto the background
     result_center = (result_image.shape[1] // 2, result_image.shape[0] // 2)
     top_left_x = result_center[0] - center[0]
     top_left_y = result_center[1] - center[1]
@@ -210,7 +152,6 @@ def straighten(image: np.ndarray, angle_radians: float) -> np.ndarray:
         rotated_image
     )
 
-    # Crop the result image to the original dimensions
     cropped_image = result_image[:h, :w]
     return cropped_image
 
@@ -218,13 +159,6 @@ def straighten(image: np.ndarray, angle_radians: float) -> np.ndarray:
 def symmetry_ratio(a: float, b: float) -> float:
     """
     Calculate the symmetry ratio between two numbers.
-
-    Parameters:
-        a (float): The size of the first object.
-        b (float): The size of the second object.
-
-    Returns:
-        float: The symmetry ratio, a value between 0 and 1.
     """
     if a == 0 and b == 0:
         return 1.0  # Perfect symmetry if both are zero.
@@ -239,14 +173,6 @@ def line_intersection(
     """
     Return a list of (intersection_point, edge_index) for all edges in 'contour'
     that intersect with 'line'. Deduplicate near-identical points.
-
-    Parameters:
-        line (Tuple[Tuple[float, float], Tuple[float, float]]): The line defined by two points.
-        contour (np.ndarray): Array of points defining the polygon contour.
-        tol (float): Tolerance for deduplication of intersection points.
-
-    Returns:
-        List[Tuple[Tuple[float, float], int]]: A list of tuples containing the intersection point and the corresponding edge index.
     """
     intersections: List[Tuple[Tuple[float, float], int]] = []
     for i in range(len(contour)):
@@ -256,7 +182,6 @@ def line_intersection(
         if intersection is not None:
             intersections.append((intersection, i))
 
-    # Deduplicate intersection points that are effectively the same
     unique_intersections: List[Tuple[Tuple[float, float], int]] = []
     for pt, idx in intersections:
         if not any(
@@ -274,13 +199,6 @@ def compute_intersection(
 ) -> Optional[Tuple[float, float]]:
     """
     Compute the intersection point of two lines if they intersect within the bounds of the second line segment.
-
-    Parameters:
-        line1 (Tuple[Tuple[float, float], Tuple[float, float]]): First line defined by two points.
-        line2 (Tuple[Tuple[float, float], Tuple[float, float]]): Second line defined by two points.
-
-    Returns:
-        Optional[Tuple[float, float]]: The intersection point (x, y) if it exists, otherwise None.
     """
     xdiff = (line1[0][0] - line1[1][0], line2[0][0] - line2[1][0])
     ydiff = (line1[0][1] - line1[1][1], line2[0][1] - line2[1][1])
@@ -309,16 +227,6 @@ def split_polygon(
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Split a polygon into two parts using a line that bisects it.
-
-    Parameters:
-        polygon (np.ndarray): Array of points representing the polygon.
-        line (Tuple[Tuple[float, float], Tuple[float, float]]): The bisecting line defined by two points.
-
-    Returns:
-        Tuple[np.ndarray, np.ndarray]: Two arrays of points representing the split polygons.
-
-    Raises:
-        ValueError: If the line does not properly bisect the polygon.
     """
     intersections = line_intersection(line, polygon)
     if len(intersections) != 2:
@@ -351,13 +259,6 @@ def bisecting_line_coordinates(
 ) -> Tuple[Tuple[int, int], Tuple[int, int]]:
     """
     Compute the coordinates of the bisecting line of the eyes in an image.
-
-    Parameters:
-        img_size (int): The size (width/height) of the square image.
-        pupils (Tuple[Tuple[float, float], Tuple[float, float]]): A tuple containing two (x, y) pupil coordinates.
-
-    Returns:
-        Tuple[Tuple[int, int], Tuple[int, int]]: Two points representing the endpoints of the bisecting line.
     """
     (x1, y1), (x2, y2) = pupils
 
@@ -380,23 +281,24 @@ def bisecting_line_coordinates(
     def get_x(y: float, mid_x: float, mid_y: float, slope: float) -> float:
         return (y - mid_y) / slope + mid_x
 
-    x0, x1_img = 0, img_size
+    # Initialize as floats so that assignments from get_x/get_y are valid.
+    x0, x1_img = 0.0, float(img_size)
     y0, y1_img = get_y(x0, mid_x, mid_y, perp_slope), get_y(
         x1_img, mid_x, mid_y, perp_slope
     )
 
     if y0 < 0:
-        y0 = 0
+        y0 = 0.0
         x0 = get_x(y0, mid_x, mid_y, perp_slope)
     elif y0 > img_size:
-        y0 = img_size
+        y0 = float(img_size)
         x0 = get_x(y0, mid_x, mid_y, perp_slope)
 
     if y1_img < 0:
-        y1_img = 0
+        y1_img = 0.0
         x1_img = get_x(y1_img, mid_x, mid_y, perp_slope)
     elif y1_img > img_size:
-        y1_img = img_size
+        y1_img = float(img_size)
         x1_img = get_x(y1_img, mid_x, mid_y, perp_slope)
 
     return (int(x0), int(y0)), (int(x1_img), int(y1_img))
@@ -408,15 +310,6 @@ def line_to_edge(
     """
     Compute the intersection point where a line, originating from a given start point and extending at a specified angle,
     meets the boundary of a square image.
-
-    Parameters:
-        img_size (int): The size (width/height) of the square image.
-        start_point (Tuple[float, float]): The (x, y) coordinates of the starting point.
-        angle (float): The angle (in radians) of the line measured counterclockwise from the x-axis.
-
-    Returns:
-        Optional[Tuple[int, int]]: The (x, y) coordinates of the intersection point on the image boundary,
-            or None if no valid intersection is found.
     """
     x0, y0 = start_point
     slope = np.tan(angle)
@@ -462,12 +355,6 @@ def line_to_edge(
 def normalize_angle(angle: float) -> float:
     """
     Normalize an angle to the range [0, 2*pi).
-
-    Parameters:
-        angle (float): The angle in radians.
-
-    Returns:
-        float: The normalized angle.
     """
     return angle % (2 * math.pi)
 
@@ -475,12 +362,6 @@ def normalize_angle(angle: float) -> float:
 def cv2_to_pil(cv_image: np.ndarray) -> Image.Image:
     """
     Convert an OpenCV image (NumPy array) to a PIL image.
-
-    Parameters:
-        cv_image (np.ndarray): OpenCV image.
-
-    Returns:
-        Image.Image: Converted PIL image.
     """
     if len(cv_image.shape) == 2:  # Grayscale image
         return Image.fromarray(cv_image)
@@ -494,21 +375,19 @@ def cv2_to_pil(cv_image: np.ndarray) -> Image.Image:
 def convert_matplotlib_to_opencv(ax: Axes) -> np.ndarray:
     """
     Convert a Matplotlib axis to an OpenCV image without extra whitespace.
-
-    Parameters:
-        ax (Axes): The Matplotlib axis containing the plot.
-
-    Returns:
-        np.ndarray: The plot converted to an OpenCV image (BGR format).
     """
     fig = ax.figure
     fig.subplots_adjust(left=0, right=1, top=1, bottom=0)  # Remove margins
-    canvas = FigureCanvas(fig)
+    # Cast fig to a Figure to satisfy the type for FigureCanvas.
+    canvas = FigureCanvas(cast(Figure, fig))
     canvas.draw()
     image = np.array(canvas.renderer.buffer_rgba())
-    bbox = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-    bbox = [int(coord * fig.dpi) for coord in bbox.extents]  # Convert to pixels
-    image = image[bbox[1] : bbox[3], bbox[0] : bbox[2], :]
+    bbox_obj = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+    # Convert bbox extents to a list of ints.
+    bbox = [int(coord * fig.dpi) for coord in bbox_obj.extents]
+    # Unpack bbox into integer coordinates for slicing.
+    left, bottom, right, top = bbox[0], bbox[1], bbox[2], bbox[3]
+    image = image[bottom:top, left:right, :]  # type: ignore
     image = cv2.cvtColor(image, cv2.COLOR_RGBA2BGR)
     return image
 
@@ -517,14 +396,7 @@ def trim_sides(image: np.ndarray) -> np.ndarray:
     """
     Trims space from the left and right sides of the image based on the background color sampled
     from the upper-left pixel, while maintaining the original height.
-
-    Parameters:
-        image (np.ndarray): Input image as a NumPy array.
-
-    Returns:
-        np.ndarray: Cropped image with the same height but reduced width.
     """
-    # Get background color from the upper-left pixel
     background_color = image[0, 0]
 
     if len(image.shape) == 3:
@@ -532,13 +404,9 @@ def trim_sides(image: np.ndarray) -> np.ndarray:
     else:
         mask = (image == background_color).astype(np.uint8)
 
-    # Sum along rows to determine where content starts and ends horizontally
     col_sum = mask.sum(axis=0)
-
-    # Find the first and last column that is not entirely background
     left_trim = int(np.argmax(col_sum < image.shape[0]))
     right_trim = len(col_sum) - int(np.argmax(col_sum[::-1] < image.shape[0]))
 
-    # Crop the image
     cropped = image[:, left_trim:right_trim]
     return cropped
