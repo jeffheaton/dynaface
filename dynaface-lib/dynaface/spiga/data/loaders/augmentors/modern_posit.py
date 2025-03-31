@@ -128,32 +128,50 @@ class PositPose:
     ) -> Tuple[np.ndarray, np.ndarray]:
         return modern_posit(world_pts, image_pts, cam_matrix, self.max_iter)
 
-    def _project_points(
-        self,
-        rot: np.ndarray,
-        trl: np.ndarray,
-        cam_matrix: np.ndarray,
-        norm: Optional[np.ndarray] = None,
-    ) -> np.ndarray:
-        # Perspective projection model
-        trl = np.expand_dims(trl, 1)
-        extrinsics = np.concatenate((rot, trl), 1)
-        proj_matrix = np.matmul(cam_matrix, extrinsics)
 
-        # Homogeneous landmarks
-        pts = self.model3d_world
-        ones = np.ones(pts.shape[0])
-        ones = np.expand_dims(ones, 1)
-        pts_hom = np.concatenate((pts, ones), 1)
+def _project_points(
+    self,
+    rot: np.ndarray,
+    trl: np.ndarray,
+    cam_matrix: np.ndarray,
+    norm: Optional[np.ndarray] = None,
+) -> np.ndarray:
+    """
+    Projects 3D landmarks to 2D image space using a perspective projection model.
 
-        # Project landmarks
-        pts_proj = np.matmul(proj_matrix, pts_hom.T).T
-        pts_proj = pts_proj / np.expand_dims(pts_proj[:, 2], 1)  # Lambda = 1
+    This method takes rotation, translation, and camera matrix inputs and projects
+    3D points onto a 2D plane. Optionally, the projected points can be normalized.
 
-        if norm is not None:
-            pts_proj[:, 0] /= norm[0]
-            pts_proj[:, 1] /= norm[1]
-        return pts_proj[:, :-1]
+    Args:
+        rot (np.ndarray): A 3x3 rotation matrix.
+        trl (np.ndarray): A 3x1 translation vector.
+        cam_matrix (np.ndarray): A 3x3 camera intrinsic matrix.
+        norm (Optional[np.ndarray], optional): An array of shape (2,) for normalizing
+            the projected points. If provided, the projected points' x and y coordinates
+            are divided by `norm[0]` and `norm[1]` respectively. Defaults to None.
+
+    Returns:
+        np.ndarray: An (N, 2) array of projected 2D points, where N is the number of landmarks.
+    """
+    # Perspective projection model
+    trl = np.expand_dims(trl, 1)  # Shape: (3, 1)
+    extrinsics = np.concatenate((rot, trl), 1)  # Shape: (3, 4)
+    proj_matrix: np.ndarray = np.matmul(cam_matrix, extrinsics)  # Shape: (3, 4)
+
+    # Homogeneous landmarks
+    pts: np.ndarray = self.model3d_world  # Shape: (N, 3)
+    ones: np.ndarray = np.ones((pts.shape[0], 1))  # Shape: (N, 1)
+    pts_hom: np.ndarray = np.concatenate((pts, ones), 1)  # Shape: (N, 4)
+
+    # Project landmarks
+    pts_proj: np.ndarray = np.matmul(proj_matrix, pts_hom.T).T  # Shape: (N, 3)
+    pts_proj = pts_proj / np.expand_dims(pts_proj[:, 2], 1)  # Normalize by depth (λ=1)
+
+    if norm is not None:
+        pts_proj[:, 0] /= norm[0]
+        pts_proj[:, 1] /= norm[1]
+
+    return pts_proj[:, :-1]  # Return shape: (N, 2)
 
 
 def load_world_shape(
@@ -166,13 +184,13 @@ def load_world_shape(
         raise ValueError("No 3D model found for %i landmarks" % num_ldm)
 
     posit_landmarks = np.genfromtxt(
-        filename, delimiter="|", dtype=np.int32, usecols=0
+        filename, delimiter="|", dtype=np.int32, usecols=[0]
     ).tolist()
     mean_face_3D = np.genfromtxt(
-        filename, delimiter="|", dtype=float, usecols=(1, 2, 3)
+        filename, delimiter="|", dtype=float, usecols=[1, 2, 3]
     ).tolist()
-    world_all: List[List[float]] = [None] * len(mean_face_3D)
-    index_all: List[int] = [None] * len(mean_face_3D)
+    world_all: List[List[float]] = [[] for _ in range(len(mean_face_3D))]
+    index_all: List[int] = [-1] * len(mean_face_3D)  # Use -1 to indicate uninitialized
 
     for cont, elem in enumerate(mean_face_3D):
         pt3d: List[float] = [elem[2], -elem[0], -elem[1]]
