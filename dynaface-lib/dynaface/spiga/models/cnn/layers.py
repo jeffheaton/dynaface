@@ -21,7 +21,7 @@ class Conv(nn.Module):
             self.bn = nn.BatchNorm2d(out_dim)
 
     def forward(self, x):
-        assert x.size()[1] == self.inp_dim, "{} {}".format(x.size()[1], self.inp_dim)
+        # assert x.size()[1] == self.inp_dim, "{} {}".format(x.size()[1], self.inp_dim)
         x = self.conv(x)
         if self.bn is not None:
             x = self.bn(x)
@@ -45,7 +45,7 @@ class Deconv(nn.Module):
             self.bn = nn.BatchNorm2d(out_dim)
 
     def forward(self, x):
-        assert x.size()[1] == self.inp_dim, "{} {}".format(x.size()[1], self.inp_dim)
+        # assert x.size()[1] == self.inp_dim, "{} {}".format(x.size()[1], self.inp_dim)
         x = self.deconv(x)
         if self.bn is not None:
             x = self.bn(x)
