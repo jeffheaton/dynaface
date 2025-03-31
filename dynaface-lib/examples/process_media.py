@@ -10,9 +10,7 @@ from dynaface.measures import (
     AnalyzeFAI,
     AnalyzeOralCommissureExcursion,
 )
-from dynaface.video import VideoToVideo
-
-import dynaface
+from video import VideoToVideo
 from dynaface import models
 
 # Sample usage:
