@@ -36,14 +36,11 @@ FILL_COLOR = [255, 255, 255]
 
 def util_calc_pd(
     pupils: Tuple[Tuple[int, int], Tuple[int, int]],
-) -> Tuple[int, int]:
-    left_pupil: np.ndarray = np.array(pupils[0])
-    right_pupil: np.ndarray = np.array(pupils[1])
+) -> Tuple[float, float]:
+    left_pupil = np.array(pupils[0])
+    right_pupil = np.array(pupils[1])
 
-    # Calculate Euclidean distance between the two pupils
     pupillary_distance = np.linalg.norm(left_pupil - right_pupil)
-
-    # Convert the distance from pixels to millimeters
     pix2mm = AnalyzeFace.pd / pupillary_distance
 
     return pupillary_distance, pix2mm
@@ -283,8 +280,12 @@ class AnalyzeFace(ImageAnalysis):
             self.circle(landmark, radius=3, color=color)
             if numbers:
                 self.write_text((landmark[0] + 3, landmark[1]), str(i), size=0.5)
-        self.circle(self.left_eye, color=color)
-        self.circle(self.right_eye, color=color)
+
+        if self.left_eye is None:
+            self.circle(self.left_eye, color=color)
+
+        if self.right_eye is None:
+            self.circle(self.right_eye, color=color)
 
     def measure(
         self,
