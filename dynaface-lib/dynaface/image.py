@@ -89,10 +89,10 @@ class ImageAnalysis:
         Args:
             img (np.ndarray): Input image.
         """
-        self.original_img: Optional[np.ndarray] = img.copy()
-        self.gray_img: Optional[np.ndarray] = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        self.render_img: Optional[np.ndarray] = img.copy()
-        self.original_hsv: Optional[np.ndarray] = cv2.cvtColor(
+        self.original_img: np.ndarray = img.copy()
+        self.gray_img: np.ndarray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        self.render_img: np.ndarray = img.copy()
+        self.original_hsv: np.ndarray = cv2.cvtColor(
             self.original_img, cv2.COLOR_RGB2HSV
         ).astype(np.int64)
         self.shape: Tuple[int, int, int] = self.original_img.shape

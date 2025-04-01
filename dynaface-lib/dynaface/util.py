@@ -174,21 +174,21 @@ def line_intersection(
     Return a list of (intersection_point, edge_index) for all edges in 'contour'
     that intersect with 'line'. Deduplicate near-identical points.
     """
-    intersections: List[Tuple[Tuple[float, float], int]] = []
+    intersections: List[Tuple[Tuple[int, int], int]] = []
     for i in range(len(contour)):
         p1 = contour[i]
         p2 = contour[(i + 1) % len(contour)]
         intersection = compute_intersection(line, (p1, p2))
         if intersection is not None:
-            intersections.append((intersection, i))
+            intersections.append(((int(intersection[0]), int(intersection[1])), i))
 
-    unique_intersections: List[Tuple[Tuple[float, float], int]] = []
+    unique_intersections: List[Tuple[Tuple[int, int], int]] = []
     for pt, idx in intersections:
         if not any(
             np.linalg.norm(np.array(pt) - np.array(u_pt)) < tol
             for (u_pt, _) in unique_intersections
         ):
-            unique_intersections.append((pt, idx))
+            unique_intersections.append(((int(pt[0]), int(pt[1])), idx))
 
     return unique_intersections
 
