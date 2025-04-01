@@ -159,7 +159,7 @@ class AnalyzeFace(ImageAnalysis):
         landmarks2 = models.convert_landmarks(features)[0]
 
         headpose = np.array(features["headpose"][0])
-        return landmarks2, headpose
+        return cast(List[Tuple[float, float]], landmarks2), headpose
 
     def is_lateral(self) -> Tuple[bool, bool]:
         """
@@ -239,7 +239,8 @@ class AnalyzeFace(ImageAnalysis):
         """
         super().load_image(img)
         logger.debug("Low level-image loaded")
-        self.landmarks, self._headpose = self._find_landmarks(img)
+        landmarks, self._headpose = self._find_landmarks(img)
+        self.landmarks = landmarks if landmarks is not None else []
 
         lateral_pos, facing_left = self.is_lateral()
 
@@ -250,7 +251,8 @@ class AnalyzeFace(ImageAnalysis):
                 self.flipped = True
                 flipped = cv2.flip(self.original_img, 1)
                 super().load_image(flipped)
-                self.landmarks, self._headpose = self._find_landmarks(flipped)
+                landmarks, self._headpose = self._find_landmarks(flipped)
+                self.landmarks = landmarks if landmarks is not None else []
             else:
                 self.flipped = False
 
@@ -296,7 +298,7 @@ class AnalyzeFace(ImageAnalysis):
         if self.is_no_face():
             return
         for i, landmark in enumerate(self.landmarks):
-            self.circle(landmark, radius=3, color=color)
+            self.circle((int(landmark[0]), int(landmark[1])), radius=3, color=color)
             if numbers:
                 self.write_text(
                     (int(landmark[0]) + 3, int(landmark[1])), str(i), size=0.5
@@ -435,7 +437,11 @@ class AnalyzeFace(ImageAnalysis):
         Calculates the face rotation in degrees.
         """
         p = util_get_pupils(self.landmarks)
-        return measures.to_degrees(util.calculate_face_rotation(p))
+        return measures.to_degrees(
+            util.calculate_face_rotation(
+                ((int(p[0][0]), int(p[0][1])), (int(p[1][0]), int(p[1][1])))
+            )
+        )
 
     def crop_lateral(self) -> None:
         """
@@ -484,7 +490,13 @@ class AnalyzeFace(ImageAnalysis):
         img2 = cast(np.ndarray, img2)
         # Ensure landmarks is not None by providing a fallback empty list.
         self.landmarks = (
-            util.scale_crop_points(self.landmarks, crop_x, crop_y, scale) or []
+            cast(
+                List[Tuple[float, float]],
+                util.scale_crop_points(
+                    [(int(x), int(y)) for x, y in self.landmarks], crop_x, crop_y, scale
+                ),
+            )
+            or []
         )
         super().load_image(img2)
 
@@ -494,7 +506,14 @@ class AnalyzeFace(ImageAnalysis):
         """
         Processes and crops the image for StyleGAN.
         """
-        self.orig_pupils = util_get_pupils(self.landmarks)
+        pupils = cast(
+            Tuple[Tuple[int, int], Tuple[int, int]],
+            tuple((int(x), int(y)) for x, y in util_get_pupils(self.landmarks)),
+        )
+        self.orig_pupils = (
+            (int(pupils[0][0]), int(pupils[0][1])) if pupils else (0, 0),
+            (int(pupils[1][0]), int(pupils[1][1])) if pupils else (0, 0),
+        )
         pupils = self.orig_pupils if pupils is None else pupils
         img2 = self.original_img
         if pupils:
@@ -509,7 +528,9 @@ class AnalyzeFace(ImageAnalysis):
                     self.original_img.shape[1] // 2,
                     self.original_img.shape[0] // 2,
                 )
-                self.landmarks = util.rotate_crop_points(self.landmarks, center, tilt)
+                self.landmarks = util.rotate_crop_points(
+                    [(int(x), int(y)) for x, y in self.landmarks], center, tilt
+                )
             else:
                 self.face_rotation = None
         if not pupils:
@@ -538,7 +559,13 @@ class AnalyzeFace(ImageAnalysis):
         )
         img2 = cast(np.ndarray, img2)
         self.landmarks = (
-            util.scale_crop_points(self.landmarks, crop_x, crop_y, scale) or []
+            cast(
+                List[Tuple[float, float]],
+                util.scale_crop_points(
+                    [(int(x), int(y)) for x, y in self.landmarks], crop_x, crop_y, scale
+                ),
+            )
+            or []
         )
         super().load_image(img2)
 
@@ -578,7 +605,10 @@ class AnalyzeFace(ImageAnalysis):
 
     def calc_bisect(self) -> Any:
         # Convert pupil coordinates to ints to match the expected type.
-        pupils = tuple((int(x), int(y)) for (x, y) in self.find_pupils())
+        pupils: Tuple[Tuple[int, int], Tuple[int, int]] = (
+            (int(self.find_pupils()[0][0]), int(self.find_pupils()[0][1])),
+            (int(self.find_pupils()[1][0]), int(self.find_pupils()[1][1])),
+        )  # Explicitly type pupils
         return util.bisecting_line_coordinates(img_size=1024, pupils=pupils)
 
     def draw_static(self) -> None:

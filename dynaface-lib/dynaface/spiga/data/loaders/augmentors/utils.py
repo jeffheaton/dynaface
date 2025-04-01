@@ -1,5 +1,6 @@
-import numpy as np
 from typing import Tuple, Union
+
+import numpy as np
 
 
 def affine2homogeneous(points: np.ndarray) -> np.ndarray:
