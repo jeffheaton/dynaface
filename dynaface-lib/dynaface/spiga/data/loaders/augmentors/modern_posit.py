@@ -45,51 +45,6 @@ class PositPose:
         self.focal_ratio: float = focal_ratio  # Camera matrix focal length ratio
         self.fix_bbox: bool = fix_bbox  # Camera matrix centered on image
 
-    def __call__(self, sample: Dict[str, Any]) -> Dict[str, Any]:
-        landmarks: np.ndarray = sample["landmarks"]
-        mask: np.ndarray = sample["mask_ldm"]
-
-        # Camera matrix
-        img_shape: np.ndarray = np.array(sample["image"].shape)[0:2]
-        if "img2map_scale" in sample.keys():
-            img_shape = img_shape * sample["img2map_scale"]
-
-        if self.fix_bbox:
-            img_bbox = [
-                0,
-                0,
-                img_shape[1],
-                img_shape[0],
-            ]  # Shapes given are inverted (y,x)
-            cam_matrix = self._camera_matrix(img_bbox)
-        else:
-            bbox = sample["bbox"]  # Scale error when ftshape and img_shape mismatch
-            cam_matrix = self._camera_matrix(bbox)
-
-        # Save intrinsic matrix and 3D model landmarks
-        sample["cam_matrix"] = cam_matrix
-        sample["model3d"] = self.model3d_world
-
-        world_pts, image_pts = self._set_correspondences(landmarks, mask)
-
-        if image_pts.shape[0] < 4:
-            print("POSIT does not work without landmarks")
-            rot_matrix: np.ndarray = np.eye(3, dtype=float)
-            trl_matrix: np.ndarray = np.array([0.0, 0.0, 0.0])
-        else:
-            rot_matrix, trl_matrix = self._modern_posit(
-                world_pts, image_pts, cam_matrix
-            )
-
-        euler = rotation_matrix_to_euler(rot_matrix)
-        sample["pose"] = np.array(
-            [euler[0], euler[1], euler[2], trl_matrix[0], trl_matrix[1], trl_matrix[2]]
-        )
-        sample["model3d_proj"] = self._project_points(
-            rot_matrix, trl_matrix, cam_matrix, norm=img_shape
-        )
-        return sample
-
     def _load_world_shape(
         self, ldm_ids: List[int], model_file: str
     ) -> Tuple[np.ndarray, np.ndarray]:
@@ -111,22 +66,6 @@ class PositPose:
             ]
         )
         return cam_matrix
-
-    def _set_correspondences(
-        self, landmarks: np.ndarray, mask: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        # Correspondences using labelled and robust landmarks
-        img_mask: np.ndarray = np.logical_and(mask, self.model3d_mask)
-        img_mask = img_mask.astype(bool)
-
-        image_pts: np.ndarray = landmarks[img_mask]
-        world_pts: np.ndarray = self.model3d_world[img_mask]
-        return world_pts, image_pts
-
-    def _modern_posit(
-        self, world_pts: np.ndarray, image_pts: np.ndarray, cam_matrix: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        return modern_posit(world_pts, image_pts, cam_matrix, self.max_iter)
 
 
 def _project_points(

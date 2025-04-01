@@ -45,11 +45,6 @@ def load_image(filename: str) -> np.ndarray:
 class ImageAnalysis:
 
     def __init__(self) -> None:
-        self.original_img: Optional[np.ndarray] = None
-        self.gray_img: Optional[np.ndarray] = None
-        self.render_img: Optional[np.ndarray] = None
-        self.original_hsv: Optional[np.ndarray] = None
-        self.shape: Optional[Tuple[int, int, int]] = None
         self.text_font: int = cv2.FONT_HERSHEY_SIMPLEX
         self.text_size: float = 0.75
         self.text_color: Tuple[int, int, int] = (255, 255, 255)
@@ -64,12 +59,8 @@ class ImageAnalysis:
         Raises:
             ValueError: If the image is not loaded.
         """
-        if self.original_img is None:
+        if not hasattr(self, "render_img"):
             raise ValueError("Image not loaded. Please load an image first.")
-        if self.render_img is None:
-            raise ValueError(
-                "Render image not initialized. Please load an image first."
-            )
         return True
 
     def load_image(self, img: np.ndarray) -> None:
@@ -98,14 +89,16 @@ class ImageAnalysis:
         Args:
             img (np.ndarray): Input image.
         """
-        self.original_img = img.copy()
-        self.gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        self.render_img = img.copy()
-        self.original_hsv = cv2.cvtColor(self.original_img, cv2.COLOR_RGB2HSV).astype(
-            np.int64
-        )
-        self.shape = self.original_img.shape
+        self.original_img: Optional[np.ndarray] = img.copy()
+        self.gray_img: Optional[np.ndarray] = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        self.render_img: Optional[np.ndarray] = img.copy()
+        self.original_hsv: Optional[np.ndarray] = cv2.cvtColor(
+            self.original_img, cv2.COLOR_RGB2HSV
+        ).astype(np.int64)
+        self.shape: Tuple[int, int, int] = self.original_img.shape
 
+        self.height: int
+        self.width: int
         self.height, self.width = self.original_img.shape[:2]
 
     def write_text(
