@@ -402,19 +402,21 @@ class ImageAnalysis:
         :return: The computed area of the polygon.
         """
         self._check_image()
-        # Create a numpy array from the list with a specified dtype.
+        # Create an integer numpy array for rendering.
         contours_arr = np.array(contours, dtype=np.int32)
+
         if render:
             overlay = self.render_img.copy()
             cv2.fillPoly(overlay, pts=[contours_arr], color=color)
             self.render_img[:, :] = cv2.addWeighted(
                 overlay, alpha, self.render_img, 1 - alpha, 0
             ).astype(self.render_img.dtype)
-        # Multiply the array by pix2mm and extract columns.
-        contours_arr = contours_arr * pix2mm
-        x = contours_arr[:, 0]
-        y = contours_arr[:, 1]
-        # Cast the result of PolyArea to float.
+
+        # Create a separate float array for area measurement.
+        scaled_contours = np.array(contours, dtype=np.float64) * pix2mm
+        x = scaled_contours[:, 0]
+        y = scaled_contours[:, 1]
+
         return float(PolyArea(x, y))
 
     def line(
