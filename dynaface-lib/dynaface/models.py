@@ -4,10 +4,11 @@ import os
 import platform
 import zipfile
 from pathlib import Path
+from typing import Union, Tuple, Optional, List, Any, Dict
 
 import numpy as np
 import rembg
-import requests
+import requests  # type: ignore
 import torch
 from dynaface.spiga.inference.config import ModelConfig
 from dynaface.spiga.inference.framework import SPIGAFramework
@@ -28,23 +29,21 @@ REDIRECT_URL = "https://data.heatonresearch.com/dynaface/model-loc.json"
 FALLBACK_URL = f"https://data.heatonresearch.com/dynaface/model/{MODEL_VERSION}/dynaface_models.zip"
 EXPECTED_SHA256 = "c18f9c038b65d7486e7f9e081506bc69cbbc5719680eb31b1bafa8235ca6aa4d"
 
-
-# Other values
-_model_path = None
-_device = None
-mtcnn_model = None
-spiga_model = None
-rembg_session = None
+# Global variables (now explicitly typed as Optional)
+_model_path: Optional[str] = None
+_device: Optional[str] = None
+mtcnn_model: Optional[Union[MTCNN, "MTCNN2"]] = None
+spiga_model: Optional[SPIGAFramework] = None
+rembg_session: Optional[Any] = None
 
 SPIGA_MODEL = "wflw"
 
 logger = logging.getLogger(__name__)
 
 
-def imresample_mps(img, sz):
-    # Move the tensor to the CPU
+def imresample_mps(img: torch.Tensor, sz: Union[int, Tuple[int, ...]]) -> torch.Tensor:
+    # Move the tensor to the CPU and perform interpolation on the CPU before sending it to "mps"
     img_cpu = img.to("cpu")
-    # Perform the interpolation on the CPU
     im_data = interpolate(img_cpu, size=sz, mode="area")
     return im_data.to("mps")
 
@@ -52,20 +51,19 @@ def imresample_mps(img, sz):
 class MTCNN2(MTCNN):
     def __init__(
         self,
-        image_size=160,
-        margin=0,
-        min_face_size=20,
-        thresholds=[0.6, 0.7, 0.7],
-        factor=0.709,
-        post_process=True,
-        select_largest=True,
-        selection_method=None,
-        keep_all=False,
-        device=None,
-        path=None,
-    ):
+        image_size: int = 160,
+        margin: int = 0,
+        min_face_size: int = 20,
+        thresholds: List[float] = [0.6, 0.7, 0.7],
+        factor: float = 0.709,
+        post_process: bool = True,
+        select_largest: bool = True,
+        selection_method: Optional[str] = None,
+        keep_all: bool = False,
+        device: Optional[torch.device] = None,
+        path: str = "",  # now a required string (do not use None)
+    ) -> None:
         nn.Module.__init__(self)
-
         self.image_size = image_size
         self.margin = margin
         self.min_face_size = min_face_size
@@ -91,7 +89,7 @@ class MTCNN2(MTCNN):
         if not self.selection_method:
             self.selection_method = "largest" if self.select_largest else "probability"
 
-    def load_weights(self, net, filename):
+    def load_weights(self, net: nn.Module, filename: str) -> None:
         try:
             state_dict = torch.load(filename, pickle_module=torch.serialization.pickle)
             net.load_state_dict(state_dict)
@@ -101,7 +99,6 @@ class MTCNN2(MTCNN):
 
 def _init_mtcnn() -> None:
     global mtcnn_model
-
     if _device is None:
         raise ValueError("Device not initialized. Call init_models() first.")
 
@@ -118,7 +115,6 @@ def _init_mtcnn() -> None:
 
 def _init_spiga() -> None:
     global spiga_model
-
     config = ModelConfig(dataset_name=SPIGA_MODEL, load_model_url=False)
     config.model_weights_path = _model_path
     spiga_model = SPIGAFramework(config, device=_device)
@@ -126,36 +122,19 @@ def _init_spiga() -> None:
 
 def _init_rembg() -> None:
     global rembg_session
+    if _model_path is None:
+        raise ValueError("Model path not set. Call init_models() first.")
     os.environ["U2NET_HOME"] = _model_path
     rembg_session = rembg.new_session(model_name="u2net")
 
 
-def download_models(path: str = None, verify_hash: bool = True) -> str:
-    """
-    Downloads and extracts the DynaFace model files.
-
-    The function attempts to retrieve the download URL from a redirect JSON file
-    (REDIRECT_URL). If that fails or the download fails, it falls back to a fixed URL
-    (FALLBACK_URL). After downloading, it optionally verifies the SHA-256 checksum and
-    extracts the contents of the zip file to the specified directory.
-
-    Parameters:
-        path (str, optional): Target directory to store model files.
-                              Defaults to ~/.dynaface/models.
-        verify_hash (bool, optional): Whether to verify the SHA-256 checksum.
-                                      Defaults to True.
-
-    Returns:
-        str: Path to the directory containing the extracted model files.
-
-    Raises:
-        ValueError: If the checksum does not match and `verify_hash` is True.
-        requests.HTTPError: If both redirect and fallback downloads fail.
-    """
-    # Set default path if none provided
+def download_models(
+    path: Optional[Union[str, Path]] = None, verify_hash: bool = True
+) -> str:
+    # Accept either a string or Path; if None, use the default directory.
     if path is None:
         path = Path.home() / ".dynaface" / "models"
-    else:
+    elif isinstance(path, str):
         path = Path(path)
 
     path.mkdir(parents=True, exist_ok=True)  # Ensure directory exists
@@ -166,7 +145,7 @@ def download_models(path: str = None, verify_hash: bool = True) -> str:
 
     zip_path = path / "dynaface_models.zip"
 
-    # Try to fetch redirected URL
+    # Try to fetch redirected URL for the ZIP file
     try:
         response = requests.get(REDIRECT_URL, timeout=10)
         response.raise_for_status()
@@ -175,7 +154,7 @@ def download_models(path: str = None, verify_hash: bool = True) -> str:
     except Exception:
         zip_url = FALLBACK_URL  # Fallback if redirect fails
 
-    # Try to download ZIP
+    # Try to download ZIP using primary URL; if it fails, try the fallback.
     try:
         logger.info(f"Downloading DynaFace model files from {zip_url}...")
         response = requests.get(zip_url, stream=True, timeout=30)
@@ -183,18 +162,19 @@ def download_models(path: str = None, verify_hash: bool = True) -> str:
         with open(zip_path, "wb") as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
-    except Exception:
-        # Try fallback if original download fails
-        if zip_url != FALLBACK_URL:
+    except Exception as primary_exception:
+        if zip_url == FALLBACK_URL:
+            raise primary_exception
+        try:
             response = requests.get(FALLBACK_URL, stream=True, timeout=30)
             response.raise_for_status()
             with open(zip_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
-        else:
-            raise  # No fallback possible
+        except Exception:
+            raise primary_exception
 
-    # Verify SHA-256 checksum
+    # Verify SHA-256 checksum if requested
     if verify_hash:
         sha256 = hashlib.sha256()
         with open(zip_path, "rb") as f:
@@ -203,17 +183,15 @@ def download_models(path: str = None, verify_hash: bool = True) -> str:
         file_hash = sha256.hexdigest()
 
         if file_hash != EXPECTED_SHA256:
-            zip_path.unlink()  # Clean up
+            zip_path.unlink()  # Clean up the downloaded file
             raise ValueError(
                 f"SHA-256 mismatch: expected {EXPECTED_SHA256}, got {file_hash}. "
-                f"Set verify_hash=False to skip this check (not recommended)."
+                "Set verify_hash=False to skip this check (not recommended)."
             )
 
-    # Extract the ZIP file
+    # Extract the ZIP file and remove it afterward
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
         zip_ref.extractall(path)
-
-    # Remove the ZIP file after extraction
     zip_path.unlink()
 
     return str(path)
@@ -221,10 +199,8 @@ def download_models(path: str = None, verify_hash: bool = True) -> str:
 
 def init_models(model_path: str, device: str) -> None:
     global _model_path, _device
-
     _model_path = model_path
     _device = device
-
     _init_mtcnn()
     _init_spiga()
     _init_rembg()
@@ -253,7 +229,7 @@ def detect_device() -> str:
     return "cpu"
 
 
-def convert_landmarks(landmarks):
+def convert_landmarks(landmarks: Dict[str, Any]) -> List[List[Tuple[int, int]]]:
     return [
         [(int(x[0]), int(x[1])) for x in np.array(landmark)]
         for landmark in landmarks["landmarks"]

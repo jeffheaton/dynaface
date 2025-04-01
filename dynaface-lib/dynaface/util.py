@@ -387,7 +387,7 @@ def convert_matplotlib_to_opencv(ax: Axes) -> np.ndarray:
     bbox = [int(coord * fig.dpi) for coord in bbox_obj.extents]
     # Unpack bbox into integer coordinates for slicing.
     left, bottom, right, top = bbox[0], bbox[1], bbox[2], bbox[3]
-    image = image[bottom:top, left:right, :]  # type: ignore
+    image = image[bottom:top, left:right, :]
     image = cv2.cvtColor(image, cv2.COLOR_RGBA2BGR)
     return image
 

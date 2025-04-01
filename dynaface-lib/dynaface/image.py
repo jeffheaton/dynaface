@@ -148,7 +148,8 @@ class ImageAnalysis:
         size = self.text_size * size
         thick = int(self.text_thick * thick)
         textSize, baseline = cv2.getTextSize(txt, self.text_font, size, thick)
-        return (tuple(textSize), baseline)
+        width, height = textSize
+        return ((width, height), baseline)
 
     def write_text_sq(
         self,
@@ -365,7 +366,7 @@ class ImageAnalysis:
             cv2.fillPoly(overlay, pts=[contours_arr], color=color)
             self.render_img[:, :] = cv2.addWeighted(
                 overlay, alpha, self.render_img, 1 - alpha, 0
-            )
+            ).astype(self.render_img.dtype)
         # Multiply the array by pix2mm and extract columns.
         contours_arr = contours_arr * pix2mm
         x = contours_arr[:, 0]
