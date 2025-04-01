@@ -165,7 +165,7 @@ class AnalyzeFace(ImageAnalysis):
 
         If `_headpose` is None, it defaults to (False, False).
         """
-        if self._headpose is None:
+        if self.is_no_face():
             return False, False  # Default when head pose data is unavailable
 
         # Extract yaw, pitch, and roll values
@@ -186,6 +186,9 @@ class AnalyzeFace(ImageAnalysis):
         """
         if c is None:
             return
+
+        if self.is_no_face():
+            return False
 
         # Scale 'c' to a height of 1024 while maintaining aspect ratio
         c_height, c_width = c.shape[:2]
@@ -256,9 +259,6 @@ class AnalyzeFace(ImageAnalysis):
             if crop:
                 logger.debug("Cropping")
                 self.crop_stylegan(pupils=pupils)
-        else:
-            logger.info("No face detected")
-            return False
 
         if lateral_pos:
             p = util.cv2_to_pil(self.render_img)
@@ -285,7 +285,7 @@ class AnalyzeFace(ImageAnalysis):
             color (Tuple[int, int, int]): Color for drawing. Defaults to (0, 255, 255).
             numbers (bool): Whether to draw the landmark index numbers. Defaults to False.
         """
-        if self.landmarks is None:
+        if self.is_no_face() is None:
             return
         for i, landmark in enumerate(self.landmarks):
             self.circle(landmark, radius=3, color=color)

@@ -83,7 +83,7 @@ class MTCNN2(MTCNN):
 
         self.device = torch.device("cpu")
         if device is not None:
-            self.device = device
+            self.device = torch.device(device)
             self.to(device)
 
         if not self.selection_method:
