@@ -43,7 +43,7 @@ def util_calc_pd(
     pupillary_distance = np.linalg.norm(left_pupil - right_pupil)
     pix2mm = AnalyzeFace.pd / pupillary_distance
 
-    return pupillary_distance, pix2mm
+    return float(pupillary_distance), float(pix2mm)
 
 
 def util_get_pupils(
@@ -67,6 +67,7 @@ class AnalyzeFace(ImageAnalysis):
             measures (Optional[List[MeasureBase]]): Facial measures to be used. Defaults to None.
             tilt_threshold (float): Maximum allowable tilt threshold. Defaults to DEFAULT_TILT_THRESHOLD.
         """
+        super().__init__()
         self.original_img: Optional[np.ndarray] = None
         self.left_eye: Optional[Tuple[int, int]] = None
         self.right_eye: Optional[Tuple[int, int]] = None

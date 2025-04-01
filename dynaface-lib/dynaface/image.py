@@ -43,6 +43,20 @@ def load_image(filename: str) -> np.ndarray:
 
 
 class ImageAnalysis:
+
+    def __init__(self) -> None:
+        self.original_img: Optional[np.ndarray] = None
+        self.gray_img: Optional[np.ndarray] = None
+        self.render_img: Optional[np.ndarray] = None
+        self.original_hsv: Optional[np.ndarray] = None
+        self.shape: Optional[Tuple[int, int, int]] = None
+        self.text_font: int = cv2.FONT_HERSHEY_SIMPLEX
+        self.text_size: float = 0.75
+        self.text_color: Tuple[int, int, int] = (255, 255, 255)
+        self.text_thick: int = 2
+        self.text_back: int = 5
+        self.stats_right: int = 750
+
     def load_image(self, img: np.ndarray) -> None:
         """
         Load an image into the analysis class.
@@ -77,15 +91,7 @@ class ImageAnalysis:
         )
         self.shape = self.original_img.shape
 
-        self.text_font = cv2.FONT_HERSHEY_SIMPLEX
-        self.text_size = 0.75
-        self.text_color = (255, 255, 255)
-        self.text_thick = 2
-        self.text_back = 5
-
         self.height, self.width = self.original_img.shape[:2]
-
-        self.stats_right = 750
 
     def write_text(
         self,
