@@ -97,6 +97,15 @@ class AnalyzeFace(ImageAnalysis):
             if stat.enabled
         ]
 
+    def is_no_face(self) -> bool:
+        """
+        Check if no face is detected.
+
+        Returns:
+            bool: True if no face is detected, False otherwise.
+        """
+        return len(self.landmarks) == 0
+
     def _find_landmarks(
         self, img: np.ndarray
     ) -> Tuple[Optional[List[Tuple[int, int]]], Optional[np.ndarray]]:
@@ -111,7 +120,7 @@ class AnalyzeFace(ImageAnalysis):
         bbox, prob = models.mtcnn_model.detect(img)
 
         if prob[0] is None or prob[0] < 0.9:
-            return None, None
+            return [], [0, 0, 0]
 
         end_time = time.time()
         mtcnn_duration = end_time - start_time
@@ -119,7 +128,9 @@ class AnalyzeFace(ImageAnalysis):
 
         if bbox is None:
             bbox = [0, 0, img.shape[1], img.shape[0]]
-            logging.info("MTCNN could not detect face area")
+            logging.info(
+                "MTCNN could not detect face area, passing entire image to SPIGA"
+            )
         else:
             bbox = bbox[0]
         # bbox to spiga is x,y,w,h; however, facenet_pytorch deals in x1,y1,x2,y2.

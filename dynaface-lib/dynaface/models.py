@@ -4,11 +4,11 @@ import os
 import platform
 import zipfile
 from pathlib import Path
-from typing import Union, Tuple, Optional, List, Any, Dict
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import numpy as np
 import rembg
-import requests  # type: ignore
+import requests
 import torch
 from dynaface.spiga.inference.config import ModelConfig
 from dynaface.spiga.inference.framework import SPIGAFramework
@@ -45,7 +45,7 @@ def imresample_mps(img: torch.Tensor, sz: Union[int, Tuple[int, ...]]) -> torch.
     # Move the tensor to the CPU and perform interpolation on the CPU before sending it to "mps"
     img_cpu = img.to("cpu")
     im_data = interpolate(img_cpu, size=sz, mode="area")
-    return im_data.to("mps")
+    return cast(torch.Tensor, im_data.to("mps"))
 
 
 class MTCNN2(MTCNN):
@@ -60,7 +60,7 @@ class MTCNN2(MTCNN):
         select_largest: bool = True,
         selection_method: Optional[str] = None,
         keep_all: bool = False,
-        device: Optional[torch.device] = None,
+        device: Optional[str] = None,
         path: str = "",  # now a required string (do not use None)
     ) -> None:
         nn.Module.__init__(self)
