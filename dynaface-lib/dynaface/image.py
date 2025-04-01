@@ -71,13 +71,14 @@ class ImageAnalysis:
         """
         return hasattr(self, "render_img")
 
-    def load_image(self, img: np.ndarray) -> None:
+    def load_image(self, img: np.ndarray) -> bool:
         """
         Load an image into the analysis class.
 
         Args:
             img (np.ndarray): Input image.
-
+        Returns:
+            bool: True if the image was processed, False otherwise.
         Raises:
             TypeError: If img is None.
             ValueError: If img is too small.
@@ -89,6 +90,7 @@ class ImageAnalysis:
             raise ValueError("Image is empty")
 
         self.init_image(img)
+        return True
 
     def init_image(self, img: np.ndarray) -> None:
         """

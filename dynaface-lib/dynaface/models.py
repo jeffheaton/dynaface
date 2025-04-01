@@ -117,7 +117,7 @@ def _init_spiga() -> None:
     global spiga_model
     config = ModelConfig(dataset_name=SPIGA_MODEL, load_model_url=False)
     config.model_weights_path = _model_path
-    spiga_model = SPIGAFramework(config, device=_device)
+    spiga_model = SPIGAFramework(config, device=torch.device(_device))
 
 
 def _init_rembg() -> None:

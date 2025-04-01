@@ -1,13 +1,14 @@
-from typing import Tuple
+from typing import Any, Tuple
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-from dynaface import models, util
 from matplotlib.axes import Axes
 from PIL import Image
 from rembg import remove
-from scipy.signal import find_peaks  # <-- New import for peak detection
+from scipy.signal import find_peaks
+
+from dynaface import models, util
 
 # ================= CONSTANTS =================
 DEBUG = False
@@ -62,9 +63,14 @@ def process_image(input_image: Image.Image) -> Tuple[Image.Image, np.ndarray, in
     return input_image, binary_np, width, height
 
 
-def shift_sagittal_profile(sagittal_x: np.ndarray) -> np.ndarray:
+def shift_sagittal_profile(sagittal_x: np.ndarray) -> tuple[np.ndarray, float]:
     """
     Shift the sagittal profile so that the lowest x-coordinate becomes 0.
+
+    Returns:
+        tuple[np.ndarray, float]: A tuple containing:
+            - The shifted sagittal profile (np.ndarray)
+            - The minimum x value that was subtracted (float)
     """
     min_x = np.min(sagittal_x)
     return sagittal_x - min_x, min_x
@@ -358,12 +364,13 @@ def find_lateral_landmarks(
     max_indices: np.ndarray,
     min_indices: np.ndarray,
     shift_x: int,
-) -> np.ndarray:
+) -> list[tuple[int, ...]]:
     """
     Using the local extrema, compute the 6 lateral landmarks.
 
     Returns:
-        np.ndarray: A 2D numpy array of shape (6, 2), where each row contains [x, y] for a landmark:
+        list[tuple[int, int]]: A list of 6 tuples, where each tuple contains [x, y]
+        coordinates for a landmark:
           - LATERAL_LM_SOFT_TISSUE_GLABELLA (0): Soft Tissue Glabella
           - LATERAL_LM_SOFT_TISSUE_NASION (1): Soft Tissue Nasion
           - LATERAL_LM_NASAL_TIP (2): Nasal Tip
@@ -520,7 +527,9 @@ def save_debug_plot(
     plt.close(fig)
 
 
-def analyze_lateral(input_image: Image.Image) -> np.ndarray:
+def analyze_lateral(
+    input_image: Image.Image,
+) -> Tuple[np.ndarray, np.ndarray, Any, np.ndarray]:
     """
     Analyze the side profile from a loaded PIL image and return only the far-right plot (sagittal profile).
     The plot will have no axes, margins, or labels, but will still include the legend.

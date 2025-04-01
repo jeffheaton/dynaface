@@ -224,9 +224,9 @@ class AnalyzeFace(ImageAnalysis):
     def load_image(
         self,
         img: np.ndarray,
-        crop: bool,
+        crop: Optional[bool] = True,
         pupils: Optional[Tuple[Tuple[int, int], Tuple[int, int]]] = None,
-    ) -> bool:  # type: ignore[override]
+    ) -> bool:
         """
         Load an image and process facial landmarks.
 
