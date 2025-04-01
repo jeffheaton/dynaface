@@ -55,7 +55,7 @@ pipeline {
                     flake8 dynaface --config $WORKSPACE/.flake8 --output-file=flake8-report.txt || true
 
                     echo "Running mypy..."
-                    mypy --install-types --non-interactive
+                    mypy --install-types --non-interactive || true
                     mypy dynaface --show-error-codes --no-color-output --no-error-summary > mypy-report.txt || true
 
                     echo "Running bandit..."
