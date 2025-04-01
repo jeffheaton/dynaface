@@ -35,8 +35,8 @@ FILL_COLOR = [255, 255, 255]
 
 
 def util_calc_pd(
-    pupils: Tuple[Tuple[float, float], Tuple[float, float]],
-) -> Tuple[float, float]:
+    pupils: Tuple[Tuple[int, int], Tuple[int, int]],
+) -> Tuple[int, int]:
     left_pupil, right_pupil = pupils
     left_pupil = np.array(left_pupil)
     right_pupil = np.array(right_pupil)
@@ -51,8 +51,8 @@ def util_calc_pd(
 
 
 def util_get_pupils(
-    landmarks: List[Tuple[float, float]],
-) -> Tuple[Tuple[float, float], Tuple[float, float]]:
+    landmarks: List[Tuple[int, int]],
+) -> Tuple[Tuple[int, int], Tuple[int, int]]:
     return landmarks[LM_LEFT_PUPIL], landmarks[LM_RIGHT_PUPIL]
 
 

@@ -66,7 +66,7 @@ def safe_clip(
 
 
 def scale_crop_points(
-    lst: List[Tuple[float, float]], crop_x: int, crop_y: int, scale: float
+    lst: List[Tuple[int, int]], crop_x: int, crop_y: int, scale: float
 ) -> List[Tuple[int, int]]:
     """
     Scales and crops a list of points.
@@ -78,7 +78,7 @@ def scale_crop_points(
 
 
 def rotate_crop_points(
-    points: List[Tuple[float, float]], center: Tuple[float, float], angle_degrees: float
+    points: List[Tuple[int, int]], center: Tuple[int, int], angle_degrees: float
 ) -> List[np.ndarray]:
     """
     Rotate the points around the center by the specified angle.
@@ -99,7 +99,7 @@ def rotate_crop_points(
 
 
 def calculate_face_rotation(
-    pupil_coords: Tuple[Tuple[float, float], Tuple[float, float]],
+    pupil_coords: Tuple[Tuple[int, int], Tuple[int, int]],
 ) -> float:
     """
     Calculate the rotation angle of a face based on the coordinates of the pupils.
@@ -166,10 +166,10 @@ def symmetry_ratio(a: float, b: float) -> float:
 
 
 def line_intersection(
-    line: Tuple[Tuple[float, float], Tuple[float, float]],
+    line: Tuple[Tuple[int, int], Tuple[int, int]],
     contour: np.ndarray,
     tol: float = 1e-7,
-) -> List[Tuple[Tuple[float, float], int]]:
+) -> List[Tuple[Tuple[int, int], int]]:
     """
     Return a list of (intersection_point, edge_index) for all edges in 'contour'
     that intersect with 'line'. Deduplicate near-identical points.
@@ -182,7 +182,7 @@ def line_intersection(
         if intersection is not None:
             intersections.append((intersection, i))
 
-    unique_intersections: List[Tuple[Tuple[float, float], int]] = []
+    unique_intersections: List[Tuple[Tuple[int, int], int]] = []
     for pt, idx in intersections:
         if not any(
             np.linalg.norm(np.array(pt) - np.array(u_pt)) < tol
@@ -194,16 +194,16 @@ def line_intersection(
 
 
 def compute_intersection(
-    line1: Tuple[Tuple[float, float], Tuple[float, float]],
-    line2: Tuple[Tuple[float, float], Tuple[float, float]],
-) -> Optional[Tuple[float, float]]:
+    line1: Tuple[Tuple[int, int], Tuple[int, int]],
+    line2: Tuple[Tuple[int, int], Tuple[int, int]],
+) -> Optional[Tuple[int, int]]:
     """
     Compute the intersection point of two lines if they intersect within the bounds of the second line segment.
     """
     xdiff = (line1[0][0] - line1[1][0], line2[0][0] - line2[1][0])
     ydiff = (line1[0][1] - line1[1][1], line2[0][1] - line2[1][1])
 
-    def det(a: Tuple[float, float], b: Tuple[float, float]) -> float:
+    def det(a: Tuple[int, int], b: Tuple[int, int]) -> float:
         return a[0] * b[1] - a[1] * b[0]
 
     div = det(xdiff, ydiff)
@@ -223,7 +223,7 @@ def compute_intersection(
 
 
 def split_polygon(
-    polygon: np.ndarray, line: Tuple[Tuple[float, float], Tuple[float, float]]
+    polygon: np.ndarray, line: Tuple[Tuple[int, int], Tuple[int, int]]
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Split a polygon into two parts using a line that bisects it.
@@ -255,7 +255,7 @@ def split_polygon(
 
 
 def bisecting_line_coordinates(
-    img_size: int, pupils: Tuple[Tuple[float, float], Tuple[float, float]]
+    img_size: int, pupils: Tuple[Tuple[int, int], Tuple[int, int]]
 ) -> Tuple[Tuple[int, int], Tuple[int, int]]:
     """
     Compute the coordinates of the bisecting line of the eyes in an image.
@@ -305,7 +305,7 @@ def bisecting_line_coordinates(
 
 
 def line_to_edge(
-    img_size: int, start_point: Tuple[float, float], angle: float
+    img_size: int, start_point: Tuple[int, int], angle: float
 ) -> Optional[Tuple[int, int]]:
     """
     Compute the intersection point where a line, originating from a given start point and extending at a specified angle,
@@ -313,7 +313,7 @@ def line_to_edge(
     """
     x0, y0 = start_point
     slope = np.tan(angle)
-    possible_endpoints: List[Tuple[float, float]] = []
+    possible_endpoints: List[Tuple[int, int]] = []
 
     # Intersection with the right edge (x = img_size)
     if slope != 0:
