@@ -82,7 +82,7 @@ class AnalyzeFace(ImageAnalysis):
         else:
             self.measures = measures
         self.headpose: List[int] = [0, 0, 0]
-        self.landmarks: List[Tuple[float, float]] = []
+        self.landmarks: List[Tuple[int, int]] = []
         self.lateral: bool = False
         self.lateral_landmarks: np.ndarray = np.full((6, 2), -1.0)
         self.pupillary_distance: float = 0.0
@@ -103,7 +103,7 @@ class AnalyzeFace(ImageAnalysis):
 
     def _find_landmarks(
         self, img: np.ndarray
-    ) -> Tuple[Optional[List[Tuple[float, float]]], Optional[np.ndarray]]:
+    ) -> Tuple[Optional[List[Tuple[int, int]]], Optional[np.ndarray]]:
         logger.debug("Called _find_landmarks")
         start_time = time.time()
 
