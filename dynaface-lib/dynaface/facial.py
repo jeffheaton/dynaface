@@ -68,11 +68,10 @@ class AnalyzeFace(ImageAnalysis):
             tilt_threshold (float): Maximum allowable tilt threshold. Defaults to DEFAULT_TILT_THRESHOLD.
         """
         super().__init__()
-        self.original_img: Optional[np.ndarray] = None
-        self.left_eye: Optional[Tuple[int, int]] = None
-        self.right_eye: Optional[Tuple[int, int]] = None
-        self.nose: Any = None
-        self._headpose: Optional[np.ndarray] = None
+        self.left_eye: Tuple[int, int] = (0, 0)
+        self.right_eye: Tuple[int, int] = (0, 0)
+        self.nose: Tuple[int, int] = (0, 0)
+        self._headpose: np.ndarray = np.array([0.0, 0.0, 0.0])
         self.flipped: bool = False
         if measures is None:
             self.measures: List[MeasureBase] = dynaface.measures.all_measures()
@@ -86,8 +85,8 @@ class AnalyzeFace(ImageAnalysis):
         logger.debug(f"===INIT: t={tilt_threshold}")
         self.tilt_threshold: float = tilt_threshold
         self.pix2mm: float = 1.0
-        self.face_rotation: Optional[float] = None
-        self.orig_pupils: Optional[Tuple[Tuple[int, int], Tuple[int, int]]] = None
+        self.face_rotation: float = 0.0
+        self.orig_pupils: Tuple[Tuple[int, int], Tuple[int, int]] = ((0, 0), (0, 0))
 
     def get_all_items(self) -> List[str]:
         return [
@@ -597,7 +596,7 @@ class AnalyzeFace(ImageAnalysis):
         return copy.copy(result)
 
     def load_state(self, obj: List[Any]) -> None:
-        if self.original_img is None:
+        if not self.is_image_loaded():
             self.init_image(obj[0])
         else:
             self.original_img = obj[0][:]

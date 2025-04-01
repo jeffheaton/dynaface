@@ -59,8 +59,17 @@ class ImageAnalysis:
         Raises:
             ValueError: If the image is not loaded.
         """
-        if not hasattr(self, "render_img"):
+        if not self.is_image_loaded():
             raise ValueError("Image not loaded. Please load an image first.")
+
+    def is_image_loaded(self) -> bool:
+        """
+        Check if an image is loaded.
+
+        Returns:
+            bool: True if an image is loaded, False otherwise.
+        """
+        return hasattr(self, "render_img")
 
     def load_image(self, img: np.ndarray) -> None:
         """
