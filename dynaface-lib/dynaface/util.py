@@ -182,7 +182,7 @@ def line_intersection(
         if intersection is not None:
             intersections.append((intersection, i))
 
-    unique_intersections: List[Tuple[Tuple[int, int], int]] = []
+    unique_intersections: List[Tuple[Tuple[float, float], int]] = []
     for pt, idx in intersections:
         if not any(
             np.linalg.norm(np.array(pt) - np.array(u_pt)) < tol
@@ -203,7 +203,7 @@ def compute_intersection(
     xdiff = (line1[0][0] - line1[1][0], line2[0][0] - line2[1][0])
     ydiff = (line1[0][1] - line1[1][1], line2[0][1] - line2[1][1])
 
-    def det(a: Tuple[int, int], b: Tuple[int, int]) -> float:
+    def det(a: Tuple[float, float], b: Tuple[float, float]) -> float:
         return a[0] * b[1] - a[1] * b[0]
 
     div = det(xdiff, ydiff)
@@ -218,7 +218,7 @@ def compute_intersection(
     if min(line2[0][0], line2[1][0]) <= x <= max(line2[0][0], line2[1][0]) and min(
         line2[0][1], line2[1][1]
     ) <= y <= max(line2[0][1], line2[1][1]):
-        return x, y
+        return int(x), int(y)
     return None
 
 

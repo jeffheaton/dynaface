@@ -70,6 +70,7 @@ class ImageAnalysis:
             raise ValueError(
                 "Render image not initialized. Please load an image first."
             )
+        return True
 
     def load_image(self, img: np.ndarray) -> None:
         """
@@ -125,32 +126,44 @@ class ImageAnalysis:
             size (float): Scaling factor for text size.
             thick (int): Thickness of the text.
         """
-        self._check_image()
+
         size = self.text_size * size
         thick = int(self.text_thick * thick)
         if color is None:
             color = self.text_color
-        cv2.putText(
-            self.render_img,
-            txt,
-            pos,
-            self.text_font,
-            size,
-            (0, 0, 0),
-            thick + self.text_back,
-            cv2.LINE_AA,
-        )
 
-        cv2.putText(
-            self.render_img,
-            txt,
-            pos,
-            self.text_font,
-            size,
-            self.text_color,
-            thick,
-            cv2.LINE_AA,
-        )
+        if self._check_image():
+            cv2.putText(
+                self.render_img,
+                txt,
+                pos,
+                self.text_font,
+                size,
+                (0, 0, 0),
+                thick + self.text_back,
+                cv2.LINE_AA,
+            )
+            cv2.putText(
+                self.render_img,
+                txt,
+                pos,
+                self.text_font,
+                size,
+                (0, 0, 0),
+                thick + self.text_back,
+                cv2.LINE_AA,
+            )
+
+            cv2.putText(
+                self.render_img,
+                txt,
+                pos,
+                self.text_font,
+                size,
+                self.text_color,
+                thick,
+                cv2.LINE_AA,
+            )
 
     def calc_text_size(
         self, txt: str, size: float = 1, thick: int = 1
