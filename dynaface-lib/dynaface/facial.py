@@ -37,9 +37,8 @@ FILL_COLOR = [255, 255, 255]
 def util_calc_pd(
     pupils: Tuple[Tuple[int, int], Tuple[int, int]],
 ) -> Tuple[int, int]:
-    left_pupil, right_pupil = pupils
-    left_pupil = np.array(left_pupil)
-    right_pupil = np.array(right_pupil)
+    left_pupil: np.ndarray = np.array(pupils[0])
+    right_pupil: np.ndarray = np.array(pupils[1])
 
     # Calculate Euclidean distance between the two pupils
     pupillary_distance = np.linalg.norm(left_pupil - right_pupil)
