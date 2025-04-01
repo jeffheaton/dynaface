@@ -61,7 +61,6 @@ class ImageAnalysis:
         """
         if not hasattr(self, "render_img"):
             raise ValueError("Image not loaded. Please load an image first.")
-        return True
 
     def load_image(self, img: np.ndarray) -> None:
         """
@@ -95,7 +94,7 @@ class ImageAnalysis:
         self.original_hsv: np.ndarray = cv2.cvtColor(
             self.original_img, cv2.COLOR_RGB2HSV
         ).astype(np.int64)
-        self.shape: Tuple[int, int, int] = self.original_img.shape
+        self.shape: Tuple[int, ...] = self.original_img.shape
 
         self.height: int
         self.width: int
@@ -125,38 +124,37 @@ class ImageAnalysis:
         if color is None:
             color = self.text_color
 
-        if self._check_image():
-            cv2.putText(
-                self.render_img,
-                txt,
-                pos,
-                self.text_font,
-                size,
-                (0, 0, 0),
-                thick + self.text_back,
-                cv2.LINE_AA,
-            )
-            cv2.putText(
-                self.render_img,
-                txt,
-                pos,
-                self.text_font,
-                size,
-                (0, 0, 0),
-                thick + self.text_back,
-                cv2.LINE_AA,
-            )
+        cv2.putText(
+            self.render_img,
+            txt,
+            pos,
+            self.text_font,
+            size,
+            (0, 0, 0),
+            thick + self.text_back,
+            cv2.LINE_AA,
+        )
+        cv2.putText(
+            self.render_img,
+            txt,
+            pos,
+            self.text_font,
+            size,
+            (0, 0, 0),
+            thick + self.text_back,
+            cv2.LINE_AA,
+        )
 
-            cv2.putText(
-                self.render_img,
-                txt,
-                pos,
-                self.text_font,
-                size,
-                self.text_color,
-                thick,
-                cv2.LINE_AA,
-            )
+        cv2.putText(
+            self.render_img,
+            txt,
+            pos,
+            self.text_font,
+            size,
+            self.text_color,
+            thick,
+            cv2.LINE_AA,
+        )
 
     def calc_text_size(
         self, txt: str, size: float = 1, thick: int = 1
