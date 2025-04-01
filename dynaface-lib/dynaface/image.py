@@ -57,6 +57,20 @@ class ImageAnalysis:
         self.text_back: int = 5
         self.stats_right: int = 750
 
+    def _check_image(self) -> None:
+        """
+        Check if the image is loaded.
+
+        Raises:
+            ValueError: If the image is not loaded.
+        """
+        if self.original_img is None:
+            raise ValueError("Image not loaded. Please load an image first.")
+        if self.render_img is None:
+            raise ValueError(
+                "Render image not initialized. Please load an image first."
+            )
+
     def load_image(self, img: np.ndarray) -> None:
         """
         Load an image into the analysis class.
@@ -111,6 +125,7 @@ class ImageAnalysis:
             size (float): Scaling factor for text size.
             thick (int): Thickness of the text.
         """
+        self._check_image()
         size = self.text_size * size
         thick = int(self.text_thick * thick)
         if color is None:
@@ -151,6 +166,7 @@ class ImageAnalysis:
         Returns:
             Tuple[Tuple[int, int], int]: Text size and baseline.
         """
+        self._check_image()
         size = self.text_size * size
         thick = int(self.text_thick * thick)
         textSize, baseline = cv2.getTextSize(txt, self.text_font, size, thick)
@@ -175,6 +191,7 @@ class ImageAnalysis:
             mark (str): Marker character.
             up (int): Upward offset for the marker.
         """
+        self._check_image()
         if color is None:
             color = self.text_color
 
@@ -244,6 +261,7 @@ class ImageAnalysis:
             color (Tuple[int, int, int]): Line color.
             width (int): Line width.
         """
+        self._check_image()
         if not x1:
             x1 = 0
         if not x2:
@@ -267,6 +285,7 @@ class ImageAnalysis:
         :param color: Color of the line in BGR format.
         :param width: Thickness of the line.
         """
+        self._check_image()
         if not y1:
             y1 = 0
         if not y2:
@@ -287,6 +306,7 @@ class ImageAnalysis:
             color (Tuple[int, int, int]): Circle color.
             radius (Optional[int]): Circle radius.
         """
+        self._check_image()
         if radius is None:
             radius = int(self.render_img.shape[0] // 200)
         cv2.circle(self.render_img, pt, radius, color, -1)
@@ -295,6 +315,7 @@ class ImageAnalysis:
         """
         Reset the render image to the original image.
         """
+        self._check_image()
         # self.render_img = self.original_img.copy()
         self.render_img[:, :] = self.original_img
 
@@ -312,6 +333,7 @@ class ImageAnalysis:
         Returns:
             np.ndarray: Extracted image section.
         """
+        self._check_image()
         if not x1:
             x1 = 0
         if not x2:
@@ -344,6 +366,7 @@ class ImageAnalysis:
 
         :param filename: The path where the image should be saved.
         """
+        self._check_image()
         image = cv2.cvtColor(self.render_img, cv2.COLOR_RGB2BGR)
         cv2.imwrite(filename, image)
 
@@ -365,6 +388,7 @@ class ImageAnalysis:
         :param render: If True, renders the polygon overlay.
         :return: The computed area of the polygon.
         """
+        self._check_image()
         # Create a numpy array from the list with a specified dtype.
         contours_arr = np.array(contours, dtype=np.int32)
         if render:
@@ -395,6 +419,7 @@ class ImageAnalysis:
         :param color: Color of the line in BGR format.
         :param thickness: Thickness of the line.
         """
+        self._check_image()
         cv2.line(self.render_img, pt1, pt2, color, thickness)
 
     def arrow_head(
@@ -407,6 +432,7 @@ class ImageAnalysis:
         :param pt2: The tip of the arrow.
         :param par: Size of the arrowhead.
         """
+        self._check_image()
         # https://www.codeguru.com/multimedia/drawing-an-arrowline/
         slopy = math.atan2((pt1[1] - pt2[1]), (pt1[0] - pt2[0]))
         cosy = math.cos(slopy)
