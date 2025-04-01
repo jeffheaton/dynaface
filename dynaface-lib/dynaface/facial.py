@@ -2,19 +2,23 @@ import copy
 import logging
 import math
 import time
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Any, Dict
 from urllib.parse import urlparse
 
 import cv2
 import dynaface.image
 import dynaface.measures
 import numpy as np
-import requests
+import requests  # You may also use: # type: ignore[import]
 from dynaface.image import ImageAnalysis
 from dynaface.lateral import analyze_lateral
 
 import dynaface
 from dynaface import measures, models, util
+from dynaface.measures import MeasureBase
+
+# Restore the logger definition
+logger = logging.getLogger(__name__)
 
 STYLEGAN_WIDTH = 1024
 STYLEGAN_LEFT_PUPIL = (640, 480)
@@ -30,12 +34,9 @@ LM_RIGHT_PUPIL = 96
 FILL_COLOR = [255, 255, 255]
 
 
-SPIGA_MODEL = "wflw"
-
-logger = logging.getLogger(__name__)
-
-
-def util_calc_pd(pupils):
+def util_calc_pd(
+    pupils: Tuple[Tuple[float, float], Tuple[float, float]],
+) -> Tuple[float, float]:
     left_pupil, right_pupil = pupils
     left_pupil = np.array(left_pupil)
     right_pupil = np.array(right_pupil)
@@ -49,36 +50,49 @@ def util_calc_pd(pupils):
     return pupillary_distance, pix2mm
 
 
-def util_get_pupils(landmarks):
+def util_get_pupils(
+    landmarks: List[Tuple[float, float]],
+) -> Tuple[Tuple[float, float], Tuple[float, float]]:
     return landmarks[LM_LEFT_PUPIL], landmarks[LM_RIGHT_PUPIL]
 
 
 class AnalyzeFace(ImageAnalysis):
     pd = STD_PUPIL_DIST
 
-    def __init__(self, measures=None, tilt_threshold=DEFAULT_TILT_THRESHOLD):
-        self.original_img = None
-        self.left_eye = None
-        self.right_eye = None
-        self.nose = None
-        self._headpose = None
-        self.flipped = False
+    def __init__(
+        self,
+        measures: Optional[List[MeasureBase]] = None,
+        tilt_threshold: float = DEFAULT_TILT_THRESHOLD,
+    ) -> None:
+        """
+        Initialize the AnalyzeFace object.
+
+        Args:
+            measures (Optional[List[MeasureBase]]): Facial measures to be used. Defaults to None.
+            tilt_threshold (float): Maximum allowable tilt threshold. Defaults to DEFAULT_TILT_THRESHOLD.
+        """
+        self.original_img: Optional[np.ndarray] = None
+        self.left_eye: Optional[Tuple[int, int]] = None
+        self.right_eye: Optional[Tuple[int, int]] = None
+        self.nose: Any = None
+        self._headpose: Optional[np.ndarray] = None
+        self.flipped: bool = False
         if measures is None:
-            self.measures = dynaface.measures.all_measures()
+            self.measures: List[MeasureBase] = dynaface.measures.all_measures()
         else:
             self.measures = measures
-        self.headpose = [0, 0, 0]
-        self.landmarks = []
-        self.lateral = False
-        self.lateral_landmarks = np.full((6, 2), -1.0)
-        self.pupillary_distance = 0
+        self.headpose: List[int] = [0, 0, 0]
+        self.landmarks: List[Tuple[float, float]] = []
+        self.lateral: bool = False
+        self.lateral_landmarks: np.ndarray = np.full((6, 2), -1.0)
+        self.pupillary_distance: float = 0.0
         logger.debug(f"===INIT: t={tilt_threshold}")
-        self.tilt_threshold = tilt_threshold
-        self.pix2mm = 1
-        self.face_rotation = None
-        self.orig_pupils = None
+        self.tilt_threshold: float = tilt_threshold
+        self.pix2mm: float = 1.0
+        self.face_rotation: Optional[float] = None
+        self.orig_pupils: Optional[Tuple[Tuple[int, int], Tuple[int, int]]] = None
 
-    def get_all_items(self):
+    def get_all_items(self) -> List[str]:
         return [
             stat.name
             for obj in self.measures
@@ -87,7 +101,9 @@ class AnalyzeFace(ImageAnalysis):
             if stat.enabled
         ]
 
-    def _find_landmarks(self, img):
+    def _find_landmarks(
+        self, img: np.ndarray
+    ) -> Tuple[Optional[List[Tuple[float, float]]], Optional[np.ndarray]]:
         logger.debug("Called _find_landmarks")
         start_time = time.time()
 
@@ -111,7 +127,6 @@ class AnalyzeFace(ImageAnalysis):
         else:
             bbox = bbox[0]
         # bbox to spiga is x,y,w,h; however, facenet_pytorch deals in x1,y1,x2,y2.
-
         bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
         logger.debug("Calling SPIGA")
         start_time = time.time()
@@ -137,7 +152,7 @@ class AnalyzeFace(ImageAnalysis):
         Returns:
             Tuple[bool, bool]:
             - First value (bool): True if the head is in a lateral pose
-              (yaw angle beyond ±15 degrees), False otherwise.
+              (yaw angle beyond ±20 degrees), False otherwise.
             - Second value (bool): True if the head is facing left
               (yaw < 0), False if facing right or frontal.
 
@@ -153,13 +168,15 @@ class AnalyzeFace(ImageAnalysis):
         is_lateral: bool = abs(yaw) > 20  # Lateral if yaw exceeds ±20 degrees
         is_facing_left: bool = (
             yaw < 0
-        )  # True if facing left, False if facing right or frontal
+        )  # True if facing left, else facing right or frontal
 
         return is_lateral, is_facing_left
 
-    def _overlay_lateral_analysis(self, c):
-        """Scales and overlays the lateral analysis image onto self.render_img
-        at the top-right."""
+    def _overlay_lateral_analysis(self, c: Optional[np.ndarray]) -> None:
+        """
+        Scales and overlays the lateral analysis image onto self.render_img
+        at the top-right.
+        """
         if c is None:
             return
 
@@ -190,7 +207,22 @@ class AnalyzeFace(ImageAnalysis):
         )
         super().load_image(self.render_img)
 
-    def load_image(self, img, crop, pupils=None):
+    def load_image(
+        self,
+        img: np.ndarray,
+        crop: bool,
+        pupils: Optional[Tuple[Tuple[int, int], Tuple[int, int]]] = None,
+    ) -> bool:
+        """
+        Load an image and process facial landmarks.
+
+        Args:
+            img (np.ndarray): The image to load.
+            crop (bool): Whether to crop the face.
+            pupils (Optional[Tuple[Tuple[int, int], Tuple[int, int]]]): Optional pupils coordinates.
+        Returns:
+            bool: True if the image was processed, False otherwise.
+        """
         super().load_image(img)
         logger.debug("Low level-image loaded")
         self.landmarks, self._headpose = self._find_landmarks(img)
@@ -232,13 +264,26 @@ class AnalyzeFace(ImageAnalysis):
 
         return True
 
-    def draw_landmarks(self, size=0.25, color=[0, 255, 255], numbers=False):
+    def draw_landmarks(
+        self,
+        size: float = 0.25,
+        color: Tuple[int, int, int] = (0, 255, 255),
+        numbers: bool = False,
+    ) -> None:
+        """
+        Draws landmarks and optionally their indices on the image.
+
+        Args:
+            size (float): Scale size for numbers. Defaults to 0.25.
+            color (Tuple[int, int, int]): Color for drawing. Defaults to (0, 255, 255).
+            numbers (bool): Whether to draw the landmark index numbers. Defaults to False.
+        """
         if self.landmarks is None:
             return
         for i, landmark in enumerate(self.landmarks):
             self.circle(landmark, radius=3, color=color)
             if numbers:
-                self.write_text([landmark[0] + 3, landmark[1]], str(i), size=0.5)
+                self.write_text((landmark[0] + 3, landmark[1]), str(i), size=0.5)
         self.circle(self.left_eye, color=color)
         self.circle(self.right_eye, color=color)
 
@@ -269,38 +314,19 @@ class AnalyzeFace(ImageAnalysis):
         Returns:
         - `float`: The measured distance in millimeters.
         """
-
-        # If rendering is enabled, draw an arrow between the two points
         if render:
             self.arrow(pt1, pt2, color, thickness)
 
-        # Compute Euclidean distance and convert pixels to millimeters
-        d: float = math.dist(pt1, pt2) * self.pix2mm
-
-        # Format measurement text
+        d: float = float(math.dist(pt1, pt2) * self.pix2mm)
         txt: str = f"{d:.2f}mm"
 
-        # Calculate text size for positioning
-        # m: Tuple[Tuple[int, int], int] = self.calc_text_size(txt)
-
-        # Compute the midpoint for displaying text
         if dir == "r":
-            mp: List[int] = [
-                int((pt1[0] + pt2[0]) // 2) + 15,
-                int((pt1[1] + pt2[1]) // 2),
-            ]
+            mp = ((pt1[0] + pt2[0]) // 2 + 15, (pt1[1] + pt2[1]) // 2)
         elif dir == "a":
-            mp: List[int] = [
-                int(min(pt1[0], pt2[0]) + 15),
-                int((pt1[1] + pt2[1]) // 2) - 20,
-            ]
+            mp = (min(pt1[0], pt2[0]) + 15, (pt1[1] + pt2[1]) // 2 - 20)
         else:
-            mp: List[int] = [
-                int(pt1[0] + 15),
-                int((pt1[1] + pt2[1]) // 2),
-            ]
+            mp = (pt1[0] + 15, (pt1[1] + pt2[1]) // 2)
 
-        # Render text if enabled
         if render:
             self.write_text(mp, txt)
 
@@ -337,49 +363,36 @@ class AnalyzeFace(ImageAnalysis):
         Returns:
         - `float`: The measured curved distance in millimeters.
         """
-
-        # Combine sagittal_x and sagittal_y into a NumPy array of (x, y) points
         sagittal_line = np.column_stack((sagittal_x, sagittal_y))
 
-        # Function to find closest index for a given point
-        def find_closest_index(point, line):
+        def find_closest_index(point: Tuple[int, int], line: np.ndarray) -> int:
             distances = np.linalg.norm(line - np.array(point), axis=1)
-            return np.argmin(distances)
+            return int(np.argmin(distances))
 
-        # Find the closest indices in the sagittal line for pt1 and pt2
         idx1 = find_closest_index(pt1, sagittal_line)
         idx2 = find_closest_index(pt2, sagittal_line)
 
-        # Ensure correct ordering
         if idx1 > idx2:
             idx1, idx2 = idx2, idx1
 
-        # Extract the segment of the curve between pt1 and pt2
         segment = sagittal_line[idx1 : idx2 + 1]
-
-        # Compute total curved distance along the segment
-        d = (
+        d: float = float(
             sum(math.dist(segment[i], segment[i + 1]) for i in range(len(segment) - 1))
             * self.pix2mm
         )
-
-        # Format measurement text
         txt = f"{d:.2f}mm"
-
-        # Compute the midpoint for displaying text
         mid_idx = len(segment) // 2
-        mp = (
-            (segment[mid_idx][0] + 15, segment[mid_idx][1])
-            if dir == "r"
-            else (segment[mid_idx][0] - 15, segment[mid_idx][1])
-        )
-
-        # Render curve and text if enabled
+        if dir == "r":
+            mp: Tuple[int, int] = (
+                int(segment[mid_idx][0] + 15),
+                int(segment[mid_idx][1]),
+            )
+        else:
+            mp = (int(segment[mid_idx][0] - 15), int(segment[mid_idx][1]))
         if render:
             self.draw_curve(segment, color, thickness)
             if hasattr(self, "write_text"):
                 self.write_text(mp, txt)
-
         return d
 
     def draw_curve(
@@ -399,8 +412,7 @@ class AnalyzeFace(ImageAnalysis):
         # Convert points to integer format required for OpenCV
         curve_pts = segment.astype(np.int32)
 
-        # Draw polyline on the image (assuming `self.image` exists as the
-        # frame to draw on)
+        # Draw polyline on the image (assuming `self.render_img` exists)
         cv2.polylines(
             self.render_img,
             [curve_pts],
@@ -409,29 +421,52 @@ class AnalyzeFace(ImageAnalysis):
             thickness=thickness,
         )
 
-    def analyze_next_pt(self, txt):
+    def analyze_next_pt(self, txt: str) -> Tuple[int, int]:
+        """
+        Determines the next position for analysis text based on current position.
+
+        Args:
+            txt (str): The text for which size is calculated.
+        Returns:
+            Tuple[int, int]: The new analysis point (x, y).
+        """
         result = (self.analyze_x, self.analyze_y)
         m = self.calc_text_size(txt)
         self.analyze_y += int(m[0][1] * 2)
         return result
 
-    def analyze(self):
+    def analyze(self) -> Optional[Dict[str, Any]]:
+        """
+        Performs analysis on the face using enabled measures.
+
+        Returns:
+            Optional[Dict[str, Any]]: A dictionary of computed measurements.
+        """
         if self.landmarks is None:
-            return
+            return None
         m = self.calc_text_size("W")
         self.analyze_x = int(m[0][0] * 0.25)
         self.analyze_y = int(m[0][1] * 1.5)
-        result = {}
+        result: Dict[str, Any] = {}
         for calc in self.measures:
             if calc.enabled:
                 result.update(calc.calc(self))
         return result
 
-    def calculate_face_rotation(self):
+    def calculate_face_rotation(self) -> float:
+        """
+        Calculates the face rotation in degrees.
+
+        Returns:
+            float: The face rotation.
+        """
         p = util_get_pupils(self.landmarks)
         return measures.to_degrees(util.calculate_face_rotation(p))
 
-    def crop_lateral(self):
+    def crop_lateral(self) -> None:
+        """
+        Crops the image for lateral analysis by inflating the bounding box.
+        """
         INFLATE_LATERAL_TOP = 0.1  # Increase top by 10%
         INFLATE_LATERAL_BOTTOM = 0.1  # Increase bottom by 10%
 
@@ -441,7 +476,6 @@ class AnalyzeFace(ImageAnalysis):
         crop_x, crop_y, h = (
             int(bbox[0]),  # x-min
             int(bbox[1]),  # y-min
-            # int(bbox[2] - bbox[0]),  # width
             int(bbox[3] - bbox[1]),  # height
         )
 
@@ -480,7 +514,15 @@ class AnalyzeFace(ImageAnalysis):
         # Reload Image
         super().load_image(img2)
 
-    def crop_stylegan(self, pupils=None):
+    def crop_stylegan(
+        self, pupils: Optional[Tuple[Tuple[int, int], Tuple[int, int]]] = None
+    ) -> None:
+        """
+        Processes and crops the image for StyleGAN.
+
+        Args:
+            pupils (Optional[Tuple[Tuple[int, int], Tuple[int, int]]]): Optional pupils coordinates.
+        """
         # Save orig pupils so we can lock the scale, rotate, and crop during a load
         self.orig_pupils = util_get_pupils(self.landmarks)
 
@@ -492,8 +534,7 @@ class AnalyzeFace(ImageAnalysis):
             tilt = measures.to_degrees(r)
             if (self.tilt_threshold >= 0) and (abs(tilt) > self.tilt_threshold):
                 logger.debug(
-                    f"Rotate landmarks: detected tilt={tilt} "
-                    f"threshold={self.tilt_threshold}"
+                    f"Rotate landmarks: detected tilt={tilt} threshold={self.tilt_threshold}"
                 )
                 self.face_rotation = r
                 center = (
@@ -505,27 +546,23 @@ class AnalyzeFace(ImageAnalysis):
                 self.face_rotation = None
 
         if not pupils:
-            pupils = util_get_pupils(landmarks=self.landmarks)
+            pupils = util_get_pupils(self.landmarks)
 
         d, _ = util_calc_pd(pupils)
 
         if d == 0:
-            raise ValueError(
-                "Can't process face pupils must " "be in different locations"
-            )
+            raise ValueError("Can't process face pupils must be in different locations")
 
         if self.face_rotation:
             logger.debug(f"Fix tilt: {self.face_rotation}")
             img2 = util.straighten(self.original_img, self.face_rotation)
         width, height = img2.shape[1], img2.shape[0]
-
         ar = width / height
         new_width = int(width * (STYLEGAN_PUPIL_DIST / d))
         new_height = int(new_width / ar)
         scale = new_width / width
         crop_x = int((self.landmarks[96][0] * scale) - STYLEGAN_RIGHT_PUPIL[0])
         crop_y = int((self.landmarks[96][1] * scale) - STYLEGAN_RIGHT_PUPIL[1])
-
         img2 = cv2.resize(img2, (new_width, new_height))
 
         img2, _, _ = util.safe_clip(
@@ -541,13 +578,13 @@ class AnalyzeFace(ImageAnalysis):
         # Reload Image
         super().load_image(img2)
 
-    def calc_pd(self):
+    def calc_pd(self) -> None:
         self.pupillary_distance, self.pix2mm = util_calc_pd(self.get_pupils())
 
-    def get_pupils(self):
+    def get_pupils(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
         return util_get_pupils(self.landmarks)
 
-    def dump_state(self):
+    def dump_state(self) -> List[Any]:
         result = [
             self.original_img,
             self.headpose,
@@ -558,40 +595,36 @@ class AnalyzeFace(ImageAnalysis):
         ]
         return copy.copy(result)
 
-    def load_state(self, obj):
+    def load_state(self, obj: List[Any]) -> None:
         if self.original_img is None:
             self.init_image(obj[0])
         else:
             self.original_img = obj[0][:]
-
         self.headpose = copy.copy(obj[1])
         self.landmarks = copy.copy(obj[2])
         self.pupillary_distance = obj[3]
         self.pix2mm = obj[4]
-
         try:
             self.face_rotation = obj[5]
-        except IndexError:
-            self.face_rotation = 0
-        except TypeError:
+        except (IndexError, TypeError):
             self.face_rotation = 0
 
-    def find_pupils(self):
+    def find_pupils(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
         return util_get_pupils(self.landmarks)
 
-    def calc_bisect(self):
+    def calc_bisect(self) -> Any:
         return util.bisecting_line_coordinates(img_size=1024, pupils=self.find_pupils())
 
-    def draw_static(self):
+    def draw_static(self) -> None:
         if self.lateral:
-            str = "Lateral (right)" if self.flipped else "Lateral (left)"
-            self.write_text((10, self.height - 20), str, size=2)
+            text = "Lateral (right)" if self.flipped else "Lateral (left)"
+            self.write_text((10, self.height - 20), text, size=2)
 
 
 def load_face_image(
     filename: str,
     crop: bool = True,
-    measures: Optional[List[str]] = None,
+    measures: Optional[List[MeasureBase]] = None,
     tilt_threshold: float = DEFAULT_TILT_THRESHOLD,
 ) -> AnalyzeFace:
     """
@@ -599,17 +632,13 @@ def load_face_image(
 
     Args:
         filename (str): Path to the image file or an HTTP/HTTPS URL.
-        crop (bool, optional): Whether to crop the face image to the
-        face bounding box. Defaults to True.
-        measures (Optional[List[str]], optional): List of facial statistics
-        to analyze.
+        crop (bool, optional): Whether to crop the face image to the face bounding box. Defaults to True.
+        measures (Optional[List[MeasureBase]], optional): List of facial statistics to analyze.
             If None, all default measures will be used. Defaults to None.
-        tilt_threshold (float, optional): Maximum allowable tilt in degrees
-        before analysis fails.
-        Defaults to dynaface.facial.DEFAULT_TILT_THRESHOLD.
-
+        tilt_threshold (float, optional): Maximum allowable tilt in degrees before analysis fails.
+            Defaults to dynaface.facial.DEFAULT_TILT_THRESHOLD.
     Returns:
-        dynaface.facial.AnalyzeFace: The analyzed face object.
+        AnalyzeFace: The analyzed face object.
     """
     if measures is None:
         measures = dynaface.measures.all_measures()

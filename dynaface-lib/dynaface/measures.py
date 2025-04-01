@@ -210,8 +210,8 @@ class AnalyzeFAI(MeasureBase):
         fai: float = d1 - d2 if d1 > d2 else d2 - d1
 
         if render and render2:
-            txt: str = f"FAI={fai:.2f}"
-            pos: Any = face.analyze_next_pt(txt)
+            txt = f"FAI={fai:.2f}"
+            pos = face.analyze_next_pt(txt)
             face.write_text(pos, txt)
         return filter_measurements({"fai": fai}, self.items)
 
@@ -326,7 +326,7 @@ class AnalyzeBrows(MeasureBase):
                 return {}
             face.arrow(face.landmarks[44], left_brow, apt2=False)
             diff = abs(left_brow[1] - right_brow[1]) * face.pix2mm
-            txt: str = f"d.brow={diff:.2f} mm"
+            txt = f"d.brow={diff:.2f} mm"
             m: Any = face.calc_text_size(txt)
             face.write_text(
                 (face.width - (m[0][0] + 5), min(left_brow[1], right_brow[1]) - 10),
@@ -383,7 +383,8 @@ class AnalyzeDentalArea(MeasureBase):
         render2_ratio: bool = self.is_enabled("dental_ratio")
         render2_diff: bool = self.is_enabled("dental_diff")
 
-        contours_area: List[Any] = [
+        # Build a list of contour landmarks then convert to an ndarray.
+        contours_area_list = [
             face.landmarks[88],
             face.landmarks[89],
             face.landmarks[90],
@@ -393,14 +394,13 @@ class AnalyzeDentalArea(MeasureBase):
             face.landmarks[94],
             face.landmarks[95],
         ]
-
         p1, p2 = face.calc_bisect()
-
-        contours_area = np.array(contours_area)
+        contours_area = np.array(contours_area_list)
 
         try:
+            # Pass a tuple as the second argument.
             contours_area_left, contours_area_right = util.split_polygon(
-                contours_area, [p1, p2]
+                contours_area, (p1, p2)
             )
 
             contours_area_left = np.array(contours_area_left, dtype=int)
@@ -433,28 +433,28 @@ class AnalyzeDentalArea(MeasureBase):
             dental_diff = 0
 
         if render and render2_area:
-            txt: str = f"dental={round(dental_area,2)} mm"
-            pos: Any = face.analyze_next_pt(txt)
+            txt = f"dental={round(dental_area,2)} mm"
+            pos = face.analyze_next_pt(txt)
             face.write_text_sq(pos, txt)
 
         if render and render2_left:
-            txt: str = f"dental.left={round(dental_area_left,2)} mm"
-            pos: Any = face.analyze_next_pt(txt)
+            txt = f"dental.left={round(dental_area_left,2)} mm"
+            pos = face.analyze_next_pt(txt)
             face.write_text_sq(pos, txt)
 
         if render and render2_right:
-            txt: str = f"dental.right={round(dental_area_right,2)} mm"
-            pos: Any = face.analyze_next_pt(txt)
+            txt = f"dental.right={round(dental_area_right,2)} mm"
+            pos = face.analyze_next_pt(txt)
             face.write_text_sq(pos, txt)
 
         if render and render2_ratio:
-            txt: str = f"dental.ratio={round(dental_ratio,2)}"
-            pos: Any = face.analyze_next_pt(txt)
+            txt = f"dental.ratio={round(dental_ratio,2)}"
+            pos = face.analyze_next_pt(txt)
             face.write_text(pos, txt)
 
         if render and render2_diff:
-            txt: str = f"dental.diff={round(dental_diff,2)} mm"
-            pos: Any = face.analyze_next_pt(txt)
+            txt = f"dental.diff={round(dental_diff,2)} mm"
+            pos = face.analyze_next_pt(txt)
             face.write_text_sq(pos, txt)
 
         return filter_measurements(
@@ -560,13 +560,13 @@ class AnalyzeEyeArea(MeasureBase):
             )
 
         if render and render2_eye_diff:
-            txt: str = f"eye.diff={round(eye_area_diff,2)} mm"
-            pos: Any = face.analyze_next_pt(txt)
+            txt = f"eye.diff={round(eye_area_diff,2)} mm"
+            pos = face.analyze_next_pt(txt)
             face.write_text_sq(pos, txt)
 
         if render and render2_eye_ratio:
-            txt: str = f"eye.ratio={round(eye_area_ratio,2)}"
-            pos: Any = face.analyze_next_pt(txt)
+            txt = f"eye.ratio={round(eye_area_ratio,2)}"
+            pos = face.analyze_next_pt(txt)
             face.write_text(pos, txt)
 
         return filter_measurements(
@@ -629,10 +629,10 @@ class AnalyzePosition(MeasureBase):
                 tilt = to_degrees(util.calculate_face_rotation(p))
                 if face.face_rotation:
                     orig: float = to_degrees(face.face_rotation)
-                    txt: str = f"tilt={round(orig,2)} -> {round(tilt,2)}"
+                    txt = f"tilt={round(orig,2)} -> {round(tilt,2)}"
                 else:
-                    txt: str = f"tilt={round(tilt,2)}"
-                pos: Any = face.analyze_next_pt(txt)
+                    txt = f"tilt={round(tilt,2)}"
+                pos = face.analyze_next_pt(txt)
                 face.write_text_sq(pos, txt, mark="o", up=15)
                 p1, p2 = face.calc_bisect()
                 face.line(p1, p2)
@@ -644,13 +644,13 @@ class AnalyzePosition(MeasureBase):
                 pd, pix2mm = facial.util_calc_pd(facial.util_get_pupils(landmarks))
 
             if render and render2_pd:
-                txt: str = f"pd={round(pd,2)} px"
-                pos: Any = face.analyze_next_pt(txt)
+                txt = f"pd={round(pd,2)} px"
+                pos = face.analyze_next_pt(txt)
                 face.write_text(pos, txt)
 
             if render and render2_px2mm:
-                txt: str = f"px2mm={round(pix2mm,2)}"
-                pos: Any = face.analyze_next_pt(txt)
+                txt = f"px2mm={round(pix2mm,2)}"
+                pos = face.analyze_next_pt(txt)
                 face.write_text(pos, txt)
 
         return filter_measurements(
@@ -919,5 +919,4 @@ class AnalyzeLateral(MeasureBase):
             pos_np: Any = face.analyze_next_pt(txt_np)
             face.write_text(pos_np, txt_np)
 
-        # Note: The original code uses "self. Items" (with a space) here.
         return filter_measurements({"nn": nn, "nm": nm, "np": np_val}, self.items)
