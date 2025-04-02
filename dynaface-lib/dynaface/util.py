@@ -1,5 +1,5 @@
 import math
-from typing import List, Tuple, Optional, cast
+from typing import List, Optional, Tuple, Union, cast
 
 import cv2
 import numpy as np
@@ -410,3 +410,24 @@ def trim_sides(image: np.ndarray) -> np.ndarray:
 
     cropped = image[:, left_trim:right_trim]
     return cropped
+
+
+def is_zero_tuple(
+    p: Union[Tuple[Tuple[float, float], Tuple[float, float]], object], tol: float = 1e-9
+) -> bool:
+    """
+    Check whether the input is a 2x2 tuple of floats approximately equal to zero.
+
+    Args:
+        p: The value to check. Expected to be a tuple of two tuples, each containing two floats.
+        tol: Absolute tolerance for floating-point comparison. Defaults to 1e-9.
+
+    Returns:
+        True if p is a ((0, 0), (0, 0))-like structure with all values close to zero; False otherwise.
+    """
+    return (
+        isinstance(p, tuple)
+        and len(p) == 2
+        and all(isinstance(sub, tuple) and len(sub) == 2 for sub in p)
+        and all(math.isclose(value, 0.0, abs_tol=tol) for sub in p for value in sub)
+    )

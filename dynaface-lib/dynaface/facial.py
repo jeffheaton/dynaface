@@ -48,8 +48,8 @@ def util_calc_pd(
 
 
 def util_get_pupils(
-    landmarks: List[Tuple[float, float]],
-) -> Tuple[Tuple[float, float], Tuple[float, float]]:
+    landmarks: List[Tuple[int, int]],
+) -> Tuple[Tuple[int, int], Tuple[int, int]]:
     return landmarks[LM_LEFT_PUPIL], landmarks[LM_RIGHT_PUPIL]
 
 
@@ -80,10 +80,8 @@ class AnalyzeFace(ImageAnalysis):
         else:
             self.measures = measures
         self.headpose: List[int] = [0, 0, 0]
-        # Changed landmarks type to allow floats from scaling functions.
-        self.landmarks: List[Tuple[float, float]] = []
+        self.landmarks: List[Tuple[int, int]] = []
         self.lateral: bool = False
-        # Changed lateral_landmarks to a list of ndarrays based on what analyze_lateral returns.
         self.lateral_landmarks: List[np.ndarray] = []
         self.pupillary_distance: float = 0.0
         logger.debug(f"===INIT: t={tilt_threshold}")
@@ -113,7 +111,7 @@ class AnalyzeFace(ImageAnalysis):
 
     def _find_landmarks(
         self, img: np.ndarray
-    ) -> Tuple[Optional[List[Tuple[float, float]]], Optional[np.ndarray]]:
+    ) -> Tuple[Optional[List[Tuple[int, int]]], Optional[np.ndarray]]:
         logger.debug("Called _find_landmarks")
         start_time = time.time()
 
@@ -161,7 +159,7 @@ class AnalyzeFace(ImageAnalysis):
         landmarks2 = models.convert_landmarks(features)[0]
 
         headpose = np.array(features["headpose"][0])
-        return cast(List[Tuple[float, float]], landmarks2), headpose
+        return cast(List[Tuple[int, int]], landmarks2), headpose
 
     def is_lateral(self) -> Tuple[bool, bool]:
         """
@@ -242,7 +240,9 @@ class AnalyzeFace(ImageAnalysis):
         super().load_image(img)
         logger.debug("Low level-image loaded")
         landmarks, self._headpose = self._find_landmarks(img)
-        self.landmarks = landmarks if landmarks is not None else []
+        self.landmarks = (
+            [(int(x), int(y)) for x, y in landmarks] if landmarks is not None else []
+        )
 
         lateral_pos, facing_left = self.is_lateral()
 
@@ -491,15 +491,12 @@ class AnalyzeFace(ImageAnalysis):
         )
         img2 = cast(np.ndarray, img2)
         # Ensure landmarks is not None by providing a fallback empty list.
-        self.landmarks = (
-            cast(
-                List[Tuple[float, float]],
-                util.scale_crop_points(
-                    [(int(x), int(y)) for x, y in self.landmarks], crop_x, crop_y, scale
-                ),
+        self.landmarks = [
+            (int(x), int(y))
+            for x, y in util.scale_crop_points(
+                [(int(x), int(y)) for x, y in self.landmarks], crop_x, crop_y, scale
             )
-            or []
-        )
+        ]
         super().load_image(img2)
 
     def crop_stylegan(
@@ -535,7 +532,7 @@ class AnalyzeFace(ImageAnalysis):
                 )
             else:
                 self.face_rotation = None
-        if not pupils:
+        if util.is_zero_tuple(pupils):
             pupils = util_get_pupils(self.landmarks)
         d, _ = util_calc_pd(pupils)
         if d == 0:
@@ -560,15 +557,12 @@ class AnalyzeFace(ImageAnalysis):
             FILL_COLOR,
         )
         img2 = img2
-        self.landmarks = (
-            cast(
-                List[Tuple[float, float]],
-                util.scale_crop_points(
-                    [(int(x), int(y)) for x, y in self.landmarks], crop_x, crop_y, scale
-                ),
+        self.landmarks = [
+            (int(x), int(y))
+            for x, y in util.scale_crop_points(
+                [(int(x), int(y)) for x, y in self.landmarks], crop_x, crop_y, scale
             )
-            or []
-        )
+        ]
         super().load_image(img2)
 
     def calc_pd(self) -> None:
