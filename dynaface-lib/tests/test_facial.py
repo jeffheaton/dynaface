@@ -203,7 +203,7 @@ class TestFaceAnalysis(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             _ = facial.load_face_image("./tests_data/img1-512.jpg")
 
-        self.assertIn("Models not initialized", str(context.exception))
+        self.assertIn("not initialized", str(context.exception).lower())
 
     def test_face_rotation(self):
         # Initialize models

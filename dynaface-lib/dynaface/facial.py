@@ -123,7 +123,9 @@ class AnalyzeFace(ImageAnalysis):
             )
 
         # Ensure the mtcnn model is available.
-        assert models.mtcnn_model is not None, "mtcnn_model is None"
+        if models.mtcnn_model is None:
+            raise ValueError("MTCNN model not initialized, please call init_models()")
+
         bbox, prob = models.mtcnn_model.detect(img)
 
         if prob[0] is None or prob[0] < 0.9:
@@ -557,7 +559,7 @@ class AnalyzeFace(ImageAnalysis):
             STYLEGAN_WIDTH,
             FILL_COLOR,
         )
-        img2 = cast(np.ndarray, img2)
+        img2 = img2
         self.landmarks = (
             cast(
                 List[Tuple[float, float]],

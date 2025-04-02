@@ -209,7 +209,7 @@ def init_models(model_path: str, device: str) -> None:
 def unload_models() -> None:
     global _model_path, _device, mtcnn_model, spiga_model, rembg_session
     _model_path = None
-    _device = None
+    _device = "cpu"
     mtcnn_model = None
     spiga_model = None
     rembg_session = None

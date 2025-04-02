@@ -364,13 +364,12 @@ def find_lateral_landmarks(
     max_indices: np.ndarray,
     min_indices: np.ndarray,
     shift_x: int,
-) -> list[tuple[int, ...]]:
+) -> np.ndarray:
     """
     Using the local extrema, compute the 6 lateral landmarks.
 
     Returns:
-        list[tuple[int, int]]: A list of 6 tuples, where each tuple contains [x, y]
-        coordinates for a landmark:
+        np.ndarray: A 6x2 array containing the (x, y) coordinates for each landmark:
           - LATERAL_LM_SOFT_TISSUE_GLABELLA (0): Soft Tissue Glabella
           - LATERAL_LM_SOFT_TISSUE_NASION (1): Soft Tissue Nasion
           - LATERAL_LM_NASAL_TIP (2): Nasal Tip
@@ -421,7 +420,8 @@ def find_lateral_landmarks(
     # Shift all x-coordinates to the left by shift_x
     landmarks[:, 0] += shift_x
 
-    return [tuple(map(int, point)) for point in landmarks]
+    # return [tuple(map(int, point)) for point in landmarks]
+    return np.array([tuple(map(int, point)) for point in landmarks])
 
 
 def plot_sagittal_minmax(
