@@ -560,9 +560,9 @@ def analyze_lateral(
 
     # Compute and plot lateral landmarks.
     landmarks = find_lateral_landmarks(
-        sagittal_x, sagittal_y, max_indices, min_indices, shift_x
+        sagittal_x, sagittal_y, max_indices, min_indices, int(shift_x)
     )
-    plot_lateral_landmarks(ax2, landmarks, shift_x)
+    plot_lateral_landmarks(ax2, landmarks, int(shift_x))
     if DEBUG:
         print("Lateral Landmarks (x, y):")
         print(landmarks)

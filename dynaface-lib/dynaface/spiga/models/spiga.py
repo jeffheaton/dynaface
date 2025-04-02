@@ -150,7 +150,7 @@ class SPIGA(nn.Module):
         visual_field: torch.Tensor = features["VisualField"][-1]
 
         # Iterate over each regression step
-        gat_prob = []
+        gat_prob: list[torch.Tensor] = []
         features["Landmarks"] = []
         for step in range(self.steps):
             # Generate embedded features from visual and shape information

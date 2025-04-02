@@ -31,7 +31,7 @@ EXPECTED_SHA256 = "c18f9c038b65d7486e7f9e081506bc69cbbc5719680eb31b1bafa8235ca6a
 
 # Global variables (now explicitly typed as Optional)
 _model_path: Optional[str] = None
-_device: Optional[str] = None
+_device: str = "cpu"  # Default to CPU
 mtcnn_model: Optional[Union[MTCNN, "MTCNN2"]] = None
 spiga_model: Optional[SPIGAFramework] = None
 rembg_session: Optional[Any] = None
