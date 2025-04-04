@@ -18,6 +18,8 @@ from tab_eval import TabEval
 
 logger = logging.getLogger(__name__)
 
+ALLOW_ONE_ANALYZE_TAB = False
+
 
 class DynafaceWindow(MainWindowJTH):
     def __init__(self, app, app_name):
@@ -221,7 +223,8 @@ class DynafaceWindow(MainWindowJTH):
 
     def show_analyze_video(self, filename):
         try:
-            self.close_analyze_tabs()
+            if ALLOW_ONE_ANALYZE_TAB:
+                self.close_analyze_tabs()
             basename = os.path.basename(filename)
             tab_name = f"Analyze: {basename}"
             self.add_tab(AnalyzeVideoTab(self, filename), tab_name)
