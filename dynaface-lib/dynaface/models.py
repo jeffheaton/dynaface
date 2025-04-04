@@ -147,17 +147,17 @@ def download_models(
 
     # Try to fetch redirected URL for the ZIP file
     try:
-        response = requests.get(REDIRECT_URL, timeout=10)
+        response = requests.get(REDIRECT_URL, timeout=10, verify=False)
         response.raise_for_status()
         model_info = response.json()
         zip_url = model_info[MODEL_VERSION]["url"]
-    except Exception:
+    except Exception as e:
         zip_url = FALLBACK_URL  # Fallback if redirect fails
 
     # Try to download ZIP using primary URL; if it fails, try the fallback.
     try:
         logger.info(f"Downloading DynaFace model files from {zip_url}...")
-        response = requests.get(zip_url, stream=True, timeout=30)
+        response = requests.get(zip_url, stream=True, timeout=30, verify=False)
         response.raise_for_status()
         with open(zip_path, "wb") as f:
             for chunk in response.iter_content(chunk_size=8192):
@@ -166,7 +166,7 @@ def download_models(
         if zip_url == FALLBACK_URL:
             raise primary_exception
         try:
-            response = requests.get(FALLBACK_URL, stream=True, timeout=30)
+            response = requests.get(FALLBACK_URL, stream=True, timeout=30, verify=False)
             response.raise_for_status()
             with open(zip_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):

@@ -627,7 +627,7 @@ def load_face_image(
 
     parsed = urlparse(filename)
     if parsed.scheme in ("http", "https"):
-        response = requests.get(filename, timeout=10)
+        response = requests.get(filename, timeout=10, verify=False)
         response.raise_for_status()
         img_array = np.asarray(bytearray(response.content), dtype=np.uint8)
         img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
