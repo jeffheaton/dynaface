@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
 from PIL import Image
-from rembg import remove
-from scipy.signal import find_peaks
+from rembg import remove  # type: ignore
+from scipy.signal import find_peaks  # type: ignore
 
 from dynaface import models, util
 

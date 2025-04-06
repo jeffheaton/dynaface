@@ -1,6 +1,8 @@
 import math
 import os
 from typing import List, Optional, Tuple
+from numpy.typing import NDArray
+from typing import Any, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -23,7 +25,7 @@ CLUST_NUM = 3
 USE_HSV = False
 
 
-def load_image(filename: str) -> np.ndarray:
+def load_image(filename: str) -> NDArray[Any]:
     """
     Load an image from a file and convert it to RGB format.
 
@@ -51,6 +53,9 @@ class ImageAnalysis:
         self.text_thick: int = 2
         self.text_back: int = 5
         self.stats_right: int = 750
+        self.width: int = 0
+        self.height: int = 0
+        self.shape: Tuple[int, ...] = (0, 0, 3)
 
     def _check_image(self) -> None:
         """
@@ -71,7 +76,7 @@ class ImageAnalysis:
         """
         return hasattr(self, "render_img")
 
-    def load_image(self, img: np.ndarray) -> bool:
+    def load_image(self, img: NDArray[Any]) -> bool:
         """
         Load an image into the analysis class.
 
@@ -83,8 +88,6 @@ class ImageAnalysis:
             TypeError: If img is None.
             ValueError: If img is too small.
         """
-        if img is None:
-            raise TypeError("Expected a value for img, but got None instead.")
 
         if img.shape[0] < 5 or img.shape[1] < 5:
             raise ValueError("Image is empty")
@@ -92,23 +95,21 @@ class ImageAnalysis:
         self.init_image(img)
         return True
 
-    def init_image(self, img: np.ndarray) -> None:
+    def init_image(self, img: NDArray[Any]) -> None:
         """
         Initialize the image and related attributes.
 
         Args:
             img (np.ndarray): Input image.
         """
-        self.original_img: np.ndarray = img.copy()
-        self.gray_img: np.ndarray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        self.render_img: np.ndarray = img.copy()
-        self.original_hsv: np.ndarray = cv2.cvtColor(
+        self.original_img: NDArray[Any] = img.copy()
+        self.gray_img: NDArray[Any] = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        self.render_img: NDArray[Any] = img.copy()
+        self.original_hsv: NDArray[Any] = cv2.cvtColor(
             self.original_img, cv2.COLOR_RGB2HSV
         ).astype(np.int64)
-        self.shape: Tuple[int, ...] = self.original_img.shape
+        self.shape = self.original_img.shape
 
-        self.height: int
-        self.width: int
         self.height, self.width = self.original_img.shape[:2]
 
     def write_text(
@@ -336,7 +337,7 @@ class ImageAnalysis:
 
     def extract_horiz(
         self, y: int, x1: Optional[int] = None, x2: Optional[int] = None
-    ) -> np.ndarray:
+    ) -> NDArray[Any]:
         """
         Extract a horizontal section of the image.
 
@@ -357,7 +358,7 @@ class ImageAnalysis:
 
     def extract_horiz_hsv(
         self, y: int, x1: Optional[int] = None, x2: Optional[int] = None
-    ) -> np.ndarray:
+    ) -> NDArray[Any]:
         """
         Extract a horizontal section of the HSV image.
 

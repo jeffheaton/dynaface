@@ -7,9 +7,13 @@ from matplotlib.axes import Axes
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 from PIL import Image
+from numpy.typing import NDArray
+from typing import Any, List, Optional, Tuple, cast
+
+Number = Union[int, float]
 
 
-def PolyArea(x: np.ndarray, y: np.ndarray) -> float:
+def PolyArea(x: NDArray[Any], y: NDArray[Any]) -> float:
     """
     Calculate the area of a polygon using the Shoelace formula.
 
@@ -25,13 +29,13 @@ def PolyArea(x: np.ndarray, y: np.ndarray) -> float:
 
 
 def safe_clip(
-    cv2_image: np.ndarray,
+    cv2_image: NDArray[Any],
     x: int,
     y: int,
     width: int,
     height: int,
     background: Tuple[int, int, int],
-) -> Tuple[np.ndarray, int, int]:
+) -> Tuple[NDArray[Any], int, int]:
     """
     Clips a region from an OpenCV image, adjusting for boundaries and filling missing areas with a specified color.
     """
@@ -79,7 +83,7 @@ def scale_crop_points(
 
 def rotate_crop_points(
     points: List[Tuple[int, int]], center: Tuple[int, int], angle_degrees: float
-) -> List[np.ndarray]:
+) -> List[NDArray[Any]]:
     """
     Rotate the points around the center by the specified angle.
     """
@@ -88,7 +92,7 @@ def rotate_crop_points(
     sin_theta = np.sin(angle_radians)
     rotation_matrix = np.array([[cos_theta, -sin_theta], [sin_theta, cos_theta]])
 
-    rotated_points: List[np.ndarray] = []
+    rotated_points: List[NDArray[Any]] = []
     for point in points:
         vector = np.array(point) - np.array(center)
         rotated_vector = np.dot(rotation_matrix, vector)
@@ -112,7 +116,7 @@ def calculate_face_rotation(
     return angle
 
 
-def calculate_average_rgb(image: np.ndarray) -> Tuple[int, int, int]:
+def calculate_average_rgb(image: NDArray[Any]) -> Tuple[int, int, int]:
     """
     Calculate the average RGB value of an image.
     """
@@ -123,7 +127,7 @@ def calculate_average_rgb(image: np.ndarray) -> Tuple[int, int, int]:
     return int(r), int(g), int(b)
 
 
-def straighten(image: np.ndarray, angle_radians: float) -> np.ndarray:
+def straighten(image: NDArray[Any], angle_radians: float) -> NDArray[Any]:
     """
     Rotate the image to align the pupils horizontally, crop to original dimensions,
     and fill dead-space with the average RGB color.
@@ -167,7 +171,7 @@ def symmetry_ratio(a: float, b: float) -> float:
 
 def line_intersection(
     line: Tuple[Tuple[int, int], Tuple[int, int]],
-    contour: np.ndarray,
+    contour: NDArray[Any],
     tol: float = 1e-7,
 ) -> List[Tuple[Tuple[int, int], int]]:
     """
@@ -223,8 +227,8 @@ def compute_intersection(
 
 
 def split_polygon(
-    polygon: np.ndarray, line: Tuple[Tuple[int, int], Tuple[int, int]]
-) -> Tuple[np.ndarray, np.ndarray]:
+    polygon: NDArray[Any], line: Tuple[Tuple[int, int], Tuple[int, int]]
+) -> Tuple[NDArray[Any], NDArray[Any]]:
     """
     Split a polygon into two parts using a line that bisects it.
     """
@@ -312,44 +316,43 @@ def line_to_edge(
     meets the boundary of a square image.
     """
     x0, y0 = start_point
-    slope = np.tan(angle)
+    slope = math.tan(angle)
     possible_endpoints: List[Tuple[int, int]] = []
 
-    # Intersection with the right edge (x = img_size)
+    def safe_append(x: float, y: float) -> None:
+        if not math.isfinite(x) or not math.isfinite(y):
+            return
+        if 0 <= x <= img_size and 0 <= y <= img_size:
+            possible_endpoints.append((int(x), int(y)))
+
+    # Right edge (x = img_size)
     if slope != 0:
         x_right = img_size
         y_right = slope * (x_right - x0) + y0
-        if 0 <= y_right <= img_size:
-            possible_endpoints.append((x_right, y_right))
+        safe_append(x_right, y_right)
 
-    # Intersection with the left edge (x = 0)
+    # Left edge (x = 0)
     if slope != 0:
         x_left = 0
         y_left = slope * (x_left - x0) + y0
-        if 0 <= y_left <= img_size:
-            possible_endpoints.append((x_left, y_left))
+        safe_append(x_left, y_left)
 
-    # Intersection with the top edge (y = 0)
-    if slope != np.inf:
+    # Top edge (y = 0)
+    if slope != 0:
         y_top = 0
         x_top = (y_top - y0) / slope + x0
-        if 0 <= x_top <= img_size:
-            possible_endpoints.append((x_top, y_top))
+        safe_append(x_top, y_top)
 
-    # Intersection with the bottom edge (y = img_size)
-    if slope != np.inf:
+    # Bottom edge (y = img_size)
+    if slope != 0:
         y_bottom = img_size
-        if (slope + x0) < 1e-10:  # Prevent division by zero
-            return None
         x_bottom = (y_bottom - y0) / slope + x0
-        if 0 <= x_bottom <= img_size:
-            possible_endpoints.append((x_bottom, y_bottom))
+        safe_append(x_bottom, y_bottom)
 
     if not possible_endpoints:
         return None
 
-    endpoint = possible_endpoints[0]
-    return (int(endpoint[0]), int(endpoint[1]))
+    return possible_endpoints[0]
 
 
 def normalize_angle(angle: float) -> float:
@@ -359,7 +362,7 @@ def normalize_angle(angle: float) -> float:
     return angle % (2 * math.pi)
 
 
-def cv2_to_pil(cv_image: np.ndarray) -> Image.Image:
+def cv2_to_pil(cv_image: NDArray[Any]) -> Image.Image:
     """
     Convert an OpenCV image (NumPy array) to a PIL image.
     """
@@ -372,7 +375,7 @@ def cv2_to_pil(cv_image: np.ndarray) -> Image.Image:
         raise ValueError("Unsupported image format")
 
 
-def convert_matplotlib_to_opencv(ax: Axes) -> np.ndarray:
+def convert_matplotlib_to_opencv(ax: Axes) -> NDArray[Any]:
     """
     Convert a Matplotlib axis to an OpenCV image without extra whitespace.
     """
@@ -392,7 +395,7 @@ def convert_matplotlib_to_opencv(ax: Axes) -> np.ndarray:
     return image
 
 
-def trim_sides(image: np.ndarray) -> np.ndarray:
+def trim_sides(image: NDArray[Any]) -> NDArray[Any]:
     """
     Trims space from the left and right sides of the image based on the background color sampled
     from the upper-left pixel, while maintaining the original height.
@@ -412,22 +415,13 @@ def trim_sides(image: np.ndarray) -> np.ndarray:
     return cropped
 
 
-def is_zero_tuple(
-    p: Union[Tuple[Tuple[float, float], Tuple[float, float]], object], tol: float = 1e-9
-) -> bool:
-    """
-    Check whether the input is a 2x2 tuple of floats approximately equal to zero.
+def is_zero_tuple(p: Any, tol: float = 1e-9) -> bool:
+    if not isinstance(p, tuple):
+        return False
 
-    Args:
-        p: The value to check. Expected to be a tuple of two tuples, each containing two floats.
-        tol: Absolute tolerance for floating-point comparison. Defaults to 1e-9.
+    p_tuple = cast(Tuple[Any, ...], p)
 
-    Returns:
-        True if p is a ((0, 0), (0, 0))-like structure with all values close to zero; False otherwise.
-    """
-    return (
-        isinstance(p, tuple)
-        and len(p) == 2
-        and all(isinstance(sub, tuple) and len(sub) == 2 for sub in p)
-        and all(math.isclose(value, 0.0, abs_tol=tol) for sub in p for value in sub)
-    )
+    if not all(isinstance(x, (int, float)) for x in p_tuple):
+        return False
+
+    return math.isclose(sum(p_tuple), 0.0, abs_tol=tol)

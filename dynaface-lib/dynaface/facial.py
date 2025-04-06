@@ -2,7 +2,7 @@ import copy
 import logging
 import math
 import time
-from typing import List, Optional, Tuple, Any, Dict, cast
+from typing import Any, Dict, List, Optional, Tuple, cast
 from urllib.parse import urlparse
 
 import cv2
@@ -11,11 +11,13 @@ import dynaface.measures
 import numpy as np
 import requests  # You may also use: # type: ignore[import]
 from dynaface.image import ImageAnalysis
-from dynaface.lateral import analyze_lateral
+from dynaface.lateral import analyze_lateral  # type: ignore
+from dynaface.measures import MeasureBase
+from dynaface.models import are_models_init
+from numpy.typing import NDArray
 
 import dynaface
 from dynaface import measures, models, util
-from dynaface.measures import MeasureBase
 
 # Restore the logger definition
 logger = logging.getLogger(__name__)
@@ -69,11 +71,12 @@ class AnalyzeFace(ImageAnalysis):
             tilt_threshold (float): Maximum allowable tilt threshold. Defaults to DEFAULT_TILT_THRESHOLD.
         """
         super().__init__()
-        # Changed to Optional so that later checks in draw_landmarks work as intended.
+
+        self.render_img: NDArray[np.uint8] = np.zeros((1024, 1024, 3), dtype=np.uint8)
         self.left_eye: Optional[Tuple[int, int]] = None
         self.right_eye: Optional[Tuple[int, int]] = None
         self.nose: Tuple[int, int] = (0, 0)
-        self._headpose: np.ndarray = np.array([0.0, 0.0, 0.0])
+        self._headpose: NDArray[np.float64] = np.array([0.0, 0.0, 0.0])
         self.flipped: bool = False
         if measures is None:
             self.measures: List[MeasureBase] = dynaface.measures.all_measures()
@@ -82,7 +85,7 @@ class AnalyzeFace(ImageAnalysis):
         self.headpose: List[int] = [0, 0, 0]
         self.landmarks: List[Tuple[int, int]] = []
         self.lateral: bool = False
-        self.lateral_landmarks: List[np.ndarray] = []
+        self.lateral_landmarks: List[NDArray[Any]] = []
         self.pupillary_distance: float = 0.0
         logger.debug(f"===INIT: t={tilt_threshold}")
         self.tilt_threshold: float = tilt_threshold
@@ -110,12 +113,12 @@ class AnalyzeFace(ImageAnalysis):
         return len(self.landmarks) == 0
 
     def _find_landmarks(
-        self, img: np.ndarray
-    ) -> Tuple[Optional[List[Tuple[int, int]]], Optional[np.ndarray]]:
+        self, img: NDArray[Any]
+    ) -> Tuple[Optional[List[Tuple[int, int]]], Optional[NDArray[Any]]]:
         logger.debug("Called _find_landmarks")
         start_time = time.time()
 
-        if not dynaface.models.are_models_init():
+        if not are_models_init():
             raise ValueError(
                 "Models not initialized, please call dynaface.models.init_models()"
             )
@@ -124,7 +127,7 @@ class AnalyzeFace(ImageAnalysis):
         if models.mtcnn_model is None:
             raise ValueError("MTCNN model not initialized, please call init_models()")
 
-        bbox, prob = models.mtcnn_model.detect(img)
+        bbox, prob = models.mtcnn_model.detect(img)  # type: ignore
 
         if prob[0] is None or prob[0] < 0.9:
             # Return an ndarray for headpose instead of a list.
@@ -147,7 +150,7 @@ class AnalyzeFace(ImageAnalysis):
         start_time = time.time()
         # Ensure the spiga model is available.
         assert models.spiga_model is not None, "spiga_model is None"
-        features = models.spiga_model.inference(img, [bbox])
+        features = models.spiga_model.inference(img, [bbox])  # type: ignore
         end_time = time.time()
         spiga_duration = end_time - start_time
 
@@ -155,11 +158,10 @@ class AnalyzeFace(ImageAnalysis):
             f"Elapsed time (sec): MTCNN={mtcnn_duration:,}, SPIGA={spiga_duration:,}"
         )
         # Prepare variables
-        x0, y0, w, h = bbox
         landmarks2 = models.convert_landmarks(features)[0]
 
         headpose = np.array(features["headpose"][0])
-        return cast(List[Tuple[int, int]], landmarks2), headpose
+        return landmarks2, headpose
 
     def is_lateral(self) -> Tuple[bool, bool]:
         """
@@ -187,7 +189,7 @@ class AnalyzeFace(ImageAnalysis):
 
         return is_lateral, is_facing_left
 
-    def _overlay_lateral_analysis(self, c: Optional[np.ndarray]) -> None:
+    def _overlay_lateral_analysis(self, c: Optional[NDArray[np.uint8]]) -> None:
         """
         Scales and overlays the lateral analysis image onto self.render_img
         at the top-right.
@@ -211,19 +213,20 @@ class AnalyzeFace(ImageAnalysis):
             new_width = MAX_INSERT_WIDTH  # Crop to MAX_INSERT_WIDTH max width
             c_resized = c_resized[:, :MAX_INSERT_WIDTH]
 
-        render_h, render_w = self.render_img.shape[:2]
+        _, render_w = self.render_img.shape[:2]
         x_offset = render_w - new_width
         y_offset = 0
 
         self.render_img[y_offset : y_offset + 1024, x_offset : x_offset + new_width] = (
             c_resized
         )
+
         super().load_image(self.render_img)
 
     # Overridden with extra parameters – ignore type-checking override error.
     def load_image(
         self,
-        img: np.ndarray,
+        img: NDArray[Any],
         crop: Optional[bool] = True,
         pupils: Optional[Tuple[Tuple[int, int], Tuple[int, int]]] = None,
     ) -> bool:

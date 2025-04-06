@@ -11,4 +11,4 @@ unzip -o ./data/dynaface_models.zip -d ./data/
 rm ./data/dynaface_models.zip
 
 cd ../dynaface-lib
-pip install -e .
+pip install -e .[dev]

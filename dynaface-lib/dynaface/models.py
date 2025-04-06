@@ -7,15 +7,16 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import numpy as np
-import rembg
+import rembg  # type: ignore
+from rembg.sessions.u2net import U2netSession  # type: ignore
 import requests
 import torch
 from dynaface.spiga.inference.config import ModelConfig
 from dynaface.spiga.inference.framework import SPIGAFramework
-from facenet_pytorch import MTCNN
-from facenet_pytorch.models.mtcnn import ONet, PNet, RNet
+from facenet_pytorch import MTCNN  # type: ignore
+from facenet_pytorch.models.mtcnn import ONet, PNet, RNet  # type: ignore
 from torch import nn
-from torch.nn.functional import interpolate
+from torch.nn.functional import interpolate  # type: ignore
 
 # Mac M1 issue - hope to remove some day
 # RuntimeError: Adaptive pool MPS: input sizes must be divisible by output sizes.
@@ -31,10 +32,10 @@ EXPECTED_SHA256 = "c18f9c038b65d7486e7f9e081506bc69cbbc5719680eb31b1bafa8235ca6a
 
 # Global variables (now explicitly typed as Optional)
 _model_path: Optional[str] = None
-_device: str = "cpu"  # Default to CPU
+_device: str = "?"  # Default to CPU
 mtcnn_model: Optional[Union[MTCNN, "MTCNN2"]] = None
 spiga_model: Optional[SPIGAFramework] = None
-rembg_session: Optional[Any] = None
+rembg_session: Optional[U2netSession] = None
 
 SPIGA_MODEL = "wflw"
 
@@ -44,8 +45,8 @@ logger = logging.getLogger(__name__)
 def imresample_mps(img: torch.Tensor, sz: Union[int, Tuple[int, ...]]) -> torch.Tensor:
     # Move the tensor to the CPU and perform interpolation on the CPU before sending it to "mps"
     img_cpu = img.to("cpu")
-    im_data = interpolate(img_cpu, size=sz, mode="area")
-    return cast(torch.Tensor, im_data.to("mps"))
+    im_data = cast(torch.Tensor, interpolate(img_cpu, size=sz, mode="area"))
+    return im_data.to("mps")
 
 
 class MTCNN2(MTCNN):
@@ -63,7 +64,7 @@ class MTCNN2(MTCNN):
         device: Optional[str] = None,
         path: str = "",  # now a required string (do not use None)
     ) -> None:
-        nn.Module.__init__(self)
+        super().__init__()  # type: ignore
         self.image_size = image_size
         self.margin = margin
         self.min_face_size = min_face_size
@@ -91,7 +92,7 @@ class MTCNN2(MTCNN):
 
     def load_weights(self, net: nn.Module, filename: str) -> None:
         try:
-            state_dict = torch.load(filename, pickle_module=torch.serialization.pickle)
+            state_dict = cast(Dict[str, torch.Tensor], torch.load(filename, map_location="cpu"))  # type: ignore
             net.load_state_dict(state_dict)
         except Exception as e:
             raise ValueError(f"Error loading model weights from {filename}: {str(e)}")
@@ -99,7 +100,7 @@ class MTCNN2(MTCNN):
 
 def _init_mtcnn() -> None:
     global mtcnn_model
-    if _device is None:
+    if _device is "?":
         raise ValueError("Device not initialized. Call init_models() first.")
 
     if _device == "mps" and FIX_MPS_ISSUE:
@@ -125,7 +126,7 @@ def _init_rembg() -> None:
     if _model_path is None:
         raise ValueError("Model path not set. Call init_models() first.")
     os.environ["U2NET_HOME"] = _model_path
-    rembg_session = rembg.new_session(model_name="u2net")
+    rembg_session = rembg.new_session(model_name="u2net")  # type: ignore
 
 
 def download_models(
@@ -217,7 +218,7 @@ def unload_models() -> None:
 
 
 def are_models_init() -> bool:
-    return _device is not None
+    return _device is not "?"
 
 
 def detect_device() -> str:

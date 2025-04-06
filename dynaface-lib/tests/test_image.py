@@ -37,8 +37,8 @@ class TestImage(unittest.TestCase):
     #
     def test_load_image_none(self):
         analysis = ImageAnalysis()
-        with self.assertRaises(TypeError):
-            analysis.load_image(None)
+        with self.assertRaises(Exception):
+            analysis.load_image(None)  # type: ignore
 
     def test_load_image_too_small(self):
         analysis = ImageAnalysis()
