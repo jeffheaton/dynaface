@@ -81,9 +81,13 @@ def scale_crop_points(
     return lst2
 
 
+from typing import List, Tuple
+import numpy as np
+
+
 def rotate_crop_points(
     points: List[Tuple[int, int]], center: Tuple[int, int], angle_degrees: float
-) -> List[NDArray[Any]]:
+) -> List[Tuple[int, int]]:
     """
     Rotate the points around the center by the specified angle.
     """
@@ -92,12 +96,14 @@ def rotate_crop_points(
     sin_theta = np.sin(angle_radians)
     rotation_matrix = np.array([[cos_theta, -sin_theta], [sin_theta, cos_theta]])
 
-    rotated_points: List[NDArray[Any]] = []
+    rotated_points: List[Tuple[int, int]] = []
     for point in points:
         vector = np.array(point) - np.array(center)
         rotated_vector = np.dot(rotation_matrix, vector)
         rotated_point = rotated_vector + np.array(center)
-        rotated_points.append(rotated_point)
+        rotated_points.append(
+            (int(round(rotated_point[0])), int(round(rotated_point[1])))
+        )
 
     return rotated_points
 

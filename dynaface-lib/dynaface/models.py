@@ -152,7 +152,7 @@ def download_models(
         response.raise_for_status()
         model_info = response.json()
         zip_url = model_info[MODEL_VERSION]["url"]
-    except Exception as e:
+    except Exception:
         zip_url = FALLBACK_URL  # Fallback if redirect fails
 
     # Try to download ZIP using primary URL; if it fails, try the fallback.

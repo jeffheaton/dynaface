@@ -85,7 +85,7 @@ class AnalyzeFace(ImageAnalysis):
         self.headpose: List[int] = [0, 0, 0]
         self.landmarks: List[Tuple[int, int]] = []
         self.lateral: bool = False
-        self.lateral_landmarks: List[NDArray[Any]] = []
+        self.lateral_landmarks: NDArray[Any] = np.ndarray([])
         self.pupillary_distance: float = 0.0
         logger.debug(f"===INIT: t={tilt_threshold}")
         self.tilt_threshold: float = tilt_threshold
@@ -114,7 +114,7 @@ class AnalyzeFace(ImageAnalysis):
 
     def _find_landmarks(
         self, img: NDArray[Any]
-    ) -> Tuple[Optional[List[Tuple[int, int]]], Optional[NDArray[Any]]]:
+    ) -> Tuple[List[Tuple[int, int]], NDArray[Any]]:
         logger.debug("Called _find_landmarks")
         start_time = time.time()
 
@@ -223,7 +223,6 @@ class AnalyzeFace(ImageAnalysis):
 
         super().load_image(self.render_img)
 
-    # Overridden with extra parameters – ignore type-checking override error.
     def load_image(
         self,
         img: NDArray[Any],
@@ -243,9 +242,7 @@ class AnalyzeFace(ImageAnalysis):
         super().load_image(img)
         logger.debug("Low level-image loaded")
         landmarks, self._headpose = self._find_landmarks(img)
-        self.landmarks = (
-            [(int(x), int(y)) for x, y in landmarks] if landmarks is not None else []
-        )
+        self.landmarks = [(int(x), int(y)) for x, y in landmarks]
 
         lateral_pos, facing_left = self.is_lateral()
 
@@ -257,7 +254,7 @@ class AnalyzeFace(ImageAnalysis):
                 flipped = cv2.flip(self.original_img, 1)
                 super().load_image(flipped)
                 landmarks, self._headpose = self._find_landmarks(flipped)
-                self.landmarks = landmarks if landmarks is not None else []
+                self.landmarks = landmarks
             else:
                 self.flipped = False
 
@@ -351,8 +348,8 @@ class AnalyzeFace(ImageAnalysis):
         self,
         pt1: Tuple[int, int],
         pt2: Tuple[int, int],
-        sagittal_x: np.ndarray,
-        sagittal_y: np.ndarray,
+        sagittal_x: NDArray[Any],
+        sagittal_y: NDArray[Any],
         color: Tuple[int, int, int] = (255, 0, 0),
         thickness: int = 3,
         render: bool = True,
@@ -364,7 +361,7 @@ class AnalyzeFace(ImageAnalysis):
         """
         sagittal_line = np.column_stack((sagittal_x, sagittal_y))
 
-        def find_closest_index(point: Tuple[int, int], line: np.ndarray) -> int:
+        def find_closest_index(point: Tuple[int, int], line: NDArray[Any]) -> int:
             distances = np.linalg.norm(line - np.array(point), axis=1)
             return int(np.argmin(distances))
 
@@ -395,7 +392,7 @@ class AnalyzeFace(ImageAnalysis):
         return d
 
     def draw_curve(
-        self, segment: np.ndarray, color: Tuple[int, int, int], thickness: int
+        self, segment: NDArray[Any], color: Tuple[int, int, int], thickness: int
     ) -> None:
         """
         Draws a curve connecting a segment of points.
@@ -457,7 +454,7 @@ class AnalyzeFace(ImageAnalysis):
 
         # Ensure mtcnn_model is available.
         assert models.mtcnn_model is not None, "mtcnn_model is None"
-        bbox, _ = models.mtcnn_model.detect(self.render_img)
+        bbox, _ = models.mtcnn_model.detect(self.render_img)  # type: ignore
         bbox = bbox[0]
 
         crop_x, crop_y, h = (
@@ -492,7 +489,6 @@ class AnalyzeFace(ImageAnalysis):
             STYLEGAN_WIDTH,
             FILL_COLOR,
         )
-        img2 = cast(np.ndarray, img2)
         # Ensure landmarks is not None by providing a fallback empty list.
         self.landmarks = [
             (int(x), int(y))
@@ -516,7 +512,7 @@ class AnalyzeFace(ImageAnalysis):
             (int(pupils[0][0]), int(pupils[0][1])) if pupils else (0, 0),
             (int(pupils[1][0]), int(pupils[1][1])) if pupils else (0, 0),
         )
-        pupils = self.orig_pupils if pupils is None else pupils
+        pupils = self.orig_pupils if util.is_zero_tuple(pupils) else pupils
         img2 = self.original_img
         if pupils:
             r = util.calculate_face_rotation(pupils)
@@ -575,7 +571,7 @@ class AnalyzeFace(ImageAnalysis):
         return util_get_pupils(self.landmarks)
 
     def dump_state(self) -> List[Any]:
-        result = [
+        result: List[Any] = [
             self.original_img,
             self.headpose,
             self.landmarks,

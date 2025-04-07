@@ -308,26 +308,30 @@ class AnalyzeBrows(MeasureBase):
         p: Any = facial.util_get_pupils(face.landmarks)
         tilt: float = util.normalize_angle(util.calculate_face_rotation(p))
 
+        right_brow: Any = util.line_to_edge(
+            img_size=1024, start_point=face.landmarks[35], angle=tilt
+        )
+        if not right_brow:
+            return {}
+
         if render and render2:
-            right_brow: Any = util.line_to_edge(
-                img_size=1024, start_point=face.landmarks[35], angle=tilt
-            )
-            if not right_brow:
-                return {}
             face.arrow(face.landmarks[36], right_brow, apt2=False)
 
         diff: float = 0
 
+        left_brow: Any = util.line_to_edge(
+            img_size=1024, start_point=face.landmarks[44], angle=tilt
+        )
+
+        if not left_brow:
+            return {}
+
+        diff = abs(left_brow[1] - right_brow[1]) * face.pix2mm
+        txt = f"d.brow={diff:.2f} mm"
+        m: Any = face.calc_text_size(txt)
+
         if render and render2:
-            left_brow: Any = util.line_to_edge(
-                img_size=1024, start_point=face.landmarks[44], angle=tilt
-            )
-            if not left_brow:
-                return {}
             face.arrow(face.landmarks[44], left_brow, apt2=False)
-            diff = abs(left_brow[1] - right_brow[1]) * face.pix2mm
-            txt = f"d.brow={diff:.2f} mm"
-            m: Any = face.calc_text_size(txt)
             face.write_text(
                 (face.width - (m[0][0] + 5), min(left_brow[1], right_brow[1]) - 10),
                 txt,
@@ -622,6 +626,8 @@ class AnalyzePosition(MeasureBase):
 
         p: Any = facial.util_get_pupils(face.landmarks)
         tilt: float = 0.0
+        pd: float = 260
+        pix2mm: float = 0.24
 
         if p:
             landmarks: Any = face.landmarks
@@ -637,10 +643,7 @@ class AnalyzePosition(MeasureBase):
                 p1, p2 = face.calc_bisect()
                 face.line(p1, p2)
 
-            if face.lateral:
-                pd: float = 260
-                pix2mm: float = 0.24
-            else:
+            if not face.lateral:
                 pd, pix2mm = facial.util_calc_pd(facial.util_get_pupils(landmarks))
 
             if render and render2_pd:

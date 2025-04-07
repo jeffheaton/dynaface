@@ -1,9 +1,10 @@
-from typing import Any, Tuple
+from typing import Any, List, Tuple
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
+from numpy.typing import NDArray
 from PIL import Image
 from rembg import remove  # type: ignore
 from scipy.signal import find_peaks  # type: ignore
@@ -34,89 +35,95 @@ LATERAL_LM_MENTO_LABIAL_POINT = 4
 LATERAL_LM_SOFT_TISSUE_POGONION = 5
 
 
-def process_image(input_image: Image.Image) -> Tuple[Image.Image, np.ndarray, int, int]:
+def process_image(
+    input_image: Image.Image,
+) -> Tuple[Image.Image, NDArray[Any], int, int]:
     """
     Process the image by removing the background, converting to grayscale and binary,
     applying morphological closing, and inverting the binary image.
     """
     # Remove background
-    output_image: Image.Image = remove(input_image, session=models.rembg_session)
+    output_image: Image.Image = remove(input_image, session=models.rembg_session)  # type: ignore
 
     # Convert to grayscale
     grayscale: Image.Image = output_image.convert("L")
 
     # Convert to binary
     binary_threshold: int = 32
-    binary: Image.Image = grayscale.point(lambda p: 255 if p > binary_threshold else 0)
-    binary_np: np.ndarray = np.array(binary)
+    binary: Image.Image = grayscale.point(lambda p: 255 if p > binary_threshold else 0)  # type: ignore
+    binary_np: NDArray[Any] = np.array(binary)
 
     # Apply morphological closing
-    kernel: np.ndarray = np.ones((10, 10), np.uint8)
+    kernel: NDArray[Any] = np.ones((10, 10), np.uint8)
     binary_np = cv2.morphologyEx(binary_np, cv2.MORPH_CLOSE, kernel)
 
     # Invert the binary image
     binary_np = 255 - binary_np
 
     # Get image dimensions
+    height: int
+    width: int
     height, width = binary_np.shape
 
     return input_image, binary_np, width, height
 
 
-def shift_sagittal_profile(sagittal_x: np.ndarray) -> tuple[np.ndarray, float]:
+def shift_sagittal_profile(sagittal_x: NDArray[Any]) -> tuple[NDArray[Any], float]:
     """
     Shift the sagittal profile so that the lowest x-coordinate becomes 0.
 
     Returns:
-        tuple[np.ndarray, float]: A tuple containing:
-            - The shifted sagittal profile (np.ndarray)
+        tuple[NDArray[Any], float]: A tuple containing:
+            - The shifted sagittal profile (NDArray[Any])
             - The minimum x value that was subtracted (float)
     """
     min_x = np.min(sagittal_x)
     return sagittal_x - min_x, min_x
 
 
-def extract_sagittal_profile(binary_np: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def extract_sagittal_profile(
+    binary_np: NDArray[np.uint8],
+) -> Tuple[NDArray[np.int32], NDArray[np.int32]]:
     """
     Extract the sagittal profile from the binary image. For each row, finds the first black pixel.
     """
-    height, width = binary_np.shape
-    sagittal_x: list = []
-    sagittal_y: list = []
+    height, _ = binary_np.shape
+    sagittal_x: List[int] = []
+    sagittal_y: List[int] = []
     for y in range(height):
         row = binary_np[y, :]
         black_pixels = np.where(row == 0)[0]  # Get indices of black pixels
         if len(black_pixels) > 0:
-            sagittal_x.append(black_pixels[0])  # Take the first black pixel (leftmost)
-            sagittal_y.append(y)
+            sagittal_x.append(int(black_pixels[0]))  # Ensure type
+            sagittal_y.append(int(y))
 
-    return np.array(sagittal_x), np.array(sagittal_y)
+    return np.array(sagittal_x, dtype=np.int32), np.array(sagittal_y, dtype=np.int32)
 
 
 def compute_derivatives(
-    sagittal_x: np.ndarray,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    sagittal_x: NDArray[Any],
+) -> Tuple[NDArray[Any], NDArray[Any], NDArray[Any], NDArray[Any]]:
     """
     Compute the first and second derivatives of the sagittal profile and return both the raw and scaled values.
     """
-    dx: np.ndarray = np.gradient(sagittal_x)
-    ddx: np.ndarray = np.gradient(dx)
-    dx_scaled: np.ndarray = dx + DX1_OFFSET + DX1_SCALE_FACTOR * dx
-    ddx_scaled: np.ndarray = ddx + DX2_OFFSET + DX2_SCALE_FACTOR * ddx
+    dx: NDArray[Any] = np.gradient(sagittal_x)
+    ddx: NDArray[Any] = np.gradient(dx)
+    dx_scaled: NDArray[Any] = dx + DX1_OFFSET + DX1_SCALE_FACTOR * dx
+    ddx_scaled: NDArray[Any] = ddx + DX2_OFFSET + DX2_SCALE_FACTOR * ddx
     return dx, ddx, dx_scaled, ddx_scaled
 
 
 def plot_sagittal_profile(
     ax: Axes,
-    sagittal_x: np.ndarray,
-    sagittal_y: np.ndarray,
-    dx_scaled: np.ndarray,
-    ddx_scaled: np.ndarray,
+    sagittal_x: NDArray[Any],
+    sagittal_y: NDArray[Any],
+    dx_scaled: NDArray[Any],
+    ddx_scaled: NDArray[Any],
 ) -> None:
     """
     Plot the sagittal profile along with its first and second derivatives on the given axes.
     """
-    ax.plot(
+    ax.plot(  # type: ignore
         sagittal_x,
         sagittal_y,
         color="black",
@@ -138,7 +145,7 @@ def calculate_quarter_lines(start_y: int, end_y: int) -> tuple[float, float, flo
     )
 
 
-def plot_quarter_lines(ax: Axes, sagittal_y: np.ndarray) -> None:
+def plot_quarter_lines(ax: Axes, sagittal_y: NDArray[Any]) -> None:
     """
     Plot horizontal lines at 25%, 50%, and 75% of the sagittal profile's vertical span.
     """
@@ -146,38 +153,38 @@ def plot_quarter_lines(ax: Axes, sagittal_y: np.ndarray) -> None:
     q1, q2, q3 = calculate_quarter_lines(start_y, end_y)
 
     for q, label in zip((q1, q2, q3), ("25% Line", "50% Line", "75% Line")):
-        ax.axhline(q, color="green", linestyle="--", linewidth=1, label=label)
+        ax.axhline(q, color="green", linestyle="--", linewidth=1, label=label)  # type: ignore
 
 
-def find_local_max_min(sagittal_x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def find_local_max_min(sagittal_x: NDArray[Any]) -> Tuple[NDArray[Any], NDArray[Any]]:
     """
     Find local maxima and minima on the sagittal profile using peak detection.
     Returns two arrays: indices of maxima and indices of minima.
     """
-    max_indices, _ = find_peaks(sagittal_x)
-    min_indices, _ = find_peaks(-sagittal_x)
-    return max_indices, min_indices
+    max_indices, _ = find_peaks(sagittal_x)  # type: ignore
+    min_indices, _ = find_peaks(-sagittal_x)  # type: ignore
+    return max_indices, min_indices  # type: ignore
 
 
 def find_nasal_tip(
-    sagittal_x: np.ndarray,
-    sagittal_y: np.ndarray,
-    min_indices: np.ndarray,
+    sagittal_x: NDArray[Any],
+    sagittal_y: NDArray[Any],
+    min_indices: NDArray[Any],
     q2: float,
     q3: float,
-) -> np.ndarray:
+) -> NDArray[Any]:
     """
     Finds the nasal tip as the smallest local minimum between the 50th (Q2) and 75th (Q3) percentile lines.
 
     Args:
-        sagittal_x (np.ndarray): X-coordinates of the sagittal profile.
-        sagittal_y (np.ndarray): Y-coordinates of the sagittal profile.
-        min_indices (np.ndarray): Indices of local minima.
+        sagittal_x (NDArray[Any]): X-coordinates of the sagittal profile.
+        sagittal_y (NDArray[Any]): Y-coordinates of the sagittal profile.
+        min_indices (NDArray[Any]): Indices of local minima.
         q2 (float): 50th percentile line.
         q3 (float): 75th percentile line.
 
     Returns:
-        np.ndarray: (x, y) coordinates of the nasal tip, or [-1, -1] if no valid minimum is found.
+        NDArray[Any]: (x, y) coordinates of the nasal tip, or [-1, -1] if no valid minimum is found.
     """
     valid_min_indices = min_indices[
         (sagittal_y[min_indices] >= q2) & (sagittal_y[min_indices] <= q3)
@@ -191,19 +198,22 @@ def find_nasal_tip(
 
 
 def find_soft_tissue_pogonion(
-    sagittal_x: np.ndarray, sagittal_y: np.ndarray, min_indices: np.ndarray, q3: float
-) -> np.ndarray:
+    sagittal_x: NDArray[Any],
+    sagittal_y: NDArray[Any],
+    min_indices: NDArray[Any],
+    q3: float,
+) -> NDArray[Any]:
     """
     Finds the soft tissue pogonion as the last local minimum between the 75th (Q3) and 100th percentile lines.
 
     Args:
-        sagittal_x (np.ndarray): X-coordinates of the sagittal profile.
-        sagittal_y (np.ndarray): Y-coordinates of the sagittal profile.
-        min_indices (np.ndarray): Indices of local minima.
+        sagittal_x (NDArray[Any]): X-coordinates of the sagittal profile.
+        sagittal_y (NDArray[Any]): Y-coordinates of the sagittal profile.
+        min_indices (NDArray[Any]): Indices of local minima.
         q3 (float): 75th percentile line.
 
     Returns:
-        np.ndarray: (x, y) coordinates of the soft tissue pogonion, or [-1, -1] if no valid minimum is found.
+        NDArray[Any]: (x, y) coordinates of the soft tissue pogonion, or [-1, -1] if no valid minimum is found.
     """
     valid_min_indices = min_indices[sagittal_y[min_indices] >= q3]
 
@@ -216,24 +226,24 @@ def find_soft_tissue_pogonion(
 
 
 def find_soft_tissue_glabella(
-    sagittal_x: np.ndarray,
-    sagittal_y: np.ndarray,
-    min_indices: np.ndarray,
+    sagittal_x: NDArray[Any],
+    sagittal_y: NDArray[Any],
+    min_indices: NDArray[Any],
     q1: float,
     q2: float,
-) -> np.ndarray:
+) -> NDArray[Any]:
     """
     Finds the soft tissue glabella as the local minimum closest to the 25% (Q1) line but within the 25%-50% (Q1-Q2) range.
 
     Args:
-        sagittal_x (np.ndarray): X-coordinates of the sagittal profile.
-        sagittal_y (np.ndarray): Y-coordinates of the sagittal profile.
-        min_indices (np.ndarray): Indices of local minima.
+        sagittal_x (NDArray[Any]): X-coordinates of the sagittal profile.
+        sagittal_y (NDArray[Any]): Y-coordinates of the sagittal profile.
+        min_indices (NDArray[Any]): Indices of local minima.
         q1 (float): 25th percentile line.
         q2 (float): 50th percentile line.
 
     Returns:
-        np.ndarray: (x, y) coordinates of the soft tissue glabella, or [-1, -1] if no valid minimum is found.
+        NDArray[Any]: (x, y) coordinates of the soft tissue glabella, or [-1, -1] if no valid minimum is found.
     """
     valid_min_indices = min_indices[
         (sagittal_y[min_indices] >= q1) & (sagittal_y[min_indices] <= q2)
@@ -250,29 +260,29 @@ def find_soft_tissue_glabella(
 
 
 def find_soft_tissue_nasion(
-    sagittal_x: np.ndarray,
-    sagittal_y: np.ndarray,
-    max_indices: np.ndarray,
+    sagittal_x: NDArray[Any],
+    sagittal_y: NDArray[Any],
+    max_indices: NDArray[Any],
     glabella_x: float,
     glabella_y: float,
     q1: float,
     q2: float,
-) -> np.ndarray:
+) -> NDArray[Any]:
     """
     Finds the soft tissue nasion as the next local maximum after glabella, moving toward the nasal tip,
     but within the 25%-50% (Q1-Q2) range. Ensures nasion is **above** glabella (`y_nasion > y_glabella`).
 
     Args:
-        sagittal_x (np.ndarray): X-coordinates of the sagittal profile.
-        sagittal_y (np.ndarray): Y-coordinates of the sagittal profile.
-        max_indices (np.ndarray): Indices of local maxima.
+        sagittal_x (NDArray[Any]): X-coordinates of the sagittal profile.
+        sagittal_y (NDArray[Any]): Y-coordinates of the sagittal profile.
+        max_indices (NDArray[Any]): Indices of local maxima.
         glabella_x (float): X-coordinate of the glabella.
         glabella_y (float): Y-coordinate of the glabella.
         q1 (float): 25th percentile line.
         q2 (float): 50th percentile line.
 
     Returns:
-        np.ndarray: (x, y) coordinates of the soft tissue nasion, or [-1, -1] if no valid max is found.
+        NDArray[Any]: (x, y) coordinates of the soft tissue nasion, or [-1, -1] if no valid max is found.
     """
     valid_max_indices = max_indices[
         (sagittal_y[max_indices] >= q1) & (sagittal_y[max_indices] <= q2)
@@ -292,24 +302,24 @@ def find_soft_tissue_nasion(
 
 
 def find_subnasal_point(
-    sagittal_x: np.ndarray,
-    sagittal_y: np.ndarray,
-    max_indices: np.ndarray,
+    sagittal_x: NDArray[Any],
+    sagittal_y: NDArray[Any],
+    max_indices: NDArray[Any],
     nasal_tip_x: float,
     nasal_tip_y: float,
-) -> np.ndarray:
+) -> NDArray[Any]:
     """
     Finds the subnasal point as the next local maximum after the nasal tip and above it.
 
     Args:
-        sagittal_x (np.ndarray): X-coordinates of the sagittal profile.
-        sagittal_y (np.ndarray): Y-coordinates of the sagittal profile.
-        max_indices (np.ndarray): Indices of local maxima.
+        sagittal_x (NDArray[Any]): X-coordinates of the sagittal profile.
+        sagittal_y (NDArray[Any]): Y-coordinates of the sagittal profile.
+        max_indices (NDArray[Any]): Indices of local maxima.
         nasal_tip_x (float): X-coordinate of the nasal tip.
         nasal_tip_y (float): Y-coordinate of the nasal tip.
 
     Returns:
-        np.ndarray: (x, y) coordinates of the subnasal point, or [-1, -1] if no valid max is found.
+        NDArray[Any]: (x, y) coordinates of the subnasal point, or [-1, -1] if no valid max is found.
     """
     valid_max_indices = max_indices[
         sagittal_x[max_indices] > nasal_tip_x
@@ -326,25 +336,25 @@ def find_subnasal_point(
 
 
 def find_mento_labial_point(
-    sagittal_x: np.ndarray,
-    sagittal_y: np.ndarray,
-    max_indices: np.ndarray,
+    sagittal_x: NDArray[Any],
+    sagittal_y: NDArray[Any],
+    max_indices: NDArray[Any],
     pogonion_y: float,
     q3: float,
-) -> np.ndarray:
+) -> NDArray[Any]:
     """
     Finds the mento-labial point as the first local maximum below the soft tissue pogonion,
     within the 75%-100% (Q3 to end) range.
 
     Args:
-        sagittal_x (np.ndarray): X-coordinates of the sagittal profile.
-        sagittal_y (np.ndarray): Y-coordinates of the sagittal profile.
-        max_indices (np.ndarray): Indices of local maxima.
+        sagittal_x (NDArray[Any]): X-coordinates of the sagittal profile.
+        sagittal_y (NDArray[Any]): Y-coordinates of the sagittal profile.
+        max_indices (NDArray[Any]): Indices of local maxima.
         pogonion_y (float): Y-coordinate of the pogonion.
         q3 (float): 75th percentile line.
 
     Returns:
-        np.ndarray: (x, y) coordinates of the mento-labial point, or [-1, -1] if no valid max is found.
+        NDArray[Any]: (x, y) coordinates of the mento-labial point, or [-1, -1] if no valid max is found.
     """
     # Filter for maxima that are in the Q3 to end range and **below** the Pogonion
     valid_max_indices = max_indices[
@@ -359,17 +369,17 @@ def find_mento_labial_point(
 
 
 def find_lateral_landmarks(
-    sagittal_x: np.ndarray,
-    sagittal_y: np.ndarray,
-    max_indices: np.ndarray,
-    min_indices: np.ndarray,
+    sagittal_x: NDArray[Any],
+    sagittal_y: NDArray[Any],
+    max_indices: NDArray[Any],
+    min_indices: NDArray[Any],
     shift_x: int,
-) -> np.ndarray:
+) -> NDArray[Any]:
     """
     Using the local extrema, compute the 6 lateral landmarks.
 
     Returns:
-        np.ndarray: A 6x2 array containing the (x, y) coordinates for each landmark:
+        NDArray[Any]: A 6x2 array containing the (x, y) coordinates for each landmark:
           - LATERAL_LM_SOFT_TISSUE_GLABELLA (0): Soft Tissue Glabella
           - LATERAL_LM_SOFT_TISSUE_NASION (1): Soft Tissue Nasion
           - LATERAL_LM_NASAL_TIP (2): Nasal Tip
@@ -426,15 +436,12 @@ def find_lateral_landmarks(
 
 def plot_sagittal_minmax(
     ax: Axes,
-    sagittal_x: np.ndarray,
-    sagittal_y: np.ndarray,
-    max_indices: np.ndarray,
-    min_indices: np.ndarray,
+    sagittal_x: NDArray[Any],
+    sagittal_y: NDArray[Any],
+    max_indices: NDArray[np.int64],
+    min_indices: NDArray[np.int64],
 ) -> None:
-    """
-    Plot the local minima and maxima points (with index annotations) on the sagittal profile.
-    """
-    ax.scatter(
+    ax.scatter(  # type: ignore
         sagittal_x[max_indices],
         sagittal_y[max_indices],
         color="green",
@@ -442,7 +449,7 @@ def plot_sagittal_minmax(
         label="Local Maxima",
         zorder=3,
     )
-    ax.scatter(
+    ax.scatter(  # type: ignore
         sagittal_x[min_indices],
         sagittal_y[min_indices],
         color="red",
@@ -451,31 +458,30 @@ def plot_sagittal_minmax(
         zorder=3,
     )
 
-    # Enumerate for positional index labels
     for i, idx in enumerate(max_indices):
-        ax.annotate(
+        ax.annotate(  # type: ignore
             f"max-{i}",
-            (sagittal_x[idx], sagittal_y[idx]),
+            (float(sagittal_x[idx]), float(sagittal_y[idx])),
             textcoords="offset points",
-            xytext=(10, 0),  # Shift right
+            xytext=(10, 0),
             ha="left",
             va="center",
             color="green",
         )
 
     for i, idx in enumerate(min_indices):
-        ax.annotate(
+        ax.annotate(  # type: ignore
             f"min-{i}",
-            (sagittal_x[idx], sagittal_y[idx]),
+            (float(sagittal_x[idx]), float(sagittal_y[idx])),
             textcoords="offset points",
-            xytext=(10, 0),  # Shift right
+            xytext=(10, 0),
             ha="left",
             va="center",
             color="red",
         )
 
 
-def plot_lateral_landmarks(ax: Axes, landmarks: np.ndarray, shift_x: int) -> None:
+def plot_lateral_landmarks(ax: Axes, landmarks: NDArray[Any], shift_x: int) -> None:
     """
     Plot the 6 lateral landmarks on the sagittal profile, shifted to the left by shift_x.
     """
@@ -494,8 +500,8 @@ def plot_lateral_landmarks(ax: Axes, landmarks: np.ndarray, shift_x: int) -> Non
         # Only plot if a valid point was found.
         if x != -1 and y != -1:
             x -= shift_x  # Shift x-coordinate to the left by shift_x
-            ax.scatter(x, y, color="green", s=80, zorder=3)
-            ax.annotate(
+            ax.scatter(x, y, color="green", s=80, zorder=3)  # type: ignore
+            ax.annotate(  # type: ignore
                 name,
                 (x, y),
                 textcoords="offset points",
@@ -511,31 +517,31 @@ def plot_lateral_landmarks(ax: Axes, landmarks: np.ndarray, shift_x: int) -> Non
 
 
 def save_debug_plot(
-    sagittal_x: np.ndarray, sagittal_y: np.ndarray, filename: str
+    sagittal_x: NDArray[Any], sagittal_y: NDArray[Any], filename: str
 ) -> None:
     """
     Helper function to plot and save the sagittal profile for debugging purposes.
     """
-    fig, ax = plt.subplots(figsize=(6, 10))
-    ax.plot(
+    fig, ax = plt.subplots(figsize=(6, 10))  # type: ignore
+    ax.plot(  # type: ignore
         sagittal_x, sagittal_y, color="black", linewidth=2, label="Sagittal Profile"
     )
     ax.invert_yaxis()  # Maintain consistency with image coordinates
     ax.set_aspect("equal")
     plt.tight_layout(pad=0)
-    plt.savefig(filename, dpi=300, bbox_inches="tight")
+    plt.savefig(filename, dpi=300, bbox_inches="tight")  # type: ignore
     plt.close(fig)
 
 
 def analyze_lateral(
     input_image: Image.Image,
-) -> Tuple[np.ndarray, np.ndarray, Any, np.ndarray]:
+) -> Tuple[NDArray[Any], NDArray[Any], Any, NDArray[Any]]:
     """
     Analyze the side profile from a loaded PIL image and return only the far-right plot (sagittal profile).
     The plot will have no axes, margins, or labels, but will still include the legend.
     """
     # Process the image: remove background, threshold, and clean up.
-    processed_image, binary_np, _, _ = process_image(input_image)
+    _, binary_np, _, _ = process_image(input_image)
     # processed_image.save("debug_image1.png")
     # cv2.imwrite("debug_image2.png", binary_np)
 
@@ -545,10 +551,10 @@ def analyze_lateral(
     # save_debug_plot(sagittal_x, sagittal_y, "debug_image3.png")
 
     # Compute derivatives on the sagittal profile.
-    dx, ddx, dx_scaled, ddx_scaled = compute_derivatives(sagittal_x)
+    _, _, dx_scaled, ddx_scaled = compute_derivatives(sagittal_x)
 
     # Create the sagittal profile plot.
-    fig, ax2 = plt.subplots(figsize=(6, 10))
+    fig, ax2 = plt.subplots(figsize=(6, 10))  # type: ignore
 
     # Plot the sagittal profile.
     plot_sagittal_profile(ax2, sagittal_x, sagittal_y, dx_scaled, ddx_scaled)
@@ -577,7 +583,7 @@ def analyze_lateral(
     ax2.axis("off")
     ax2.margins(0)
     fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
-    legend = ax2.legend(frameon=True, loc="upper left", bbox_to_anchor=(0.0, 1.0))
+    legend = ax2.legend(frameon=True, loc="upper left", bbox_to_anchor=(0.0, 1.0))  # type: ignore
     legend.get_frame().set_alpha(0.8)
 
     # Convert the plot to OpenCV format.
