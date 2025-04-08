@@ -14,12 +14,12 @@ from dynaface.image import ImageAnalysis
 from dynaface.lateral import analyze_lateral  # type: ignore
 from dynaface.measures import MeasureBase
 from dynaface.models import are_models_init
+from dynaface.util import VERIFY_CERTS
 from numpy.typing import NDArray
 
 import dynaface
 from dynaface import measures, models, util
 
-# Restore the logger definition
 logger = logging.getLogger(__name__)
 
 STYLEGAN_WIDTH = 1024
@@ -626,7 +626,7 @@ def load_face_image(
 
     parsed = urlparse(filename)
     if parsed.scheme in ("http", "https"):
-        response = requests.get(filename, timeout=10, verify=False)
+        response = requests.get(filename, timeout=10, verify=VERIFY_CERTS)
         response.raise_for_status()
         img_array = np.asarray(bytearray(response.content), dtype=np.uint8)
         img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)

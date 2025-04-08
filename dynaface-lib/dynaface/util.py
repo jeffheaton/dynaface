@@ -1,16 +1,21 @@
 import math
-from typing import List, Optional, Tuple, Union, cast
+from typing import Any, List, Optional, Tuple, Union, cast
 
 import cv2
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
-from PIL import Image
 from numpy.typing import NDArray
-from typing import Any, List, Optional, Tuple, cast
+from PIL import Image
 
 Number = Union[int, float]
+
+# Should request.get verify SSL certificates. The strict setting of True can cause this to
+# fail when run from corporate networks that intercept HTTPS traffic. Setting to True will
+# generally work on home networks. For a controlled server environment you will likely
+# predownload any needed files and block network traffic, so this value may not matter.
+VERIFY_CERTS: bool = False
 
 
 def PolyArea(x: NDArray[Any], y: NDArray[Any]) -> float:
@@ -79,10 +84,6 @@ def scale_crop_points(
     for pt in lst:
         lst2.append((int((pt[0] * scale) - crop_x), int((pt[1] * scale) - crop_y)))
     return lst2
-
-
-from typing import List, Tuple
-import numpy as np
 
 
 def rotate_crop_points(

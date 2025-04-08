@@ -8,13 +8,14 @@ from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import numpy as np
 import rembg  # type: ignore
-from rembg.sessions.u2net import U2netSession  # type: ignore
 import requests
 import torch
 from dynaface.spiga.inference.config import ModelConfig
 from dynaface.spiga.inference.framework import SPIGAFramework
+from dynaface.util import VERIFY_CERTS
 from facenet_pytorch import MTCNN  # type: ignore
 from facenet_pytorch.models.mtcnn import ONet, PNet, RNet  # type: ignore
+from rembg.sessions.u2net import U2netSession  # type: ignore
 from torch import nn
 from torch.nn.functional import interpolate  # type: ignore
 
@@ -148,7 +149,7 @@ def download_models(
 
     # Try to fetch redirected URL for the ZIP file
     try:
-        response = requests.get(REDIRECT_URL, timeout=10, verify=False)
+        response = requests.get(REDIRECT_URL, timeout=10, verify=VERIFY_CERTS)
         response.raise_for_status()
         model_info = response.json()
         zip_url = model_info[MODEL_VERSION]["url"]
@@ -158,7 +159,7 @@ def download_models(
     # Try to download ZIP using primary URL; if it fails, try the fallback.
     try:
         logger.info(f"Downloading DynaFace model files from {zip_url}...")
-        response = requests.get(zip_url, stream=True, timeout=30, verify=False)
+        response = requests.get(zip_url, stream=True, timeout=30, verify=VERIFY_CERTS)
         response.raise_for_status()
         with open(zip_path, "wb") as f:
             for chunk in response.iter_content(chunk_size=8192):
@@ -167,7 +168,9 @@ def download_models(
         if zip_url == FALLBACK_URL:
             raise primary_exception
         try:
-            response = requests.get(FALLBACK_URL, stream=True, timeout=30, verify=False)
+            response = requests.get(
+                FALLBACK_URL, stream=True, timeout=30, verify=VERIFY_CERTS
+            )
             response.raise_for_status()
             with open(zip_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
