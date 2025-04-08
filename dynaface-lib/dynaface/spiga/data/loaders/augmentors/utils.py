@@ -3,76 +3,6 @@ from typing import Tuple, Union
 import numpy as np
 
 
-def affine2homogeneous(points: np.ndarray) -> np.ndarray:
-    """Returns the points completed with a new last coordinate equal to 1.
-    Arguments
-    ---------
-    points: np.array of shape (num_points, dim)
-    Returns
-    -------
-    hpoints: np.array of shape (num_points, dim + 1),
-        of the points completed with ones"""
-    num_points = points.shape[0]
-    hpoints = np.hstack((points, np.repeat(1, num_points).reshape(num_points, 1)))
-    return hpoints
-
-
-def get_similarity_matrix(
-    deg_angle: float, scale: float, center: Tuple[float, float]
-) -> np.ndarray:
-    """Similarity matrix.
-    Arguments:
-    ---------
-    deg_angle: rotation angle in degrees
-    scale: factor scale
-    center: coordinates of the rotation center
-
-    Returns:
-    -------
-    matrix: (2, 3) numpy array representing the similarity matrix.
-    """
-    x0, y0 = center
-    angle = np.radians(deg_angle)
-
-    matrix = np.zeros((2, 3))
-    matrix[0:2, 0:2] = [[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]]
-    matrix[0:2, 0:2] *= scale
-
-    matrix[:, 2] = [
-        (1 - scale * np.cos(angle)) * x0 + scale * np.sin(angle) * y0,
-        -scale * np.sin(angle) * x0 + (1 - scale * np.cos(angle)) * y0,
-    ]
-    return matrix
-
-
-def get_inverse_similarity_matrix(
-    deg_angle: float, scale: float, center: Tuple[float, float]
-) -> np.ndarray:
-    """Returns the inverse of the affine similarity
-    Arguments
-    ---------
-    deg_angle: angle in degrees of the rotation
-    center: iterable of two components (x0, y0), center of the rotation
-    scale: float, scale factor
-    Returns
-    -------
-    matrix: np.array of shape (2, 3) with the coordinates of the inverse of the similarity
-    """
-    x0, y0 = center
-    angle = np.radians(deg_angle)
-    inv_scale = 1 / scale
-    matrix = np.zeros((2, 3))
-    matrix[0:2, 0:2] = [[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]]
-    matrix[0:2, 0:2] *= inv_scale
-
-    matrix[:, 2] = [
-        (1 - inv_scale * np.cos(angle)) * x0 - inv_scale * np.sin(angle) * y0,
-        inv_scale * np.sin(angle) * x0 + (1 - inv_scale * np.cos(angle)) * y0,
-    ]
-
-    return matrix
-
-
 def get_inverse_transf(affine_transf: np.ndarray) -> np.ndarray:
     A = affine_transf[0:2, 0:2]
     b = affine_transf[:, 2]
@@ -81,17 +11,6 @@ def get_inverse_transf(affine_transf: np.ndarray) -> np.ndarray:
     inv_affine[0:2, 0:2] = inv_A
     inv_affine[:, 2] = -inv_A.dot(b)
     return inv_affine
-
-
-def image2vect(image: np.ndarray) -> np.ndarray:
-    """
-    Input:
-    image[batch_size, num_channels, im_size_x, im_size_y]
-    Output:
-    vect[batch_size, num_channels, im_size_x*im_size_y]
-    """
-    vect = image.reshape(*image.shape[0:-2], -1)
-    return vect
 
 
 def rotation_matrix_to_euler(rot_matrix: np.ndarray) -> np.ndarray:
@@ -116,30 +35,3 @@ def rotation_matrix_to_euler(rot_matrix: np.ndarray) -> np.ndarray:
     euler = np.where(euler > 180, euler - 360, euler)
     euler = np.where(euler < -180, euler + 360, euler)
     return euler
-
-
-def euler_to_rotation_matrix(
-    headpose: Union[np.ndarray, Tuple[float, float, float]],
-) -> np.ndarray:
-    """
-    Converts Euler angles (yaw, pitch, roll) to a rotation matrix.
-
-    Arguments:
-    ---------
-    headpose: Union[np.ndarray, Tuple[float, float, float]]
-        Euler angles in degrees, given as (yaw, pitch, roll).
-
-    Returns:
-    -------
-    np.ndarray
-        A 3x3 rotation matrix corresponding to the input Euler angles.
-    """
-    euler = np.array([-(headpose[0] - 90), -headpose[1], -(headpose[2] + 90)])
-    rad = euler * (np.pi / 180.0)
-    cy, sy = np.cos(rad[0]), np.sin(rad[0])
-    cp, sp = np.cos(rad[1]), np.sin(rad[1])
-    cr, sr = np.cos(rad[2]), np.sin(rad[2])
-    Ry = np.array([[cy, 0.0, sy], [0.0, 1.0, 0.0], [-sy, 0.0, cy]])  # yaw
-    Rp = np.array([[cp, -sp, 0.0], [sp, cp, 0.0], [0.0, 0.0, 1.0]])  # pitch
-    Rr = np.array([[1.0, 0.0, 0.0], [0.0, cr, -sr], [0.0, sr, cr]])  # roll
-    return np.matmul(np.matmul(Ry, Rp), Rr)

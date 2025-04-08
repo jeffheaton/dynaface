@@ -68,51 +68,6 @@ class PositPose:
         return cam_matrix
 
 
-def _project_points(
-    self,
-    rot: np.ndarray,
-    trl: np.ndarray,
-    cam_matrix: np.ndarray,
-    norm: Optional[np.ndarray] = None,
-) -> np.ndarray:
-    """
-    Projects 3D landmarks to 2D image space using a perspective projection model.
-
-    This method takes rotation, translation, and camera matrix inputs and projects
-    3D points onto a 2D plane. Optionally, the projected points can be normalized.
-
-    Args:
-        rot (np.ndarray): A 3x3 rotation matrix.
-        trl (np.ndarray): A 3x1 translation vector.
-        cam_matrix (np.ndarray): A 3x3 camera intrinsic matrix.
-        norm (Optional[np.ndarray], optional): An array of shape (2,) for normalizing
-            the projected points. If provided, the projected points' x and y coordinates
-            are divided by `norm[0]` and `norm[1]` respectively. Defaults to None.
-
-    Returns:
-        np.ndarray: An (N, 2) array of projected 2D points, where N is the number of landmarks.
-    """
-    # Perspective projection model
-    trl = np.expand_dims(trl, 1)  # Shape: (3, 1)
-    extrinsics = np.concatenate((rot, trl), 1)  # Shape: (3, 4)
-    proj_matrix: np.ndarray = np.matmul(cam_matrix, extrinsics)  # Shape: (3, 4)
-
-    # Homogeneous landmarks
-    pts: np.ndarray = self.model3d_world  # Shape: (N, 3)
-    ones: np.ndarray = np.ones((pts.shape[0], 1))  # Shape: (N, 1)
-    pts_hom: np.ndarray = np.concatenate((pts, ones), 1)  # Shape: (N, 4)
-
-    # Project landmarks
-    pts_proj: np.ndarray = np.matmul(proj_matrix, pts_hom.T).T  # Shape: (N, 3)
-    pts_proj = pts_proj / np.expand_dims(pts_proj[:, 2], 1)  # Normalize by depth (λ=1)
-
-    if norm is not None:
-        pts_proj[:, 0] /= norm[0]
-        pts_proj[:, 1] /= norm[1]
-
-    return pts_proj[:, :-1]  # Return shape: (N, 2)
-
-
 def load_world_shape(
     db_landmarks: List[int], model_file: str = model_file_dft
 ) -> Tuple[np.ndarray, np.ndarray]:
@@ -138,44 +93,3 @@ def load_world_shape(
         index_all[lnd_idx] = posit_landmarks[cont]
 
     return np.array(world_all), np.array(index_all)
-
-
-def modern_posit(
-    world_pts: np.ndarray, image_pts: np.ndarray, cam_matrix: np.ndarray, max_iters: int
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Estimate rotation and translation matrices using the POSIT algorithm.
-
-    Args:
-        world_pts (np.ndarray): 3D world points (num_landmarks, 3).
-        image_pts (np.ndarray): 2D image points (num_landmarks, 2).
-        cam_matrix (np.ndarray): Camera intrinsic matrix (3x3).
-        max_iters (int): Maximum number of POSIT iterations.
-
-    Returns:
-        Tuple[np.ndarray, np.ndarray]:
-            - rot_matrix: Estimated 3x3 rotation matrix.
-            - trl_matrix: Estimated translation vector (Tx, Ty, Tz).
-    """
-    # Fix for type issues in the POSIT loop
-    trans_x: float = 0.0
-    trans_y: float = 0.0
-    trans_z: float = 0.0
-    rot_vec1: np.ndarray = np.zeros(3)
-    rot_vec2: np.ndarray = np.zeros(3)
-    rot_vec3: np.ndarray = np.zeros(3)
-
-    # POSIT iteration loop
-    for iteration in range(max_iters):
-        # ...existing code...
-        pass
-
-    # Create rotation matrix and translation vector
-    rot_matrix: np.ndarray = np.array([rot_vec1, rot_vec2, rot_vec3]).T
-    trl_matrix: np.ndarray = np.array([trans_x, trans_y, trans_z])
-
-    # Convert to nearest orthogonal rotation matrix using SVD
-    _, u_matrix, vt_matrix = cv2.SVDecomp(rot_matrix)
-    rot_matrix = np.matmul(u_matrix, vt_matrix)
-
-    return rot_matrix, trl_matrix
