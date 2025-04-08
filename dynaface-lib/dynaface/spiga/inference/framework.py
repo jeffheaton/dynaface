@@ -67,7 +67,7 @@ class SPIGAFramework:
         self.model = self.model.to(self.device)
 
         self.model.eval()
-        logger.info("SPIGA model loaded!")
+        logger.info("SPIGA model loaded")
 
         # Load 3D model and camera intrinsic matrix
         if load3DM:

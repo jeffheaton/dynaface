@@ -10,6 +10,9 @@ from rembg import remove  # type: ignore
 from scipy.signal import find_peaks  # type: ignore
 
 from dynaface import models, util
+import logging
+
+logger = logging.getLogger(__name__)
 
 # ================= CONSTANTS =================
 DEBUG = False
@@ -569,9 +572,8 @@ def analyze_lateral(
         sagittal_x, sagittal_y, max_indices, min_indices, int(shift_x)
     )
     plot_lateral_landmarks(ax2, landmarks, int(shift_x))
-    if DEBUG:
-        print("Lateral Landmarks (x, y):")
-        print(landmarks)
+    logging.debug("Lateral Landmarks (x, y):")
+    logging.debug(landmarks)
 
     if DEBUG:
         plot_quarter_lines(ax2, sagittal_y)
