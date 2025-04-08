@@ -9,6 +9,7 @@ import pkg_resources
 import torch
 from dynaface.spiga.inference.config import ModelConfig
 from dynaface.spiga.models.spiga import SPIGA
+from numpy.typing import NDArray
 
 logger = logging.getLogger(__name__)
 
@@ -81,13 +82,13 @@ class SPIGAFramework:
             self.cam_matrix = params_3DM["cam_matrix"]
 
     def inference_batch(
-        self, images: List[np.ndarray], bbox: List[Any]
+        self, images: List[NDArray[Any]], bbox: List[Any]
     ) -> Dict[str, Any]:
         """
         Perform batch inference on a list of images and bounding boxes.
 
         Parameters:
-            images (List[np.ndarray]): List of input images.
+            images (List[NDArray[Any]]): List of input images.
             bbox (List[Any]): List of bounding boxes corresponding to each image.
 
         Returns:
@@ -114,12 +115,12 @@ class SPIGAFramework:
         features = self.postreatment(outputs, crop_bboxes, bbox)
         return features
 
-    def inference(self, image: np.ndarray, bboxes: List[Any]) -> Dict[str, Any]:
+    def inference(self, image: NDArray[Any], bboxes: List[Any]) -> Dict[str, Any]:
         """
         Perform inference on a single image and its bounding boxes.
 
         Parameters:
-            image (np.ndarray): The raw input image.
+            image (NDArray[Any]): The raw input image.
             bboxes (List[Any]): List of bounding boxes on the image, each defined as [x, y, w, h].
 
         Returns:
@@ -131,13 +132,13 @@ class SPIGAFramework:
         return features
 
     def pretreat(
-        self, image: np.ndarray, bboxes: List[Any]
+        self, image: NDArray[Any], bboxes: List[Any]
     ) -> Tuple[List[torch.Tensor], List[Any]]:
         """
         Preprocess the image and bounding boxes for inference.
 
         Parameters:
-            image (np.ndarray): The raw input image.
+            image (NDArray[Any]): The raw input image.
             bboxes (List[Any]): List of bounding boxes.
 
         Returns:

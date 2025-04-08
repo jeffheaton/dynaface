@@ -1,9 +1,10 @@
-from typing import Tuple, Union
+from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 
 
-def get_inverse_transf(affine_transf: np.ndarray) -> np.ndarray:
+def get_inverse_transf(affine_transf: NDArray[Any]) -> NDArray[Any]:
     A = affine_transf[0:2, 0:2]
     b = affine_transf[:, 2]
     inv_A = np.linalg.inv(A)  # we assume A invertible!
@@ -13,7 +14,7 @@ def get_inverse_transf(affine_transf: np.ndarray) -> np.ndarray:
     return inv_affine
 
 
-def rotation_matrix_to_euler(rot_matrix: np.ndarray) -> np.ndarray:
+def rotation_matrix_to_euler(rot_matrix: NDArray[Any]) -> NDArray[Any]:
     """Converts a rotation matrix to Euler angles."""
     a00, _, a02 = rot_matrix[0, 0], rot_matrix[0, 1], rot_matrix[0, 2]
     a10, a11, a12 = rot_matrix[1, 0], rot_matrix[1, 1], rot_matrix[1, 2]

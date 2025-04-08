@@ -85,7 +85,7 @@ class AnalyzeFace(ImageAnalysis):
         self.headpose: List[int] = [0, 0, 0]
         self.landmarks: List[Tuple[int, int]] = []
         self.lateral: bool = False
-        self.lateral_landmarks: NDArray[Any] = np.ndarray([])
+        self.lateral_landmarks: NDArray[Any] = NDArray[Any]([])
         self.pupillary_distance: float = 0.0
         logger.debug(f"===INIT: t={tilt_threshold}")
         self.tilt_threshold: float = tilt_threshold
@@ -233,7 +233,7 @@ class AnalyzeFace(ImageAnalysis):
         Load an image and process facial landmarks.
 
         Args:
-            img (np.ndarray): The image to load.
+            img (NDArray[Any]): The image to load.
             crop (bool): Whether to crop the face.
             pupils (Optional[Tuple[Tuple[int, int], Tuple[int, int]]]): Optional pupils coordinates.
         Returns:

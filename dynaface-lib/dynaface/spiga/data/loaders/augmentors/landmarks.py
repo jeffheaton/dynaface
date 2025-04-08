@@ -1,9 +1,7 @@
-import random
-import cv2
 import numpy as np
 from PIL import Image
-from torchvision import transforms
-from typing import Any, Dict, Tuple, Union, List, Optional
+from typing import Any, Dict, Tuple, Union, Optional
+from numpy.typing import NDArray
 
 # My libs
 import dynaface.spiga.data.loaders.augmentors.utils as dlu
@@ -32,7 +30,7 @@ class GeometryBaseAug:
     def map_affine_transformation(
         self,
         sample: Dict[str, Any],
-        affine_transf: np.ndarray,
+        affine_transf: NDArray[Any],
         new_size: Optional[Tuple[int, int]] = None,
     ) -> Dict[str, Any]:
         """
@@ -40,7 +38,7 @@ class GeometryBaseAug:
 
         Args:
             sample (Dict[str, Any]): A dictionary with keys "image", "bbox", and optionally "landmarks".
-            affine_transf (np.ndarray): The affine transformation matrix.
+            affine_transf (NDArray[Any]): The affine transformation matrix.
             new_size (Optional[Tuple[int, int]], optional): New size for the transformed image. Defaults to None.
 
         Returns:
@@ -57,18 +55,21 @@ class GeometryBaseAug:
         return sample
 
     def clean_outbbox_landmarks(
-        self, shape: Tuple[int, int, int, int], landmarks: np.ndarray, mask: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        self,
+        shape: Tuple[int, int, int, int],
+        landmarks: NDArray[Any],
+        mask: NDArray[Any],
+    ) -> Tuple[NDArray[Any], NDArray[Any]]:
         """
         Removes landmarks that fall outside the image bounding box and updates the mask accordingly.
 
         Args:
             shape (Tuple[int, int, int, int]): The bounding box of the image (x, y, w, h).
-            landmarks (np.ndarray): Array of landmarks.
-            mask (np.ndarray): Visibility mask for the landmarks.
+            landmarks (NDArray[Any]): Array of landmarks.
+            mask (NDArray[Any]): Visibility mask for the landmarks.
 
         Returns:
-            Tuple[np.ndarray, np.ndarray]: Updated mask and landmarks.
+            Tuple[NDArray[Any], NDArray[Any]]: Updated mask and landmarks.
         """
         filter_x1 = landmarks[:, 0] >= shape[0]
         filter_x2 = landmarks[:, 0] < (shape[0] + shape[2])
@@ -87,7 +88,7 @@ class GeometryBaseAug:
     def _image_affine_trans(
         self,
         image: Image.Image,
-        affine_transf: np.ndarray,
+        affine_transf: NDArray[Any],
         new_size: Optional[Tuple[int, int]] = None,
     ) -> Image.Image:
         """
@@ -95,7 +96,7 @@ class GeometryBaseAug:
 
         Args:
             image (Image.Image): The original image.
-            affine_transf (np.ndarray): The affine transformation matrix.
+            affine_transf (NDArray[Any]): The affine transformation matrix.
             new_size (Optional[Tuple[int, int]], optional): New image size after transformation. Defaults to None.
 
         Returns:
@@ -108,17 +109,17 @@ class GeometryBaseAug:
         return new_image
 
     def _bbox_affine_trans(
-        self, bbox: np.ndarray, affine_transf: np.ndarray
-    ) -> np.ndarray:
+        self, bbox: NDArray[Any], affine_transf: NDArray[Any]
+    ) -> NDArray[Any]:
         """
         Applies an affine transformation to a bounding box.
 
         Args:
-            bbox (np.ndarray): The bounding box in the format (x, y, w, h).
-            affine_transf (np.ndarray): The affine transformation matrix.
+            bbox (NDArray[Any]): The bounding box in the format (x, y, w, h).
+            affine_transf (NDArray[Any]): The affine transformation matrix.
 
         Returns:
-            np.ndarray: The transformed bounding box.
+            NDArray[Any]: The transformed bounding box.
         """
         x, y, w, h = bbox
         images_bb = []
@@ -135,17 +136,17 @@ class GeometryBaseAug:
         return new_bbox
 
     def _landmarks_affine_trans(
-        self, landmarks: np.ndarray, affine_transf: np.ndarray
-    ) -> np.ndarray:
+        self, landmarks: NDArray[Any], affine_transf: NDArray[Any]
+    ) -> NDArray[Any]:
         """
         Applies an affine transformation to landmarks.
 
         Args:
-            landmarks (np.ndarray): Array of landmarks.
-            affine_transf (np.ndarray): The affine transformation matrix.
+            landmarks (NDArray[Any]): Array of landmarks.
+            affine_transf (NDArray[Any]): The affine transformation matrix.
 
         Returns:
-            np.ndarray: The transformed landmarks.
+            NDArray[Any]: The transformed landmarks.
         """
         homog_landmarks = dlu.affine2homogeneous(landmarks)
         new_landmarks = affine_transf.dot(homog_landmarks.T).T

@@ -33,7 +33,7 @@ def load_image(filename: str) -> NDArray[Any]:
         filename (str): Path to the image file.
 
     Returns:
-        np.ndarray: The loaded image in RGB format.
+        NDArray[Any]: The loaded image in RGB format.
 
     Raises:
         FileNotFoundError: If the file does not exist.
@@ -81,7 +81,7 @@ class ImageAnalysis:
         Load an image into the analysis class.
 
         Args:
-            img (np.ndarray): Input image.
+            img (NDArray[Any]): Input image.
         Returns:
             bool: True if the image was processed, False otherwise.
         Raises:
@@ -100,7 +100,7 @@ class ImageAnalysis:
         Initialize the image and related attributes.
 
         Args:
-            img (np.ndarray): Input image.
+            img (NDArray[Any]): Input image.
         """
         self.original_img: NDArray[Any] = img.copy()
         self.gray_img: NDArray[Any] = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -347,7 +347,7 @@ class ImageAnalysis:
             x2 (Optional[int]): End column index.
 
         Returns:
-            np.ndarray: Extracted image section.
+            NDArray[Any]: Extracted image section.
         """
         self._check_image()
         if not x1:
@@ -368,7 +368,7 @@ class ImageAnalysis:
             x2 (Optional[int]): End column index.
 
         Returns:
-            np.ndarray: Extracted image section in HSV.
+            NDArray[Any]: Extracted image section in HSV.
         """
         if not x1:
             x1 = 0

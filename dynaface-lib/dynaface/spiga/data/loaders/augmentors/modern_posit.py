@@ -1,12 +1,9 @@
 import os
-from typing import Tuple, Dict, Any, Optional, List
+from typing import Any, List, Optional, Tuple
 
-import cv2
 import numpy as np
 import pkg_resources
-
-# My libs
-from dynaface.spiga.data.loaders.augmentors.utils import rotation_matrix_to_euler
+from numpy.typing import NDArray
 
 # Model file nomenclature
 model_file_dft: str = (
@@ -38,19 +35,19 @@ class PositPose:
                     model3d_mask[index] = True
 
         self.ldm_ids: List[int] = ldm_ids  # Ids from the database
-        self.model3d_world: np.ndarray = model3d_world  # Model data
-        self.model3d_ids: np.ndarray = model3d_ids  # Model ids
-        self.model3d_mask: np.ndarray = model3d_mask  # Model mask ids
+        self.model3d_world: NDArray[Any] = model3d_world  # Model data
+        self.model3d_ids: NDArray[Any] = model3d_ids  # Model ids
+        self.model3d_mask: NDArray[Any] = model3d_mask  # Model mask ids
         self.max_iter: int = max_iter  # Refinement iterations
         self.focal_ratio: float = focal_ratio  # Camera matrix focal length ratio
         self.fix_bbox: bool = fix_bbox  # Camera matrix centered on image
 
     def _load_world_shape(
         self, ldm_ids: List[int], model_file: str
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> Tuple[NDArray[Any], NDArray[Any]]:
         return load_world_shape(ldm_ids, model_file=model_file)
 
-    def _camera_matrix(self, bbox: List[float]) -> np.ndarray:
+    def _camera_matrix(self, bbox: List[float]) -> NDArray[Any]:
         focal_length_x: float = bbox[2] * self.focal_ratio
         focal_length_y: float = bbox[3] * self.focal_ratio
         face_center: Tuple[float, float] = (
@@ -58,7 +55,7 @@ class PositPose:
             bbox[1] + (bbox[3] * 0.5),
         )
 
-        cam_matrix: np.ndarray = np.array(
+        cam_matrix: NDArray[Any] = np.array(
             [
                 [focal_length_x, 0, face_center[0]],
                 [0, focal_length_y, face_center[1]],
@@ -70,7 +67,7 @@ class PositPose:
 
 def load_world_shape(
     db_landmarks: List[int], model_file: str = model_file_dft
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> Tuple[NDArray[Any], NDArray[Any]]:
     # Load 3D mean face coordinates
     num_ldm = len(db_landmarks)
     filename = model_file.format(num_ldm=num_ldm)

@@ -23,8 +23,8 @@ def PolyArea(x: NDArray[Any], y: NDArray[Any]) -> float:
     Calculate the area of a polygon using the Shoelace formula.
 
     Parameters:
-        x (np.ndarray): Array of x-coordinates.
-        y (np.ndarray): Array of y-coordinates.
+        x (NDArray[Any]): Array of x-coordinates.
+        y (NDArray[Any]): Array of y-coordinates.
 
     Returns:
         float: The computed area of the polygon.
