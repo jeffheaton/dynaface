@@ -15,7 +15,7 @@ Number = Union[int, float]
 # fail when run from corporate networks that intercept HTTPS traffic. Setting to True will
 # generally work on home networks. For a controlled server environment you will likely
 # predownload any needed files and block network traffic, so this value may not matter.
-VERIFY_CERTS: bool = False
+VERIFY_CERTS: bool = True
 
 
 def PolyArea(x: NDArray[Any], y: NDArray[Any]) -> float:
