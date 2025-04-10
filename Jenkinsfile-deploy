@@ -1,0 +1,61 @@
+pipeline {
+    agent any
+
+    // Retrieve the PyPI API token stored in Jenkins credentials and
+    // define the S3 bucket name and the path where your built artifacts are stored.
+    environment {
+        PYPI_API_TOKEN = credentials('PYPI_API_TOKEN')
+        AWS_BUCKET_NAME = "data.heatonresearch.com"
+        AWS_BUCKET_PATH = "library/"
+    }
+
+    // Define a pipeline parameter for the wheel file.
+    // This allows you to input the name of the .whl file (e.g. dynaface-0.2.0-py3-none-any.whl)
+    parameters {
+        string(name: 'WHL_FILE', defaultValue: '', description: 'The wheel file name to deploy (e.g., dynaface-0.2.0-py3-none-any.whl)')
+    }
+
+    stages {
+        stage('Download Artifact from S3') {
+            steps {
+                sh '''
+                    # Ensure the target directory exists.
+                    mkdir -p dist
+
+                    # Check if the WHL_FILE parameter is provided.
+                    if [ -z "$WHL_FILE" ]; then
+                        echo "Error: The WHL_FILE environment variable is not provided."
+                        exit 1
+                    fi
+
+                    echo "Downloading artifact $WHL_FILE from S3 (s3://$AWS_BUCKET_NAME/$AWS_BUCKET_PATH)..."
+                    
+                    # Attempt to download the specific wheel file from S3.
+                    aws s3 cp s3://$AWS_BUCKET_NAME/$AWS_BUCKET_PATH$WHL_FILE dist/ || {
+                        echo "Error: File $WHL_FILE does not exist in S3."
+                        exit 1
+                    }
+                '''
+            }
+        }
+        stage('Deploy to PyPI') {
+            steps {
+                sh '''
+                    echo "Installing twine..."
+                    pip install --upgrade twine
+
+                    echo "Publishing package to PyPI..."
+                    # Upload the package using twine to PyPI.
+                    ls dist/*
+                    # twine upload --non-interactive -u __token__ -p "$PYPI_API_TOKEN" dist/*
+                '''
+            }
+        }
+    }
+    post {
+        always {
+            echo "Cleaning up workspace..."
+            cleanWs()  // Optionally clean the workspace after the build.
+        }
+    }
+}
