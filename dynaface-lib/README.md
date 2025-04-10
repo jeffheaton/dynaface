@@ -1,31 +1,40 @@
-# facial-analysis
+# Dynaface Python Application
 
-pip install --upgrade pip
+[![PyPI version](https://badge.fury.io/py/spiga.svg)](https://badge.fury.io/py/dynaface)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/jeffheaton/dynaface/blob/main/dynaface-lib/examples/dynaface_intro.ipynb)
 
-python3 -m venv venv
+# Helpful Links
+
+- [Dynaface Application](https://github.com/jeffheaton/dynaface/tree/main/dynaface-app)
+
+# Helpful Python Commands
+
+** Activate Environment **
+
+```
 source venv/bin/activate
-#python setup.py install
-pip install -e .
-python setup.py bdist_wheel
+.\venv\Scripts\activate.bat
+.\venv\Scripts\Activate.ps1
+```
 
-pip install -r requirements.txt
+** Allow Windows to Use Environment **
 
+```
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+** Run Unit Tests **
+
+```
 python -m unittest discover -s tests
+```
 
-git clone https://github.com/andresprados/SPIGA.git
-cd SPIGA
-pip install -e .
-cd ..
-rm -rf ./SPIGA
+# Running Examples
 
-https://www.geeksforgeeks.org/using-jupyter-notebook-in-virtual-environment/
+- [Dynaface Examples]()
 
-ipython kernel install --user --name=venv
-
-python setup.py sdist bdist_wheel
-
-cp -R /content/drive/MyDrive/dynaface/ /content
-
+```
 python ./examples/process_media.py /Users/jeff/data/facial/samples/tracy-ref-blink.mp4
 
 python ./examples/process_media.py --crop /Users/jeff/data/facial/samples/2021-8-19.png
@@ -33,3 +42,4 @@ python ./examples/process_media.py --crop /Users/jeff/data/facial/samples/2021-8
 python ./examples/process_media.py --crop /Users/jeff/data/facial/samples/tracy_frame.png
 
 python ./examples/process_media.py --crop /Users/jeff/data/facial/samples/tracy-blink-single.mp4
+```

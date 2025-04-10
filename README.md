@@ -8,6 +8,7 @@ Dynaface is a computer application and Python library that measures facial symme
 
 - [Download Latest Version](https://github.com/jeffheaton/dynaface/releases/tag/v1.1.6-prepub)
 - [Users Guide](https://github.com/jeffheaton/dynaface/blob/main/dynaface-app/manual.md)
+- [Dynaface Python Library](https://github.com/jeffheaton/dynaface/tree/main/dynaface-lib)
 
 # Artificial Intelligence References
 
