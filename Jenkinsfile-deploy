@@ -46,8 +46,7 @@ pipeline {
 
                     echo "Publishing package to PyPI..."
                     # Upload the package using twine to PyPI.
-                    ls dist/*
-                    # twine upload --non-interactive -u __token__ -p "$PYPI_API_TOKEN" dist/*
+                    twine upload --non-interactive -u __token__ -p "$PYPI_API_TOKEN" dist/*
                 '''
             }
         }
