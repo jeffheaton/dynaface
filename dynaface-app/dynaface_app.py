@@ -49,7 +49,7 @@ class AppDynaface(AppJTH):
             super().__init__(
                 app_name="Dynaface",
                 app_author="HeatonResearch",
-                copyright="Copyright 2025 by Jeff Heaton, released under the <a href='https://opensource.org/license/mit/'>MIT License</a>",
+                copyright="Copyright 2025 by Jeff Heaton, released under the <a href='https://www.apache.org/licenses/LICENSE-2.0'>Apache 2.0 License</a>",
                 version=version.VERSION,
                 bundle_id="com.heatonresearch.dynaface",
             )

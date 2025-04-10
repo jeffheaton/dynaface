@@ -10,7 +10,7 @@ class AboutTab(QWidget):
     def __init__(self, window):
         super().__init__()
         self._window = window
-        device = dynaface.detect_device()
+        device = dynaface.models.detect_device()
         current_device = dynaface.models._device
         v1 = get_library_version("torch")
         v2 = get_library_version("facenet-pytorch")
