@@ -1,6 +1,9 @@
 from typing import Any, List, Tuple
 
 import cv2
+import matplotlib
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes

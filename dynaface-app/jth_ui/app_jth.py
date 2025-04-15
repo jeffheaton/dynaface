@@ -2,16 +2,15 @@ import datetime
 import glob
 import json
 import logging
-import logging.config
 import logging.handlers
 import os
-import pkg_resources
 import platform
 import plistlib
 import sys
 
 import appdirs
-from PyQt6.QtCore import Qt, QtMsgType, QUrl, qInstallMessageHandler, QEvent
+import pkg_resources
+from PyQt6.QtCore import QEvent, Qt, QtMsgType, QUrl, qInstallMessageHandler
 from PyQt6.QtGui import QDesktopServices, QFileOpenEvent
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox
 
