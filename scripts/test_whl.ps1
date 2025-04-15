@@ -1,4 +1,5 @@
-# Example use: .\test_whl.ps1 3.11 0.2.1
+# Usage: .\test_whl.ps1 3.11 0.2.1
+
 param (
     [Parameter(Mandatory = $true)][string]$python_version,
     [Parameter(Mandatory = $true)][string]$wheel_version
@@ -6,41 +7,45 @@ param (
 
 $ErrorActionPreference = "Stop"
 
-# Upgrade pip for the specified Python interpreter
-& "pip$python_version" install --upgrade pip
+# Paths
+$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$venvPath = Join-Path $scriptPath "venv"
+$venvPython = Join-Path $venvPath "Scripts\python.exe"
 
-# Remove previous virtual environment if it exists
-if (Test-Path "./venv") {
-    Remove-Item -Recurse -Force "./venv"
+# Remove existing virtual environment
+if (Test-Path $venvPath) {
+    Remove-Item -Recurse -Force $venvPath
 }
 
-# Create a new virtual environment using the specified Python version
-& "python$python_version" -m venv venv
+# Create virtual environment using the specified version
+& "python$python_version" -m venv $venvPath
 
-# Activate the virtual environment (Windows-specific)
-& ".\venv\Scripts\Activate.ps1"
+# Ensure the Python executable exists
+if (!(Test-Path $venvPython)) {
+    throw "Virtual environment Python not found at $venvPython"
+}
 
 # Upgrade pip and setuptools inside the virtual environment
-pip install --upgrade pip setuptools
+& $venvPython -m pip install --upgrade pip setuptools
 
-# Install the built wheel file
-pip install --upgrade "https://data.heatonresearch.com/library/dynaface-$wheel_version-py3-none-any.whl"
+# Install the specified wheel
+$wheelUrl = "https://data.heatonresearch.com/library/dynaface-$wheel_version-py3-none-any.whl"
+& $venvPython -m pip install --upgrade $wheelUrl
 
-# Create a temporary directory
+# Create temp test directory
 $tmp_dir = New-TemporaryFile
 Remove-Item $tmp_dir
 $tmp_dir = New-Item -ItemType Directory -Path ([System.IO.Path]::Combine($env:TEMP, "dynaface-tests-" + [System.Guid]::NewGuid().ToString("N")))
-
 Write-Host "Created temporary directory: $($tmp_dir.FullName)"
 
-# Define cleanup logic
+# Register cleanup
 $cleanup = {
-    Write-Host "Cleaning up temporary directory: $($tmp_dir.FullName)"
-    Remove-Item -Recurse -Force $tmp_dir
+    Write-Host "Cleaning up temporary directory: $($using:tmp_dir.FullName)"
+    Remove-Item -Recurse -Force $using:tmp_dir
 }
 Register-EngineEvent PowerShell.Exiting -Action $cleanup | Out-Null
 
-# Clone the repository
+# Clone the repo
 git clone https://github.com/jeffheaton/dynaface.git "$($tmp_dir.FullName)\dynaface"
 
 # Copy test files
@@ -48,16 +53,13 @@ $temp_tests = "$($tmp_dir.FullName)\temp_tests"
 New-Item -ItemType Directory -Path $temp_tests | Out-Null
 Copy-Item -Recurse "$($tmp_dir.FullName)\dynaface\dynaface-lib\tests\*" $temp_tests
 
-# Copy test_data folder if it exists
+# Optionally copy test_data
 $tests_data = "$($tmp_dir.FullName)\dynaface\dynaface-lib\tests_data"
 if (Test-Path $tests_data) {
     Copy-Item -Recurse $tests_data "$temp_tests\tests_data"
 }
 
-# Change to test directory and run tests
+# Run tests
 Push-Location $temp_tests
-& "python$python_version" -m unittest discover -s .
+& $venvPython -m unittest discover -s .
 Pop-Location
-
-# Deactivate the virtual environment
-& ".\venv\Scripts\Deactivate.ps1"
