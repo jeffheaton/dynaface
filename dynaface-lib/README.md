@@ -28,8 +28,32 @@ Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 **Run Unit Tests**
 
+For Mac/Linux:
+
 ```
+cd dynaface-lib
+python3.11 -m venv venv
+source venv/bin/activate
+pip install -e ".[dev]"
 python -m unittest discover -s tests
+```
+
+For Windows:
+
+```
+cd dynaface-lib
+python3.11 -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+python -m unittest discover -s tests
+```
+
+⚠️ Note for Windows users:
+If you get an error like execution of scripts is disabled on this system when activating the virtual environment, you can temporarily bypass it with:
+
+```
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\venv\Scripts\Activate.ps1
 ```
 
 # Running Examples
