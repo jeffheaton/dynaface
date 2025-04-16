@@ -182,9 +182,10 @@ class TestImage(unittest.TestCase):
         analysis.load_image(test_img)
 
         with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp_file:
-            analysis.save(temp_file.name)
-            assert os.path.exists(temp_file.name)
-            os.remove(temp_file.name)  # Clean up immediately after assertion
+            temp_path = temp_file.name  # Store the name
+        analysis.save(temp_path)
+        assert os.path.exists(temp_path)
+        os.remove(temp_path)  
 
     #
     # measure_polygon() Tests
