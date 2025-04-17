@@ -12,11 +12,14 @@ source venv/bin/activate
 .\venv\Scripts\Activate.ps1
 ```
 
-** Allow Windows to Use Environment **
+⚠️ Note for Windows users:
+If you get an error like execution of scripts is disabled on this system when activating the virtual environment, you can temporarily bypass it with:
 
 ```
-Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\venv\Scripts\Activate.ps1
 ```
+
 
 ** Run Unit Tests **
 

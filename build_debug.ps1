@@ -5,7 +5,7 @@ Set-Location -Path ".\dynaface-app"
 Remove-Item -Path ".\venv" -Recurse -Force -ErrorAction SilentlyContinue
 
 # Create a virtual environment using Python 3.11
-python -m venv venv
+python3.11 -m venv venv
 
 # Activate the virtual environment
 .\venv\Scripts\Activate.ps1
