@@ -56,10 +56,10 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,                     # set to True for a console app
+    console=True,
     disable_windowed_traceback=False,
     target_arch=target_arch,
-    icon="dynaface_icon.ico",          # your Windows .ico file
+    icon="dynaface_icon.ico",
 )
 
 coll = COLLECT(

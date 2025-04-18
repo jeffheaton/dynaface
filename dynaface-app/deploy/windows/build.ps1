@@ -45,11 +45,16 @@ try {
 
     # Copy needed files
     Write-Output "** Copy files to working **"
-    cp ./dynaface_icon.png ./working
+    cp ../../data/* ./working/data
+    cp ./dynaface_doc_icon.ico ./working
+    cp ./dynaface_icon.ico ./working
     cp ./dynaface-windows.spec ./working
-
+    cp ../../*.py ./working
+    cp -r ../../jth_ui ./working/jth_ui
+    
     # Run Pyinstaller
     Write-Output "**Run PyInstaller **"
+    Set-Location working
     pyinstaller --clean --noconfirm --distpath dist --workpath build dynaface-windows.spec
 }
 catch {

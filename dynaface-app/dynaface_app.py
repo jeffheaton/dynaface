@@ -1,3 +1,8 @@
+with open("D:\\test.txt", "w") as f:
+    f.write("Hello from dynaface_app.py!\n")
+
+print("Hello World from dynaface_app.py")
+
 import os
 
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
