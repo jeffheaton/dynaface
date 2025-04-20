@@ -1,9 +1,12 @@
-with open("D:\\test.txt", "w") as f:
-    f.write("Hello from dynaface_app.py!\n")
-
-print("Hello World from dynaface_app.py")
-
 import os
+
+import cv2
+import os
+import sys
+
+print("✅ cv2 loaded from:", cv2.__file__)
+print("✅ Contents of cv2 dir:", os.listdir(os.path.dirname(cv2.__file__)))
+print("✅ Python executable:", sys.executable)
 
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"

@@ -101,7 +101,7 @@ class MTCNN2(MTCNN):
 
 def _init_mtcnn() -> None:
     global mtcnn_model
-    if _device is "?":
+    if _device == "?":
         raise ValueError("Device not initialized. Call init_models() first.")
 
     if _device == "mps" and FIX_MPS_ISSUE:
@@ -221,7 +221,7 @@ def unload_models() -> None:
 
 
 def are_models_init() -> bool:
-    return _device is not "?"
+    return _device != "?"
 
 
 def detect_device() -> str:
