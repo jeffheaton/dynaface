@@ -20,4 +20,4 @@ Dynaface is a computer application and Python library that measures facial symme
 
 # License
 
-This application and Python library are licensed under the [The MIT License](https://github.com/jeffheaton/dynaface/blob/main/LICENSE.txt).
+This application and Python library are licensed under the [Apache License Version 2.0](https://github.com/jeffheaton/dynaface/blob/main/LICENSE.txt).

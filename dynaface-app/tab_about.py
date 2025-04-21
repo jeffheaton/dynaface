@@ -30,7 +30,8 @@ Log path: {self._window.app.LOG_DIR} <br>
 Torch version: {v1}<br>
 Dynaface Library Version: {dynaface.__version__}<br>
 Facenet-pytorch version: {v2}<br>
-Processor in use: {current_device} (detected: {device})
+Processor in use: {current_device} (detected: {device})<br>
+Data Path: {self._window.app.DATA_DIR} <br>
 """
 
         # Create the QLabel with the hyperlink

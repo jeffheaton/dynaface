@@ -65,7 +65,8 @@ class MTCNN2(MTCNN):
         device: Optional[str] = None,
         path: str = "",  # now a required string (do not use None)
     ) -> None:
-        super().__init__()  # type: ignore
+        #super().__init__()  # type: ignore
+        # Don't call the parent constructor, as it initializes MTCNN with default values
         self.image_size = image_size
         self.margin = margin
         self.min_face_size = min_face_size

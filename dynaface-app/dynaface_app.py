@@ -1,13 +1,5 @@
 import os
 
-import cv2
-import os
-import sys
-
-print("✅ cv2 loaded from:", cv2.__file__)
-print("✅ Contents of cv2 dir:", os.listdir(os.path.dirname(cv2.__file__)))
-print("✅ Python executable:", sys.executable)
-
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
@@ -26,6 +18,7 @@ import sys
 import jth_ui.utl_settings as utl_settings
 import torch
 import version
+
 from dynaface.facial import DEFAULT_TILT_THRESHOLD, STD_PUPIL_DIST
 from dynaface_window import DynafaceWindow
 from jth_ui.app_jth import AppJTH, get_library_version
@@ -66,6 +59,7 @@ class AppDynaface(AppJTH):
             self.tilt_threshold = DEFAULT_TILT_THRESHOLD
 
             self.BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+            print(f"=====Base dir: {self.BASE_DIR}")
             self.DATA_DIR = os.path.join(self.BASE_DIR, "data")
 
             self.main_window = DynafaceWindow(app=self, app_name=self.APP_NAME)

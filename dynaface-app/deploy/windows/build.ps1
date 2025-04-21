@@ -22,6 +22,7 @@ try {
     # Install dependencies
     pip install -r requirements.txt
     pip install --upgrade dynaface
+    pip install --force-reinstall --upgrade onnxruntime==1.20.1
 
     # Move to deploy/windows
     Set-Location deploy/windows
@@ -54,7 +55,7 @@ try {
     
     # Run Pyinstaller
     Write-Output "**Run PyInstaller **"
-    Set-Location working
+    Set-Location ./working
     pyinstaller --clean --noconfirm --distpath dist --workpath build dynaface-windows.spec 
     
 }

@@ -1,9 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
-import os
 import platform
 from PyInstaller.utils.hooks import collect_all
-
-block_cipher = None
 
 # version from env (optional)
 version = os.getenv('version', '0.0.1')
@@ -34,55 +31,38 @@ extra_hiddenimports = [
 
 # Final lists
 datas = added_datas + cv2_datas
-binaries = cv2_binaries
-hiddenimports = cv2_hidden + extra_hiddenimports
-
-# --------- BUILD ---------
 
 a = Analysis(
-    ["dynaface_app.py"],
-    pathex=["."],
-    binaries=binaries,
+    ['dynaface_app.py'],
+    pathex=[os.path.abspath('.')],
+    binaries=[],
     datas=datas,
-    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
     noarchive=False,
     optimize=0,
 )
-
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.datas,
     [],
-    exclude_binaries=True,
-    name="dynaface.exe",
+    name='dynaface',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=False,  # UPX disabled for PyQt/OpenCV compatibility
+    upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=True,  # Set to False once stable
+    console=True,
     disable_windowed_traceback=False,
-    target_arch=target_arch,
-    icon="dynaface_icon.ico",
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=False,
-    upx_exclude=[],
-    name=f"Dynaface-win-{target_arch}",
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
 )
