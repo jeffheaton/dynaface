@@ -19,11 +19,11 @@ try {
     # Activate virtual environment
     & "./venv/Scripts/Activate.ps1"
 
-    # Install dependencies
-    pip install -r requirements.txt --constraint constraints.txt
-    pip install --upgrade dynaface
-    # pip install --force-reinstall --upgrade onnxruntime==1.20.1
-    pip install --upgrade https://data.heatonresearch.com/library/dynaface-0.2.2-py3-none-any.whl
+    # Install dependencies with constraint
+    pip install -r requirements.txt --constraint ./deploy/windows/constraints.txt
+
+    # Install dynaface with constraint
+    pip install --upgrade https://data.heatonresearch.com/library/dynaface-0.2.2-py3-none-any.whl --constraint ./deploy/windows/constraints.txt
 
     # Move to deploy/windows
     Set-Location deploy/windows
