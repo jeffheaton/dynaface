@@ -59,7 +59,7 @@ class AppDynaface(AppJTH):
             self.tilt_threshold = DEFAULT_TILT_THRESHOLD
 
             self.BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-            print(f"=====Base dir: {self.BASE_DIR}")
+
             self.DATA_DIR = os.path.join(self.BASE_DIR, "data")
 
             self.main_window = DynafaceWindow(app=self, app_name=self.APP_NAME)
