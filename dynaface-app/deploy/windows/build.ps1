@@ -23,7 +23,7 @@ try {
     pip install -r requirements.txt --constraint ./deploy/windows/constraints.txt
 
     # Install dynaface with constraint
-    pip install --upgrade https://data.heatonresearch.com/library/dynaface-0.2.2-py3-none-any.whl --constraint ./deploy/windows/constraints.txt
+    pip install --constraint ./deploy/windows/constraints.txt --upgrade C:\PythonBuilds\library\dynaface-0.2.2-py3-none-any.whl
 
     # Move to deploy/windows
     Set-Location deploy/windows
