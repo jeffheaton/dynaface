@@ -11,7 +11,6 @@ import dynaface.measures
 import numpy as np
 import requests  # You may also use: # type: ignore[import]
 from dynaface.image import ImageAnalysis
-from dynaface.lateral import analyze_lateral  # type: ignore
 from dynaface.measures import MeasureBase
 from dynaface.models import are_models_init
 from dynaface.util import VERIFY_CERTS
@@ -271,6 +270,8 @@ class AnalyzeFace(ImageAnalysis):
                 self.crop_stylegan(pupils=pupils)
 
         if lateral_pos:
+            from dynaface.lateral import analyze_lateral
+
             p = util.cv2_to_pil(self.render_img)
             # Convert lateral_landmarks and sagittal data from analyze_lateral.
             c, self.lateral_landmarks, self.sagittal_x, self.sagittal_y = (
