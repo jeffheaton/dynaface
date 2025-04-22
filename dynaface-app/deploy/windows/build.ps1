@@ -20,7 +20,7 @@ try {
     & "./venv/Scripts/Activate.ps1"
 
     # Install dependencies
-    pip install -r requirements.txt
+    pip install -r requirements.txt --constraint constraints.txt
     pip install --upgrade dynaface
     # pip install --force-reinstall --upgrade onnxruntime==1.20.1
     pip install --upgrade https://data.heatonresearch.com/library/dynaface-0.2.2-py3-none-any.whl
