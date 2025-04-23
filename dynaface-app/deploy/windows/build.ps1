@@ -58,7 +58,7 @@ try {
     Write-Output "**Run PyInstaller **"
     Set-Location ./working
     pyinstaller --clean --noconfirm --distpath dist --workpath build dynaface-windows.spec 
-    
+
 }
 catch {
     Write-Error "An error occurred: $_"

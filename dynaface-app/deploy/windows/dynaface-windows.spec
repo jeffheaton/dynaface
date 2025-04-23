@@ -21,7 +21,8 @@ cv2_datas, cv2_binaries, cv2_hidden = collect_all("cv2")
 
 # Add any app-specific data
 added_datas = [
-    ("data/", "data")
+    ("data/", "data"),
+    ("dynaface_doc_icon.ico", ".")
 ]
 
 # Add any extra hidden imports you know about
@@ -53,6 +54,7 @@ exe = EXE(
     a.datas,
     [],
     name='dynaface',
+    icon='dynaface_icon.ico',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
