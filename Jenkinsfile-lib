@@ -95,21 +95,21 @@ pipeline {
             steps {
                 script {
                     sh '''
-                        cd dynaface-lib
+                    cd dynaface-lib
 
-                        VERSION=$(python3.11 -c "import configparser; c = configparser.ConfigParser(); c.read('setup.cfg'); print(c['metadata']['version'])")
-                        BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%S%z")
-                        BUILD="$BUILD_NUMBER"
+                    VERSION=$(python3.11 -c "import configparser; c = configparser.ConfigParser(); c.read('setup.cfg'); print(c['metadata']['version'])")
+                    BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%S%z")
+                    BUILD="$BUILD_NUMBER"
 
-                        cat <<EOF > dynaface/version.py
-        VERSION = "$VERSION"
-        BUILD_DATE = "$BUILD_DATE"
-        BUILD = $BUILD
-        EOF
+                    cat <<EOF > dynaface/version.py
+VERSION = "$VERSION"
+BUILD_DATE = "$BUILD_DATE"
+BUILD = $BUILD
+EOF
 
-                        echo "Generated dynaface/version.py:"
-                        cat dynaface/version.py
-                    '''
+                    echo "Generated dynaface/version.py:"
+                    cat dynaface/version.py
+                '''
                 }
             }
         }
