@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 
 # Constants
 $MODEL_BINARY_URL = "https://github.com/jeffheaton/dynaface-models/releases/download/v1/dynaface_models.zip"
+$DYNAFACE_WHL = "https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/library/dynaface-0.2.2-py3-none-any.whl"
 
 try {
     # Move to project root
@@ -23,7 +24,7 @@ try {
     pip install -r requirements.txt --constraint ./deploy/windows/constraints.txt
 
     # Install dynaface with constraint
-    pip install --constraint ./deploy/windows/constraints.txt --upgrade C:\PythonBuilds\library\dynaface-0.2.2-py3-none-any.whl
+    pip install --constraint ./deploy/windows/constraints.txt --upgrade $DYNAFACE_WHL
 
     # Move to deploy/windows
     Set-Location deploy/windows
