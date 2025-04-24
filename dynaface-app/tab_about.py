@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from version import BUILD_DATE
 
 import dynaface
+from jth_ui import app_const
 
 
 class AboutTab(QWidget):
@@ -15,8 +16,8 @@ class AboutTab(QWidget):
         v1 = get_library_version("torch")
         v2 = get_library_version("facenet-pytorch")
         text = f"""
-<H1>{self._window.app.APP_NAME} {self._window.app.VERSION}</H1>
-{self._window.app.COPYRIGHT}
+<H1>{app_const.APP_NAME} {app_const.VERSION}</H1>
+{app_const.COPYRIGHT}
 <br>
 Produced in collaboration with [insert names], [Johns Hopkins reference]. 
 <br>

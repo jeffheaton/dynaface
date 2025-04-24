@@ -1,4 +1,12 @@
 import os
+from jth_ui import app_const
+
+app_const.BUNDLE_ID = "com.heatonresearch.dynaface"
+app_const.APP_NAME = "Dynaface"
+app_const.APP_AUTHOR = "Jeff Heaton"
+app_const.COPYRIGHT = "Copyright 2025 by Jeff Heaton, released under the <a href='https://www.apache.org/licenses/LICENSE-2.0'>Apache 2.0 License</a>"
+app_const.VERSION = "1.0.0"
+app_const.BUNDLE_ID.split(".")[-1]
 
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -18,7 +26,6 @@ import sys
 import jth_ui.utl_settings as utl_settings
 import torch
 import version
-
 from dynaface.facial import DEFAULT_TILT_THRESHOLD, STD_PUPIL_DIST
 from dynaface_window import DynafaceWindow
 from jth_ui.app_jth import AppJTH, get_library_version
@@ -47,22 +54,15 @@ register_heif_opener()
 class AppDynaface(AppJTH):
     def __init__(self):
         try:
-            super().__init__(
-                app_name="Dynaface",
-                app_author="HeatonResearch",
-                copyright="Copyright 2025 by Jeff Heaton, released under the <a href='https://www.apache.org/licenses/LICENSE-2.0'>Apache 2.0 License</a>",
-                version=version.VERSION,
-                bundle_id="com.heatonresearch.dynaface",
-            )
+            super().__init__()
             self.dynamic_adjust = DEFAULT_DYNAMIC_ADJUST
             self.data_smoothing = DEFAULT_SMOOTH
             self.tilt_threshold = DEFAULT_TILT_THRESHOLD
 
             self.BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
             self.DATA_DIR = os.path.join(self.BASE_DIR, "data")
 
-            self.main_window = DynafaceWindow(app=self, app_name=self.APP_NAME)
+            self.main_window = DynafaceWindow(app=self, app_name=app_const.APP_NAME)
             self.main_window.show()
 
             self.load_dynaface_settings()

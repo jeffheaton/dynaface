@@ -13,6 +13,7 @@ import pkg_resources
 from PyQt6.QtCore import QEvent, Qt, QtMsgType, QUrl, qInstallMessageHandler
 from PyQt6.QtGui import QDesktopServices, QFileOpenEvent
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox
+from jth_ui import app_const
 
 logger = logging.getLogger(__name__)
 
@@ -33,15 +34,10 @@ def get_library_version(library_name):
 
 
 class AppJTH(QApplication):
-    def __init__(self, app_name, app_author, copyright, version, bundle_id):
+    def __init__(self):
         super().__init__(sys.argv)
         self.file_open_request = None
-        self.BUNDLE_ID = bundle_id
-        self.APP_NAME = app_name
-        self.APP_AUTHOR = app_author
-        self.COPYRIGHT = copyright
-        self.VERSION = version
-        self.APP_ID = self.BUNDLE_ID.split(".")[-1]
+
         self.settings = {}
         if self.get_system_name() == "osx":
             if self.is_sandboxed():
@@ -49,28 +45,34 @@ class AppJTH(QApplication):
                 self.SETTING_DIR = os.path.expanduser(f"~/preferences")
             else:
                 self.LOG_DIR = os.path.expanduser(
-                    f"~/Library/Application Support/{self.APP_ID}/logs/"
+                    f"~/Library/Application Support/{app_const.APP_ID}/logs/"
                 )
                 self.SETTING_DIR = os.path.expanduser(
-                    f"~/Library/Application Support/{self.APP_ID}/"
+                    f"~/Library/Application Support/{app_const.APP_ID}/"
                 )
-            self.SETTING_FILE = os.path.join(self.SETTING_DIR, f"{self.APP_ID}.plist")
+            self.SETTING_FILE = os.path.join(
+                self.SETTING_DIR, f"{app_const.APP_ID}.plist"
+            )
             self.STATE_FILE = os.path.join(self.SETTING_DIR, "state.json")
         elif self.get_system_name() == "windows":
             base_dir = appdirs.user_config_dir(
-                self.APP_NAME, self.APP_AUTHOR, roaming=False
+                app_const.APP_NAME, app_const.APP_AUTHOR, roaming=False
             )
             self.LOG_DIR = os.path.join(base_dir, "logs")
             self.SETTING_DIR = os.path.join(base_dir, "preferences")
-            self.SETTING_FILE = os.path.join(self.SETTING_DIR, f"{self.APP_ID}.json")
+            self.SETTING_FILE = os.path.join(
+                self.SETTING_DIR, f"{app_const.APP_ID}.json"
+            )
             self.STATE_FILE = os.path.join(self.SETTING_DIR, "state.json")
         else:
             home_dir = os.path.expanduser("~")
-            base_dir = os.path.join(home_dir, self.APP_ID)
+            base_dir = os.path.join(home_dir, app_const.APP_ID)
             os.makedirs(base_dir, exist_ok=True)
             self.LOG_DIR = os.path.join(base_dir, "logs")
             self.SETTING_DIR = os.path.join(base_dir, "preferences")
-            self.SETTING_FILE = os.path.join(self.SETTING_DIR, f"{self.APP_ID}.json")
+            self.SETTING_FILE = os.path.join(
+                self.SETTING_DIR, f"{app_const.APP_ID}.json"
+            )
             self.STATE_FILE = os.path.join(self.SETTING_DIR, "state.json")
 
         print(f"Logs path: {self.LOG_DIR}")
@@ -90,7 +92,7 @@ class AppJTH(QApplication):
         if s == "osx":
             logging.info(f"Sandbox mode: {self.is_sandboxed()}")
 
-        self.setApplicationName(app_name)
+        self.setApplicationName(app_const.APP_NAME)
 
         self.load_state()
 
@@ -212,7 +214,7 @@ class AppJTH(QApplication):
         try:
             with open(self.STATE_FILE, "r") as fp:
                 self.state = json.load(fp)
-        except FileNotFoundError:
+        except Exception:
             self.init_state()
             logger.info("Failed to read state file, using defaults.")
 

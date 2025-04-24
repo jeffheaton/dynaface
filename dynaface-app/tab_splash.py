@@ -11,6 +11,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from jth_ui import app_const
+
 
 class SplashTab(QWidget):
     def __init__(self, window):
@@ -73,7 +75,7 @@ class SplashTab(QWidget):
         self.setLayout(main_layout)
 
         # Version label
-        self.version_label = QLabel(f"v{self._window.app.VERSION}", self)
+        self.version_label = QLabel(f"v{app_const.VERSION}", self)
         self.version_label.setStyleSheet(
             "background-color: black; color: white; padding: 5px;"
         )

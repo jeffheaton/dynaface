@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import QMenu, QMenuBar, QMessageBox, QTabWidget
 from tab_about import AboutTab
 from tab_analyze_video import AnalyzeVideoTab
 from tab_eval import TabEval
+from jth_ui import app_const
 
 logger = logging.getLogger(__name__)
 
@@ -54,11 +55,11 @@ class DynafaceWindow(MainWindowJTH):
         self.setMenuBar(self.menubar)
 
         # Create the app menu and add it to the menu bar
-        app_menu = QMenu(self.app.APP_NAME, self)
+        app_menu = QMenu(app_const.APP_NAME, self)
 
         # Add items to the app menu
         if self.app.get_system_name() == "osx":
-            about_action = QAction(f"About {self.app.APP_NAME}", self)
+            about_action = QAction(f"About {app_const.APP_NAME}", self)
             app_menu.addAction(about_action)
             self.about_menu = QMenu("About", self)
             about_action.triggered.connect(self.show_about)
@@ -153,7 +154,7 @@ class DynafaceWindow(MainWindowJTH):
         self._help_menu = QMenu("Help", self)
 
         if self.app.get_system_name() == "windows":
-            about_action = QAction(f"About {self.app.APP_NAME}", self)
+            about_action = QAction(f"About {app_const.APP_NAME}", self)
             self._help_menu.addAction(about_action)
             about_action.triggered.connect(self.show_about)
 
