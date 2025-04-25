@@ -1,5 +1,9 @@
 # Begin logging ASAP
 from jth_ui import app_const, utl_log
+app_const.BUNDLE_ID = "com.heatonresearch.dynaface"
+app_const.APP_NAME = "Dynaface"
+app_const.APP_AUTHOR = "Jeff Heaton"
+app_const.COPYRIGHT = "Copyright 2025 by Jeff Heaton, released under the <a href='https://www.apache.org/licenses/LICENSE-2.0'>Apache 2.0 License</a>"
 
 utl_log.delete_old_logs()
 utl_log.setup_logging()
@@ -7,10 +11,6 @@ utl_log.setup_logging()
 # Setup the application information
 import version as v
 
-app_const.BUNDLE_ID = "com.heatonresearch.dynaface"
-app_const.APP_NAME = "Dynaface"
-app_const.APP_AUTHOR = "Jeff Heaton"
-app_const.COPYRIGHT = "Copyright 2025 by Jeff Heaton, released under the <a href='https://www.apache.org/licenses/LICENSE-2.0'>Apache 2.0 License</a>"
 app_const.VERSION = v.VERSION
 app_const.BUNDLE_ID.split(".")[-1]
 

@@ -14,6 +14,7 @@ _console_handler = None
 _file_handler = None
 
 logger = logging.getLogger(__name__)
+logger.propagate = True
 
 
 def get_log_dir():
@@ -32,8 +33,8 @@ def get_log_dir():
     else:
         home_dir = os.path.expanduser("~")
         base_dir = os.path.join(home_dir, app_const.APP_ID)
-        os.makedirs(base_dir, exist_ok=True)
         log_dir = os.path.join(base_dir, "logs")
+    os.makedirs(log_dir, exist_ok=True)
     return log_dir
 
 
@@ -77,19 +78,21 @@ def setup_logging(level=logging.DEBUG):
     _file_handler.setFormatter(
         logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     )
-    _file_handler.flush = sys.stdout.flush  # Ensure immediate flush
+    
+    _file_handler.flush()
 
-    # Console Handler
-    _console_handler = logging.StreamHandler()
-    _console_handler.setLevel(level)
-    _console_handler.setFormatter(
-        logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-    )
+    # Console Handler (if stderr is available)
+    if sys.stderr and hasattr(sys.stderr, 'write'):
+        _console_handler = logging.StreamHandler()
+        _console_handler.setLevel(level)
+        _console_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        )
+        root_logger.addHandler(_console_handler)
 
     # Attach handlers to the root logger
     root_logger.addHandler(_file_handler)
-    root_logger.addHandler(_console_handler)
-    logger.info("Logging initialized.")
+    logger.info(f"Logging initialized. Output: {log_dir}")
 
 
 def change_log_level(level):
