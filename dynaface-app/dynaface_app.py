@@ -26,21 +26,21 @@ os.environ["MKL_DYNAMIC"] = "FALSE"
 os.environ["MKL_THREADING_LAYER"] = "GNU"
 
 
-import os
 import logging
+import os
 import sys
+
+logger = logging.getLogger(__name__)
 
 import jth_ui.utl_settings as utl_settings
 import torch
-from dynaface.facial import DEFAULT_TILT_THRESHOLD, STD_PUPIL_DIST
+from dynaface.const import DEFAULT_TILT_THRESHOLD, STD_PUPIL_DIST
 from dynaface_window import DynafaceWindow
 from jth_ui import app_const, utl_log
 from jth_ui.app_jth import AppJTH, get_library_version
 from pillow_heif import register_heif_opener
 
 import dynaface
-
-logger = logging.getLogger(__name__)
 
 # Constants for settings keys
 SETTING_PD = "pd"

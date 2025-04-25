@@ -1,19 +1,13 @@
 import logging
-import logging.config
-import logging.handlers
 import os
 import webbrowser
 
-import dynaface_document
-import tab_settings
 import tab_splash
 from jth_ui import app_jth
 from jth_ui.window_jth import MainWindowJTH
 from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QAction, QKeySequence
-from PyQt6.QtWidgets import QMenu, QMenuBar, QMessageBox, QTabWidget
-from tab_about import AboutTab
-from tab_analyze_video import AnalyzeVideoTab
+from PyQt6.QtWidgets import QMenu, QMenuBar, QTabWidget
 from tab_eval import TabEval
 from jth_ui import app_const, utl_env, utl_log
 
@@ -209,6 +203,8 @@ class DynafaceWindow(MainWindowJTH):
 
     def show_about(self):
         try:
+            from tab_about import AboutTab
+
             if not self.is_tab_open("About"):
                 self.add_tab(AboutTab(self), "About Dynaface")
         except Exception as e:
@@ -224,6 +220,8 @@ class DynafaceWindow(MainWindowJTH):
 
     def show_analyze_video(self, filename):
         try:
+            from tab_analyze_video import AnalyzeVideoTab
+
             if ALLOW_ONE_ANALYZE_TAB:
                 self.close_analyze_tabs()
             basename = os.path.basename(filename)
@@ -255,6 +253,8 @@ class DynafaceWindow(MainWindowJTH):
 
     def show_properties(self):
         try:
+            import tab_settings
+
             if not self.is_tab_open("Preferences"):
                 self.add_tab(tab_settings.SettingsTab(self), "Preferences")
         except Exception as e:

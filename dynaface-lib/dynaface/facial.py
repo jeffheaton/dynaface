@@ -10,6 +10,16 @@ import dynaface.image
 import dynaface.measures
 import numpy as np
 import requests  # You may also use: # type: ignore[import]
+from dynaface.const import (
+    DEFAULT_TILT_THRESHOLD,
+    FILL_COLOR,
+    LM_LEFT_PUPIL,
+    LM_RIGHT_PUPIL,
+    STD_PUPIL_DIST,
+    STYLEGAN_PUPIL_DIST,
+    STYLEGAN_RIGHT_PUPIL,
+    STYLEGAN_WIDTH,
+)
 from dynaface.image import ImageAnalysis
 from dynaface.measures import MeasureBase
 from dynaface.models import are_models_init
@@ -20,20 +30,6 @@ import dynaface
 from dynaface import measures, models, util
 
 logger = logging.getLogger(__name__)
-
-STYLEGAN_WIDTH = 1024
-STYLEGAN_LEFT_PUPIL = (640, 480)
-STYLEGAN_RIGHT_PUPIL = (380, 480)
-STYLEGAN_PUPIL_DIST = STYLEGAN_LEFT_PUPIL[0] - STYLEGAN_RIGHT_PUPIL[0]
-
-STD_PUPIL_DIST = 63
-DEFAULT_TILT_THRESHOLD = -1
-
-LM_LEFT_PUPIL = 97
-LM_RIGHT_PUPIL = 96
-
-# Changed FILL_COLOR to a tuple to match expected type in safe_clip.
-FILL_COLOR = (255, 255, 255)
 
 
 def util_calc_pd(
