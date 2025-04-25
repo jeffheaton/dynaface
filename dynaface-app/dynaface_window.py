@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import QMenu, QMenuBar, QMessageBox, QTabWidget
 from tab_about import AboutTab
 from tab_analyze_video import AnalyzeVideoTab
 from tab_eval import TabEval
-from jth_ui import app_const
+from jth_ui import app_const, utl_env, utl_log
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ class DynafaceWindow(MainWindowJTH):
         app_menu = QMenu(app_const.APP_NAME, self)
 
         # Add items to the app menu
-        if self.app.get_system_name() == "osx":
+        if utl_env.get_system_name() == "osx":
             about_action = QAction(f"About {app_const.APP_NAME}", self)
             app_menu.addAction(about_action)
             self.about_menu = QMenu("About", self)
@@ -111,7 +111,7 @@ class DynafaceWindow(MainWindowJTH):
         self._print_menu.triggered.connect(self.print_action)
         self._file_menu.addAction(self._print_menu)
 
-        if self.app.get_system_name() == "windows":
+        if utl_env.get_system_name() == "windows":
             preferences_action = QAction("Settings...", self)
             self._file_menu.addAction(preferences_action)
             preferences_action.triggered.connect(self.show_properties)
@@ -153,7 +153,7 @@ class DynafaceWindow(MainWindowJTH):
         # Help menu
         self._help_menu = QMenu("Help", self)
 
-        if self.app.get_system_name() == "windows":
+        if utl_env.get_system_name() == "windows":
             about_action = QAction(f"About {app_const.APP_NAME}", self)
             self._help_menu.addAction(about_action)
             about_action.triggered.connect(self.show_about)
@@ -378,7 +378,7 @@ class DynafaceWindow(MainWindowJTH):
             self.display_message_box("Unable to close tab.")
 
     def open_logs(self):
-        self.app.open_logs()
+        utl_log.open_logs()
 
     def has_method(self, name):
         current_tab = self._tab_widget.currentWidget()

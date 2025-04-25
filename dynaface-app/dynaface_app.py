@@ -1,12 +1,23 @@
-import os
-from jth_ui import app_const
+# Begin logging ASAP
+from jth_ui import app_const, utl_log
+
+utl_log.delete_old_logs()
+utl_log.setup_logging()
+
+# Setup the application information
+import version as v
 
 app_const.BUNDLE_ID = "com.heatonresearch.dynaface"
 app_const.APP_NAME = "Dynaface"
 app_const.APP_AUTHOR = "Jeff Heaton"
 app_const.COPYRIGHT = "Copyright 2025 by Jeff Heaton, released under the <a href='https://www.apache.org/licenses/LICENSE-2.0'>Apache 2.0 License</a>"
-app_const.VERSION = "1.0.0"
+app_const.VERSION = v.VERSION
 app_const.BUNDLE_ID.split(".")[-1]
+
+# Need the above thread setting because of this issue:
+# https://github.com/numpy/numpy/issues/654
+# See note in spgia.augmentors.utils
+import os
 
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
@@ -14,20 +25,16 @@ os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["MKL_DYNAMIC"] = "FALSE"
 os.environ["MKL_THREADING_LAYER"] = "GNU"
 
-# Need the above thread setting because of this issue:
-# https://github.com/numpy/numpy/issues/654
-# See note in spgia.augmentors.utils
 
+import os
 import logging
-import logging.config
-import logging.handlers
 import sys
 
 import jth_ui.utl_settings as utl_settings
 import torch
-import version
 from dynaface.facial import DEFAULT_TILT_THRESHOLD, STD_PUPIL_DIST
 from dynaface_window import DynafaceWindow
+from jth_ui import app_const, utl_log
 from jth_ui.app_jth import AppJTH, get_library_version
 from pillow_heif import register_heif_opener
 
@@ -82,7 +89,7 @@ class AppDynaface(AppJTH):
             self.settings, key=SETTING_LOG_LEVEL, default="INFO"
         )
         logging_level = getattr(logging, level)
-        self.change_log_level(logging_level)
+        utl_log.change_log_level(logging_level)
 
         # Set pupillary distance (PD)
         dynaface.facial.AnalyzeFace.pd = utl_settings.get_int(

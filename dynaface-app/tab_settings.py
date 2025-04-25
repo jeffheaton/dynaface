@@ -1,7 +1,7 @@
 import logging
 
 from dynaface.facial import DEFAULT_TILT_THRESHOLD, STD_PUPIL_DIST
-from jth_ui import utl_settings
+from jth_ui import utl_settings, utl_log
 from PyQt6.QtGui import QIntValidator
 from PyQt6.QtWidgets import (
     QApplication,
@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 class SettingsTab(QWidget):
     def __init__(self, window):
         super().__init__()
+        import dynaface_app
+
         app = QApplication.instance()
 
         self._window = window
@@ -150,7 +152,7 @@ class SettingsTab(QWidget):
 
         level = settings[dynaface_app.SETTING_LOG_LEVEL]
         logging_level = getattr(logging, level)
-        self._window.app.change_log_level(logging_level)
+        utl_log.change_log_level(logging_level)
         self._window.app.save_settings()
         self._window.app.load_dynaface_settings()
 

@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from version import BUILD_DATE
 
 import dynaface
-from jth_ui import app_const
+from jth_ui import app_const, utl_log
 
 
 class AboutTab(QWidget):
@@ -27,7 +27,7 @@ This program implements the algorithms described in the paper:<br>
 [insert actual paper cite]
 <hr>
 Build Date: {BUILD_DATE} <br>
-Log path: {self._window.app.LOG_DIR} <br>
+Log path: {utl_log.get_log_dir()} <br>
 Torch version: {v1}<br>
 Dynaface Library Version: {dynaface.__version__}<br>
 Facenet-pytorch version: {v2}<br>

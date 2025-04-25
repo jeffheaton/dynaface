@@ -13,7 +13,8 @@ import pkg_resources
 from PyQt6.QtCore import QEvent, Qt, QtMsgType, QUrl, qInstallMessageHandler
 from PyQt6.QtGui import QDesktopServices, QFileOpenEvent
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox
-from jth_ui import app_const
+from jth_ui import app_const, utl_env
+
 
 logger = logging.getLogger(__name__)
 
@@ -39,14 +40,10 @@ class AppJTH(QApplication):
         self.file_open_request = None
 
         self.settings = {}
-        if self.get_system_name() == "osx":
-            if self.is_sandboxed():
-                self.LOG_DIR = os.path.join(os.path.expanduser("~"), "logs")
+        if utl_env.get_system_name() == "osx":
+            if utl_env.is_sandboxed():
                 self.SETTING_DIR = os.path.expanduser(f"~/preferences")
             else:
-                self.LOG_DIR = os.path.expanduser(
-                    f"~/Library/Application Support/{app_const.APP_ID}/logs/"
-                )
                 self.SETTING_DIR = os.path.expanduser(
                     f"~/Library/Application Support/{app_const.APP_ID}/"
                 )
@@ -54,11 +51,10 @@ class AppJTH(QApplication):
                 self.SETTING_DIR, f"{app_const.APP_ID}.plist"
             )
             self.STATE_FILE = os.path.join(self.SETTING_DIR, "state.json")
-        elif self.get_system_name() == "windows":
+        elif utl_env.get_system_name() == "windows":
             base_dir = appdirs.user_config_dir(
                 app_const.APP_NAME, app_const.APP_AUTHOR, roaming=False
             )
-            self.LOG_DIR = os.path.join(base_dir, "logs")
             self.SETTING_DIR = os.path.join(base_dir, "preferences")
             self.SETTING_FILE = os.path.join(
                 self.SETTING_DIR, f"{app_const.APP_ID}.json"
@@ -75,22 +71,19 @@ class AppJTH(QApplication):
             )
             self.STATE_FILE = os.path.join(self.SETTING_DIR, "state.json")
 
-        print(f"Logs path: {self.LOG_DIR}")
         print(f"Settings path: {self.SETTING_DIR}")
         print(f"Settings file: {self.SETTING_FILE}")
 
         self.load_settings()
-        self.setup_logging()
-        self.delete_old_logs()
 
         logging.info("Application starting up")
-        s = self.get_system_name()
+        s = utl_env.get_system_name()
         logging.info(f"System: {s}")
-        logging.info(f"Pyinstaller: {self.is_pyinstaller_bundle()}")
+        logging.info(f"Pyinstaller: {utl_env.is_pyinstaller_bundle()}")
         z = os.path.expanduser("~")
         logging.info(f"User: {z}")
         if s == "osx":
-            logging.info(f"Sandbox mode: {self.is_sandboxed()}")
+            logging.info(f"Sandbox mode: {utl_env.is_sandboxed()}")
 
         self.setApplicationName(app_const.APP_NAME)
 
@@ -104,9 +97,6 @@ class AppJTH(QApplication):
         except Exception as e:
             logger.error("Error running app", exc_info=True)
 
-    def is_sandboxed(self):
-        return "APP_SANDBOX_CONTAINER_ID" in os.environ
-
     def get_resource_path(self, relative_path, base_path):
         """Get the path to a resource, supporting both normal and bundled (PyInstaller) modes."""
         if getattr(sys, "frozen", False):
@@ -117,97 +107,9 @@ class AppJTH(QApplication):
 
         return os.path.join(base_path, relative_path)
 
-    def get_system_name(self):
-        system = platform.system().lower()
-        if system == "darwin":
-            return "osx"
-        elif system == "windows":
-            return "windows"
-        else:
-            # This covers Linux and other UNIX-like systems
-            return "unix"
-
-    def is_pyinstaller_bundle(self):
-        return getattr(sys, "frozen", False)
-
-    # Define a function to handle deletion of old log files
-    def delete_old_logs(self):
-        retention_period = 7  # days
-        current_time = datetime.datetime.now()
-        log_files = glob.glob(os.path.join(self.LOG_DIR, "*.log"))
-
-        for file in log_files:
-            creation_time = datetime.datetime.fromtimestamp(os.path.getctime(file))
-            if (current_time - creation_time).days > retention_period:
-                os.remove(file)
-
-    def setup_logging(self, level=logging.DEBUG):
-        os.makedirs(self.LOG_DIR, exist_ok=True)
-
-        log_filename = os.path.join(
-            self.LOG_DIR, f"{datetime.datetime.now().strftime('%Y-%m-%d')}.log"
-        )
-
-        # Get the root logger
-        root_logger = logging.getLogger()
-        root_logger.setLevel(level)
-
-        # Remove existing handlers to prevent duplication
-        for handler in root_logger.handlers[:]:
-            root_logger.removeHandler(handler)
-
-        # File Handler
-        self._file_handler = logging.handlers.TimedRotatingFileHandler(
-            log_filename, when="midnight", interval=1, backupCount=7
-        )
-        self._file_handler.setLevel(level)
-        self._file_handler.setFormatter(
-            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-        )
-        self._file_handler.flush = sys.stdout.flush  # Ensure immediate flush
-
-        # Console Handler
-        self._console_handler = logging.StreamHandler()
-        self._console_handler.setLevel(level)
-        self._console_handler.setFormatter(
-            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-        )
-
-        # Attach handlers to the root logger
-        root_logger.addHandler(self._file_handler)
-        root_logger.addHandler(self._console_handler)
-
-        # Set `logger` to reference the root logger
-        global logger
-        logger = root_logger
-
-        logger.info("Logging initialized.")
-
-    def change_log_level(self, level):
-        """Change the log level of the logger and its handlers."""
-
-        if not isinstance(level, int):
-            raise ValueError("Log level must be an integer (e.g., logging.INFO)")
-
-        if hasattr(self, "_console_handler"):
-            self._console_handler.setLevel(level)
-        if hasattr(self, "_file_handler"):
-            self._file_handler.setLevel(level)
-        if hasattr(self, "_logger"):
-            self._logger.setLevel(level)
-            self._logger.info(
-                f"Log level changed to {logging.getLevelName(level)} ({level})"
-            )
-        else:
-            logging.info(
-                f"Log level changed to {logging.getLevelName(level)} ({level})"
-            )
-
     def shutdown(self):
         self.save_state()
         self.save_settings()
-        self.setup_logging()
-        self.delete_old_logs()
         logging.info("Application shutting down")
 
     def load_state(self):
@@ -236,7 +138,7 @@ class AppJTH(QApplication):
     # Save settings to a JSON file
     def save_settings(self):
         try:
-            if self.get_system_name() == "osx":
+            if utl_env.get_system_name() == "osx":
                 logger.info("Saved MacOS settings")
                 with open(self.SETTING_FILE, "wb") as fp:
                     plistlib.dump(self.settings, fp)
@@ -255,7 +157,7 @@ class AppJTH(QApplication):
                 logger.info("Resetting to default settings")
                 self.init_settings()
             else:
-                if self.get_system_name() == "osx":
+                if utl_env.get_system_name() == "osx":
                     with open(self.SETTING_FILE, "rb") as fp:
                         self.settings = plistlib.load(fp)
                     logger.info("Loaded MacOS settings")
@@ -265,13 +167,6 @@ class AppJTH(QApplication):
                         logger.info("Loaded Windows settings")
         except Exception as e:
             logging.error("Caught an exception loading settings", exc_info=True)
-
-    def open_logs(self):
-        # Convert the file path to a QUrl object
-        file_url = QUrl.fromLocalFile(self.LOG_DIR)
-
-        # Open the file location in the default file explorer
-        QDesktopServices.openUrl(file_url)
 
     def event(self, event):
         try:
