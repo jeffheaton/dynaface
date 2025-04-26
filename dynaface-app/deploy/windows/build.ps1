@@ -1,6 +1,5 @@
 $ErrorActionPreference = "Stop"
 
-
 # Constants
 $MODEL_BINARY_URL = "https://github.com/jeffheaton/dynaface-models/releases/download/v1/dynaface_models.zip"
 $DYNAFACE_WHL = "https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/library/dynaface-0.2.2-py3-none-any.whl"
@@ -16,15 +15,14 @@ try {
 
     # Create virtual environment
     python3.11 -m venv venv
-
-    # Activate virtual environment
-    & "./venv/Scripts/Activate.ps1"
+    $venvPython = Join-Path (Get-Location) "venv/Scripts/python.exe"
+    $venvPip = Join-Path (Get-Location) "venv/Scripts/pip.exe"
 
     # Install dependencies with constraint
-    pip install -r requirements.txt --constraint ./deploy/windows/constraints.txt
+    & $venvPip install -r requirements.txt --constraint ./deploy/windows/constraints.txt
 
     # Install dynaface with constraint
-    pip install --constraint ./deploy/windows/constraints.txt --upgrade $DYNAFACE_WHL
+    & $venvPip install --constraint ./deploy/windows/constraints.txt --upgrade $DYNAFACE_WHL
 
     # Move to deploy/windows
     Set-Location deploy/windows
@@ -51,14 +49,15 @@ try {
     cp ../../data/* ./working/data
     cp ./dynaface_doc_icon.ico ./working
     cp ./dynaface_icon.ico ./working
+    cp ./splash.png ./working
     cp ./dynaface-windows.spec ./working
     cp ../../*.py ./working
     cp -r ../../jth_ui ./working/jth_ui
     
-    # Run Pyinstaller
-    Write-Output "**Run PyInstaller **"
+    # Run PyInstaller
+    Write-Output "** Run PyInstaller **"
     Set-Location ./working
-    pyinstaller --clean --noconfirm --distpath dist --workpath build dynaface-windows.spec 
+    & $venvPython -m PyInstaller --clean --noconfirm --distpath dist --workpath build dynaface-windows.spec 
 
 }
 catch {

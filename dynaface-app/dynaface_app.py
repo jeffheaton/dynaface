@@ -71,6 +71,15 @@ class AppDynaface(AppJTH):
 
             self.main_window = DynafaceWindow(app=self, app_name=app_const.APP_NAME)
             self.main_window.show()
+            self.main_window.raise_()
+            self.main_window.activateWindow()
+
+            try:
+                import pyi_splash
+                pyi_splash.close()
+                logger.info("Splash screen closed.")
+            except ImportError:
+                logger.info("No splash screen to close.")
 
             self.load_dynaface_settings()
 

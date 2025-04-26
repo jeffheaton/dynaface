@@ -12,9 +12,12 @@ from PyQt6.QtGui import QDesktopServices
 
 _console_handler = None
 _file_handler = None
+_LOG_FORMAT = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
 
 logger = logging.getLogger(__name__)
 logger.propagate = True
+
+
 
 
 def get_log_dir():
@@ -76,7 +79,7 @@ def setup_logging(level=logging.DEBUG):
     )
     _file_handler.setLevel(level)
     _file_handler.setFormatter(
-        logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        logging.Formatter(_LOG_FORMAT)
     )
     
     _file_handler.flush()
@@ -86,13 +89,17 @@ def setup_logging(level=logging.DEBUG):
         _console_handler = logging.StreamHandler()
         _console_handler.setLevel(level)
         _console_handler.setFormatter(
-            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+            logging.Formatter(_LOG_FORMAT)
         )
         root_logger.addHandler(_console_handler)
 
     # Attach handlers to the root logger
     root_logger.addHandler(_file_handler)
     logger.info(f"Logging initialized. Output: {log_dir}")
+
+    # Silence noisy libraries
+    for noisy_logger in ["torch", "urllib3", "matplotlib", "PyQt6"]:
+        logging.getLogger(noisy_logger).setLevel(logging.WARNING)
 
 
 def change_log_level(level):
@@ -101,8 +108,11 @@ def change_log_level(level):
     if not isinstance(level, int):
         raise ValueError("Log level must be an integer (e.g., logging.INFO)")
 
-    _console_handler.setLevel(level)
-    _file_handler.setLevel(level)
+    if _console_handler:
+        _console_handler.setLevel(level)
+    
+    if _file_handler:
+        _file_handler.setLevel(level)
 
     logging.info(f"Log level changed to {logging.getLevelName(level)} ({level})")
 
