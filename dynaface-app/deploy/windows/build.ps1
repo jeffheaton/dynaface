@@ -1,8 +1,11 @@
 $ErrorActionPreference = "Stop"
 
-# Constants
-$MODEL_BINARY_URL = "https://github.com/jeffheaton/dynaface-models/releases/download/v1/dynaface_models.zip"
-$DYNAFACE_WHL = "https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/library/dynaface-0.2.2-py3-none-any.whl"
+# Save the initial directory
+$InitialLocation = Get-Location
+
+# Constants (scoped to the script)
+$script:MODEL_BINARY_URL = "https://github.com/jeffheaton/dynaface-models/releases/download/v1/dynaface_models.zip"
+$script:DYNAFACE_WHL = "https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/library/dynaface-0.2.2-py3-none-any.whl"
 
 try {
     # Move to project root
@@ -21,8 +24,11 @@ try {
     # Install dependencies with constraint
     & $venvPip install -r requirements.txt --constraint ./deploy/windows/constraints.txt
 
+    # Debug output for DYNAFACE_WHL
+    Write-Output "DYNAFACE_WHL: $script:DYNAFACE_WHL"
+
     # Install dynaface with constraint
-    & $venvPip install --constraint ./deploy/windows/constraints.txt --upgrade $DYNAFACE_WHL
+    & $venvPip install --constraint ./deploy/windows/constraints.txt --upgrade $script:DYNAFACE_WHL
 
     # Move to deploy/windows
     Set-Location deploy/windows
@@ -36,11 +42,14 @@ try {
     # Download and extract model binary
     Write-Output "** Downloading model binaries **"
 
+    # Debug output for MODEL_BINARY_URL
+    Write-Output "MODEL_BINARY_URL: $script:MODEL_BINARY_URL"
+
     $TEMP_ZIP = [System.IO.Path]::GetTempFileName()
     $ZIP_FILE = "$TEMP_ZIP.zip"
     Rename-Item -Path $TEMP_ZIP -NewName $ZIP_FILE
     
-    Invoke-WebRequest -Uri $MODEL_BINARY_URL -OutFile $ZIP_FILE
+    Invoke-WebRequest -Uri $script:MODEL_BINARY_URL -OutFile $ZIP_FILE
     Expand-Archive -Path $ZIP_FILE -DestinationPath "./working/data" -Force
     Remove-Item -Force $ZIP_FILE
 
@@ -63,4 +72,8 @@ try {
 catch {
     Write-Error "An error occurred: $_"
     exit 1
+}
+finally {
+    # Always restore the initial directory
+    Set-Location $InitialLocation
 }

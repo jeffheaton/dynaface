@@ -108,13 +108,19 @@ def change_log_level(level):
     if not isinstance(level, int):
         raise ValueError("Log level must be an integer (e.g., logging.INFO)")
 
+    # Update root logger level (this is the key missing piece)
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+
+    # Update handler levels
     if _console_handler:
         _console_handler.setLevel(level)
-    
+
     if _file_handler:
         _file_handler.setLevel(level)
 
     logging.info(f"Log level changed to {logging.getLevelName(level)} ({level})")
+
 
 
 def open_logs():
