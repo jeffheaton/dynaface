@@ -18,8 +18,6 @@ logger = logging.getLogger(__name__)
 logger.propagate = True
 
 
-
-
 def get_log_dir():
     if utl_env.get_system_name() == "osx":
         if utl_env.is_sandboxed():
@@ -54,7 +52,7 @@ def delete_old_logs():
             os.remove(file)
 
 
-def setup_logging(level=logging.DEBUG):
+def setup_logging(level=logging.INFO):
     global _console_handler, _file_handler
 
     log_dir = get_log_dir()
@@ -78,19 +76,15 @@ def setup_logging(level=logging.DEBUG):
         log_filename, when="midnight", interval=1, backupCount=7
     )
     _file_handler.setLevel(level)
-    _file_handler.setFormatter(
-        logging.Formatter(_LOG_FORMAT)
-    )
-    
+    _file_handler.setFormatter(logging.Formatter(_LOG_FORMAT))
+
     _file_handler.flush()
 
     # Console Handler (if stderr is available)
-    if sys.stderr and hasattr(sys.stderr, 'write'):
+    if sys.stderr and hasattr(sys.stderr, "write"):
         _console_handler = logging.StreamHandler()
         _console_handler.setLevel(level)
-        _console_handler.setFormatter(
-            logging.Formatter(_LOG_FORMAT)
-        )
+        _console_handler.setFormatter(logging.Formatter(_LOG_FORMAT))
         root_logger.addHandler(_console_handler)
 
     # Attach handlers to the root logger
@@ -120,7 +114,6 @@ def change_log_level(level):
         _file_handler.setLevel(level)
 
     logging.info(f"Log level changed to {logging.getLevelName(level)} ({level})")
-
 
 
 def open_logs():

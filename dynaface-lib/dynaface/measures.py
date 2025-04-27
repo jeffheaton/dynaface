@@ -56,14 +56,14 @@ def to_degrees(r: float) -> float:
     Returns:
         float: Adjusted angle in degrees.
     """
-    tilt = r * (180 / math.pi)
+    result = r * (180 / math.pi)
 
-    if tilt > 90:
-        tilt -= 180
-    elif tilt < -90:
-        tilt += 180
+    if result > 90:
+        result -= 180
+    elif result < -90:
+        result += 180
 
-    return tilt
+    return result
 
 
 class MeasureItem:
@@ -306,10 +306,10 @@ class AnalyzeBrows(MeasureBase):
         render2: bool = self.is_enabled("brow.d")
 
         p: Any = facial.util_get_pupils(face.landmarks)
-        tilt: float = util.normalize_angle(util.calculate_face_rotation(p))
+        roll: float = util.normalize_angle(util.calculate_face_rotation(p))
 
         right_brow: Any = util.line_to_edge(
-            img_size=1024, start_point=face.landmarks[35], angle=tilt
+            img_size=1024, start_point=face.landmarks[35], angle=roll
         )
         if not right_brow:
             return {}
@@ -320,7 +320,7 @@ class AnalyzeBrows(MeasureBase):
         diff: float = 0
 
         left_brow: Any = util.line_to_edge(
-            img_size=1024, start_point=face.landmarks[44], angle=tilt
+            img_size=1024, start_point=face.landmarks[44], angle=roll
         )
 
         if not left_brow:
@@ -586,7 +586,7 @@ class AnalyzeEyeArea(MeasureBase):
 
 class AnalyzePosition(MeasureBase):
     """
-    Analyze facial position measurements including tilt, pixel-to-millimeter conversion, and pupillary distance.
+    Analyze facial position measurements including roll, pixel-to-millimeter conversion, and pupillary distance.
     """
 
     def __init__(self) -> None:
@@ -595,7 +595,7 @@ class AnalyzePosition(MeasureBase):
         """
         super().__init__()
         self.enabled = True
-        self.items = [MeasureItem("tilt"), MeasureItem("px2mm"), MeasureItem("pd")]
+        self.items = [MeasureItem("roll"), MeasureItem("px2mm"), MeasureItem("pd")]
         self.is_frontal = True
         self.is_lateral = True
         self.sync_items()
@@ -611,7 +611,7 @@ class AnalyzePosition(MeasureBase):
 
     def calc(self, face: Any, render: bool = True) -> Dict[str, Any]:
         """
-        Calculate the position measurements (tilt, px2mm, pd).
+        Calculate the position measurements (roll, px2mm, pd).
 
         Args:
             face (Any): Face object containing landmarks and measurement methods.
@@ -620,24 +620,24 @@ class AnalyzePosition(MeasureBase):
         Returns:
             Dict[str, Any]: Filtered measurement results.
         """
-        render2_tilt: bool = self.is_enabled("tilt")
+        render2_roll: bool = self.is_enabled("roll")
         render2_px2mm: bool = self.is_enabled("px2mm")
         render2_pd: bool = self.is_enabled("pd")
 
         p: Any = facial.util_get_pupils(face.landmarks)
-        tilt: float = 0.0
+        roll: float = 0.0
         pd: float = 260
         pix2mm: float = 0.24
 
         if p:
             landmarks: Any = face.landmarks
-            if render and render2_tilt:
-                tilt = to_degrees(util.calculate_face_rotation(p))
+            if render and render2_roll:
+                roll = to_degrees(util.calculate_face_rotation(p))
                 if face.face_rotation:
                     orig: float = to_degrees(face.face_rotation)
-                    txt = f"tilt={round(orig,2)} -> {round(tilt,2)}"
+                    txt = f"roll={round(orig,2)} -> {round(roll,2)}"
                 else:
-                    txt = f"tilt={round(tilt,2)}"
+                    txt = f"roll={round(roll,2)}"
                 pos = face.analyze_next_pt(txt)
                 face.write_text_sq(pos, txt, mark="o", up=15)
                 p1, p2 = face.calc_bisect()
@@ -657,7 +657,7 @@ class AnalyzePosition(MeasureBase):
                 face.write_text(pos, txt)
 
         return filter_measurements(
-            {"tilt": tilt, "px2mm": pix2mm, "pd": pd}, self.items
+            {"roll": roll, "px2mm": pix2mm, "pd": pd}, self.items
         )
 
 
