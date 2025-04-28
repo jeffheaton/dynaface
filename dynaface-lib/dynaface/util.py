@@ -432,3 +432,44 @@ def is_zero_tuple(p: Any, tol: float = 1e-9) -> bool:
         return False
 
     return math.isclose(sum(p_tuple), 0.0, abs_tol=tol)
+
+
+def to_degrees(r: float) -> float:
+    """
+    Convert an angle from radians to degrees and adjust it to be in a more intuitive range.
+
+    Args:
+        r (float): Angle in radians.
+
+    Returns:
+        float: Adjusted angle in degrees.
+    """
+    tilt = r * (180 / math.pi)
+
+    if tilt > 90:
+        tilt -= 180
+    elif tilt < -90:
+        tilt += 180
+
+    return tilt
+
+
+def correct_distance_2d_for_yaw(measured_distance: float, yaw_degrees: float) -> float:
+    """
+    Corrects a 2D facial landmark distance for yaw rotation.
+
+    Args:
+        measured_distance (float): The 2D distance between two landmarks.
+        yaw_degrees (float): The yaw angle of the head in degrees (0 = frontal).
+
+    Returns:
+        float: The corrected distance.
+    """
+    # Convert yaw from degrees to radians
+    yaw_radians = math.radians(yaw_degrees)
+
+    # Avoid division by zero or extreme correction at 90 degrees
+    correction_factor = max(math.cos(yaw_radians), 1e-6)
+
+    corrected_distance = measured_distance / correction_factor
+    return corrected_distance

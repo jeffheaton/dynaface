@@ -6,8 +6,10 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 from urllib.parse import urlparse
 
 import cv2
+from dynaface import util
 import dynaface.image
 import dynaface.measures
+from dynaface import config
 import numpy as np
 import requests  # You may also use: # type: ignore[import]
 from dynaface.const import (
@@ -88,6 +90,7 @@ class AnalyzeFace(ImageAnalysis):
         # Changed face_rotation to Optional[float] to allow assigning None.
         self.face_rotation: Optional[float] = 0.0
         self.orig_pupils: Tuple[Tuple[int, int], Tuple[int, int]] = ((0, 0), (0, 0))
+        self.yaw, self.pitch, self.roll = 0.0, 0.0, 0.0
 
     def get_all_items(self) -> List[str]:
         return [
@@ -172,6 +175,10 @@ class AnalyzeFace(ImageAnalysis):
 
         If _headpose is None, it defaults to (False, False).
         """
+
+        if not config.AUTO_LATERAL:
+            return False, False  # Do not detect lateral if AUTO_LATERAL is False
+
         if self.is_no_face():
             return False, False  # Default when head pose data is unavailable
 
@@ -182,7 +189,8 @@ class AnalyzeFace(ImageAnalysis):
         is_lateral: bool = abs(yaw) > 20  # Lateral if yaw exceeds ±20 degrees
         is_facing_left: bool = yaw < 0  # True if facing left
 
-        return is_lateral, is_facing_left
+        # return is_lateral, is_facing_left
+        return False, False  # Default when head pose data is unavailable
 
     def _overlay_lateral_analysis(self, c: Optional[NDArray[np.uint8]]) -> None:
         """
@@ -237,6 +245,7 @@ class AnalyzeFace(ImageAnalysis):
         super().load_image(img)
         logger.debug("Low level-image loaded")
         landmarks, self._headpose = self._find_landmarks(img)
+        self.yaw, self.pitch, self.roll = self._headpose[:3]
         self.landmarks = [(int(x), int(y)) for x, y in landmarks]
 
         lateral_pos, facing_left = self.is_lateral()
@@ -436,7 +445,7 @@ class AnalyzeFace(ImageAnalysis):
         Calculates the face rotation in degrees.
         """
         p = util_get_pupils(self.landmarks)
-        return measures.to_degrees(
+        return util.to_degrees(
             util.calculate_face_rotation(
                 ((int(p[0][0]), int(p[0][1])), (int(p[1][0]), int(p[1][1])))
             )
@@ -513,7 +522,7 @@ class AnalyzeFace(ImageAnalysis):
         img2 = self.original_img
         if pupils:
             r = util.calculate_face_rotation(pupils)
-            tilt = measures.to_degrees(r)
+            tilt = util.to_degrees(r)
             if (self.tilt_threshold >= 0) and (abs(tilt) > self.tilt_threshold):
                 logger.debug(
                     f"Rotate landmarks: detected tilt={tilt} threshold={self.tilt_threshold}"
@@ -533,6 +542,11 @@ class AnalyzeFace(ImageAnalysis):
         d, _ = util_calc_pd(pupils)
         if d == 0:
             raise ValueError("Can't process face pupils must be in different locations")
+
+        if self.yaw > 2:
+            d = util.correct_distance_2d_for_yaw(d, self.yaw)
+            logger.debug(f"Corrected pupil distance for yaw={self.yaw}°: {d:.2f}")
+
         if self.face_rotation:
             logger.debug(f"Fix tilt: {self.face_rotation}")
             img2 = util.straighten(self.original_img, self.face_rotation)

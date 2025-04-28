@@ -3,7 +3,8 @@ import math
 from typing import Any, Dict, List
 
 import numpy as np
-from dynaface import lateral, util, facial
+
+from dynaface import facial, lateral, util
 
 logger = logging.getLogger(__name__)
 
@@ -43,27 +44,8 @@ def all_measures() -> List["MeasureBase"]:
         AnalyzeOuterEyeCorners(),
         AnalyzeLateral(),
         AnalyzePosition(),
+        AnalyzePose(),
     ]
-
-
-def to_degrees(r: float) -> float:
-    """
-    Convert an angle from radians to degrees and adjust it to be in a more intuitive range.
-
-    Args:
-        r (float): Angle in radians.
-
-    Returns:
-        float: Adjusted angle in degrees.
-    """
-    result = r * (180 / math.pi)
-
-    if result > 90:
-        result -= 180
-    elif result < -90:
-        result += 180
-
-    return result
 
 
 class MeasureItem:
@@ -306,10 +288,10 @@ class AnalyzeBrows(MeasureBase):
         render2: bool = self.is_enabled("brow.d")
 
         p: Any = facial.util_get_pupils(face.landmarks)
-        roll: float = util.normalize_angle(util.calculate_face_rotation(p))
+        tilt: float = util.normalize_angle(util.calculate_face_rotation(p))
 
         right_brow: Any = util.line_to_edge(
-            img_size=1024, start_point=face.landmarks[35], angle=roll
+            img_size=1024, start_point=face.landmarks[35], angle=tilt
         )
         if not right_brow:
             return {}
@@ -320,7 +302,7 @@ class AnalyzeBrows(MeasureBase):
         diff: float = 0
 
         left_brow: Any = util.line_to_edge(
-            img_size=1024, start_point=face.landmarks[44], angle=roll
+            img_size=1024, start_point=face.landmarks[44], angle=tilt
         )
 
         if not left_brow:
@@ -586,7 +568,7 @@ class AnalyzeEyeArea(MeasureBase):
 
 class AnalyzePosition(MeasureBase):
     """
-    Analyze facial position measurements including roll, pixel-to-millimeter conversion, and pupillary distance.
+    Analyze facial position measurements including tilt, pixel-to-millimeter conversion, and pupillary distance.
     """
 
     def __init__(self) -> None:
@@ -595,7 +577,7 @@ class AnalyzePosition(MeasureBase):
         """
         super().__init__()
         self.enabled = True
-        self.items = [MeasureItem("roll"), MeasureItem("px2mm"), MeasureItem("pd")]
+        self.items = [MeasureItem("tilt"), MeasureItem("px2mm"), MeasureItem("pd")]
         self.is_frontal = True
         self.is_lateral = True
         self.sync_items()
@@ -611,7 +593,7 @@ class AnalyzePosition(MeasureBase):
 
     def calc(self, face: Any, render: bool = True) -> Dict[str, Any]:
         """
-        Calculate the position measurements (roll, px2mm, pd).
+        Calculate the position measurements (tilt, px2mm, pd).
 
         Args:
             face (Any): Face object containing landmarks and measurement methods.
@@ -620,24 +602,24 @@ class AnalyzePosition(MeasureBase):
         Returns:
             Dict[str, Any]: Filtered measurement results.
         """
-        render2_roll: bool = self.is_enabled("roll")
+        render2_tilt: bool = self.is_enabled("tilt")
         render2_px2mm: bool = self.is_enabled("px2mm")
         render2_pd: bool = self.is_enabled("pd")
 
         p: Any = facial.util_get_pupils(face.landmarks)
-        roll: float = 0.0
+        tilt: float = 0.0
         pd: float = 260
         pix2mm: float = 0.24
 
         if p:
             landmarks: Any = face.landmarks
-            if render and render2_roll:
-                roll = to_degrees(util.calculate_face_rotation(p))
+            if render and render2_tilt:
+                tilt = util.to_degrees(util.calculate_face_rotation(p))
                 if face.face_rotation:
-                    orig: float = to_degrees(face.face_rotation)
-                    txt = f"roll={round(orig,2)} -> {round(roll,2)}"
+                    orig: float = util.to_degrees(face.face_rotation)
+                    txt = f"tilt={round(orig,2)} -> {round(tilt,2)}"
                 else:
-                    txt = f"roll={round(roll,2)}"
+                    txt = f"tilt={round(tilt,2)}"
                 pos = face.analyze_next_pt(txt)
                 face.write_text_sq(pos, txt, mark="o", up=15)
                 p1, p2 = face.calc_bisect()
@@ -657,7 +639,77 @@ class AnalyzePosition(MeasureBase):
                 face.write_text(pos, txt)
 
         return filter_measurements(
-            {"roll": roll, "px2mm": pix2mm, "pd": pd}, self.items
+            {"tilt": tilt, "px2mm": pix2mm, "pd": pd}, self.items
+        )
+
+
+class AnalyzePose(MeasureBase):
+    """
+    Analyze facial pose, pitch, yaw and roll. Pitch is when you nod your head up and down, like saying "yes." Yaw is
+    when you turn your head left and right, like saying "no." Roll is when you tilt your head sideways toward
+    your shoulder, like trying to touch your ear to your shoulder.
+    """
+
+    def __init__(self) -> None:
+        """
+        Initialize the AnalyzePose measurement.
+        """
+        super().__init__()
+        self.enabled = True
+        self.items = [MeasureItem("pitch"), MeasureItem("roll"), MeasureItem("yaw")]
+        self.is_frontal = True
+        self.is_lateral = True
+        self.sync_items()
+
+    def abbrev(self) -> str:
+        """
+        Return the abbreviation for the pose measurements.
+
+        Returns:
+            str: Abbreviation string.
+        """
+        return "Pose"
+
+    def calc(self, face: Any, render: bool = True) -> Dict[str, Any]:
+        """
+        Calculate the pose measurements (pitch, roll, yaw).
+
+        Args:
+            face (Any): Face object containing landmarks and measurement methods.
+            render (bool): Whether to render the measurement visually.
+
+        Returns:
+            Dict[str, Any]: Filtered measurement results.
+        """
+        render2_pitch: bool = self.is_enabled("pitch")
+        render2_roll: bool = self.is_enabled("roll")
+        render2_yaw: bool = self.is_enabled("yaw")
+
+        # pitch = util.to_degrees(face.pitch)
+        # roll = util.to_degrees(face.roll)
+        # yaw = util.to_degrees(face.yaw)
+
+        pitch = face.pitch
+        roll = face.roll
+        yaw = face.yaw
+
+        if render2_pitch:
+            txt = f"Pitch: {pitch:.2f}"
+            pos = face.analyze_next_pt(txt)
+            face.write_text_sq(pos, txt, mark="o", up=15)
+
+        if render2_roll:
+            txt = f"Roll: {roll:.2f}"
+            pos = face.analyze_next_pt(txt)
+            face.write_text_sq(pos, txt, mark="o", up=15)
+
+        if render2_yaw:
+            txt = f"Yaw: {yaw:.2f}"
+            pos = face.analyze_next_pt(txt)
+            face.write_text_sq(pos, txt, mark="o", up=15)
+
+        return filter_measurements(
+            {"pitch": pitch, "roll": roll, "yaw": yaw}, self.items
         )
 
 
