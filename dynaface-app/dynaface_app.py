@@ -1,5 +1,6 @@
 # Begin logging ASAP
 from jth_ui import app_const, utl_log
+
 app_const.BUNDLE_ID = "com.heatonresearch.dynaface"
 app_const.APP_NAME = "Dynaface"
 app_const.APP_AUTHOR = "Jeff Heaton"
@@ -49,6 +50,7 @@ SETTING_ACC = "accelerator"
 SETTING_TILT_THRESHOLD = "tilt"
 SETTING_DYNAMIC_ADJUST = "dynamic"
 SETTING_SMOOTH = "smooth"
+SETTING_LATERAL = "lateral"
 
 DEFAULT_DYNAMIC_ADJUST = 2
 DEFAULT_SMOOTH = 2
@@ -76,6 +78,7 @@ class AppDynaface(AppJTH):
 
             try:
                 import pyi_splash
+
                 pyi_splash.close()
                 logger.info("Splash screen closed.")
             except ImportError:
@@ -118,6 +121,12 @@ class AppDynaface(AppJTH):
         self.data_smoothing = utl_settings.get_int(
             self.settings, key=SETTING_SMOOTH, default=DEFAULT_SMOOTH
         )
+
+        # Set the lateral
+        lateral = utl_settings.get_bool(
+            self.settings, key=SETTING_LATERAL, default=True
+        )
+        dynaface.config.AUTO_LATERAL = lateral
 
         # accelerator device
         acc = utl_settings.get_bool(self.settings, key=SETTING_ACC, default=True)
@@ -165,6 +174,7 @@ class AppDynaface(AppJTH):
             SETTING_TILT_THRESHOLD: DEFAULT_TILT_THRESHOLD,
             SETTING_DYNAMIC_ADJUST: DEFAULT_DYNAMIC_ADJUST,
             SETTING_SMOOTH: DEFAULT_SMOOTH,
+            SETTING_LATERAL: True,
         }
 
 

@@ -84,7 +84,6 @@ class AnalyzeFace(ImageAnalysis):
         self.lateral: bool = False
         self.lateral_landmarks: NDArray[Any] = NDArray[Any]([])
         self.pupillary_distance: float = 0.0
-        logger.debug(f"===INIT: t={tilt_threshold}")
         self.tilt_threshold: float = tilt_threshold
         self.pix2mm: float = 1.0
         # Changed face_rotation to Optional[float] to allow assigning None.
@@ -177,6 +176,7 @@ class AnalyzeFace(ImageAnalysis):
         """
 
         if not config.AUTO_LATERAL:
+            logger.debug("AUTO_LATERAL is False, skipping lateral detection.")
             return False, False  # Do not detect lateral if AUTO_LATERAL is False
 
         if self.is_no_face():
@@ -189,8 +189,7 @@ class AnalyzeFace(ImageAnalysis):
         is_lateral: bool = abs(yaw) > 20  # Lateral if yaw exceeds ±20 degrees
         is_facing_left: bool = yaw < 0  # True if facing left
 
-        # return is_lateral, is_facing_left
-        return False, False  # Default when head pose data is unavailable
+        return is_lateral, is_facing_left
 
     def _overlay_lateral_analysis(self, c: Optional[NDArray[np.uint8]]) -> None:
         """

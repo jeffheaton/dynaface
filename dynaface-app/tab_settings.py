@@ -50,6 +50,10 @@ class SettingsTab(QWidget):
         log_level_label = QLabel("Log Level:", self)
         self._log_combo_box = QComboBox()
         self._log_combo_box.addItems(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
+
+        lbl_lateral = QLabel("Use lateral view:")
+        self._chk_lateral = QCheckBox()
+
         lbl_acc = QLabel("Use Accelerator (GPU)")
         self._chk_accelerator = QCheckBox()
 
@@ -72,6 +76,7 @@ class SettingsTab(QWidget):
         form_layout.addRow(lbl_dynamic_adjust, self._text_dynamic_adjust)
         form_layout.addRow(lbl_data_smooth, self._text_data_smooth)
         form_layout.addRow(log_level_label, self._log_combo_box)
+        form_layout.addRow(lbl_lateral, self._chk_lateral)
         form_layout.addRow(lbl_acc, self._chk_accelerator)
 
         # Main layout
@@ -95,6 +100,7 @@ class SettingsTab(QWidget):
             settings.get(dynaface_app.SETTING_LOG_LEVEL, "INFO"),
         )
         self._chk_accelerator.setChecked(settings.get(dynaface_app.SETTING_ACC, True))
+        self._chk_lateral.setChecked(settings.get(dynaface_app.SETTING_LATERAL, True))
 
     def on_close(self):
         pass
@@ -111,6 +117,7 @@ class SettingsTab(QWidget):
         self._text_tilt.setText(str(dynaface.facial.DEFAULT_TILT_THRESHOLD))
         self._text_dynamic_adjust.setText(str(dynaface_app.DEFAULT_DYNAMIC_ADJUST))
         self._text_data_smooth.setText(str(dynaface_app.DEFAULT_SMOOTH))
+        self._chk_accelerator.setChecked(True)
         utl_settings.set_combo(self._log_combo_box, "INFO")
 
     def action_cancel(self):
@@ -129,6 +136,7 @@ class SettingsTab(QWidget):
         )
         settings[dynaface_app.SETTING_LOG_LEVEL] = self._log_combo_box.currentText()
         settings[dynaface_app.SETTING_ACC] = self._chk_accelerator.isChecked()
+        settings[dynaface_app.SETTING_LATERAL] = self._chk_lateral.isChecked()
         settings[dynaface_app.SETTING_TILT_THRESHOLD] = utl_settings.parse_int(
             self._text_tilt.text(), default=DEFAULT_TILT_THRESHOLD
         )
