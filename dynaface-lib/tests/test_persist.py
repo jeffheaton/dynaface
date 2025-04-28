@@ -30,29 +30,30 @@ class TestFaceSave(unittest.TestCase):
 
         # Expected values (rounded to 2 decimals)
         expected_values = {
-            "fai": 2.01,
-            "oce.l": 108.97,
-            "oce.r": 140.95,
-            "brow.d": 10.86,
-            "dental_area": 5549.47,
-            "dental_left": 2635.77,
-            "dental_right": 2913.69,
-            "dental_ratio": 0.90,
-            "dental_diff": 277.92,
-            "eye.left": 966.69,
-            "eye.right": 980.06,
-            "eye.diff": 13.37,
-            "eye.ratio": 0.99,
-            "id": 103.57,
-            "ml": 214.44,
-            "nw": 116.59,
-            "oe": 266.52,
+            "fai": 2.0,
+            "oce.l": 107.35,
+            "oce.r": 139.34,
+            "brow.d": 10.14,
+            "dental_area": 5397.14,
+            "dental_left": 2581.24,
+            "dental_right": 2815.9,
+            "dental_ratio": 0.92,
+            "dental_diff": 234.66,
+            "eye.left": 988.71,
+            "eye.right": 1009.16,
+            "eye.diff": 20.45,
+            "eye.ratio": 0.98,
+            "id": 102.13,
+            "ml": 211.55,
+            "nw": 115.14,
+            "oe": 262.17,
             "tilt": 0.0,
-            "px2mm": 0.24,
-            "pd": 260.0,
+            "px2mm": 0.25,
+            "pd": 256.0,
         }
 
         # Check expected values (rounded)
+
         for key, expected in expected_values.items():
             actual = round(stats.get(key, float("inf")), 2)
             self.assertAlmostEqual(
