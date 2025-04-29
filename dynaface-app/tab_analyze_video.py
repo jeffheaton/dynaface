@@ -53,7 +53,7 @@ class AnalyzeVideoTab(TabGraphic):
     def __init__(self, window, path):
         super().__init__(window)
         self.unsaved_changes = False
-
+        self.load_error = False
         self._auto_update = False
 
         # Load the face
@@ -67,7 +67,9 @@ class AnalyzeVideoTab(TabGraphic):
             self.load_image(path)
         elif path.lower().endswith(".dyfc"):
             self.filename = path
-            self.load_document(path)
+            if not self.load_document(path):
+                self.load_error = True
+                return
         else:
             self.begin_load_video(path)
             self.filename = None
@@ -1063,15 +1065,19 @@ gesture you wish to analyze."""
 
         doc = dynaface_document.DynafaceDocument()
         f = lambda: doc.load(filename)
-        dlg_modal.display_please_wait(window=self, f=f, message="Loading document")
-        tilt_threshold = app.tilt_threshold
-        self._face = AnalyzeFace(doc.measures, tilt_threshold=tilt_threshold)
-        self._frames = doc.frames
-        self.filename = filename
-        self.frame_count = len(self._frames)
-        self._frame_begin = 0
-        self._frame_end = len(self._frames)
-        self.frame_rate = doc.fps
+        if dlg_modal.display_please_wait(window=self, f=f, message="Loading document"):
+            tilt_threshold = app.tilt_threshold
+            self._face = AnalyzeFace(doc.measures, tilt_threshold=tilt_threshold)
+            self._frames = doc.frames
+            self.filename = filename
+            self.frame_count = len(self._frames)
+            self._frame_begin = 0
+            self._frame_end = len(self._frames)
+            self.frame_rate = doc.fps
+            return True
+        else:
+            self._window.close_action()
+            return False
 
     def on_save(self):
         if self.filename is None:

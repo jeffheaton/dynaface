@@ -226,7 +226,13 @@ class DynafaceWindow(MainWindowJTH):
                 self.close_analyze_tabs()
             basename = os.path.basename(filename)
             tab_name = f"Analyze: {basename}"
-            self.add_tab(AnalyzeVideoTab(self, filename), tab_name)
+            tab = AnalyzeVideoTab(self, filename)
+            if tab.load_error:
+                self.display_message_box(
+                    f"Unable to load video file {filename}. Not valid format."
+                )
+                return
+            self.add_tab(tab, tab_name)
         except Exception as e:
             logger.error("Error during video open", exc_info=True)
             self.display_message_box(f"Unable to open file. {e}")

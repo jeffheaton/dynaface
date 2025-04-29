@@ -7,6 +7,7 @@ import dynaface
 DOC_HEADER = "header"
 DOC_HEADER_VERSION = "version"
 DOC_HEADER_FPS = "fps"
+DOC_HEADER_TYPE = "type"
 DOC_BODY = "body"
 DOC_BODY_FACE = "face"
 DOC_BODY_MEASURES = "measures"

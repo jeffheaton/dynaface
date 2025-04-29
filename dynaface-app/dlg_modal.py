@@ -210,6 +210,9 @@ class PleaseWaitDialog(QDialog):
 def display_please_wait(window: QWidget, f: Callable, message: str = "Waiting") -> None:
     dlog = PleaseWaitDialog(window=window, f=f, message=message)
     dlog.exec()
+    if dlog.thread.aborted:
+        return False
+    return True
 
 
 def prompt_save_changes():

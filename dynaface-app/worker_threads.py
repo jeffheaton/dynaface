@@ -250,7 +250,13 @@ class WorkerPleaseWait(QThread):
     def __init__(self, proc: Callable):
         super().__init__()
         self._proc = proc
+        self.aborted = False
 
     def run(self):
-        self._proc()
-        self.update_signal.emit()
+        try:
+            self._proc()
+            self.update_signal.emit()
+        except Exception as e:
+            logger.error("Error in worker thread", exc_info=True)
+            self.update_signal.emit()
+            self.aborted = True
