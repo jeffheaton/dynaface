@@ -230,7 +230,7 @@ def detect_device() -> str:
         if torch.backends.mps.is_built() and torch.backends.mps.is_available():
             return "mps"
     if torch.cuda.is_available():
-        return "gpu"
+        return "cuda"
     return "cpu"
 
 

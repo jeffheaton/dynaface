@@ -138,7 +138,7 @@ class AppDynaface(AppJTH):
                 if torch.backends.mps.is_built():
                     has_mps = True
             self.device = (
-                "mps" if has_mps else "gpu" if torch.cuda.is_available() else "cpu"
+                "mps" if has_mps else "cuda" if torch.cuda.is_available() else "cpu"
             )
             logger.info(f"PyTorch Device: {self.device}")
         else:
