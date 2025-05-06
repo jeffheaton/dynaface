@@ -42,6 +42,7 @@ def util_calc_pd(
 
     pupillary_distance = np.linalg.norm(left_pupil - right_pupil)
     pix2mm = AnalyzeFace.pd / pupillary_distance
+    print("===", left_pupil, right_pupil, pupillary_distance, pix2mm)
 
     return float(pupillary_distance), float(pix2mm)
 
@@ -305,10 +306,15 @@ class AnalyzeFace(ImageAnalysis):
         if self.is_no_face():
             return
         for i, landmark in enumerate(self.landmarks):
+            # if i not in (LM_LEFT_PUPIL, LM_RIGHT_PUPIL):
+            #    continue
             self.circle((int(landmark[0]), int(landmark[1])), radius=3, color=color)
             if numbers:
                 self.write_text(
-                    (int(landmark[0]) + 3, int(landmark[1])), str(i), size=0.5
+                    (int(landmark[0]) + 3, int(landmark[1])),
+                    str(i),
+                    size=0.5,
+                    thick=0.5,
                 )
 
         # Changed conditions to check for non-None values.

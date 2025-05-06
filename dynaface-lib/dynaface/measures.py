@@ -627,6 +627,8 @@ class AnalyzePosition(MeasureBase):
 
             if not face.lateral:
                 pd, pix2mm = facial.util_calc_pd(facial.util_get_pupils(landmarks))
+            else:
+                pd, _ = facial.util_calc_pd(facial.util_get_pupils(landmarks))
 
             if render and render2_pd:
                 txt = f"pd={round(pd,2)} px"
