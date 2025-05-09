@@ -7,3 +7,4 @@ scipy
 pillow
 appdirs
 pillow-heif
+h5py

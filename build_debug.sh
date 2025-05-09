@@ -3,6 +3,7 @@ rm -rf ./venv || true
 python3.11 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+pip install -r requirements.txt --constraint ../constraints.txt
 
 # Download and unzip dynaface_models.zip
 mkdir -p ./data

@@ -1,0 +1,5 @@
+# Current version of onnxruntime causes the Windows app to crash, Mac is fine
+onnxruntime==1.20.0
+
+# Pin because the latest version gives MacOS issues with QFileDialog
+pyqt6==6.8.0
