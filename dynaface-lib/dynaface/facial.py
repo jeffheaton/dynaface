@@ -186,8 +186,14 @@ class AnalyzeFace(ImageAnalysis):
         # Extract yaw, pitch, and roll values
         yaw, pitch, roll = self._headpose[:3]
         logger.info(f"Headpose: yaw:{yaw}, pitch:{pitch}, roll:{roll}")
+        nose_distance1 = self.landmarks[54][0] - self.landmarks[6][0]
+        nose_distance2 = self.landmarks[26][0] - self.landmarks[54][0]
+        nose_distance = min(nose_distance1, nose_distance2, key=abs)
+        nose_distance_ratio = nose_distance / self.shape[1]
 
-        is_lateral: bool = abs(yaw) > 20  # Lateral if yaw exceeds ±20 degrees
+        is_lateral: bool = (
+            abs(yaw) > 20 and nose_distance_ratio < 0
+        )  # Lateral if yaw exceeds ±20 degrees
         is_facing_left: bool = yaw < 0  # True if facing left
 
         return is_lateral, is_facing_left
@@ -548,8 +554,8 @@ class AnalyzeFace(ImageAnalysis):
         if d == 0:
             raise ValueError("Can't process face pupils must be in different locations")
 
-        if self.yaw > 2:
-            d = util.correct_distance_2d_for_yaw(d, self.yaw)
+        if self.yaw > 5:
+            d = util.correct_distance_2d_for_yaw(d, self.yaw) * 1.3
             logger.debug(f"Corrected pupil distance for yaw={self.yaw}°: {d:.2f}")
 
         if self.face_rotation:

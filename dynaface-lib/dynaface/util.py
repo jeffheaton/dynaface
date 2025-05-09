@@ -473,3 +473,7 @@ def correct_distance_2d_for_yaw(measured_distance: float, yaw_degrees: float) ->
 
     corrected_distance = measured_distance / correction_factor
     return corrected_distance
+
+
+def closest_to_zero(values):
+    return min(values, key=abs)
