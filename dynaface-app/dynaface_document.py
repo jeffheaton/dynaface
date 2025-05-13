@@ -74,10 +74,20 @@ class DynafaceDocument:
         self.fps = doc[DOC_HEADER][DOC_HEADER_FPS]
         self.frames = doc[DOC_BODY][DOC_BODY_FRAMES]
         self.measures = measures
-        self.lateral = doc[DOC_HEADER][DOC_HEADER_LATERAL]
-        self.lateral_landmarks = doc[DOC_BODY][DOC_BODY_LATERAL_LANDMARKS]
-        self.sagittal_x = doc[DOC_BODY][DOC_BODY_SAGITTAL_X]
-        self.sagittal_y = doc[DOC_BODY][DOC_BODY_SAGITTAL_Y]
+        if DOC_HEADER_LATERAL not in doc[DOC_HEADER]:
+            # If the lateral key is not present, set it to False
+            self.lateral = False
+            self.lateral_landmarks = None
+            self.sagittal_x = None
+            self.sagittal_y = None
+        else:
+            # If the key is present, set it to the value in the document
+            # This allows for backward compatibility with older documents
+            # that do not have this key.
+            self.lateral = doc[DOC_HEADER][DOC_HEADER_LATERAL]
+            self.lateral_landmarks = doc[DOC_BODY][DOC_BODY_LATERAL_LANDMARKS]
+            self.sagittal_x = doc[DOC_BODY][DOC_BODY_SAGITTAL_X]
+            self.sagittal_y = doc[DOC_BODY][DOC_BODY_SAGITTAL_Y]
 
     def _load_measures(self, measures):
         result = []
@@ -127,3 +137,4 @@ class DynafaceDocument:
         for measure in all_measures:
             if not self._has_measure(doc_measures, measure):
                 doc_measures.append(measure)
+                measure.set_enabled(False)

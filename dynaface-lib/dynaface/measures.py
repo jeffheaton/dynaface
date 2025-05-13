@@ -710,13 +710,6 @@ class AnalyzePose(MeasureBase):
             pos = face.analyze_next_pt(txt)
             face.write_text_sq(pos, txt, mark="o", up=15)
 
-        # nose_distance = self.landmarks[54][0] - self.landmarks[6][0]
-        face.measure(face.landmarks[54], face.landmarks[6])
-        face.vline(face.landmarks[54][0])
-        face.vline(face.landmarks[6][0])
-        face.vline(50)
-        # print(self.landmarks[54], self.landmarks[6])
-
         return filter_measurements(
             {"pitch": pitch, "roll": roll, "yaw": yaw}, self.items
         )

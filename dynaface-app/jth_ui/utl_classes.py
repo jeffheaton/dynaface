@@ -8,10 +8,10 @@ def get_class_full_name(instance):
 
 def create_instance_from_full_name(full_name):
     """Creates an instance of the class with the given full name."""
-    module_name, class_name = full_name.rsplit(".", 1)
-    module = importlib.import_module(module_name)
     try:
+        module_name, class_name = full_name.rsplit(".", 1)
+        module = importlib.import_module(module_name)
         cls = getattr(module, class_name)
-    except AttributeError:
+    except Exception:
         return None
     return cls()
