@@ -31,6 +31,7 @@ Log path: {utl_log.get_log_dir()} <br>
 Torch version: {v1}<br>
 Dynaface Library Version: {dynaface.__version__}<br>
 Facenet-pytorch version: {v2}<br>
+PyQt6 Version: {get_library_version("PyQt6")}<br>
 Processor in use: {current_device} (detected: {device})<br>
 Data Path: {self._window.app.DATA_DIR} <br>
 """

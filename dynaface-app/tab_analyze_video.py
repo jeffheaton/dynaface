@@ -1056,6 +1056,12 @@ gesture you wish to analyze."""
         doc.measures = self._face.measures
         doc.frames = self._frames[self._frame_begin : self._frame_end]
         doc.fps = self.frame_rate
+
+        doc.lateral = self._face.lateral
+        doc.lateral_landmarks = self._face.lateral_landmarks
+        doc.sagittal_x = self._face.sagittal_x
+        doc.sagittal_y = self._face.sagittal_y
+
         f = lambda: doc.save(filename)
         dlg_modal.display_please_wait(window=self, f=f, message="Saving document")
         self.unsaved_changes = False
@@ -1074,6 +1080,10 @@ gesture you wish to analyze."""
             self._frame_begin = 0
             self._frame_end = len(self._frames)
             self.frame_rate = doc.fps
+            self._face.lateral = doc.lateral
+            self._face.lateral_landmarks = doc.lateral_landmarks
+            self._face.sagittal_x = doc.sagittal_x
+            self._face.sagittal_y = doc.sagittal_y
             return True
         else:
             self._window.close_action()

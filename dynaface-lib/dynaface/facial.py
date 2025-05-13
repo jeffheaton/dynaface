@@ -42,7 +42,6 @@ def util_calc_pd(
 
     pupillary_distance = np.linalg.norm(left_pupil - right_pupil)
     pix2mm = AnalyzeFace.pd / pupillary_distance
-    print("===", left_pupil, right_pupil, pupillary_distance, pix2mm)
 
     return float(pupillary_distance), float(pix2mm)
 

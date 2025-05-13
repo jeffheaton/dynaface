@@ -3,17 +3,22 @@ import pickle
 
 from jth_ui import utl_classes
 import dynaface
+from utl_general import assert_standard_python
 
 DOC_HEADER = "header"
 DOC_HEADER_VERSION = "version"
 DOC_HEADER_FPS = "fps"
 DOC_HEADER_VIEW = "view"
+DOC_HEADER_LATERAL = "lateral"
 DOC_BODY = "body"
 DOC_BODY_FACE = "face"
 DOC_BODY_MEASURES = "measures"
 DOC_BODY_MEASURE = "measure"
 DOC_BODY_MEASURE_ITEMS = "items"
 DOC_BODY_FRAMES = "frames"
+DOC_BODY_LATERAL_LANDMARKS = "lateral_landmarks"
+DOC_BODY_SAGITTAL_X = "sagittal_x"
+DOC_BODY_SAGITTAL_Y = "sagittal_y"
 
 DOC_NAME = "name"
 DOC_ENABLED = "enabled"
@@ -26,6 +31,10 @@ class DynafaceDocument:
         self.frames = []
         self.measures = []
         self.fps = 0
+        self.lateral = False
+        self.lateral_landmarks = None
+        self.sagittal_x = None
+        self.sagittal_y = None
 
     def save(self, filename: str):
         measures = self._save_measures(self.measures)
@@ -34,9 +43,17 @@ class DynafaceDocument:
             DOC_HEADER: {
                 DOC_HEADER_VERSION: self._version,
                 DOC_HEADER_FPS: self.fps,
+                DOC_HEADER_LATERAL: self.lateral,
             },
-            DOC_BODY: {DOC_BODY_MEASURES: measures, DOC_BODY_FRAMES: self.frames},
+            DOC_BODY: {
+                DOC_BODY_MEASURES: measures,
+                DOC_BODY_FRAMES: self.frames,
+                DOC_BODY_LATERAL_LANDMARKS: self.lateral_landmarks,
+                DOC_BODY_SAGITTAL_X: self.sagittal_x,
+                DOC_BODY_SAGITTAL_Y: self.sagittal_y,
+            },
         }
+        assert_standard_python(doc)
 
         with gzip.open(filename, "wb") as f:
             pickle.dump(doc, f)
@@ -57,6 +74,10 @@ class DynafaceDocument:
         self.fps = doc[DOC_HEADER][DOC_HEADER_FPS]
         self.frames = doc[DOC_BODY][DOC_BODY_FRAMES]
         self.measures = measures
+        self.lateral = doc[DOC_HEADER][DOC_HEADER_LATERAL]
+        self.lateral_landmarks = doc[DOC_BODY][DOC_BODY_LATERAL_LANDMARKS]
+        self.sagittal_x = doc[DOC_BODY][DOC_BODY_SAGITTAL_X]
+        self.sagittal_y = doc[DOC_BODY][DOC_BODY_SAGITTAL_Y]
 
     def _load_measures(self, measures):
         result = []
