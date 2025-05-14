@@ -40,6 +40,7 @@ from dynaface_window import DynafaceWindow
 from jth_ui import app_const, utl_log
 from jth_ui.app_jth import AppJTH, get_library_version
 from pillow_heif import register_heif_opener
+from PyQt6.QtCore import QTimer
 
 import dynaface
 
@@ -74,6 +75,9 @@ class AppDynaface(AppJTH):
             self.main_window = DynafaceWindow(app=self, app_name=app_const.APP_NAME)
             self.main_window.show()
             self.main_window.raise_()
+            QTimer.singleShot(
+                2000, self.main_window.activateWindow
+            )  # Activate after 2sec delay
             self.main_window.activateWindow()
 
             try:

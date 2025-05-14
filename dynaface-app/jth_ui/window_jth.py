@@ -1,11 +1,10 @@
 import logging
-import logging.config
-import logging.handlers
 import os
 
 from PyQt6.QtCore import Qt, QtMsgType, qInstallMessageHandler
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox
 from jth_ui import app_jth
+from PyQt6.QtCore import QEvent
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +17,13 @@ class MainWindowJTH(QMainWindow):
 
         # Enable the main window to accept drops
         self.setAcceptDrops(True)
+
+    def event(self, event):
+        if event.type() == QEvent.Type.WindowActivate:
+            logger.info("Window activated")
+        elif event.type() == QEvent.Type.WindowDeactivate:
+            logger.info("Window deactivated")
+        return super().event(event)
 
     def resizeEvent(self, event):
         """This method is called whenever the window is resized."""
