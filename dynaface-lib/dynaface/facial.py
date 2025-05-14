@@ -350,6 +350,8 @@ class AnalyzeFace(ImageAnalysis):
 
         if dir == "r":
             mp = ((pt1[0] + pt2[0]) // 2 + 15, (pt1[1] + pt2[1]) // 2)
+        elif dir == "s":
+            mp = (pt2[0] + 15, pt2[1])
         elif dir == "a":
             mp = (min(pt1[0], pt2[0]) + 15, (pt1[1] + pt2[1]) // 2 - 20)
         else:
