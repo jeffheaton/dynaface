@@ -89,6 +89,35 @@ class AppJTH(QApplication):
 
         self.load_state()
 
+    def show_main_window(self, main_window):
+        self.main_window = main_window
+        self.main_window.show()
+        if sys.platform == "win32":
+            # Windows-specific activation logic:
+            self.main_window.raise_()
+            self.main_window.activateWindow()
+
+            # Splash screen close (only relevant on Windows)
+            try:
+                import pyi_splash
+
+                pyi_splash.close()
+                logger.info("Splash screen closed.")
+            except ImportError:
+                logger.info("No splash screen to close.")
+
+        elif sys.platform == "darwin":
+            # macOS minimal, clean startup logic:
+            # NSApp.activateIgnoringOtherApps_(True)
+            # No timers, no additional raise_, no redundant activateWindow()
+            # You can optionally add the AppDelegate here if needed
+            # but start simple first to confirm stability
+            pass
+        else:
+            # Linux/other platforms (simple approach)
+            self.main_window.raise_()
+            self.main_window.activateWindow()
+
     def exec(self):
         try:
             logger.info("Starting app main loop")

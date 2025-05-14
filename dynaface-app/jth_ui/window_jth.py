@@ -5,6 +5,7 @@ from PyQt6.QtCore import Qt, QtMsgType, qInstallMessageHandler
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox
 from jth_ui import app_jth
 from PyQt6.QtCore import QEvent
+from AppKit import NSApp
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +122,10 @@ class MainWindowJTH(QMainWindow):
             self.display_message_box("Unable to load file.")
 
     def open_action(self):
+        logger.info("Open action triggered, cycle activation")
+        # NSApp.activateIgnoringOtherApps_(False)
+        # NSApp.activateIgnoringOtherApps_(True)
+
         home_directory = os.path.expanduser("~")
         documents_path = os.path.join(home_directory, "Documents")
         path = self.app.state.get(app_jth.STATE_LAST_FOLDER, documents_path)

@@ -73,23 +73,8 @@ class AppDynaface(AppJTH):
             self.BASE_DIR = os.path.dirname(os.path.abspath(__file__))
             self.DATA_DIR = os.path.join(self.BASE_DIR, "data")
 
-            self.main_window = DynafaceWindow(app=self, app_name=app_const.APP_NAME)
-            self.main_window.show()
-            self.main_window.raise_()
-            # Force macOS to explicitly activate your app
-            NSApp.activateIgnoringOtherApps_(True)
-            QTimer.singleShot(
-                2000, self.main_window.activateWindow
-            )  # Activate after 2sec delay
-            self.main_window.activateWindow()
-
-            try:
-                import pyi_splash
-
-                pyi_splash.close()
-                logger.info("Splash screen closed.")
-            except ImportError:
-                logger.info("No splash screen to close.")
+            main_window = DynafaceWindow(app=self, app_name=app_const.APP_NAME)
+            self.show_main_window(main_window)
 
             self.load_dynaface_settings()
 
