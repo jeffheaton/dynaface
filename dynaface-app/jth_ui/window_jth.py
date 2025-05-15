@@ -5,7 +5,6 @@ from PyQt6.QtCore import Qt, QtMsgType, qInstallMessageHandler
 from PyQt6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox
 from jth_ui import app_jth
 from PyQt6.QtCore import QEvent
-from AppKit import NSApp
 
 logger = logging.getLogger(__name__)
 

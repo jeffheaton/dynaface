@@ -41,7 +41,6 @@ from jth_ui import app_const, utl_log
 from jth_ui.app_jth import AppJTH, get_library_version
 from pillow_heif import register_heif_opener
 from PyQt6.QtCore import QTimer
-from AppKit import NSApp
 
 import dynaface
 
