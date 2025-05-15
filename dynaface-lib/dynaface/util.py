@@ -477,3 +477,17 @@ def correct_distance_2d_for_yaw(measured_distance: float, yaw_degrees: float) ->
 
 def closest_to_zero(values):
     return min(values, key=abs)
+
+
+def euclidean_distance(pt1: Tuple[float, float], pt2: Tuple[float, float]) -> float:
+    """
+    Calculate the Euclidean distance between two points.
+
+    Args:
+        pt1 (Tuple[float, float]): The first point (x1, y1).
+        pt2 (Tuple[float, float]): The second point (x2, y2).
+
+    Returns:
+        float: The Euclidean distance.
+    """
+    return float(np.linalg.norm(np.array(pt1) - np.array(pt2)))
