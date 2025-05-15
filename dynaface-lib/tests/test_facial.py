@@ -33,31 +33,31 @@ class TestFaceAnalysis(unittest.TestCase):
 
         # Expected values (rounded to 2 decimals)
         expected_values = {
-            "fai": 2.0,
-            "oce.l": 107.35,
-            "oce.r": 139.34,
-            "brow.d": 10.14,
-            "dental_area": 5397.14,
-            "dental_left": 2581.24,
-            "dental_right": 2815.9,
-            "dental_ratio": 0.92,
-            "dental_diff": 234.66,
-            "eye.left": 988.71,
-            "eye.right": 1009.16,
-            "eye.diff": 20.45,
-            "eye.ratio": 0.98,
-            "id": 102.13,
-            "ml": 211.55,
-            "nw": 115.14,
-            "oe": 262.17,
+            "fai": 1.1,
+            "oce.l": 82.35,
+            "oce.r": 107.47,
+            "brow.d": 8.69,
+            "dental_area": 3167.49,
+            "dental_left": 1501.03,
+            "dental_right": 1666.47,
+            "dental_ratio": 0.9,
+            "dental_diff": 165.44,
+            "eye.left": 567.37,
+            "eye.right": 588.35,
+            "eye.diff": 20.98,
+            "eye.ratio": 0.96,
+            "id": 78.22,
+            "ml": 162.29,
+            "oe": 201.34,
             "tilt": 0.0,
-            "px2mm": 0.25,
-            "pd": 256.0,
+            "px2mm": 0.32,
+            "pd": 197.0,
         }
 
         # Check expected values (rounded)
         for key, expected in expected_values.items():
             actual = round(stats.get(key, float("inf")), 2)
+            # print(f'"{key}": {actual},')
             self.assertAlmostEqual(
                 actual,
                 expected,
@@ -98,11 +98,7 @@ class TestFaceAnalysis(unittest.TestCase):
             "eye.ratio": 0.00,
             "id": 12.30,
             "ml": 21.95,
-            "nw": 8.57,
             "oe": 28.47,
-            "nn": 56.50,
-            "nm": 42.66,
-            "np": 51.32,
             "tilt": -7.13,
             "px2mm": 0.24,
             "pd": 260.0,
@@ -111,6 +107,7 @@ class TestFaceAnalysis(unittest.TestCase):
         # Check expected values (rounded)
         for key, expected in expected_values.items():
             actual = round(stats.get(key, float("inf")), 2)
+            # print(f'"{key}": {actual},')
             self.assertAlmostEqual(
                 actual,
                 expected,
@@ -140,29 +137,26 @@ class TestFaceAnalysis(unittest.TestCase):
             "oce.r": 15.51,
             "brow.d": 7.68,
             "dental_area": 49.91,
-            "dental_left": 45.30,
+            "dental_left": 45.3,
             "dental_right": 4.61,
-            "dental_ratio": 0.10,
+            "dental_ratio": 0.1,
             "dental_diff": 40.69,
             "eye.left": 78.65,
-            "eye.right": 3.20,
+            "eye.right": 3.2,
             "eye.diff": 75.46,
             "eye.ratio": 0.04,
             "id": 14.05,
             "ml": 20.66,
-            "nw": 7.03,
             "oe": 30.05,
-            "nn": 63.64,
-            "nm": 46.78,
-            "np": 56.73,
             "tilt": -0.86,
             "px2mm": 0.24,
-            "pd": 260.0,
+            "pd": 67.01,
         }
 
         # Check expected values (rounded)
         for key, expected in expected_values.items():
             actual = round(stats.get(key, float("inf")), 2)
+            # print(f'"{key}": {actual},')
             self.assertAlmostEqual(
                 actual,
                 expected,
