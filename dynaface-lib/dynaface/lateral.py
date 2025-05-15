@@ -367,6 +367,29 @@ def find_lateral_landmark(
     return np.array([sagittal_x[closest_idx], sagittal_y[closest_idx]])
 
 
+def find_nearest_sagittal_point(
+    sagittal_x: NDArray[Any],
+    sagittal_y: NDArray[Any],
+    y_coord: float,
+) -> NDArray[Any]:
+    """
+    Finds the sagittal landmark nearest to a specified y-coordinate on the sagittal line.
+
+    Args:
+        sagittal_x (NDArray[Any]): X-coordinates of the sagittal profile.
+        sagittal_y (NDArray[Any]): Y-coordinates of the sagittal profile.
+        y_coord (float): Target y-coordinate to find the nearest landmark.
+
+    Returns:
+        NDArray[Any]: (x, y) coordinates of the found landmark.
+    """
+    if len(sagittal_y) == 0:
+        return np.array([-1.0, -1.0])
+
+    closest_idx = np.argmin(np.abs(sagittal_y - y_coord))
+    return np.array([sagittal_x[closest_idx], sagittal_y[closest_idx]])
+
+
 def find_lateral_landmarks(
     sagittal_x: NDArray[Any],
     sagittal_y: NDArray[Any],
@@ -383,12 +406,12 @@ def find_lateral_landmarks(
           - 0: Soft Tissue Glabella (highest landmark on face, local min)
           - 1: Soft Tissue Nasion (landmark #53, local max)
           - 2: Nasal Tip (landmark #54, local min)
-          - 3: Subnasal Point (landmark #58, local max)
+          - 3: Subnasal Point (landmark #57, nearest sagittal point)
           - 4: Mento Labial Point (landmark #85, local max)
           - 5: Soft Tissue Pogonion (landmark #16, local min)
     """
 
-    landmarks_frontal = np.array(landmarks_frontal)  # <-- Convert to NumPy array!
+    landmarks_frontal = np.array(landmarks_frontal)
 
     # Dynamically select highest landmark for Glabella (smallest y-value)
     highest_landmark_idx = np.argmin(landmarks_frontal[:, 1])
@@ -397,7 +420,7 @@ def find_lateral_landmarks(
         (highest_landmark_idx, False),  # Glabella (min) dynamically chosen
         (53, True),  # Nasion (max)
         (54, False),  # Nasal tip (min)
-        (58, True),  # Subnasal point (max)
+        (58, None),  # Subnasal point (nearest sagittal point, no min/max)
         (85, True),  # Mento Labial (max)
         (16, False),  # Pogonion (min)
     ]
@@ -406,14 +429,24 @@ def find_lateral_landmarks(
 
     for i, (lm_index, find_max) in enumerate(landmark_mapping):
         y_coord = landmarks_frontal[lm_index][1]
-        landmark_point = find_lateral_landmark(
-            sagittal_x,
-            sagittal_y,
-            max_indices,
-            min_indices,
-            y_coord=y_coord,
-            find_max=find_max,
-        )
+
+        if find_max is None:
+            # Use nearest sagittal point for Subnasal Point
+            landmark_point = find_nearest_sagittal_point(
+                sagittal_x,
+                sagittal_y,
+                y_coord=y_coord,
+            )
+        else:
+            landmark_point = find_lateral_landmark(
+                sagittal_x,
+                sagittal_y,
+                max_indices,
+                min_indices,
+                y_coord=y_coord,
+                find_max=find_max,
+            )
+
         landmarks[i] = landmark_point
 
     # Shift all x-coordinates by shift_x

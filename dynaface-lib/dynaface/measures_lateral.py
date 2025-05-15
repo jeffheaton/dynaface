@@ -1,7 +1,8 @@
 import logging
 from typing import Any, Dict
+import numpy as np
 
-from dynaface import lateral
+from dynaface import lateral, util
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,8 @@ class AnalyzeLateral(MeasureBase):
     NN: Distance from soft tissue nasion to subnasal point.
     NM: Distance from subnasal point to mentolabial point.
     NP: Distance from subnasal point to soft tissue pogonion.
+    NFA: Nasofrontal Angle at Soft Tissue Nasion formed by Glabella and Nasal Tip.
+    NLA: Nasolabial Angle at Subnasal Point formed by Nasal Tip and Soft Tissue Pogonion.
     """
 
     def __init__(self) -> None:
@@ -26,6 +29,8 @@ class AnalyzeLateral(MeasureBase):
             MeasureItem("nn"),
             MeasureItem("nm"),
             MeasureItem("np"),
+            MeasureItem("nfa"),
+            MeasureItem("nla"),
         ]
         self.is_frontal = False
         self.is_lateral = True
@@ -49,11 +54,13 @@ class AnalyzeLateral(MeasureBase):
             render (bool): Whether to render the measurements visually.
 
         Returns:
-            Dict[str, float]: Filtered measurement results for NN, NM, and NP.
+            Dict[str, float]: Filtered measurement results for NN, NM, NP, NFA, and NLA.
         """
         render_nn: bool = self.is_enabled("nn")
         render_nm: bool = self.is_enabled("nm")
         render_np: bool = self.is_enabled("np")
+        render_nfa: bool = self.is_enabled("nfa")
+        render_nla: bool = self.is_enabled("nla")
 
         if not face.lateral:
             return {}
@@ -85,6 +92,30 @@ class AnalyzeLateral(MeasureBase):
             dir="r",
         )
 
+        def calculate_angle(pt_center, pt1, pt2):
+            v1 = np.array(pt1) - np.array(pt_center)
+            v2 = np.array(pt2) - np.array(pt_center)
+            angle_rad = np.arccos(
+                np.clip(
+                    np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)),
+                    -1.0,
+                    1.0,
+                )
+            )
+            return np.degrees(angle_rad)
+
+        nfa: float = calculate_angle(
+            landmarks[lateral.LATERAL_LM_SOFT_TISSUE_NASION],
+            landmarks[lateral.LATERAL_LM_SOFT_TISSUE_GLABELLA],
+            landmarks[lateral.LATERAL_LM_NASAL_TIP],
+        )
+
+        nla: float = calculate_angle(
+            landmarks[lateral.LATERAL_LM_SUBNASAL_POINT],
+            landmarks[lateral.LATERAL_LM_NASAL_TIP],
+            landmarks[lateral.LATERAL_LM_SOFT_TISSUE_POGONION],
+        )
+
         if render and render_nn:
             txt_nn: str = f"NN={nn:.2f} mm"
             pos_nn: Any = face.analyze_next_pt(txt_nn)
@@ -100,4 +131,46 @@ class AnalyzeLateral(MeasureBase):
             pos_np: Any = face.analyze_next_pt(txt_np)
             face.write_text(pos_np, txt_np)
 
-        return filter_measurements({"nn": nn, "nm": nm, "np": np_val}, self.items)
+        if render and render_nfa:
+            face.arrow(
+                landmarks[lateral.LATERAL_LM_SOFT_TISSUE_NASION],
+                landmarks[lateral.LATERAL_LM_SOFT_TISSUE_GLABELLA],
+                thickness=2,
+                apt1=False,
+            )
+            face.arrow(
+                landmarks[lateral.LATERAL_LM_SOFT_TISSUE_NASION],
+                landmarks[lateral.LATERAL_LM_NASAL_TIP],
+                thickness=2,
+                apt1=False,
+            )
+            pt = (
+                landmarks[lateral.LATERAL_LM_SOFT_TISSUE_NASION][0] + 10,
+                landmarks[lateral.LATERAL_LM_SOFT_TISSUE_NASION][1],
+            )
+            txt_nfa: str = f"NFA={nfa:.2f}"
+            face.write_text_sq(pt, txt_nfa, mark="o", up=10)
+
+        if render and render_nla:
+            face.arrow(
+                landmarks[lateral.LATERAL_LM_SUBNASAL_POINT],
+                landmarks[lateral.LATERAL_LM_NASAL_TIP],
+                thickness=2,
+                apt1=False,
+            )
+            face.arrow(
+                landmarks[lateral.LATERAL_LM_SUBNASAL_POINT],
+                landmarks[lateral.LATERAL_LM_SOFT_TISSUE_POGONION],
+                thickness=2,
+                apt1=False,
+            )
+            pt = (
+                landmarks[lateral.LATERAL_LM_SUBNASAL_POINT][0] + 10,
+                landmarks[lateral.LATERAL_LM_SUBNASAL_POINT][1],
+            )
+            txt_nla: str = f"NLA={nla:.2f}"
+            face.write_text_sq(pt, txt_nla, mark="o", up=10)
+
+        return filter_measurements(
+            {"nn": nn, "nm": nm, "np": np_val, "nfa": nfa, "nla": nla}, self.items
+        )
