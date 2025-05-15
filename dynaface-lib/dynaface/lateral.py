@@ -172,274 +172,6 @@ def find_local_max_min(sagittal_x: NDArray[Any]) -> Tuple[NDArray[Any], NDArray[
     return max_indices, min_indices  # type: ignore
 
 
-def find_nasal_tip(
-    sagittal_x: NDArray[Any],
-    sagittal_y: NDArray[Any],
-    min_indices: NDArray[Any],
-    q2: float,
-    q3: float,
-) -> NDArray[Any]:
-    """
-    Finds the nasal tip as the smallest local minimum between the 50th (Q2) and 75th (Q3) percentile lines.
-
-    Args:
-        sagittal_x (NDArray[Any]): X-coordinates of the sagittal profile.
-        sagittal_y (NDArray[Any]): Y-coordinates of the sagittal profile.
-        min_indices (NDArray[Any]): Indices of local minima.
-        q2 (float): 50th percentile line.
-        q3 (float): 75th percentile line.
-
-    Returns:
-        NDArray[Any]: (x, y) coordinates of the nasal tip, or [-1, -1] if no valid minimum is found.
-    """
-    valid_min_indices = min_indices[
-        (sagittal_y[min_indices] >= q2) & (sagittal_y[min_indices] <= q3)
-    ]
-
-    if len(valid_min_indices) > 0:
-        nasal_tip_idx = valid_min_indices[np.argmin(sagittal_y[valid_min_indices])]
-        return np.array([sagittal_x[nasal_tip_idx], sagittal_y[nasal_tip_idx]])
-
-    return np.array([-1.0, -1.0])
-
-
-def find_soft_tissue_pogonion(
-    sagittal_x: NDArray[Any],
-    sagittal_y: NDArray[Any],
-    min_indices: NDArray[Any],
-    q3: float,
-) -> NDArray[Any]:
-    """
-    Finds the soft tissue pogonion as the last local minimum between the 75th (Q3) and 100th percentile lines.
-
-    Args:
-        sagittal_x (NDArray[Any]): X-coordinates of the sagittal profile.
-        sagittal_y (NDArray[Any]): Y-coordinates of the sagittal profile.
-        min_indices (NDArray[Any]): Indices of local minima.
-        q3 (float): 75th percentile line.
-
-    Returns:
-        NDArray[Any]: (x, y) coordinates of the soft tissue pogonion, or [-1, -1] if no valid minimum is found.
-    """
-    valid_min_indices = min_indices[sagittal_y[min_indices] >= q3]
-
-    if len(valid_min_indices) > 0:
-        # Select the last local minimum in the range (closest to the end)
-        pogonion_idx = valid_min_indices[-1]
-        return np.array([sagittal_x[pogonion_idx], sagittal_y[pogonion_idx]])
-
-    return np.array([-1.0, -1.0])
-
-
-def find_soft_tissue_glabella(
-    sagittal_x: NDArray[Any],
-    sagittal_y: NDArray[Any],
-    min_indices: NDArray[Any],
-    q1: float,
-    q2: float,
-) -> NDArray[Any]:
-    """
-    Finds the soft tissue glabella as the local minimum closest to the 25% (Q1) line but within the 25%-50% (Q1-Q2) range.
-
-    Args:
-        sagittal_x (NDArray[Any]): X-coordinates of the sagittal profile.
-        sagittal_y (NDArray[Any]): Y-coordinates of the sagittal profile.
-        min_indices (NDArray[Any]): Indices of local minima.
-        q1 (float): 25th percentile line.
-        q2 (float): 50th percentile line.
-
-    Returns:
-        NDArray[Any]: (x, y) coordinates of the soft tissue glabella, or [-1, -1] if no valid minimum is found.
-    """
-    valid_min_indices = min_indices[
-        (sagittal_y[min_indices] >= q1) & (sagittal_y[min_indices] <= q2)
-    ]  # Only consider minima between Q1 and Q2
-
-    if len(valid_min_indices) > 0:
-        # Find the local minimum closest to Q1
-        glabella_idx = valid_min_indices[
-            np.argmin(np.abs(sagittal_y[valid_min_indices] - q1))
-        ]
-        return np.array([sagittal_x[glabella_idx], sagittal_y[glabella_idx]])
-
-    return np.array([-1.0, -1.0])
-
-
-def find_soft_tissue_nasion(
-    sagittal_x: NDArray[Any],
-    sagittal_y: NDArray[Any],
-    max_indices: NDArray[Any],
-    glabella_x: float,
-    glabella_y: float,
-    q1: float,
-    q2: float,
-) -> NDArray[Any]:
-    """
-    Finds the soft tissue nasion as the next local maximum after glabella, moving toward the nasal tip,
-    but within the 25%-50% (Q1-Q2) range. Ensures nasion is **above** glabella (`y_nasion > y_glabella`).
-
-    Args:
-        sagittal_x (NDArray[Any]): X-coordinates of the sagittal profile.
-        sagittal_y (NDArray[Any]): Y-coordinates of the sagittal profile.
-        max_indices (NDArray[Any]): Indices of local maxima.
-        glabella_x (float): X-coordinate of the glabella.
-        glabella_y (float): Y-coordinate of the glabella.
-        q1 (float): 25th percentile line.
-        q2 (float): 50th percentile line.
-
-    Returns:
-        NDArray[Any]: (x, y) coordinates of the soft tissue nasion, or [-1, -1] if no valid max is found.
-    """
-    valid_max_indices = max_indices[
-        (sagittal_y[max_indices] >= q1) & (sagittal_y[max_indices] <= q2)
-    ]
-
-    # Filter for points occurring after glabella and higher than glabella
-    valid_max_indices = valid_max_indices[
-        (sagittal_x[valid_max_indices] > glabella_x)
-        & (sagittal_y[valid_max_indices] > glabella_y)
-    ]
-
-    if len(valid_max_indices) > 0:
-        nasion_idx = valid_max_indices[0]  # First maximum after Glabella
-        return np.array([sagittal_x[nasion_idx], sagittal_y[nasion_idx]])
-
-    return np.array([-1.0, -1.0])
-
-
-def find_subnasal_point(
-    sagittal_x: NDArray[Any],
-    sagittal_y: NDArray[Any],
-    max_indices: NDArray[Any],
-    nasal_tip_x: float,
-    nasal_tip_y: float,
-) -> NDArray[Any]:
-    """
-    Finds the subnasal point as the next local maximum after the nasal tip and above it.
-
-    Args:
-        sagittal_x (NDArray[Any]): X-coordinates of the sagittal profile.
-        sagittal_y (NDArray[Any]): Y-coordinates of the sagittal profile.
-        max_indices (NDArray[Any]): Indices of local maxima.
-        nasal_tip_x (float): X-coordinate of the nasal tip.
-        nasal_tip_y (float): Y-coordinate of the nasal tip.
-
-    Returns:
-        NDArray[Any]: (x, y) coordinates of the subnasal point, or [-1, -1] if no valid max is found.
-    """
-    valid_max_indices = max_indices[
-        sagittal_x[max_indices] > nasal_tip_x
-    ]  # Must be after Nasal Tip
-
-    # Ensure subnasal point is **above** the nasal tip
-    valid_max_indices = valid_max_indices[sagittal_y[valid_max_indices] > nasal_tip_y]
-
-    if len(valid_max_indices) > 0:
-        subnasal_idx = valid_max_indices[0]  # First max after Nasal Tip
-        return np.array([sagittal_x[subnasal_idx], sagittal_y[subnasal_idx]])
-
-    return np.array([-1.0, -1.0])
-
-
-def find_mento_labial_point(
-    sagittal_x: NDArray[Any],
-    sagittal_y: NDArray[Any],
-    max_indices: NDArray[Any],
-    pogonion_y: float,
-    q3: float,
-) -> NDArray[Any]:
-    """
-    Finds the mento-labial point as the first local maximum below the soft tissue pogonion,
-    within the 75%-100% (Q3 to end) range.
-
-    Args:
-        sagittal_x (NDArray[Any]): X-coordinates of the sagittal profile.
-        sagittal_y (NDArray[Any]): Y-coordinates of the sagittal profile.
-        max_indices (NDArray[Any]): Indices of local maxima.
-        pogonion_y (float): Y-coordinate of the pogonion.
-        q3 (float): 75th percentile line.
-
-    Returns:
-        NDArray[Any]: (x, y) coordinates of the mento-labial point, or [-1, -1] if no valid max is found.
-    """
-    # Filter for maxima that are in the Q3 to end range and **below** the Pogonion
-    valid_max_indices = max_indices[
-        (sagittal_y[max_indices] >= q3) & (sagittal_y[max_indices] < pogonion_y)
-    ]
-
-    if len(valid_max_indices) > 0:
-        mento_idx = valid_max_indices[0]  # First valid max below Pogonion
-        return np.array([sagittal_x[mento_idx], sagittal_y[mento_idx]])
-
-    return np.array([-1.0, -1.0])
-
-
-def find_lateral_landmarks(
-    sagittal_x: NDArray[Any],
-    sagittal_y: NDArray[Any],
-    max_indices: NDArray[Any],
-    min_indices: NDArray[Any],
-    shift_x: int,
-) -> NDArray[Any]:
-    """
-    Using the local extrema, compute the 6 lateral landmarks.
-
-    Returns:
-        NDArray[Any]: A 6x2 array containing the (x, y) coordinates for each landmark:
-          - LATERAL_LM_SOFT_TISSUE_GLABELLA (0): Soft Tissue Glabella
-          - LATERAL_LM_SOFT_TISSUE_NASION (1): Soft Tissue Nasion
-          - LATERAL_LM_NASAL_TIP (2): Nasal Tip
-          - LATERAL_LM_SUBNASAL_POINT (3): Subnasal Point
-          - LATERAL_LM_MENTO_LABIAL_POINT (4): Mento Labial Point
-          - LATERAL_LM_SOFT_TISSUE_POGONION (5): Soft Tissue Pogonion
-    """
-    if len(max_indices) == 0:
-        raise ValueError("No local maxima found.")
-
-    if len(min_indices) == 0:
-        raise ValueError("No local minima found.")
-
-    # Compute quartile lines
-    start_y, end_y = sagittal_y[0], sagittal_y[-1]
-    q1, q2, q3 = calculate_quarter_lines(start_y, end_y)
-
-    # Initialize landmarks array with placeholder values
-    landmarks = np.full((6, 2), -1.0)
-
-    # Compute Soft Tissue Glabella
-    glabella = find_soft_tissue_glabella(sagittal_x, sagittal_y, min_indices, q1, q2)
-    landmarks[LATERAL_LM_SOFT_TISSUE_GLABELLA] = glabella
-
-    # Compute Soft Tissue Nasion
-    landmarks[LATERAL_LM_SOFT_TISSUE_NASION] = find_soft_tissue_nasion(
-        sagittal_x, sagittal_y, max_indices, glabella[0], glabella[1], q1, q2
-    )
-
-    # Compute Nasal Tip
-    nasal_tip = find_nasal_tip(sagittal_x, sagittal_y, min_indices, q2, q3)
-    landmarks[LATERAL_LM_NASAL_TIP] = nasal_tip
-
-    # Compute Subnasal Point
-    landmarks[LATERAL_LM_SUBNASAL_POINT] = find_subnasal_point(
-        sagittal_x, sagittal_y, max_indices, nasal_tip[0], nasal_tip[1]
-    )
-
-    # Compute Soft Tissue Pogonion
-    pogonion = find_soft_tissue_pogonion(sagittal_x, sagittal_y, min_indices, q3)
-    landmarks[LATERAL_LM_SOFT_TISSUE_POGONION] = pogonion
-
-    # Compute Mento-Labial Point (below Pogonion)
-    landmarks[LATERAL_LM_MENTO_LABIAL_POINT] = find_mento_labial_point(
-        sagittal_x, sagittal_y, max_indices, pogonion[1], q3
-    )
-
-    # Shift all x-coordinates to the left by shift_x
-    landmarks[:, 0] += shift_x
-
-    # return [tuple(map(int, point)) for point in landmarks]
-    return np.array([tuple(map(int, point)) for point in landmarks])
-
-
 def plot_sagittal_minmax(
     ax: Axes,
     sagittal_x: NDArray[Any],
@@ -541,6 +273,7 @@ def save_debug_plot(
 
 def analyze_lateral(
     input_image: Image.Image,
+    landmarks: List[Tuple[int, int]],
 ) -> Tuple[NDArray[Any], NDArray[Any], Any, NDArray[Any]]:
     """
     Analyze the side profile from a loaded PIL image and return only the far-right plot (sagittal profile).
@@ -572,7 +305,7 @@ def analyze_lateral(
 
     # Compute and plot lateral landmarks.
     landmarks = find_lateral_landmarks(
-        sagittal_x, sagittal_y, max_indices, min_indices, int(shift_x)
+        sagittal_x, sagittal_y, max_indices, min_indices, int(shift_x), landmarks
     )
     plot_lateral_landmarks(ax2, landmarks, int(shift_x))
     logging.debug("Lateral Landmarks (x, y):")
@@ -598,3 +331,87 @@ def analyze_lateral(
         sagittal_x + shift_x,
         sagittal_y,
     )
+
+
+def find_lateral_landmark(
+    sagittal_x: NDArray[Any],
+    sagittal_y: NDArray[Any],
+    max_indices: NDArray[Any],
+    min_indices: NDArray[Any],
+    y_coord: float,
+    find_max: bool = True,
+) -> NDArray[Any]:
+    """
+    Finds the lateral landmark nearest to a specified y-coordinate on the sagittal line,
+    either as a local maximum or minimum depending on the find_max parameter.
+
+    Args:
+        sagittal_x (NDArray[Any]): X-coordinates of the sagittal profile.
+        sagittal_y (NDArray[Any]): Y-coordinates of the sagittal profile.
+        max_indices (NDArray[Any]): Indices of local maxima.
+        min_indices (NDArray[Any]): Indices of local minima.
+        y_coord (float): Target y-coordinate to find nearest landmark.
+        find_max (bool): If True, find nearest local maximum; otherwise, find nearest local minimum.
+
+    Returns:
+        NDArray[Any]: (x, y) coordinates of the found landmark, or [-1, -1] if no valid landmark is found.
+    """
+    indices = max_indices if find_max else min_indices
+
+    if len(indices) == 0:
+        return np.array([-1.0, -1.0])
+
+    # Find the index of the landmark nearest to the provided y-coordinate
+    closest_idx = indices[np.argmin(np.abs(sagittal_y[indices] - y_coord))]
+
+    return np.array([sagittal_x[closest_idx], sagittal_y[closest_idx]])
+
+
+def find_lateral_landmarks(
+    sagittal_x: NDArray[Any],
+    sagittal_y: NDArray[Any],
+    max_indices: NDArray[Any],
+    min_indices: NDArray[Any],
+    shift_x: int,
+    landmarks_frontal: NDArray[Any],  # Your original landmarks array
+) -> NDArray[Any]:
+    """
+    Compute lateral landmarks based on y-coordinates from known frontal landmarks.
+
+    Returns:
+        NDArray[Any]: A 6x2 array containing the (x, y) coordinates for each landmark:
+          - 0: Soft Tissue Glabella (landmark #52, local min)
+          - 1: Soft Tissue Nasion (landmark #53, local max)
+          - 2: Nasal Tip (landmark #54, local min)
+          - 3: Subnasal Point (landmark #58, local max)
+          - 4: Mento Labial Point (landmark #85, local max)
+          - 5: Soft Tissue Pogonion (landmark #16, local min)
+    """
+
+    landmark_mapping = [
+        (52, False),  # Glabella (min)
+        (53, True),  # Nasion (max)
+        (54, False),  # Nasal tip (min)
+        (58, True),  # Subnasal point (max)
+        (85, True),  # Mento Labial (max)
+        (16, False),  # Pogonion (min)
+    ]
+
+    landmarks = np.full((6, 2), -1.0)
+
+    for i, (lm_index, find_max) in enumerate(landmark_mapping):
+        y_coord = landmarks_frontal[lm_index][1]
+        landmark_point = find_lateral_landmark(
+            sagittal_x,
+            sagittal_y,
+            max_indices,
+            min_indices,
+            y_coord=y_coord,
+            find_max=find_max,
+        )
+        landmarks[i] = landmark_point
+
+    # Shift all x-coordinates by shift_x
+    landmarks[:, 0] += shift_x
+
+    return np.array([tuple(map(int, point)) for point in landmarks])

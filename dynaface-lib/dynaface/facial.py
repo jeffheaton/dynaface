@@ -285,7 +285,7 @@ class AnalyzeFace(ImageAnalysis):
             p = util.cv2_to_pil(self.render_img)
             # Convert lateral_landmarks and sagittal data from analyze_lateral.
             c, self.lateral_landmarks, self.sagittal_x, self.sagittal_y = (
-                analyze_lateral(p)
+                analyze_lateral(p, self.landmarks)
             )
             c = util.trim_sides(c)
             # cv2.imwrite("debug_overlay.png", c)
