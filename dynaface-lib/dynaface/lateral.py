@@ -373,14 +373,14 @@ def find_lateral_landmarks(
     max_indices: NDArray[Any],
     min_indices: NDArray[Any],
     shift_x: int,
-    landmarks_frontal: NDArray[Any],  # Your original landmarks array
+    landmarks_frontal: NDArray[Any],
 ) -> NDArray[Any]:
     """
     Compute lateral landmarks based on y-coordinates from known frontal landmarks.
 
     Returns:
         NDArray[Any]: A 6x2 array containing the (x, y) coordinates for each landmark:
-          - 0: Soft Tissue Glabella (landmark #52, local min)
+          - 0: Soft Tissue Glabella (highest landmark on face, local min)
           - 1: Soft Tissue Nasion (landmark #53, local max)
           - 2: Nasal Tip (landmark #54, local min)
           - 3: Subnasal Point (landmark #58, local max)
@@ -388,8 +388,13 @@ def find_lateral_landmarks(
           - 5: Soft Tissue Pogonion (landmark #16, local min)
     """
 
+    landmarks_frontal = np.array(landmarks_frontal)  # <-- Convert to NumPy array!
+
+    # Dynamically select highest landmark for Glabella (smallest y-value)
+    highest_landmark_idx = np.argmin(landmarks_frontal[:, 1])
+
     landmark_mapping = [
-        (52, False),  # Glabella (min)
+        (highest_landmark_idx, False),  # Glabella (min) dynamically chosen
         (53, True),  # Nasion (max)
         (54, False),  # Nasal tip (min)
         (58, True),  # Subnasal point (max)
