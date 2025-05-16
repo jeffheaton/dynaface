@@ -77,10 +77,11 @@ def load_face_image(
     crop=True,
     stats=None,
     tilt_threshold=dynaface.facial.DEFAULT_TILT_THRESHOLD,
+    force_frontal=False,
 ):
     if stats is None:
         stats = dynaface.measures.all_measures()
     img = dynaface.image.load_image(filename)
     face = dynaface.facial.AnalyzeFace(stats, tilt_threshold=tilt_threshold)
-    face.load_image(img, crop)
+    face.load_image(img, crop, force_frontal=force_frontal)
     return face

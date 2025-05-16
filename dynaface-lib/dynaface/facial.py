@@ -160,7 +160,7 @@ class AnalyzeFace(ImageAnalysis):
         headpose = np.array(features["headpose"][0])
         return landmarks2, headpose
 
-    def is_lateral(self) -> Tuple[bool, bool]:
+    def _is_lateral(self) -> Tuple[bool, bool]:
         """
         Determines whether the head pose is lateral and whether the head is
         facing left.
@@ -190,9 +190,15 @@ class AnalyzeFace(ImageAnalysis):
         nose_distance = min(nose_distance1, nose_distance2, key=abs)
         nose_distance_ratio = nose_distance / self.shape[1]
 
-        is_lateral: bool = (
-            abs(yaw) > 20 and nose_distance_ratio < 0
-        )  # Lateral if yaw exceeds ±20 degrees
+        if abs(yaw) > 20 and nose_distance_ratio < 0:
+            # Lateral if yaw exceeds ±20 degrees and nose distance ratio is negative
+            is_lateral: bool = True
+            logger.info(
+                f"Detected lateral head pose: yaw={yaw}>20, nose_distance_ratio={nose_distance_ratio}<0"
+            )
+        else:
+            is_lateral: bool = False
+
         is_facing_left: bool = yaw < 0  # True if facing left
 
         return is_lateral, is_facing_left
@@ -236,6 +242,7 @@ class AnalyzeFace(ImageAnalysis):
         img: NDArray[Any],
         crop: Optional[bool] = True,
         pupils: Optional[Tuple[Tuple[int, int], Tuple[int, int]]] = None,
+        force_frontal: Optional[bool] = False,
     ) -> bool:
         """
         Load an image and process facial landmarks.
@@ -253,7 +260,11 @@ class AnalyzeFace(ImageAnalysis):
         self.yaw, self.pitch, self.roll = self._headpose[:3]
         self.landmarks = [(int(x), int(y)) for x, y in landmarks]
 
-        lateral_pos, facing_left = self.is_lateral()
+        if force_frontal:
+            lateral_pos = False
+            facing_left = False
+        else:
+            lateral_pos, facing_left = self._is_lateral()
 
         if lateral_pos and self.landmarks:
             self.lateral = True

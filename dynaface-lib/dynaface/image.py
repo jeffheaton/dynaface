@@ -497,3 +497,71 @@ class ImageAnalysis:
 
         if apt2:
             self.arrow_head(pt2, pt1)
+
+    def rectangle(
+        self,
+        top_left: Tuple[int, int],
+        bottom_right: Tuple[int, int],
+        color: Tuple[int, int, int] = (255, 0, 0),
+        thickness: int = 3,
+        filled: bool = False,
+        alpha: float = 1.0,
+    ) -> None:
+        """
+        Draws a rectangle on the image.
+
+        Args:
+            top_left (Tuple[int, int]): Top-left corner of the rectangle.
+            bottom_right (Tuple[int, int]): Bottom-right corner of the rectangle.
+            color (Tuple[int, int, int]): Color of the rectangle (default is red).
+            thickness (int): Thickness of the rectangle border.
+            filled (bool): Whether the rectangle is filled or not.
+            alpha (float): Opacity level of filled rectangle (ignored if not filled).
+        """
+        self._check_image()
+
+        if filled:
+            overlay = self.render_img.copy()
+            cv2.rectangle(overlay, top_left, bottom_right, color, thickness=cv2.FILLED)
+            cv2.addWeighted(
+                overlay, alpha, self.render_img, 1 - alpha, 0, self.render_img
+            )
+        else:
+            cv2.rectangle(self.render_img, top_left, bottom_right, color, thickness)
+
+    def sample_rectangle(
+        self,
+        top_left: Tuple[int, int],
+        bottom_right: Tuple[int, int],
+        as_hsv: bool = False,
+    ) -> NDArray[Any]:
+        """
+        Extract RGB or HSV pixel values from a rectangular region.
+
+        Args:
+            top_left (Tuple[int, int]): Top-left corner of the rectangle.
+            bottom_right (Tuple[int, int]): Bottom-right corner of the rectangle.
+            as_hsv (bool): If True, returns HSV values; otherwise, returns RGB values.
+
+        Returns:
+            NDArray[Any]: Array of pixel values with shape (n, 3), where n is the number of pixels.
+        """
+        self._check_image()
+
+        x1, y1 = top_left
+        x2, y2 = bottom_right
+
+        # Ensure coordinates are within image bounds
+        x1, x2 = sorted((max(0, x1), min(self.width, x2)))
+        y1, y2 = sorted((max(0, y1), min(self.height, y2)))
+
+        # Extract rectangle region
+        region = self.original_img[y1:y2, x1:x2, :]
+
+        if as_hsv:
+            region = cv2.cvtColor(region, cv2.COLOR_RGB2HSV)
+
+        # Flatten the region into an (n, 3) array
+        pixels = region.reshape(-1, 3)
+
+        return pixels

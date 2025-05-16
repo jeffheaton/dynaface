@@ -3,6 +3,7 @@ import math
 from typing import Any, List
 
 import numpy as np
+from dynaface.measures_skin import AnalyzeSkinTone
 
 from dynaface.measures_base import MeasureBase
 from dynaface.measures_frontal import (
@@ -43,4 +44,5 @@ def all_measures() -> List["MeasureBase"]:
         AnalyzeLateral(),
         AnalyzePosition(),
         AnalyzePose(),
+        AnalyzeSkinTone(),
     ]

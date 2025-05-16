@@ -1,6 +1,7 @@
 import csv
 import io
 import logging
+import os
 
 import cmds
 import custom_control
@@ -18,9 +19,9 @@ from jth_ui.tab_graphic import TabGraphic
 from matplotlib.figure import Figure
 from PIL import Image
 from PyQt6.QtCore import QEvent, Qt, QTimer
-from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QColor, QPixmap, QUndoStack
 from PyQt6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -50,11 +51,12 @@ GRAPH_MAX = 100
 
 
 class AnalyzeVideoTab(TabGraphic):
-    def __init__(self, window, path):
+    def __init__(self, window, path, force_frontal=False):
         super().__init__(window)
         self.unsaved_changes = False
         self.load_error = False
         self._auto_update = False
+        self._path = path
 
         # Load the face
         self._frames = []
@@ -63,15 +65,18 @@ class AnalyzeVideoTab(TabGraphic):
         self.frame_rate = 30
         self._frame_step = 1  # The scale of the video graph
 
-        if path.lower().endswith((".jpg", ".jpeg", ".png", ".tiff", ".heic")):
-            self.load_image(path)
+        if (
+            path.lower().endswith((".jpg", ".jpeg", ".png", ".tiff", ".heic"))
+            or force_frontal
+        ):
+            self.load_image(path, force_frontal=force_frontal)
         elif path.lower().endswith(".dyfc"):
             self.filename = path
             if not self.load_document(path):
                 self.load_error = True
                 return
         else:
-            self.begin_load_video(path)
+            self.begin_load_video(path, force_frontal=force_frontal)
             self.filename = None
         self._chart_view = None
 
@@ -128,7 +133,7 @@ class AnalyzeVideoTab(TabGraphic):
         self.unsaved_changes = False
         self._window.update_enabled()
 
-    def begin_load_video(self, path):
+    def begin_load_video(self, path, force_frontal=False):
         app = QApplication.instance()
 
         # Open the video file
@@ -218,7 +223,7 @@ gesture you wish to analyze."""
         toolbar = QToolBar()
         layout.addWidget(toolbar)  # Add the toolbar to the layout first
 
-        self._chk_landmarks = QCheckBox("Landmarks")
+        self._chk_landmarks = QCheckBox("Marks")
         toolbar.addWidget(self._chk_landmarks)
         self._chk_landmarks.stateChanged.connect(self.action_landmarks)
 
@@ -231,6 +236,12 @@ gesture you wish to analyze."""
         toolbar.addWidget(self._chk_graph)
         self._chk_graph.setChecked(False)
         self._chk_graph.stateChanged.connect(self.action_graph)
+
+        toolbar.addSeparator()
+        self._btn_frontal = QPushButton("Frontal")
+        self._btn_frontal.clicked.connect(self.action_frontal)
+        toolbar.addWidget(self._btn_frontal)
+
         toolbar.addSeparator()
 
         toolbar.addWidget(QLabel("Zoom(%): ", toolbar))
@@ -1138,6 +1149,7 @@ gesture you wish to analyze."""
             self._chk_graph.setEnabled(False)
             self._btn_eval.setEnabled(False)
             self._jump_to.setEnabled(False)
+            self._btn_frontal.setEnabled(self._face.lateral)
         else:
             self._btn_backward.setEnabled(True)
             self._btn_play.setEnabled(True)
@@ -1145,8 +1157,9 @@ gesture you wish to analyze."""
             self._chk_graph.setEnabled(True)
             self._btn_eval.setEnabled(not self.loading)
             self._jump_to.setEnabled(not self.loading)
+            self._btn_frontal.setEnabled(False)
 
-    def load_image(self, path):
+    def load_image(self, path, force_frontal=False):
         app = QApplication.instance()
         tilt_threshold = app.tilt_threshold
         if path.lower().endswith(".heic"):
@@ -1154,13 +1167,14 @@ gesture you wish to analyze."""
             image_np = np.array(pil_image)
             self._face = AnalyzeFace(all_measures(), tilt_threshold=tilt_threshold)
             self._face.measures = self.get_init_measures()
-            self._face.load_image(image_np, crop=True)
+            self._face.load_image(image_np, crop=True, force_frontal=force_frontal)
         else:
             self._face = utl_gfx.load_face_image(
                 path,
                 crop=True,
                 tilt_threshold=tilt_threshold,
                 stats=all_measures(),
+                force_frontal=force_frontal,
             )
             self._face.measures = self.get_init_measures()
 
@@ -1265,3 +1279,28 @@ gesture you wish to analyze."""
     def action_eval(self):
         self._window.show_eval()
         self._window._eval.generate(self)
+
+    def action_frontal(self):
+        logger.info("Forced frontal view")
+
+        try:
+            from tab_analyze_video import AnalyzeVideoTab
+
+            basename = os.path.basename(self._path)
+            tab_name = f"Analyze: {basename}"
+            tab = AnalyzeVideoTab(self._window, self._path, force_frontal=True)
+            if tab.load_error:
+                self._window.display_message_box(
+                    f"Unable to force frontal file {self._path}. Not valid format."
+                )
+                return
+            self._window.add_tab(tab, tab_name)
+
+            # Close the current tab after adding the new one
+            index = self._window._tab_widget.indexOf(self)
+            if index != -1:
+                self._window.close_tab(index)
+
+        except Exception as e:
+            logger.error("Error during reload", exc_info=True)
+            self._window.display_message_box(f"Unable to open file. {e}")
