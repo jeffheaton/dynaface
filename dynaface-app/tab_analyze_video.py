@@ -518,6 +518,31 @@ gesture you wish to analyze."""
             self.update_chart()
             self.render_chart()
 
+    def enable_measure(self, name: str) -> None:
+        """Enable a specific measure and all of its child items.
+
+        The ``name`` parameter is matched against the text shown in the tree
+        view, which corresponds to ``MeasureBase.abbrev()``.
+        """
+
+        self._auto_update = False
+        for i in range(self._tree.topLevelItemCount()):
+            item = self._tree.topLevelItem(i)
+            if item.text(0) == name:
+                item.setCheckState(0, Qt.CheckState.Checked)
+                for j in range(item.childCount()):
+                    child = item.child(j)
+                    child.setCheckState(0, Qt.CheckState.Checked)
+                break
+        self._auto_update = True
+        self.update_items()
+        self.update_face()
+
+        if self._chart_view is not None:
+            logger.debug("Update chart, because measures changed")
+            self.update_chart()
+            self.render_chart()
+
     def update_load_progress(self, status):
         if len(status) > 0 and status[0] == "*":
             if len(self._frames) < 1:
