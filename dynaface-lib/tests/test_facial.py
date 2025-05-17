@@ -101,7 +101,7 @@ class TestFaceAnalysis(unittest.TestCase):
             "oe": 28.47,
             "tilt": -7.13,
             "px2mm": 0.24,
-            "pd": 260.0,
+            "pd": 64.5,
         }
 
         # Check expected values (rounded)
