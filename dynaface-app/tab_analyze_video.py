@@ -573,7 +573,8 @@ gesture you wish to analyze."""
             # Auto-enable the FAI measure once the UI tree exists and a frame
             # has been loaded. This ensures the checkbox state is properly
             # synchronized before the face is analyzed.
-            self.enable_measure("FAI")
+            if not self._face.lateral:
+                self.enable_measure("FAI")
             self.update_face()
             logger.debug("Done, display first video frame on load")
             # Auto fit
