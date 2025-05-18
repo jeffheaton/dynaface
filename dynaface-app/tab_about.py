@@ -19,12 +19,14 @@ class AboutTab(QWidget):
 <H1>{app_const.APP_NAME} {app_const.VERSION}</H1>
 {app_const.COPYRIGHT}
 <br>
-Produced in collaboration with [insert names], [Johns Hopkins reference]. 
+Produced in collaboration with: <br> 
+Jeffrey Heaton PhD; Angela Renne BS; Kofi Boahene MD
+Johns Hopkins Medicine (Renne, Boahene), Washington University in St. Louis (Heaton)
+
 <br>
 This program is for education and research purposes only.
 <hr>
-This program implements the algorithms described in the paper:<br>
-[insert actual paper cite]
+The source code for this program is available at: <a href="https://github.com/jeffheaton/dynaface">Dynaface GitHub repository</a>
 <hr>
 Build Date: {BUILD_DATE} <br>
 Log path: {utl_log.get_log_dir()} <br>
