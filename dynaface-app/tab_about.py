@@ -20,7 +20,7 @@ class AboutTab(QWidget):
 {app_const.COPYRIGHT}
 <br>
 Produced in collaboration with: <br> 
-Jeffrey Heaton PhD; Angela Renne BS; Kofi Boahene MD
+Jeffrey Heaton PhD; Angela Renne BS; Kofi Boahene MD <br>
 Johns Hopkins Medicine (Renne, Boahene), Washington University in St. Louis (Heaton)
 
 <br>
