@@ -570,10 +570,10 @@ gesture you wish to analyze."""
             self.create_graphic(buffer=self._face.render_img, msg_overlay=True)
             self._view.grabGesture(Qt.GestureType.PinchGesture)
             self._view.installEventFilter(self)
-            # Auto-enable the FAI measure once the UI tree exists and a frame
-            # has been loaded. This ensures the checkbox state is properly
-            # synchronized before the face is analyzed.
+
+            logger.info(f"Set default measures for, lateral = {self._face.lateral}")
             if not self._face.lateral:
+                logger.info("Enable FAI")
                 self.enable_measure("FAI")
             self.update_face()
             logger.debug("Done, display first video frame on load")
