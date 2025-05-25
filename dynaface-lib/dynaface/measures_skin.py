@@ -74,64 +74,85 @@ class AnalyzeSkinTone(MeasureBase):
         results = {}
 
         if render and self.is_enabled("hsv"):
-            square_area = face.width * face.height * 0.025
-            square_size = int(math.sqrt(square_area))
+            try:
+                # Validate all required landmarks exist
+                for idx in [2, 3, 30, 55, 59]:
+                    if idx >= len(face.landmarks):
+                        logger.warning(
+                            f"Missing landmark index {idx}, skipping skin tone analysis."
+                        )
+                        return results
 
-            offset_x = int(face.width * 0.02)
-            offset_y = int(face.height * 0.02)
+                square_area = face.width * face.height * 0.025
+                square_size = int(math.sqrt(square_area))
 
-            top_left = (face.width - offset_x - square_size, offset_y)
-            bottom_right = (face.width - offset_x, offset_y + square_size)
+                offset_x = int(face.width * 0.02)
+                offset_y = int(face.height * 0.02)
 
-            # Sample areas (cheeks)
-            top_left1 = (face.landmarks[3][0], face.landmarks[2][1])
-            bottom_right1 = (face.landmarks[55][0], face.landmarks[55][1])
-            top_left2 = (face.landmarks[30][0], face.landmarks[59][1])
-            bottom_right2 = (face.landmarks[59][0], face.landmarks[30][1])
+                top_left = (face.width - offset_x - square_size, offset_y)
+                bottom_right = (face.width - offset_x, offset_y + square_size)
 
-            sample1 = face.sample_rectangle(top_left1, bottom_right1)
-            sample2 = face.sample_rectangle(top_left2, bottom_right2)
+                # Sample cheeks (two rectangles)
+                top_left1 = (face.landmarks[3][0], face.landmarks[2][1])
+                bottom_right1 = (face.landmarks[55][0], face.landmarks[55][1])
 
-            combined_samples = np.vstack([sample1, sample2])
+                top_left2 = (face.landmarks[30][0], face.landmarks[59][1])
+                bottom_right2 = (face.landmarks[59][0], face.landmarks[30][1])
 
-            if USE_MODE:
-                from scipy.stats import mode
+                sample1 = face.sample_rectangle(top_left1, bottom_right1)
+                sample2 = face.sample_rectangle(top_left2, bottom_right2)
 
-                color_rgb = tuple(
-                    int(c) for c in mode(combined_samples, axis=0, keepdims=False).mode
-                )
-            else:
-                color_rgb = tuple(int(c) for c in np.mean(combined_samples, axis=0))
+                if sample1.size == 0 or sample2.size == 0:
+                    logger.warning(
+                        "One or both sample regions are empty. Skipping skin tone rendering."
+                    )
+                    return results
 
-            face.rectangle(top_left, bottom_right, color=color_rgb, filled=True)
-            face.rectangle(top_left, bottom_right, color=(0, 0, 0), filled=False)
+                combined_samples = np.vstack([sample1, sample2])
 
-            # Prepare text lines
-            # Convert RGB to HSB (HSV) using colorsys
-            r_norm, g_norm, b_norm = [c / 255.0 for c in color_rgb]
-            h, s, v = colorsys.rgb_to_hsv(r_norm, g_norm, b_norm)
-            hue_deg = int(h * 360)
-            sat_pct = int(s * 100)
-            bri_pct = int(v * 100)
+                if combined_samples.size == 0:
+                    logger.warning(
+                        "Combined sample region is empty. Skipping skin tone rendering."
+                    )
+                    return results
 
-            lines = []
-            lines.append(f"HUE: {hue_deg}")
-            lines.append(f"SAT: {sat_pct}")
-            lines.append(f"BRT: {bri_pct}")
+                if USE_MODE:
+                    color_rgb = tuple(
+                        int(c)
+                        for c in mode(combined_samples, axis=0, keepdims=False).mode
+                    )
+                else:
+                    color_rgb = tuple(int(c) for c in np.mean(combined_samples, axis=0))
 
-            # Calculate combined text height
-            text_sizes = [face.calc_text_size(line)[0] for line in lines]
-            total_text_height = sum(h for _, h in text_sizes)
-            spacing = 5  # spacing between lines
-            total_text_height += spacing * (len(lines) - 1)
+                # Draw the rectangle with the average skin color
+                face.rectangle(top_left, bottom_right, color=color_rgb, filled=True)
+                face.rectangle(top_left, bottom_right, color=(0, 0, 0), filled=False)
 
-            # Calculate starting vertical position
-            current_y = top_left[1] + (square_size - total_text_height) // 2
+                # Convert RGB to HSV for display
+                r_norm, g_norm, b_norm = [c / 255.0 for c in color_rgb]
+                h, s, v = colorsys.rgb_to_hsv(r_norm, g_norm, b_norm)
+                hue_deg = int(h * 360)
+                sat_pct = int(s * 100)
+                bri_pct = int(v * 100)
 
-            for line, (text_w, text_h) in zip(lines, text_sizes):
-                text_x = top_left[0] + (square_size - text_w) // 2
-                text_pos = (text_x, current_y + text_h)
-                face.write_text(text_pos, line, color=(255, 255, 255))
-                current_y += text_h + spacing
+                lines = [
+                    f"HUE: {hue_deg}",
+                    f"SAT: {sat_pct}",
+                    f"BRT: {bri_pct}",
+                ]
+
+                text_sizes = [face.calc_text_size(line)[0] for line in lines]
+                total_text_height = sum(h for _, h in text_sizes) + 5 * (len(lines) - 1)
+
+                current_y = top_left[1] + (square_size - total_text_height) // 2
+
+                for line, (text_w, text_h) in zip(lines, text_sizes):
+                    text_x = top_left[0] + (square_size - text_w) // 2
+                    text_pos = (text_x, current_y + text_h)
+                    face.write_text(text_pos, line, color=(255, 255, 255))
+                    current_y += text_h + 5
+
+            except Exception as e:
+                logger.exception(f"Unexpected error during skin tone analysis: {e}")
 
         return filter_measurements(results, self.items)

@@ -545,6 +545,7 @@ class ImageAnalysis:
 
         Returns:
             NDArray[Any]: Array of pixel values with shape (n, 3), where n is the number of pixels.
+                        If the region is empty or invalid, returns an empty array of shape (0, 3).
         """
         self._check_image()
 
@@ -555,8 +556,22 @@ class ImageAnalysis:
         x1, x2 = sorted((max(0, x1), min(self.width, x2)))
         y1, y2 = sorted((max(0, y1), min(self.height, y2)))
 
+        width = x2 - x1
+        height = y2 - y1
+
+        if width <= 0 or height <= 0:
+            logger.warning(
+                f"Invalid or empty rectangle: top_left={top_left}, bottom_right={bottom_right}, "
+                f"clamped to x=({x1},{x2}), y=({y1},{y2})"
+            )
+            return np.empty((0, 3), dtype=np.uint8)
+
         # Extract rectangle region
         region = self.original_img[y1:y2, x1:x2, :]
+
+        if region.size == 0:
+            logger.warning(f"Sampled region is empty: x=({x1},{x2}), y=({y1},{y2})")
+            return np.empty((0, 3), dtype=np.uint8)
 
         if as_hsv:
             region = cv2.cvtColor(region, cv2.COLOR_RGB2HSV)

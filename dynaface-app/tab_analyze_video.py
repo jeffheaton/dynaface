@@ -571,6 +571,8 @@ gesture you wish to analyze."""
             self._view.grabGesture(Qt.GestureType.PinchGesture)
             self._view.installEventFilter(self)
 
+            self._face.width = self._face.render_img.shape[1]
+            self._face.height = self._face.render_img.shape[0]
             logger.info(f"Set default measures for, lateral = {self._face.lateral}")
             if not self._face.lateral:
                 logger.info("Enable FAI")

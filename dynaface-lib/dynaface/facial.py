@@ -453,6 +453,8 @@ class AnalyzeFace(ImageAnalysis):
         """
         if not self.landmarks:  # Changed check since landmarks is never None.
             return None
+        self.width = self.render_img.shape[1]
+        self.height = self.render_img.shape[0]
         m = self.calc_text_size("W")
         self.analyze_x = int(m[0][0] * 0.25)
         self.analyze_y = int(m[0][1] * 1.5)
