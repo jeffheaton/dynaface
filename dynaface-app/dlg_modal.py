@@ -17,29 +17,33 @@ from dynaface import facial
 
 
 class SaveVideoDialog(QDialog):
-    def __init__(self):
+    def __init__(self, is_video: bool):
         super().__init__()
         self.setWindowTitle("Save Options")
         self.user_choice = None  # Attribute to store user's choice
 
-        # Buttons for video and image
+        # Buttons common to both video and image
         self.save_document_button = QPushButton("Save Document", self)
-        self.save_video_button = QPushButton("Save Video", self)
         self.save_image_button = QPushButton("Save Image", self)
         self.save_data_button = QPushButton("Save Data (CSV)", self)
 
-        # Connect buttons to functions
-        self.save_document_button.clicked.connect(self.save_document)
-        self.save_video_button.clicked.connect(self.save_video)
-        self.save_image_button.clicked.connect(self.save_image)
-        self.save_data_button.clicked.connect(self.save_data)
-
-        # Layout
+        # Layout setup
         layout = QVBoxLayout(self)
         layout.addWidget(self.save_document_button)
-        layout.addWidget(self.save_video_button)
+
+        # Conditionally add the video option
+        if is_video:
+            self.save_video_button = QPushButton("Save Video", self)
+            self.save_video_button.clicked.connect(self.save_video)
+            layout.addWidget(self.save_video_button)
+
         layout.addWidget(self.save_image_button)
         layout.addWidget(self.save_data_button)
+
+        # Connect buttons to functions
+        self.save_document_button.clicked.connect(self.save_document)
+        self.save_image_button.clicked.connect(self.save_image)
+        self.save_data_button.clicked.connect(self.save_data)
 
     def save_document(self):
         self.user_choice = "document"

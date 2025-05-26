@@ -775,7 +775,8 @@ gesture you wish to analyze."""
     def on_save_as(self):
         try:
             # Create and show the dialog
-            dialog = dlg_modal.SaveVideoDialog()
+            is_video = (self._frame_end - self._frame_begin) > 1
+            dialog = dlg_modal.SaveVideoDialog(is_video=is_video)
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 if dialog.user_choice == "image":
                     self._save_as_image()
