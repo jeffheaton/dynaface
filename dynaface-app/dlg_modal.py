@@ -1,11 +1,14 @@
-from typing import Callable
+from typing import Callable, Optional
 
 import worker_threads
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QApplication,
+    QButtonGroup,
     QDialog,
     QFileDialog,
+    QHBoxLayout,
     QLabel,
     QMessageBox,
     QPushButton,
@@ -266,3 +269,92 @@ def save_as_document(
                 return None
             return filename
     return None
+
+
+class SelectPoseDialog(QDialog):
+    """
+    Modal dialog for choosing a face pose. Shows three images (Frontal, Profile, 3/4),
+    one of which is selected by default.  Call get_choice() after exec() to retrieve
+    'frontal', 'profile', or 'quarter'.
+    """
+
+    def __init__(self, default_pose: str = "frontal"):
+        super().__init__()
+        self.setWindowTitle("Select Pose")
+        self.user_choice: Optional[str] = None
+
+        # Store buttons for manual exclusive logic
+        self._buttons: list[QPushButton] = []
+
+        # Main vertical layout
+        main_layout = QVBoxLayout(self)
+
+        # Row for pose options
+        row = QHBoxLayout()
+        main_layout.addLayout(row)
+
+        # Define poses: (label text, image filename, key)
+        poses = [
+            ("Frontal", "pose-frontal.png", "frontal"),
+            ("Lateral", "pose-profile.png", "profile"),
+            ("3/4", "pose-quarter.png", "quarter"),
+        ]
+
+        # Create each button manually
+        for label_text, img_file, key in poses:
+            col = QVBoxLayout()
+            # Label above the image
+            label = QLabel(label_text)
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            col.addWidget(label)
+
+            # Image button
+            btn = QPushButton(self)
+            btn.setCheckable(True)
+            btn.setIcon(QIcon(f"data/{img_file}"))
+            btn.setIconSize(QSize(120, 120))
+            btn.setFixedSize(130, 150)
+            btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
+            # Connect click to manual handler
+            btn.clicked.connect(lambda checked, b=btn, k=key: self._select(b, k))
+
+            # Add to list
+            self._buttons.append(btn)
+            col.addWidget(btn, alignment=Qt.AlignmentFlag.AlignCenter)
+            row.addLayout(col)
+
+            # Initialize default
+            if key == default_pose:
+                btn.setChecked(True)
+                self.user_choice = key
+
+        # OK and Cancel buttons
+        ctrl_layout = QHBoxLayout()
+        main_layout.addLayout(ctrl_layout)
+        ctrl_layout.addStretch()
+        ok_btn = QPushButton("OK", self)
+        ok_btn.clicked.connect(self.accept)
+        cancel_btn = QPushButton("Cancel", self)
+        cancel_btn.clicked.connect(self.reject)
+        ctrl_layout.addWidget(ok_btn)
+        ctrl_layout.addWidget(cancel_btn)
+
+    def _select(self, button: QPushButton, key: str) -> None:
+        """
+        Manually enforce single selection: uncheck all, then check chosen button.
+        Update user_choice to the provided key.
+        """
+        # Uncheck everyone
+        for btn in self._buttons:
+            btn.setChecked(False)
+        # Check the one clicked
+        button.setChecked(True)
+        # Record choice
+        self.user_choice = key
+
+    def get_choice(self) -> Optional[str]:
+        """
+        Returns the key ('frontal', 'profile', or 'quarter'), or None if cancelled.
+        """
+        return self.user_choice

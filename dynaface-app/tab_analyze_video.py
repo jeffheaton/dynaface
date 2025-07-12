@@ -238,9 +238,9 @@ gesture you wish to analyze."""
         self._chk_graph.stateChanged.connect(self.action_graph)
 
         toolbar.addSeparator()
-        self._btn_frontal = QPushButton("Frontal")
-        self._btn_frontal.clicked.connect(self.action_frontal)
-        toolbar.addWidget(self._btn_frontal)
+        self._btn_pose = QPushButton("Pose")
+        self._btn_pose.clicked.connect(self.action_pose)
+        toolbar.addWidget(self._btn_pose)
 
         toolbar.addSeparator()
 
@@ -1182,7 +1182,7 @@ gesture you wish to analyze."""
             self._chk_graph.setEnabled(False)
             self._btn_eval.setEnabled(False)
             self._jump_to.setEnabled(False)
-            self._btn_frontal.setEnabled(self._face.lateral)
+            self._btn_pose.setEnabled(True)
         else:
             self._btn_backward.setEnabled(True)
             self._btn_play.setEnabled(True)
@@ -1190,7 +1190,7 @@ gesture you wish to analyze."""
             self._chk_graph.setEnabled(True)
             self._btn_eval.setEnabled(not self.loading)
             self._jump_to.setEnabled(not self.loading)
-            self._btn_frontal.setEnabled(False)
+            self._btn_pose.setEnabled(False)
 
     def load_image(self, path, force_frontal=False):
         app = QApplication.instance()
@@ -1313,27 +1313,58 @@ gesture you wish to analyze."""
         self._window.show_eval()
         self._window._eval.generate(self)
 
-    def action_frontal(self):
-        logger.info("Forced frontal view")
+    def _reload_with_pose(self, force_frontal: bool) -> None:
+        """
+        Close this tab and reopen it forcing frontal (True) or side (False).
+        """
+        pose_name = "frontal" if force_frontal else "side"
+        logger.info(f"Forced {pose_name} view")
 
         try:
-            from tab_analyze_video import AnalyzeVideoTab
-
             basename = os.path.basename(self._path)
             tab_name = f"Analyze: {basename}"
-            tab = AnalyzeVideoTab(self._window, self._path, force_frontal=True)
-            if tab.load_error:
+            new_tab = AnalyzeVideoTab(
+                self._window, self._path, force_frontal=force_frontal
+            )
+            if new_tab.load_error:
                 self._window.display_message_box(
-                    f"Unable to force frontal file {self._path}. Not valid format."
+                    f"Unable to force {pose_name} for {self._path}; invalid format."
                 )
                 return
-            self._window.add_tab(tab, tab_name)
 
-            # Close the current tab after adding the new one
-            index = self._window._tab_widget.indexOf(self)
-            if index != -1:
-                self._window.close_tab(index)
+            self._window.add_tab(new_tab, tab_name)
+            # close the old one
+            idx = self._window._tab_widget.indexOf(self)
+            if idx != -1:
+                self._window.close_tab(idx)
 
         except Exception as e:
-            logger.error("Error during reload", exc_info=True)
-            self._window.display_message_box(f"Unable to open file. {e}")
+            logger.error("Error reloading with new pose", exc_info=True)
+            self._window.display_message_box(f"Unable to open file: {e}")
+
+    def action_pose(self):
+        # 1) Figure out whether we’re currently in profile (lateral) or frontal (includes 3/4)
+        default = "profile" if self._face.lateral else "frontal"
+
+        # 2) Show dialog using that as the default
+        dialog = dlg_modal.SelectPoseDialog(default_pose=default)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        chosen = dialog.get_choice()
+        if chosen is None:
+            print("No pose selected; aborting.")
+            return
+
+        # 3) Normalize choice
+        force_frontal = chosen in ("frontal", "quarter")
+
+        # 4) If it’s already correct, bail out
+        current = "profile" if self._face.lateral else "frontal"
+        desired = "profile" if not force_frontal else "frontal"
+        if current == desired:
+            print(f"No change needed; already in {current!r} pose.")
+            return
+
+        # 5) Otherwise reload the tab
+        self._reload_with_pose(force_frontal)
