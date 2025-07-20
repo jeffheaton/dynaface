@@ -1,7 +1,9 @@
 import sys
 
+from dynaface.facial import Pose
 from PyQt6.QtGui import QClipboard, QImage, QPixmap
 from PyQt6.QtWidgets import QApplication
+
 import dynaface
 
 
@@ -77,11 +79,11 @@ def load_face_image(
     crop=True,
     stats=None,
     tilt_threshold=dynaface.facial.DEFAULT_TILT_THRESHOLD,
-    force_frontal=False,
+    force_pose=Pose.DETECT,
 ):
     if stats is None:
         stats = dynaface.measures.all_measures()
     img = dynaface.image.load_image(filename)
     face = dynaface.facial.AnalyzeFace(stats, tilt_threshold=tilt_threshold)
-    face.load_image(img, crop, force_frontal=force_frontal)
+    face.load_image(img, crop, force_pose=force_pose)
     return face

@@ -1,15 +1,18 @@
 import gzip
 import pickle
 
+from dynaface.const import Pose
 from jth_ui import utl_classes
-import dynaface
 from utl_general import assert_standard_python
+
+import dynaface
 
 DOC_HEADER = "header"
 DOC_HEADER_VERSION = "version"
 DOC_HEADER_FPS = "fps"
 DOC_HEADER_VIEW = "view"
 DOC_HEADER_LATERAL = "lateral"
+DOC_HEADER_POSE = "pose"
 DOC_BODY = "body"
 DOC_BODY_FACE = "face"
 DOC_BODY_MEASURES = "measures"
@@ -35,6 +38,7 @@ class DynafaceDocument:
         self.lateral_landmarks = None
         self.sagittal_x = None
         self.sagittal_y = None
+        self.pose = None
 
     def save(self, filename: str):
         measures = self._save_measures(self.measures)
@@ -44,6 +48,7 @@ class DynafaceDocument:
                 DOC_HEADER_VERSION: self._version,
                 DOC_HEADER_FPS: self.fps,
                 DOC_HEADER_LATERAL: self.lateral,
+                DOC_HEADER_POSE: self.pose.value,
             },
             DOC_BODY: {
                 DOC_BODY_MEASURES: measures,
@@ -88,6 +93,11 @@ class DynafaceDocument:
             self.lateral_landmarks = doc[DOC_BODY][DOC_BODY_LATERAL_LANDMARKS]
             self.sagittal_x = doc[DOC_BODY][DOC_BODY_SAGITTAL_X]
             self.sagittal_y = doc[DOC_BODY][DOC_BODY_SAGITTAL_Y]
+            self.pose = (
+                Pose(doc[DOC_HEADER][DOC_HEADER_POSE])
+                if DOC_HEADER_POSE in doc[DOC_HEADER]
+                else Pose.FRONTAL
+            )
 
     def _load_measures(self, measures):
         result = []

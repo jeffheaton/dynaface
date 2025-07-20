@@ -1,6 +1,7 @@
 from typing import Callable, Optional
 
 import worker_threads
+from dynaface.const import Pose
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
@@ -275,13 +276,13 @@ class SelectPoseDialog(QDialog):
     """
     Modal dialog for choosing a face pose. Shows three images (Frontal, Profile, 3/4),
     one of which is selected by default.  Call get_choice() after exec() to retrieve
-    'frontal', 'profile', or 'quarter'.
+    a Pose enum member, or None if cancelled.
     """
 
-    def __init__(self, default_pose: str = "frontal"):
+    def __init__(self, default_pose: Pose = Pose.FRONTAL):
         super().__init__()
         self.setWindowTitle("Select Pose")
-        self.user_choice: Optional[str] = None
+        self.user_choice: Optional[Pose] = None
 
         # Store buttons for manual exclusive logic
         self._buttons: list[QPushButton] = []
@@ -293,15 +294,15 @@ class SelectPoseDialog(QDialog):
         row = QHBoxLayout()
         main_layout.addLayout(row)
 
-        # Define poses: (label text, image filename, key)
+        # Define poses: (enum member, label text, image filename)
         poses = [
-            ("Frontal", "pose-frontal.png", "frontal"),
-            ("Lateral", "pose-profile.png", "profile"),
-            ("3/4", "pose-quarter.png", "quarter"),
+            (Pose.FRONTAL, "Frontal", "pose-frontal.png"),
+            (Pose.LATERAL, "Lateral", "pose-profile.png"),
+            (Pose.QUARTER, "3/4", "pose-quarter.png"),
         ]
 
         # Create each button manually
-        for label_text, img_file, key in poses:
+        for pose, label_text, img_file in poses:
             col = QVBoxLayout()
             # Label above the image
             label = QLabel(label_text)
@@ -316,8 +317,8 @@ class SelectPoseDialog(QDialog):
             btn.setFixedSize(130, 150)
             btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-            # Connect click to manual handler
-            btn.clicked.connect(lambda checked, b=btn, k=key: self._select(b, k))
+            # Connect click to manual handler, passing the enum
+            btn.clicked.connect(lambda checked, b=btn, p=pose: self._select(b, p))
 
             # Add to list
             self._buttons.append(btn)
@@ -325,9 +326,9 @@ class SelectPoseDialog(QDialog):
             row.addLayout(col)
 
             # Initialize default
-            if key == default_pose:
+            if pose == default_pose:
                 btn.setChecked(True)
-                self.user_choice = key
+                self.user_choice = pose
 
         # OK and Cancel buttons
         ctrl_layout = QHBoxLayout()
@@ -340,10 +341,10 @@ class SelectPoseDialog(QDialog):
         ctrl_layout.addWidget(ok_btn)
         ctrl_layout.addWidget(cancel_btn)
 
-    def _select(self, button: QPushButton, key: str) -> None:
+    def _select(self, button: QPushButton, pose: Pose) -> None:
         """
         Manually enforce single selection: uncheck all, then check chosen button.
-        Update user_choice to the provided key.
+        Update user_choice to the provided Pose.
         """
         # Uncheck everyone
         for btn in self._buttons:
@@ -351,10 +352,11 @@ class SelectPoseDialog(QDialog):
         # Check the one clicked
         button.setChecked(True)
         # Record choice
-        self.user_choice = key
+        self.user_choice = pose
 
-    def get_choice(self) -> Optional[str]:
+    def get_choice(self) -> Optional[Pose]:
         """
-        Returns the key ('frontal', 'profile', or 'quarter'), or None if cancelled.
+        Returns the chosen Pose enum member (Pose.FRONTAL, Pose.LATERAL or Pose.QUARTER),
+        or None if the dialog was cancelled.
         """
         return self.user_choice

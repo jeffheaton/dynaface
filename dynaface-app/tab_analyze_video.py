@@ -12,6 +12,7 @@ import numpy as np
 import utl_gfx
 import utl_print
 import worker_threads
+from dynaface.const import Pose
 from dynaface.facial import AnalyzeFace
 from dynaface.measures import AnalyzeDentalArea, AnalyzeEyeArea, all_measures
 from jth_ui import app_jth, utl_etc
@@ -51,7 +52,7 @@ GRAPH_MAX = 100
 
 
 class AnalyzeVideoTab(TabGraphic):
-    def __init__(self, window, path, force_frontal=False):
+    def __init__(self, window, path, force_pose=Pose.DETECT):
         super().__init__(window)
         self.unsaved_changes = False
         self.load_error = False
@@ -67,16 +68,16 @@ class AnalyzeVideoTab(TabGraphic):
 
         if (
             path.lower().endswith((".jpg", ".jpeg", ".png", ".tiff", ".heic"))
-            or force_frontal
+            or force_pose == Pose.LATERAL
         ):
-            self.load_image(path, force_frontal=force_frontal)
+            self.load_image(path, force_pose=force_pose)
         elif path.lower().endswith(".dyfc"):
             self.filename = path
             if not self.load_document(path):
                 self.load_error = True
                 return
         else:
-            self.begin_load_video(path, force_frontal=force_frontal)
+            self.begin_load_video(path, force_pose=Pose.DETECT)
             self.filename = None
         self._chart_view = None
 
@@ -133,7 +134,7 @@ class AnalyzeVideoTab(TabGraphic):
         self.unsaved_changes = False
         self._window.update_enabled()
 
-    def begin_load_video(self, path, force_frontal=False):
+    def begin_load_video(self, path, force_pose=Pose.DETECT):
         app = QApplication.instance()
 
         # Open the video file
@@ -1100,7 +1101,7 @@ gesture you wish to analyze."""
         doc.measures = self._face.measures
         doc.frames = self._frames[self._frame_begin : self._frame_end]
         doc.fps = self.frame_rate
-
+        doc.pose = self._face.pose
         doc.lateral = self._face.lateral
         if self._face.lateral:
             doc.lateral_landmarks = self._face.lateral_landmarks
@@ -1129,6 +1130,7 @@ gesture you wish to analyze."""
             self._face.lateral_landmarks = doc.lateral_landmarks
             self._face.sagittal_x = doc.sagittal_x
             self._face.sagittal_y = doc.sagittal_y
+            self._face.pose = doc.pose
             return True
         else:
             self._window.close_action()
@@ -1192,22 +1194,23 @@ gesture you wish to analyze."""
             self._jump_to.setEnabled(not self.loading)
             self._btn_pose.setEnabled(False)
 
-    def load_image(self, path, force_frontal=False):
+    def load_image(self, path, force_pose=Pose.DETECT):
         app = QApplication.instance()
         tilt_threshold = app.tilt_threshold
+        logger.info(f"Loading image: {path}, force pose: {force_pose}")
         if path.lower().endswith(".heic"):
             pil_image = Image.open(path)
             image_np = np.array(pil_image)
             self._face = AnalyzeFace(all_measures(), tilt_threshold=tilt_threshold)
             self._face.measures = self.get_init_measures()
-            self._face.load_image(image_np, crop=True, force_frontal=force_frontal)
+            self._face.load_image(image_np, crop=True, force_pose=force_pose)
         else:
             self._face = utl_gfx.load_face_image(
                 path,
                 crop=True,
                 tilt_threshold=tilt_threshold,
                 stats=all_measures(),
-                force_frontal=force_frontal,
+                force_pose=force_pose,
             )
             self._face.measures = self.get_init_measures()
 
@@ -1313,22 +1316,19 @@ gesture you wish to analyze."""
         self._window.show_eval()
         self._window._eval.generate(self)
 
-    def _reload_with_pose(self, force_frontal: bool) -> None:
+    def _reload_with_pose(self, force_pose: Pose) -> None:
         """
         Close this tab and reopen it forcing frontal (True) or side (False).
         """
-        pose_name = "frontal" if force_frontal else "side"
-        logger.info(f"Forced {pose_name} view")
+        logger.info(f"Forced {force_pose} view")
 
         try:
             basename = os.path.basename(self._path)
             tab_name = f"Analyze: {basename}"
-            new_tab = AnalyzeVideoTab(
-                self._window, self._path, force_frontal=force_frontal
-            )
+            new_tab = AnalyzeVideoTab(self._window, self._path, force_pose=force_pose)
             if new_tab.load_error:
                 self._window.display_message_box(
-                    f"Unable to force {pose_name} for {self._path}; invalid format."
+                    f"Unable to force {force_pose} for {self._path}; invalid format."
                 )
                 return
 
@@ -1345,6 +1345,7 @@ gesture you wish to analyze."""
     def action_pose(self):
         # 1) Figure out whether we’re currently in profile (lateral) or frontal (includes 3/4)
         default = "profile" if self._face.lateral else "frontal"
+        logger.info(f"Adjust pose, Current pose is {default!r}")
 
         # 2) Show dialog using that as the default
         dialog = dlg_modal.SelectPoseDialog(default_pose=default)
@@ -1353,18 +1354,8 @@ gesture you wish to analyze."""
 
         chosen = dialog.get_choice()
         if chosen is None:
-            print("No pose selected; aborting.")
             return
 
-        # 3) Normalize choice
-        force_frontal = chosen in ("frontal", "quarter")
-
-        # 4) If it’s already correct, bail out
-        current = "profile" if self._face.lateral else "frontal"
-        desired = "profile" if not force_frontal else "frontal"
-        if current == desired:
-            print(f"No change needed; already in {current!r} pose.")
-            return
-
-        # 5) Otherwise reload the tab
-        self._reload_with_pose(force_frontal)
+        # 3) If it’s already correct, bail out
+        if chosen != self._face.pose:
+            self._reload_with_pose(chosen)

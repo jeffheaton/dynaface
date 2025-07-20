@@ -21,6 +21,7 @@ from dynaface.const import (
     STYLEGAN_PUPIL_DIST,
     STYLEGAN_RIGHT_PUPIL,
     STYLEGAN_WIDTH,
+    Pose,
 )
 from dynaface.image import ImageAnalysis
 from dynaface.measures import MeasureBase
@@ -90,6 +91,7 @@ class AnalyzeFace(ImageAnalysis):
         self.face_rotation: Optional[float] = 0.0
         self.orig_pupils: Tuple[Tuple[int, int], Tuple[int, int]] = ((0, 0), (0, 0))
         self.yaw, self.pitch, self.roll = 0.0, 0.0, 0.0
+        self.pose = Pose.FRONTAL
 
     def get_all_items(self) -> List[str]:
         return [
@@ -159,6 +161,35 @@ class AnalyzeFace(ImageAnalysis):
 
         headpose = np.array(features["headpose"][0])
         return landmarks2, headpose
+
+    def _force_lateral(self) -> Tuple[bool, bool]:
+        """
+        Forces the head to be treated as lateral, determining left/right
+        based on available headpose yaw (or, if yaw is missing, on nose
+        landmark asymmetry).
+
+        Returns:
+            (is_lateral, is_facing_left) where is_lateral is always True.
+        """
+        # If no face, force lateral but default to “right”
+        if self.is_no_face():
+            return True, False
+
+        # Try using yaw first
+        yaw = float(self._headpose[0])
+        if not math.isnan(yaw):
+            # True if yaw < 0 (nose pointing to left side of image)
+            return True, yaw < 0
+
+        # Fallback on landmark-based asymmetry
+        # Use the same nose-distance logic as _is_lateral
+        # landmarks[6] = left brow corner, [26] = right brow corner, [54] = nose tip
+        x = self.shape[1]
+        nd1 = self.landmarks[54][0] - self.landmarks[6][0]
+        nd2 = self.landmarks[26][0] - self.landmarks[54][0]
+        nd = nd1 if abs(nd1) < abs(nd2) else nd2
+        # Negative nd means nose shifted left → facing left
+        return True, (nd < 0)
 
     def _is_lateral(self) -> Tuple[bool, bool]:
         """
@@ -242,7 +273,7 @@ class AnalyzeFace(ImageAnalysis):
         img: NDArray[Any],
         crop: Optional[bool] = True,
         pupils: Optional[Tuple[Tuple[int, int], Tuple[int, int]]] = None,
-        force_frontal: Optional[bool] = False,
+        force_pose: Optional[Pose] = Pose.DETECT,
     ) -> bool:
         """
         Load an image and process facial landmarks.
@@ -260,11 +291,23 @@ class AnalyzeFace(ImageAnalysis):
         self.yaw, self.pitch, self.roll = self._headpose[:3]
         self.landmarks = [(int(x), int(y)) for x, y in landmarks]
 
-        if force_frontal:
+        if force_pose is None or force_pose == Pose.DETECT:
+            # If force_pose is None or DETECT, determine lateral position.
+            lateral_pos, facing_left = self._is_lateral()
+            if lateral_pos:
+                logger.debug("Detected lateral position")
+                self.pose = Pose.LATERAL
+            else:
+                logger.debug("Detected frontal position")
+                self.pose = Pose.FRONTAL
+        elif force_pose == Pose.FRONTAL or force_pose == Pose.QUARTER:
             lateral_pos = False
             facing_left = False
+            logger.debug("Forced frontal position")
+            self.pose = force_pose
         else:
-            lateral_pos, facing_left = self._is_lateral()
+            lateral_pos, facing_left = self._force_lateral()
+            self.pose = Pose.LATERAL
 
         if lateral_pos and self.landmarks:
             self.lateral = True
@@ -643,9 +686,14 @@ class AnalyzeFace(ImageAnalysis):
         return util.bisecting_line_coordinates(img_size=1024, pupils=pupils)
 
     def draw_static(self) -> None:
-        if self.lateral:
+        if self.pose == Pose.FRONTAL:
+            text = "Frontal"
+        elif self.pose == Pose.QUARTER:
+            text = "Quarter"
+        elif self.pose == Pose.LATERAL:
             text = "Lateral (right)" if self.flipped else "Lateral (left)"
-            self.write_text((10, self.height - 20), text, size=2)
+
+        self.write_text((10, self.height - 20), text, size=2)
 
 
 def load_face_image(
