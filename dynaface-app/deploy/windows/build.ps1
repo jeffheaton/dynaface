@@ -13,7 +13,7 @@ try {
     # ----------------------------
     Write-Host "** Updating version.py **"
     $versionFile = "..\..\version.py"
-    $currentVersion = "1.2.0"
+    $currentVersion = "1.2.1"
     $buildDate = (Get-Date -Format "yyyy-MM-ddTHH:mm:sszzz")
     $buildNum = $env:BUILD_NUMBER
     if (-not $buildNum) { $buildNum = 0 }
