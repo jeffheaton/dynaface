@@ -5,7 +5,7 @@ $InitialLocation = Get-Location
 
 # Constants
 $script:MODEL_BINARY_URL = "https://github.com/jeffheaton/dynaface-models/releases/download/v1/dynaface_models.zip"
-$script:DYNAFACE_WHL = "https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/library/dynaface-0.2.2-py3-none-any.whl"
+$script:DYNAFACE_WHL = "https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/library/dynaface-0.2.3-py3-none-any.whl"
 
 try {
     # ----------------------------
