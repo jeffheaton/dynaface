@@ -1,3 +1,4 @@
+import os
 from typing import Callable, Optional
 
 import worker_threads
@@ -279,8 +280,9 @@ class SelectPoseDialog(QDialog):
     a Pose enum member, or None if cancelled.
     """
 
-    def __init__(self, default_pose: Pose = Pose.FRONTAL):
+    def __init__(self, window, default_pose: Pose = Pose.FRONTAL):
         super().__init__()
+        self._window = window
         self.setWindowTitle("Select Pose")
         self.user_choice: Optional[Pose] = None
 
@@ -312,7 +314,12 @@ class SelectPoseDialog(QDialog):
             # Image button
             btn = QPushButton(self)
             btn.setCheckable(True)
-            btn.setIcon(QIcon(f"data/{img_file}"))
+
+            image_filename = self._window.app.get_resource_path(
+                relative_path=f"data/{img_file}", base_path=os.path.abspath(__file__)
+            )
+
+            btn.setIcon(QIcon(image_filename))
             btn.setIconSize(QSize(120, 120))
             btn.setFixedSize(130, 150)
             btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)

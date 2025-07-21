@@ -1348,7 +1348,7 @@ gesture you wish to analyze."""
         logger.info(f"Adjust pose, Current pose is {default!r}")
 
         # 2) Show dialog using that as the default
-        dialog = dlg_modal.SelectPoseDialog(default_pose=default)
+        dialog = dlg_modal.SelectPoseDialog(self._window, default_pose=default)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
