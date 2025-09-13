@@ -268,7 +268,7 @@ class DynafaceWindow(MainWindowJTH):
 
     def open_tutorial(self):
         webbrowser.open(
-            "https://github.com/jeffheaton/present/blob/master/facial/manual.md"
+            "https://github.com/jeffheaton/dynaface/blob/main/dynaface-app/manual.md"
         )
 
     def open_file(self, file_path):
