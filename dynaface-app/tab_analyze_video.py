@@ -50,6 +50,9 @@ logger = logging.getLogger(__name__)
 MAX_FRAMES = 5000
 GRAPH_MAX = 100
 
+# Landmarks to show for lateral/profile view
+LATERAL_LANDMARKS = [51, 52, 53, 54, 57, 58, 79, 85, 90, 94, 85, 16]
+
 
 class AnalyzeVideoTab(TabGraphic):
     def __init__(self, window, path, force_pose=Pose.DETECT):
@@ -459,8 +462,15 @@ gesture you wish to analyze."""
         self._face.render_reset()
         if self._chk_measures.isChecked():
             self._face.analyze()
+
         if self._chk_landmarks.isChecked():
-            self._face.draw_landmarks(numbers=True)
+            only = LATERAL_LANDMARKS if self._face.lateral else None
+            self._face.draw_landmarks(
+                numbers=True,
+                size=0.75 * self._spin_text_zoom.value(),
+                only=only,
+            )
+
         self._face.draw_static()
 
         if self._face.render_img is not None and self._render_buffer is not None:

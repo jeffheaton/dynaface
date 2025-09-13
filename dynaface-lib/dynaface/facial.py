@@ -2,14 +2,12 @@ import copy
 import logging
 import math
 import time
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, Iterable, List, Optional, Tuple, cast
 from urllib.parse import urlparse
 
 import cv2
-from dynaface import util
 import dynaface.image
 import dynaface.measures
-from dynaface import config
 import numpy as np
 import requests  # You may also use: # type: ignore[import]
 from dynaface.const import (
@@ -30,7 +28,7 @@ from dynaface.util import VERIFY_CERTS
 from numpy.typing import NDArray
 
 import dynaface
-from dynaface import measures, models, util
+from dynaface import config, measures, models, util
 
 logger = logging.getLogger(__name__)
 
@@ -352,36 +350,47 @@ class AnalyzeFace(ImageAnalysis):
         size: float = 0.25,
         color: Tuple[int, int, int] = (0, 255, 255),
         numbers: bool = False,
+        only: Optional[Iterable[int]] = None,
     ) -> None:
         """
-        Draws landmarks and optionally their indices on the image.
+        Draw landmarks (and optionally their indices) on the image.
 
         Args:
-            size (float): Scale size for numbers. Defaults to 0.25.
-            color (Tuple[int, int, int]): Color for drawing. Defaults to (0, 255, 255).
-            numbers (bool): Whether to draw the landmark index numbers. Defaults to False.
+            size (float): Visual scale factor for landmark dots and number labels.
+            color (Tuple[int,int,int]): BGR color for drawing.
+            numbers (bool): If True, draw the landmark index next to each point.
+            only (Iterable[int] | None): If provided, draw ONLY these landmark indices.
+                                        If None, draw all landmarks.
         """
-        # Since is_no_face returns a bool, check it directly.
         if self.is_no_face():
             return
-        for i, landmark in enumerate(self.landmarks):
-            # if i not in (LM_LEFT_PUPIL, LM_RIGHT_PUPIL):
-            #    continue
-            self.circle((int(landmark[0]), int(landmark[1])), radius=3, color=color)
+
+        # Precompute scaling for visibility
+        radius = max(1, int(round(3 * size)))  # dot size scales with `size`
+        text_nudge = radius + 1  # offset numbers a bit past the dot
+
+        only_set = set(only) if only is not None else None
+
+        for i, (x, y) in enumerate(self.landmarks):
+            if only_set is not None and i not in only_set:
+                continue
+
+            xi, yi = int(x), int(y)
+            self.circle((xi, yi), radius=radius, color=color)
+
             if numbers:
                 self.write_text(
-                    (int(landmark[0]) + 3, int(landmark[1])),
+                    (xi + text_nudge, yi),
                     str(i),
-                    size=0.5,
-                    thick=0.5,
+                    size=size,  # now respects caller's `size`
                 )
 
-        # Changed conditions to check for non-None values.
-        if self.left_eye is not None:
-            self.circle(self.left_eye, color=color)
-
-        if self.right_eye is not None:
-            self.circle(self.right_eye, color=color)
+        # If `only` is specified, we truly only draw those landmarks (skip helper circles).
+        if only_set is None:
+            if self.left_eye is not None:
+                self.circle(self.left_eye, color=color)
+            if self.right_eye is not None:
+                self.circle(self.right_eye, color=color)
 
     def measure(
         self,
