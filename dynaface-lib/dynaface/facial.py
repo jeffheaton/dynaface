@@ -32,6 +32,8 @@ from dynaface import config, measures, models, util
 
 logger = logging.getLogger(__name__)
 
+LATERAL_Y_DOWN_BIAS = int(STYLEGAN_WIDTH * 0.18)
+
 
 def util_calc_pd(
     pupils: Tuple[Tuple[float, float], Tuple[float, float]],
@@ -561,7 +563,11 @@ class AnalyzeFace(ImageAnalysis):
         img2 = cv2.resize(self.render_img, (new_width, new_height))
 
         crop_x = int((self.landmarks[96][0] * scale) - (STYLEGAN_WIDTH * 0.25))
-        crop_y = int((self.landmarks[96][1] * scale) - STYLEGAN_RIGHT_PUPIL[1])
+        crop_y = int(
+            (self.landmarks[96][1] * scale)
+            - STYLEGAN_RIGHT_PUPIL[1]
+            + LATERAL_Y_DOWN_BIAS
+        )
 
         # Cast the result of safe_clip to ensure non-None types.
         img2, _, _ = util.safe_clip(

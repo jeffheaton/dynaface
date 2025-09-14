@@ -51,7 +51,7 @@ MAX_FRAMES = 5000
 GRAPH_MAX = 100
 
 # Landmarks to show for lateral/profile view
-LATERAL_LANDMARKS = [51, 52, 53, 54, 57, 58, 79, 85, 90, 94, 85, 16]
+LATERAL_LANDMARKS = [16, 51, 52, 53, 54, 57, 79, 85, 90, 94]
 
 
 class AnalyzeVideoTab(TabGraphic):
