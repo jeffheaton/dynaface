@@ -18,7 +18,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # ================= CONSTANTS =================
-DEBUG = True
+DEBUG = False
 CROP_MARGIN_RATIO: float = 0.05
 
 # 1st Derivative (dx) Controls
@@ -390,29 +390,26 @@ def find_nearest_sagittal_point(
     return np.array([sagittal_x[closest_idx], sagittal_y[closest_idx]])
 
 
-def find_lateral_between_landmarks(
+def find_corner_between_landmarks(
     sagittal_x: NDArray[Any],
     sagittal_y: NDArray[Any],
     landmarks_frontal: NDArray[Any],
     lm_idx_a: int,
     lm_idx_b: int,
-    find_max: bool = True,
+    *,
+    smooth_window: int = 7,
+    slope_delta_thresh: float = 0.30,
+    min_consec: int = 3,
+    zero_tol: float = 0.04,
+    min_ddx: float = 0.0,
+    look_from_baseline: bool = True,
+    snap_window: int = 20,  # NEW: how far past max-κ to look for dx zero-crossing
 ) -> NDArray[Any]:
     """
-    Find the min/max X on the sagittal profile between the Y of two frontal landmarks.
-
-    Args:
-        sagittal_x: X-coordinates of the sagittal profile (already shifted if you did so earlier).
-        sagittal_y: Y-coordinates of the sagittal profile (same length as sagittal_x).
-        landmarks_frontal: Array-like [N x 2] of frontal landmarks (x, y) in image coords.
-        lm_idx_a: Index of the first frontal landmark (e.g., 57).
-        lm_idx_b: Index of the second frontal landmark (e.g., 79).
-        find_max: If True, pick the maximum X (rightmost). If False, pick the minimum X (leftmost).
-
-    Returns:
-        NDArray[Any]: np.array([x, y]) from the sagittal arrays, or np.array([-1.0, -1.0]) on failure.
+    Curvature-based 'corner' with a post-step that snaps to the first dx zero-crossing (−→+)
+    after the max-curvature index (within snap_window). If no crossing, use max-curvature.
     """
-    # Basic guards
+    # ---- guards ----
     if (
         landmarks_frontal is None
         or len(landmarks_frontal) == 0
@@ -428,44 +425,94 @@ def find_lateral_between_landmarks(
     ):
         return np.array([-1.0, -1.0])
 
-    # Ensure array form
-    landmarks_frontal = np.asarray(landmarks_frontal)
-
-    # If either landmark is invalid/missing (-1, -1), bail
     xa, ya = landmarks_frontal[lm_idx_a]
     xb, yb = landmarks_frontal[lm_idx_b]
     if xa < 0 or ya < 0 or xb < 0 or yb < 0:
         return np.array([-1.0, -1.0])
 
-    # Determine the Y-range between the two landmarks
-    y_min = min(ya, yb)
-    y_max = max(ya, yb)
-
-    # Mask sagittal points whose Y lies within [y_min, y_max]
-    within = (sagittal_y >= y_min) & (sagittal_y <= y_max)
-    idxs = np.where(within)[0]
-
-    # If no direct points fall inside (due to sampling gaps), try nearest slice
-    if idxs.size == 0:
-        # Find the closest sagittal indices to each Y and slice between them
+    # ---- Y slice ----
+    y_min, y_max = (ya, yb) if ya <= yb else (yb, ya)
+    idxs = np.where((sagittal_y >= y_min) & (sagittal_y <= y_max))[0]
+    if idxs.size < 3:
         i_a = int(np.argmin(np.abs(sagittal_y - ya)))
         i_b = int(np.argmin(np.abs(sagittal_y - yb)))
         i0, i1 = (i_a, i_b) if i_a <= i_b else (i_b, i_a)
-        # Expand slightly if i0 == i1 to get a meaningful slice
         if i0 == i1:
             i0 = max(0, i0 - 1)
             i1 = min(len(sagittal_y) - 1, i1 + 1)
         idxs = np.arange(i0, i1 + 1, dtype=int)
+        if idxs.size < 3:
+            return np.array([-1.0, -1.0])
 
-    if idxs.size == 0:
+    seg_x = sagittal_x[idxs].astype(float)
+
+    # ---- smoothing (odd window) ----
+    if smooth_window and smooth_window > 1:
+        k = int(smooth_window)
+        if k % 2 == 0:
+            k += 1
+        pad = k // 2
+        seg_x = np.convolve(
+            np.pad(seg_x, (pad, pad), mode="edge"),
+            np.ones(k, dtype=float) / k,
+            mode="valid",
+        )
+
+    # ---- derivatives & curvature ----
+    dx = np.gradient(seg_x)
+    ddx = np.gradient(dx)
+    kappa = np.abs(ddx) / np.power(1.0 + dx * dx, 1.5)
+
+    # ---- gate: wait until slope departs baseline ----
+    start_gate = 0
+    if look_from_baseline and len(dx) >= 5:
+        baseline = float(np.median(dx[:5]))
+        delta = np.abs(dx - baseline)
+        run = 0
+        prev = -9999
+        first = None
+        for i in np.where(delta >= float(slope_delta_thresh))[0]:
+            if first is None or i != prev + 1:
+                run, first = 1, i
+            else:
+                run += 1
+            if run >= int(min_consec):
+                start_gate = int(first)
+                break
+            prev = i
+
+    # ---- pick max curvature past the gate ----
+    kappa2 = kappa.copy()
+    kappa2[:start_gate] = -1.0
+    j_star = int(np.argmax(kappa2))
+    if kappa2[j_star] <= 0:
         return np.array([-1.0, -1.0])
 
-    # Choose leftmost (min X) or rightmost (max X) within the segment
-    chooser = np.argmax if find_max else np.argmin
-    rel = chooser(sagittal_x[idxs])
-    best_idx = idxs[int(rel)]
+    # ---- NEW: snap to first zero-crossing of dx (−→+) after j_star ----
+    j_end = min(len(dx) - 2, j_star + int(snap_window))
+    snapped = None
+    for j in range(j_star, j_end + 1):
+        if dx[j] <= 0.0 and dx[j + 1] >= 0.0:
+            # linear interpolate between j and j+1 to dx=0
+            a, b = float(dx[j]), float(dx[j + 1])
+            t = 0.0 if (a == b) else (abs(a) / (abs(a) + abs(b)))
+            # map back to ORIGINAL (unsmoothed) arrays for coordinates
+            g0, g1 = int(idxs[j]), int(idxs[j + 1])
+            x0, x1 = float(sagittal_x[g0]), float(sagittal_x[g1])
+            y0, y1 = float(sagittal_y[g0]), float(sagittal_y[g1])
+            xz = (1.0 - t) * x0 + t * x1
+            yz = (1.0 - t) * y0 + t * y1
+            snapped = np.array([xz, yz])
+            break
 
-    return np.array([float(sagittal_x[best_idx]), float(sagittal_y[best_idx])])
+    if snapped is not None:
+        return snapped
+
+    # fallback: use the max-curvature index
+    best_global_idx = int(idxs[j_star])
+    return np.array(
+        [float(sagittal_x[best_global_idx]), float(sagittal_y[best_global_idx])]
+    )
 
 
 def find_lateral_landmarks(
@@ -475,39 +522,35 @@ def find_lateral_landmarks(
     min_indices: NDArray[Any],
     shift_x: int,
     landmarks_frontal: NDArray[Any],
+    *,
+    # subnasal/corner tuning knobs
+    corner_smooth_window: int = 7,
+    corner_slope_delta_thresh: float = 0.25,
+    corner_min_consec: int = 3,
+    corner_zero_tol: float = 0.05,
+    corner_min_ddx: float = 0.0,
+    corner_look_from_baseline: bool = True,
 ) -> NDArray[Any]:
     """
-    Compute lateral landmarks based on y-coordinates from known frontal landmarks.
-
-    Returns:
-        NDArray[Any]: A 6x2 array containing the (x, y) coordinates for each landmark:
-          - 0: Soft Tissue Glabella (highest landmark on face, local min)
-          - 1: Soft Tissue Nasion (landmark #53, local max)
-          - 2: Nasal Tip (landmark #54, local min)
-          - 3: Subnasal Point (between 57 and 79, min X; fallback: nearest sagittal at 57)
-          - 4: Mento Labial Point (landmark #85, local max)
-          - 5: Soft Tissue Pogonion (landmark #16, local min)
+    Compute lateral landmarks; Subnasal now uses curvature-based 'corner' detection.
     """
     landmarks_frontal = np.array(landmarks_frontal)
 
-    # Dynamically select highest landmark for Glabella (smallest y-value)
     highest_landmark_idx = np.argmin(landmarks_frontal[:, 1])
 
-    # (idx_in_output, frontal_idx, find_max_for_extrema)
+    # (out_idx, frontal_idx, find_max)
     landmark_mapping = [
         (0, highest_landmark_idx, False),  # Glabella (min)
         (1, 53, True),  # Nasion (max)
         (2, 54, False),  # Nasal tip (min)
-        # (3, ... ) handled separately below
         (4, 85, True),  # Mento Labial (max)
         (5, 16, False),  # Pogonion (min)
     ]
 
     landmarks = np.full((6, 2), -1.0)
 
-    # Compute extrema-driven landmarks
+    # extrema-driven
     for out_idx, lm_index, find_max in landmark_mapping:
-        # Guard against bad/missing frontal landmarks
         if (
             lm_index < 0
             or lm_index >= len(landmarks_frontal)
@@ -515,7 +558,6 @@ def find_lateral_landmarks(
             or landmarks_frontal[lm_index][1] < 0
         ):
             continue
-
         y_coord = landmarks_frontal[lm_index][1]
         pt = find_lateral_landmark(
             sagittal_x,
@@ -527,37 +569,25 @@ def find_lateral_landmarks(
         )
         landmarks[out_idx] = pt
 
-    # ---- Subnasal point (index 3) ----
-    # Primary: min X between the Y of frontal landmarks 57 and 79
-    def _is_valid_point(p: NDArray[Any]) -> bool:
-        return isinstance(p, np.ndarray) and p.size == 2 and p[0] >= 0 and p[1] >= 0
-
-    subnasal_pt = np.array([-1.0, -1.0])
+    # ---- Subnasal (index 3): corner between 57 and 79 ----
     idx_a, idx_b = 57, 79
+    subnasal_pt = find_corner_between_landmarks(
+        sagittal_x,
+        sagittal_y,
+        landmarks_frontal,
+        idx_a,
+        idx_b,
+        smooth_window=corner_smooth_window,
+        slope_delta_thresh=corner_slope_delta_thresh,
+        min_consec=corner_min_consec,
+        zero_tol=corner_zero_tol,
+        min_ddx=corner_min_ddx,
+        look_from_baseline=corner_look_from_baseline,
+    )
 
-    # Only attempt the "between" method if both frontal indices exist and look valid
-    if (
-        idx_a >= 0
-        and idx_b >= 0
-        and idx_a < len(landmarks_frontal)
-        and idx_b < len(landmarks_frontal)
-        and landmarks_frontal[idx_a][0] >= 0
-        and landmarks_frontal[idx_a][1] >= 0
-        and landmarks_frontal[idx_b][0] >= 0
-        and landmarks_frontal[idx_b][1] >= 0
-    ):
-        subnasal_pt = find_lateral_between_landmarks(
-            sagittal_x=sagittal_x,
-            sagittal_y=sagittal_y,
-            landmarks_frontal=landmarks_frontal,
-            lm_idx_a=idx_a,
-            lm_idx_b=idx_b,
-            find_max=True,  # subnasal is an indentation -> leftmost (min X)
-        )
-
-    # Fallback: nearest sagittal point to the Y of landmark 57
-    if not _is_valid_point(subnasal_pt):
-        if idx_a < len(landmarks_frontal) and landmarks_frontal[idx_a][1] >= 0:
+    # Fallback: nearest sagittal at Y(57)
+    if subnasal_pt[0] < 0 or subnasal_pt[1] < 0:
+        if 0 <= idx_a < len(landmarks_frontal) and landmarks_frontal[idx_a][1] >= 0:
             subnasal_pt = find_nearest_sagittal_point(
                 sagittal_x=sagittal_x,
                 sagittal_y=sagittal_y,
@@ -566,6 +596,6 @@ def find_lateral_landmarks(
 
     landmarks[3] = subnasal_pt
 
-    # Shift all x-coordinates by shift_x and return as ints
+    # shift back and cast
     landmarks[:, 0] += shift_x
     return np.array([tuple(map(int, point)) for point in landmarks])
