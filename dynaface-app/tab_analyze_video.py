@@ -781,7 +781,10 @@ gesture you wish to analyze."""
         if not filename:
             return
 
-        self.save_csv(filename)
+        if self._face.lateral:
+            self.save_csv_lateral(filename)
+        else:
+            self.save_csv_frontal(filename)
 
     def on_save_as(self):
         try:
@@ -840,7 +843,7 @@ gesture you wish to analyze."""
         data["frame"] = list(range(0, frame_count, step_size))
         return data
 
-    def save_csv(self, filename):
+    def save_csv_frontal(self, filename):
         data = self.collect_data()
 
         with open(filename, "w") as f:
@@ -861,6 +864,9 @@ gesture you wish to analyze."""
                 for col in cols:
                     row.append(data[col][i])
                 writer.writerow(row)
+
+    def save_csv_lateral(self, filename):
+        print(filename)
 
     def update_chart(self):
         """Create the chart object, or update it if already there."""
