@@ -14,6 +14,7 @@ import utl_print
 import worker_threads
 from dynaface.const import Pose
 from dynaface.facial import AnalyzeFace
+from dynaface.lateral import LATERAL_LANDMARK_NAMES
 from dynaface.measures import AnalyzeDentalArea, AnalyzeEyeArea, all_measures
 from jth_ui import app_jth, utl_etc
 from jth_ui.tab_graphic import TabGraphic
@@ -866,7 +867,28 @@ gesture you wish to analyze."""
                 writer.writerow(row)
 
     def save_csv_lateral(self, filename):
-        print(filename)
+        landmarks = self._face.lateral_landmarks  # shape: (N, 2), format (x, y)
+        sagittal_y = self._face.sagittal_y
+        sagittal_x = self._face.sagittal_x
+
+        combined = np.column_stack((sagittal_y, sagittal_x))  # (y, x) order
+
+        labels = []
+        for pt in combined:
+            pt_xy = np.array([pt[1], pt[0]])  # convert (y, x) to (x, y)
+            label = ""
+            for idx, l in enumerate(landmarks):
+                if np.array_equal(pt_xy, l):
+                    label = LATERAL_LANDMARK_NAMES[idx]
+                    break
+            labels.append(label)
+
+        combined_with_labels = np.column_stack((sagittal_y, sagittal_x, labels))
+
+        with open(filename, "w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["y", "x", "landmark"])  # header
+            writer.writerows(combined_with_labels)
 
     def update_chart(self):
         """Create the chart object, or update it if already there."""

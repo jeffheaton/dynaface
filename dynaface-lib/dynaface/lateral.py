@@ -17,6 +17,15 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+LATERAL_LANDMARK_NAMES = [
+    "Soft Tissue Glabella",
+    "Soft Tissue Nasion",
+    "Nasal Tip",
+    "Subnasal Point",
+    "Mento Labial Point",
+    "Soft Tissue Pogonion",
+]
+
 # ================= CONSTANTS =================
 DEBUG = False
 CROP_MARGIN_RATIO: float = 0.05
@@ -223,16 +232,7 @@ def plot_lateral_landmarks(ax: Axes, landmarks: NDArray[Any], shift_x: int) -> N
     """
     Plot the 6 lateral landmarks on the sagittal profile, shifted to the left by shift_x.
     """
-    landmark_names = [
-        "Soft Tissue Glabella",
-        "Soft Tissue Nasion",
-        "Nasal Tip",
-        "Subnasal Point",
-        "Mento Labial Point",
-        "Soft Tissue Pogonion",
-    ]
-
-    for i, name in enumerate(landmark_names):
+    for i, name in enumerate(LATERAL_LANDMARK_NAMES):
         x, y = landmarks[i]
 
         # Only plot if a valid point was found.
