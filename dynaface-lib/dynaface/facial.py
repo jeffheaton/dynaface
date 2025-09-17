@@ -33,6 +33,8 @@ from dynaface import config, measures, models, util
 logger = logging.getLogger(__name__)
 
 LATERAL_Y_DOWN_BIAS = int(STYLEGAN_WIDTH * 0.18)
+LATERAL_PAD_TOP_RATIO = 0.12  # fraction of the 1024 crop height
+LATERAL_PAD_BOTTOM_RATIO = 0.10
 
 
 def util_calc_pd(
@@ -532,73 +534,83 @@ class AnalyzeFace(ImageAnalysis):
 
     def crop_lateral(self) -> None:
         """
-        Crops the image for lateral analysis so the 1024×1024 output is fully filled
-        (no bottom padding on landscape images). We scale by the larger factor of
-        (1024/width, 1024/height) so BOTH dimensions are >= 1024, then crop.
+        Crop to 1024×1024 for lateral analysis, guaranteeing that ALL landmarks
+        are visible vertically, plus configurable top/bottom padding.
 
-        Anchors horizontally near the right pupil (LM 96) and applies a gentle
-        downward bias. Also guards against cutting off the chin by nudging the crop
-        if needed.
+        - Scale is chosen so (landmark_band + pads) fits within 1024 px height.
+        - Horizontal anchoring to LM 96 is kept.
+        - If the source is narrow, side padding is allowed (pillarbox) so that
+        vertical padding is never silently squeezed away.
         """
-        # --- Detection bbox (optional; we keep this in case you use it later) ---
-        assert models.mtcnn_model is not None, "mtcnn_model is None"
-        det = models.mtcnn_model.detect(self.render_img)  # type: ignore
-        bbox = None
-        if det is not None and det[0] is not None:
-            bboxes, _ = det
-            if bboxes is not None and len(bboxes) > 0:
-                bbox = bboxes[0]
-        # If detection fails, we proceed with full-frame logic below.
-
-        # --- Compute scale so BOTH dims >= STYLEGAN_WIDTH (fills the square) ---
-        width, height = self.render_img.shape[1], self.render_img.shape[0]
         target = STYLEGAN_WIDTH
-        scale = max(target / float(width), target / float(height))
+        width, height = self.render_img.shape[1], self.render_img.shape[0]
 
-        new_width = int(round(width * scale))
-        new_height = int(round(height * scale))
+        # --- Landmark vertical band in ORIGINAL coordinates ---
+        if self.landmarks:
+            ys = [y for (_, y) in self.landmarks if y is not None]
+            min_y = int(min(ys))
+            max_y = int(max(ys))
+        else:
+            # No landmarks → center crop after a neutral scale
+            min_y, max_y = 0, height - 1
 
-        # Resize the source first (no padding)
+        band_h = max(1, max_y - min_y)
+
+        # Desired padding expressed in TARGET pixels (constant space)
+        pad_top_t = int(round(target * LATERAL_PAD_TOP_RATIO))
+        pad_bot_t = int(round(target * LATERAL_PAD_BOTTOM_RATIO))
+        pad_total_t = pad_top_t + pad_bot_t
+        pad_total_t = min(pad_total_t, target - 1)  # guard
+
+        # --- Compute scale so the vertical ROI fits WITH padding ---
+        # band_scaled + pads <= target  ->  scale <= (target - pads) / band_h
+        s_vert = max(1e-6, (target - pad_total_t) / float(band_h))
+
+        # Previous "fill both dims" scale (prevents top/bottom padding from ever growing)
+        s_fill = max(target / float(width), target / float(height))
+
+        # Choose the smaller so the pads actually fit; allow side padding if needed.
+        scale = min(s_fill, s_vert)
+
+        new_width = max(1, int(round(width * scale)))
+        new_height = max(1, int(round(height * scale)))
+
+        # Resize first
         img2 = cv2.resize(self.render_img, (new_width, new_height))
 
-        # --- Anchor crop around right-pupil (LM 96) with vertical bias ---
-        # Guard: landmarks must exist and index 96 must be valid
+        # --- Horizontal crop: anchor to right pupil (LM 96) as before ---
         if not self.landmarks or len(self.landmarks) <= 96:
-            # Fallback to centered crop if landmarks are unavailable
-            crop_x = max(0, (new_width - target) // 2)
-            crop_y = max(0, (new_height - target) // 2)
+            crop_x = (new_width - target) // 2
         else:
-            rp_x, rp_y = self.landmarks[96]  # right-pupil anchor
-            rp_x_s = int(rp_x * scale)
-            rp_y_s = int(rp_y * scale)
+            rp_x, _ = self.landmarks[96]
+            rp_x_s = int(round(rp_x * scale))
+            crop_x = rp_x_s - STYLEGAN_RIGHT_PUPIL[0]
 
-            # Horizontal: place right pupil at STYLEGAN_RIGHT_PUPIL[0]
-            crop_x = int(rp_x_s - STYLEGAN_RIGHT_PUPIL[0])
-            # Vertical: place right pupil at STYLEGAN_RIGHT_PUPIL[1], plus down-bias
-            crop_y = int(rp_y_s - STYLEGAN_RIGHT_PUPIL[1] + LATERAL_Y_DOWN_BIAS)
+        # If the scaled width is wide enough, clamp inside; otherwise let safe_clip pad.
+        if new_width >= target:
+            crop_x = max(0, min(crop_x, new_width - target))
 
-        # --- Clamp crop to image bounds (so we don't pad) ---
-        crop_x = max(0, min(crop_x, new_width - target))
-        crop_y = max(0, min(crop_y, new_height - target))
+        # --- Vertical crop: include ALL landmarks + padding (in TARGET pixels) ---
+        min_y_s = int(round(min_y * scale))
+        max_y_s = int(round(max_y * scale))
 
-        # --- Chin-protect: keep pogonion (LM 16) visible with a small margin ---
-        try:
-            pog_x, pog_y = self.landmarks[16]
-            pog_y_s = int(pog_y * scale)
-            margin = int(target * 0.05)  # keep ~5% headroom above bottom
-            # If chin would be below the cropped bottom, nudge crop down when possible
-            needed = (pog_y_s + margin) - (crop_y + target)
-            if needed > 0:
-                crop_y = min(crop_y + needed, new_height - target)
-        except Exception:
-            # If LM 16 is missing, skip chin-protect
-            pass
+        # Start by placing the top of the band at pad_top_t from the top
+        crop_y = min_y_s - pad_top_t
 
-        # --- Final safe crop (no padding expected since both dims >= target) ---
+        if new_height >= target:
+            # Keep the window inside the image
+            crop_y = max(0, min(crop_y, new_height - target))
+            # Ensure the bottom band + pad fits; nudge down if needed
+            need_down = (max_y_s + pad_bot_t) - (crop_y + target)
+            if need_down > 0:
+                crop_y = min(crop_y + need_down, new_height - target)
+        # else: allow safe_clip to pad top/bottom if the scaled height < target
+
+        # --- Final crop (safe_clip pads any out-of-bounds with FILL_COLOR) ---
         img2, _, _ = util.safe_clip(
             img2,
-            crop_x,
-            crop_y,
+            int(crop_x),
+            int(crop_y),
             target,
             target,
             FILL_COLOR,
@@ -609,8 +621,8 @@ class AnalyzeFace(ImageAnalysis):
             (int(x), int(y))
             for x, y in util.scale_crop_points(
                 [(int(x), int(y)) for x, y in self.landmarks],
-                crop_x,
-                crop_y,
+                int(crop_x),
+                int(crop_y),
                 scale,
             )
         ]

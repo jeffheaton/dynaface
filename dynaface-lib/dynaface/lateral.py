@@ -27,7 +27,7 @@ LATERAL_LANDMARK_NAMES = [
 ]
 
 # ================= CONSTANTS =================
-DEBUG = False
+DEBUG = True
 CROP_MARGIN_RATIO: float = 0.05
 
 # 1st Derivative (dx) Controls
@@ -333,6 +333,9 @@ def analyze_lateral(
     )
 
 
+from typing import Optional  # make sure this import exists
+
+
 def find_lateral_landmark(
     sagittal_x: NDArray[Any],
     sagittal_y: NDArray[Any],
@@ -340,10 +343,18 @@ def find_lateral_landmark(
     min_indices: NDArray[Any],
     y_coord: float,
     find_max: bool = True,
+    y_forward: Optional[bool] = None,
 ) -> NDArray[Any]:
     """
     Finds the lateral landmark nearest to a specified y-coordinate on the sagittal line,
     either as a local maximum or minimum depending on the find_max parameter.
+
+    Direction control (y_forward):
+      - None (default): search both directions (nearest by |Δy|, current behavior).
+      - True: search only "forward" in y (indices with sagittal_y >= y_coord).
+      - False: search only "backward" in y (indices with sagittal_y <= y_coord).
+
+    Note: "Forward" here means increasing y values.
 
     Args:
         sagittal_x (NDArray[Any]): X-coordinates of the sagittal profile.
@@ -351,20 +362,34 @@ def find_lateral_landmark(
         max_indices (NDArray[Any]): Indices of local maxima.
         min_indices (NDArray[Any]): Indices of local minima.
         y_coord (float): Target y-coordinate to find nearest landmark.
-        find_max (bool): If True, find nearest local maximum; otherwise, find nearest local minimum.
+        find_max (bool): If True, find nearest local maximum; otherwise, nearest local minimum.
+        y_forward (Optional[bool]): Directional constraint as described above.
 
     Returns:
-        NDArray[Any]: (x, y) coordinates of the found landmark, or [-1, -1] if no valid landmark is found.
+        NDArray[Any]: (x, y) coordinates of the found landmark, or [-1, -1] if none.
     """
     indices = max_indices if find_max else min_indices
-
     if len(indices) == 0:
         return np.array([-1.0, -1.0])
 
-    # Find the index of the landmark nearest to the provided y-coordinate
-    closest_idx = indices[np.argmin(np.abs(sagittal_y[indices] - y_coord))]
+    # Apply directional filter if requested
+    if y_forward is True:
+        mask = sagittal_y[indices] >= y_coord
+        candidates = indices[mask]
+    elif y_forward is False:
+        mask = sagittal_y[indices] <= y_coord
+        candidates = indices[mask]
+    else:
+        candidates = indices  # no directional constraint
 
-    return np.array([sagittal_x[closest_idx], sagittal_y[closest_idx]])
+    if len(candidates) == 0:
+        return np.array([-1.0, -1.0])
+
+    # Nearest by vertical distance
+    diffs = np.abs(sagittal_y[candidates] - y_coord)
+    closest_idx = candidates[int(np.argmin(diffs))]
+
+    return np.array([float(sagittal_x[closest_idx]), float(sagittal_y[closest_idx])])
 
 
 def find_nearest_sagittal_point(
@@ -540,24 +565,18 @@ def find_lateral_landmarks(
 
     # (out_idx, frontal_idx, find_max)
     landmark_mapping = [
-        (0, highest_landmark_idx, False),  # Glabella (min)
-        (1, 53, True),  # Nasion (max)
-        (2, 54, False),  # Nasal tip (min)
-        (4, 85, True),  # Mento Labial (max)
-        (5, 16, False),  # Pogonion (min)
+        (0, highest_landmark_idx, False, None),  # Glabella (min)
+        (1, 51, True, None),  # Nasion (max)
+        (2, 54, False, None),  # Nasal tip (min)
+        (3, 54, True, None),  # Subnasal (max)
+        (4, 16, True, False),  # Mento Labial Point (max)
+        (5, 16, False, False),  # Pogonion (min)
     ]
 
     landmarks = np.full((6, 2), -1.0)
 
     # extrema-driven
-    for out_idx, lm_index, find_max in landmark_mapping:
-        if (
-            lm_index < 0
-            or lm_index >= len(landmarks_frontal)
-            or landmarks_frontal[lm_index][0] < 0
-            or landmarks_frontal[lm_index][1] < 0
-        ):
-            continue
+    for out_idx, lm_index, find_max, y_forward in landmark_mapping:
         y_coord = landmarks_frontal[lm_index][1]
         pt = find_lateral_landmark(
             sagittal_x,
@@ -566,6 +585,7 @@ def find_lateral_landmarks(
             min_indices,
             y_coord=y_coord,
             find_max=find_max,
+            y_forward=y_forward,
         )
         landmarks[out_idx] = pt
 
@@ -594,7 +614,15 @@ def find_lateral_landmarks(
                 y_coord=landmarks_frontal[idx_a][1],
             )
 
-    landmarks[3] = subnasal_pt
+    # landmarks[3] = subnasal_pt
+    landmarks[4] = find_lateral_landmark(
+        sagittal_x,
+        sagittal_y,
+        max_indices,
+        min_indices,
+        y_coord=landmarks[5][1],
+        find_max=True,
+    )
 
     # shift back and cast
     landmarks[:, 0] += shift_x
