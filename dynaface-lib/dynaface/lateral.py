@@ -523,7 +523,13 @@ def analyze_lateral(
 
     # Compute/plot lateral landmarks
     landmarks_np = find_lateral_landmarks(
-        sagittal_x, sagittal_y, max_indices, min_indices, int(shift_x), landmarks
+        sagittal_x,
+        sagittal_y,
+        max_indices,
+        min_indices,
+        corner_idxs,
+        int(shift_x),
+        landmarks,
     )
     plot_lateral_landmarks(ax2, landmarks_np, int(shift_x))
     logging.debug("Lateral Landmarks (x, y):")
@@ -549,14 +555,12 @@ def analyze_lateral(
     )
 
 
-# ---------------- Utilities for landmark search ----------------
-
-
 def find_lateral_landmark(
     sagittal_x: NDArray[Any],
     sagittal_y: NDArray[Any],
     max_indices: NDArray[Any],
     min_indices: NDArray[Any],
+    corner_idxs: NDArray[Any],
     y_coord: float,
     find_max: bool = True,
     y_forward: Optional[bool] = None,
@@ -595,6 +599,7 @@ def find_lateral_landmarks(
     sagittal_y: NDArray[Any],
     max_indices: NDArray[Any],
     min_indices: NDArray[Any],
+    corner_idxs: NDArray[Any],
     shift_x: int,
     landmarks_frontal: NDArray[Any],
 ) -> NDArray[Any]:
@@ -634,6 +639,7 @@ def find_lateral_landmarks(
                 sagittal_y,
                 max_indices,
                 min_indices,
+                corner_idxs=corner_idxs,
                 y_coord=y_coord,
                 find_max=find_max,
             )
@@ -647,6 +653,7 @@ def find_lateral_landmarks(
             sagittal_y,
             max_indices,
             min_indices,
+            corner_idxs=corner_idxs,
             y_coord=landmarks[5][1],
             find_max=True,
         )
