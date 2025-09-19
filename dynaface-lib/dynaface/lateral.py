@@ -597,13 +597,6 @@ def find_lateral_landmarks(
     min_indices: NDArray[Any],
     shift_x: int,
     landmarks_frontal: NDArray[Any],
-    *,
-    corner_smooth_window: int = 7,
-    corner_slope_delta_thresh: float = 0.25,
-    corner_min_consec: int = 3,
-    corner_zero_tol: float = 0.05,
-    corner_min_ddx: float = 0.0,
-    corner_look_from_baseline: bool = True,
 ) -> NDArray[Any]:
     """
     Compute lateral landmarks; subnasal uses a curvature-based corner.
@@ -627,18 +620,25 @@ def find_lateral_landmarks(
     landmarks = np.full((6, 2), -1.0)
 
     for out_idx, lm_index, find_max, y_forward in landmark_mapping:
-        if 0 <= lm_index < len(landmarks_frontal):
-            y_coord = landmarks_frontal[lm_index][1]
-            pt = find_lateral_landmark(
+        y_coord = landmarks_frontal[lm_index][1]
+        if find_max is None:
+            # Use nearest sagittal point for Subnasal Point
+            landmark_point = find_nearest_sagittal_point(
+                sagittal_x,
+                sagittal_y,
+                y_coord=y_coord,
+            )
+        else:
+            landmark_point = find_lateral_landmark(
                 sagittal_x,
                 sagittal_y,
                 max_indices,
                 min_indices,
                 y_coord=y_coord,
                 find_max=find_max,
-                y_forward=y_forward,
             )
-            landmarks[out_idx] = pt
+
+        landmarks[out_idx] = landmark_point
 
     # Optionally: recompute mento-labial using Pogonion Y if present
     if landmarks[5, 1] >= 0:
