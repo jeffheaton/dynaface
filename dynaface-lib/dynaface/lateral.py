@@ -14,6 +14,10 @@ from scipy.signal import find_peaks, savgol_filter  # <-- Savitzky–Golay
 
 from dynaface import models, util
 import logging
+from enum import Enum, auto
+from typing import Optional, Any
+import numpy as np
+from numpy.typing import NDArray
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +31,7 @@ LATERAL_LANDMARK_NAMES = [
 ]
 
 # ================= CONSTANTS =================
-DEBUG = True
+DEBUG = False
 CROP_MARGIN_RATIO: float = 0.05
 
 # 1st Derivative (dx) Controls
@@ -555,6 +559,13 @@ def analyze_lateral(
     )
 
 
+class LateralSearchMode(Enum):
+    MAX = auto()  # use max_indices
+    MIN = auto()  # use min_indices
+    CORNER = auto()  # use corner_idxs (e.g., curvature-based corners)
+    NEAREST = auto()  # ignore extrema/corners; nearest sagittal y
+
+
 def find_lateral_landmark(
     sagittal_x: NDArray[Any],
     sagittal_y: NDArray[Any],
@@ -562,36 +573,67 @@ def find_lateral_landmark(
     min_indices: NDArray[Any],
     corner_idxs: NDArray[Any],
     y_coord: float,
-    find_max: bool = True,
+    mode: LateralSearchMode = LateralSearchMode.MAX,
     y_forward: Optional[bool] = None,
 ) -> NDArray[Any]:
-    indices = max_indices if find_max else min_indices
-    if len(indices) == 0:
-        return np.array([-1.0, -1.0])
-    if y_forward is True:
-        mask = sagittal_y[indices] >= y_coord
-        candidates = indices[mask]
-    elif y_forward is False:
-        mask = sagittal_y[indices] <= y_coord
-        candidates = indices[mask]
+    """
+    Find a lateral landmark on the sagittal profile according to `mode`.
+
+    Args:
+        sagittal_x, sagittal_y: 1D arrays of the sagittal polyline.
+        max_indices: indices of local maxima along the sagittal line.
+        min_indices: indices of local minima along the sagittal line.
+        corner_idxs: indices of detected 'corner' points along the line.
+        y_coord: target y to compare against.
+        mode: which search to perform (MAX, MIN, CORNER, NEAREST).
+        y_forward:
+            - True  -> consider only points with y >= y_coord
+            - False -> consider only points with y <= y_coord
+            - None  -> consider all points
+
+    Returns:
+        np.array([x, y]) as float64, or [-1.0, -1.0] if none found.
+    """
+
+    def _dir_filter(idxs: NDArray[Any]) -> NDArray[Any]:
+        if y_forward is True:
+            mask = sagittal_y[idxs] >= y_coord
+            return idxs[mask]
+        elif y_forward is False:
+            mask = sagittal_y[idxs] <= y_coord
+            return idxs[mask]
+        return idxs
+
+    # Choose candidate indices by mode
+    if mode == LateralSearchMode.MAX:
+        candidates = _dir_filter(max_indices)
+    elif mode == LateralSearchMode.MIN:
+        candidates = _dir_filter(min_indices)
+    elif mode == LateralSearchMode.CORNER:
+        candidates = _dir_filter(corner_idxs)
+    elif mode == LateralSearchMode.NEAREST:
+        # For NEAREST, we consider *all* points along the sagittal line
+        all_idxs = np.arange(len(sagittal_y), dtype=int)
+        candidates = _dir_filter(all_idxs)
     else:
-        candidates = indices
-    if len(candidates) == 0:
-        return np.array([-1.0, -1.0])
-    diffs = np.abs(sagittal_y[candidates] - y_coord)
-    closest_idx = candidates[int(np.argmin(diffs))]
-    return np.array([float(sagittal_x[closest_idx]), float(sagittal_y[closest_idx])])
+        candidates = np.array([], dtype=int)
+
+    if candidates.size == 0:
+        return np.array([-1.0, -1.0], dtype=float)
+
+    # Pick the candidate whose y is closest to y_coord
+    closest = int(np.argmin(np.abs(sagittal_y[candidates] - y_coord)))
+    idx = int(candidates[closest])
+
+    return np.array([float(sagittal_x[idx]), float(sagittal_y[idx])], dtype=float)
 
 
-def find_nearest_sagittal_point(
-    sagittal_x: NDArray[Any],
-    sagittal_y: NDArray[Any],
-    y_coord: float,
-) -> NDArray[Any]:
-    if len(sagittal_y) == 0:
-        return np.array([-1.0, -1.0])
-    closest_idx = np.argmin(np.abs(sagittal_y - y_coord))
-    return np.array([sagittal_x[closest_idx], sagittal_y[closest_idx]])
+from typing import Any
+import numpy as np
+from numpy.typing import NDArray
+
+# assumes these are already defined in your module:
+# from .whatever import find_lateral_landmark, LateralSearchMode
 
 
 def find_lateral_landmarks(
@@ -604,59 +646,53 @@ def find_lateral_landmarks(
     landmarks_frontal: NDArray[Any],
 ) -> NDArray[Any]:
     """
-    Compute lateral landmarks; subnasal uses a curvature-based corner.
+    Compute lateral landmarks; Subnasal uses curvature-based corner.
+    Output layout (indices):
+      0 = Glabella
+      1 = Nasion
+      2 = Nasal tip
+      3 = Subnasal (corner-based)
+      4 = Mento-labial
+      5 = Pogonion  (optional; leave -1,-1 if not used)
     """
     landmarks_frontal = np.array(landmarks_frontal)
-    if len(landmarks_frontal) == 0:
-        return np.full((6, 2), -1.0)
+    if landmarks_frontal.size == 0:
+        return np.full((6, 2), -1, dtype=int)
 
+    # Highest frontal landmark (smallest Y): dynamic Glabella anchor
     highest_landmark_idx = int(np.argmin(landmarks_frontal[:, 1]))
 
-    # (out_idx, frontal_idx, find_max, y_forward)
+    # (out_idx, frontal_idx, mode, y_forward)
     landmark_mapping = [
-        (0, highest_landmark_idx, False, None),  # Glabella (min)
-        (1, 51, True, None),  # Nasion (max)
-        (2, 54, False, None),  # Nasal tip (min)
-        (3, 54, True, None),  # Subnasal placeholder; replaced below
-        (4, 16, True, False),  # Mento Labial (max)
-        (5, 16, False, False),  # Pogonion (min)
+        (0, highest_landmark_idx, LateralSearchMode.MIN, None),  # Glabella (min)
+        (1, 51, LateralSearchMode.MAX, None),  # Nasion (max)
+        (2, 54, LateralSearchMode.MIN, None),  # Nasal tip (min)
+        (3, 54, LateralSearchMode.MAX, None),  # Subnasal (corner)
+        (
+            4,
+            16,
+            LateralSearchMode.MAX,
+            False,
+        ),  # Mento Labial (max), only search y <= target
+        (5, 16, LateralSearchMode.MIN, False),  # Pogonion (min), optional
     ]
 
-    landmarks = np.full((6, 2), -1.0)
+    landmarks = np.full((6, 2), -1.0, dtype=float)
 
-    for out_idx, lm_index, find_max, y_forward in landmark_mapping:
-        y_coord = landmarks_frontal[lm_index][1]
-        if find_max is None:
-            # Use nearest sagittal point for Subnasal Point
-            landmark_point = find_nearest_sagittal_point(
-                sagittal_x,
-                sagittal_y,
-                y_coord=y_coord,
-            )
-        else:
-            landmark_point = find_lateral_landmark(
-                sagittal_x,
-                sagittal_y,
-                max_indices,
-                min_indices,
-                corner_idxs=corner_idxs,
-                y_coord=y_coord,
-                find_max=find_max,
-            )
-
-        landmarks[out_idx] = landmark_point
-
-    # Optionally: recompute mento-labial using Pogonion Y if present
-    if landmarks[5, 1] >= 0:
-        landmarks[4] = find_lateral_landmark(
-            sagittal_x,
-            sagittal_y,
-            max_indices,
-            min_indices,
+    for out_idx, lm_index, mode, y_forward in landmark_mapping:
+        y_coord = float(landmarks_frontal[lm_index][1])
+        pt = find_lateral_landmark(
+            sagittal_x=sagittal_x,
+            sagittal_y=sagittal_y,
+            max_indices=max_indices,
+            min_indices=min_indices,
             corner_idxs=corner_idxs,
-            y_coord=landmarks[5][1],
-            find_max=True,
+            y_coord=y_coord,
+            mode=mode,
+            y_forward=y_forward,
         )
+        landmarks[out_idx] = pt
 
-    landmarks[:, 0] += shift_x
-    return np.array([tuple(map(int, point)) for point in landmarks])
+    # Shift X back to full-image coordinates and return ints
+    landmarks[:, 0] += float(shift_x)
+    return np.array([tuple(map(int, xy)) for xy in landmarks], dtype=int)
