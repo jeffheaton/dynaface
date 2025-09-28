@@ -628,6 +628,7 @@ def find_lateral_landmark(
 
 
 from typing import Any, Optional
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -836,6 +837,76 @@ def find_lateral_landmark_in_range(
     return np.array([float(sagittal_x[idx]), float(sagittal_y[idx])], dtype=float)
 
 
+def find_lateral_landmark_minmax(
+    sagittal_x: NDArray[Any],
+    sagittal_y: NDArray[Any],
+    idx_low: Optional[int] = None,
+    idx_high: Optional[int] = None,
+    *,
+    pick: LateralSearchMode = LateralSearchMode.MAX,  # only MAX or MIN are valid here
+) -> NDArray[Any]:
+    """
+    Return [x, y] for the global min/max of sagittal_x within an index range.
+    If idx_low/idx_high are None, the full polyline is used.
+
+    Tie-breaks:
+      - If multiple indices share the extreme X, choose the one whose Y is
+        closest to the median Y among the tied candidates.
+
+    Args:
+        sagittal_x, sagittal_y: 1D arrays (same length) of the sagittal profile.
+        idx_low, idx_high: inclusive index bounds for the search (order agnostic).
+        pick: LateralSearchMode.MAX or LateralSearchMode.MIN.
+
+    Returns:
+        np.array([x, y]) as float64, or [-1.0, -1.0] on invalid input.
+    """
+    n = int(len(sagittal_x))
+    if n == 0 or n != int(len(sagittal_y)):
+        return np.array([-1.0, -1.0], dtype=float)
+
+    # Default to full range if not provided
+    if idx_low is None:
+        idx_low = 0
+    if idx_high is None:
+        idx_high = n - 1
+
+    # Normalize/clip bounds and ensure lo <= hi
+    lo = max(0, min(int(idx_low), n - 1))
+    hi = max(0, min(int(idx_high), n - 1))
+    if lo > hi:
+        lo, hi = hi, lo
+
+    x_slice = np.asarray(sagittal_x[lo : hi + 1], dtype=float)
+    y_slice = np.asarray(sagittal_y[lo : hi + 1], dtype=float)
+
+    if x_slice.size == 0 or np.all(np.isnan(x_slice)):
+        return np.array([-1.0, -1.0], dtype=float)
+
+    if pick == LateralSearchMode.MAX:
+        extreme_val = np.nanmax(x_slice)
+    elif pick == LateralSearchMode.MIN:
+        extreme_val = np.nanmin(x_slice)
+    else:
+        return np.array([-1.0, -1.0], dtype=float)
+
+    # All indices within the slice that hit the extreme value
+    rel_candidates = np.where(x_slice == extreme_val)[0]
+    if rel_candidates.size == 0:
+        return np.array([-1.0, -1.0], dtype=float)
+
+    # Break ties by Y closest to the median Y of the candidates
+    if rel_candidates.size > 1:
+        cand_ys = y_slice[rel_candidates]
+        median_y = float(np.median(cand_ys))
+        rel_idx = int(rel_candidates[np.argmin(np.abs(cand_ys - median_y))])
+    else:
+        rel_idx = int(rel_candidates[0])
+
+    idx = lo + rel_idx
+    return np.array([float(sagittal_x[idx]), float(sagittal_y[idx])], dtype=float)
+
+
 def find_lateral_landmarks(
     sagittal_x: NDArray[Any],
     sagittal_y: NDArray[Any],
@@ -846,25 +917,28 @@ def find_lateral_landmarks(
     landmarks_frontal: NDArray[Any],
 ) -> NDArray[Any]:
     """
-    Compute lateral landmarks; Subnasal now uses the same range-based method
-    (between frontal indices 57 and 79) as Pogonion (14..16).
+    Compute lateral landmarks; Subnasal uses corner-or-max (57..79),
+    Pogonion uses MIN (14..16), and Mento-labial uses MAX (8..14)
+    via find_lateral_landmark_minmax over a sagittal range.
+
     Output layout (indices):
       0 = Glabella
       1 = Nasion
       2 = Nasal tip
-      3 = Subnasal (range-based: 57..79, MIN X)
-      4 = Mento-labial
-      5 = Pogonion  (range-based: 14..16, MIN X)
+      3 = Subnasal  (57..79, corner-or-max)
+      4 = Mento-labial (8..14, MAX X; fallback to CORNER if overlapping Pogonion)
+      5 = Pogonion (14..16, MIN X)
     """
     landmarks_frontal = np.array(landmarks_frontal)
     if landmarks_frontal.size == 0:
         return np.full((6, 2), -1, dtype=int)
 
+    n_sag = int(len(sagittal_x))
     landmarks = np.full((6, 2), -1.0, dtype=float)
 
     # ---- Pogonion via frontal pair (14..16), pick MIN X ----
     if landmarks_frontal.shape[0] > 16:
-        pog_pt = find_lateral_landmark_in_range(
+        pogonion_pt = find_lateral_landmark_in_range(
             sagittal_x=sagittal_x,
             sagittal_y=sagittal_y,
             pick=LateralSearchMode.MIN,
@@ -872,11 +946,11 @@ def find_lateral_landmarks(
             frontal_lo_idx=14,
             frontal_hi_idx=16,
         )
-        landmarks[5] = pog_pt
+        landmarks[5] = pogonion_pt
 
-    # ---- Subnasal via frontal pair (57..79), pick MIN X ----
+    # ---- Subnasal via frontal pair (57..79), corner-or-max ----
     if landmarks_frontal.shape[0] > 79:
-        sn_pt = find_corner_landmark_in_range(
+        subnasal_pt = find_corner_landmark_in_range(
             sagittal_x=sagittal_x,
             sagittal_y=sagittal_y,
             corner_idxs=corner_idxs,
@@ -884,28 +958,135 @@ def find_lateral_landmarks(
             frontal_lo_idx=57,
             frontal_hi_idx=79,
         )
-        landmarks[3] = sn_pt
+        landmarks[3] = subnasal_pt
 
-    # Highest frontal landmark (smallest Y): dynamic Glabella anchor
-    highest_landmark_idx = int(np.argmin(landmarks_frontal[:, 1]))
+    # ---- Mento-labial via frontal pair (8..14), pick MAX X using minmax finder ----
+    if landmarks_frontal.shape[0] > 14:
+        # Project the two frontal bounds to sagittal indices
+        y_upper_bound = float(landmarks_frontal[8][1])  # upper boundary landmark
+        y_lower_bound = float(landmarks_frontal[14][1])  # lower boundary landmark
 
-    # Remaining via your existing finder
+        idx_upper_bound = int(np.argmin(np.abs(sagittal_y - y_upper_bound)))
+        idx_lower_bound = int(np.argmin(np.abs(sagittal_y - y_lower_bound)))
+
+        # If both map to the same sagittal row, widen slightly
+        if idx_upper_bound == idx_lower_bound:
+            widen = 2
+            idx_upper_bound = max(0, idx_upper_bound - widen)
+            idx_lower_bound = min(n_sag - 1, idx_lower_bound + widen)
+
+        search_lo = min(idx_upper_bound, idx_lower_bound)
+        search_hi = max(idx_upper_bound, idx_lower_bound)
+
+        mentolabial_pt = find_lateral_landmark_minmax(
+            sagittal_x=sagittal_x,
+            sagittal_y=sagittal_y,
+            idx_low=search_lo,
+            idx_high=search_hi,
+            pick=LateralSearchMode.MAX,
+        )
+        landmarks[4] = mentolabial_pt
+
+    # ---- Overlap guard: if Mento-labial ~ Pogonion, recompute Mento-labial via CORNER at frontal idx 14 ----
+    # Adaptive tolerances based on face height in sagittal space
+    if np.all(landmarks[4] >= 0) and np.all(landmarks[5] >= 0):
+        ml_x, ml_y = float(landmarks[4][0]), float(landmarks[4][1])
+        pog_x, pog_y = float(landmarks[5][0]), float(landmarks[5][1])
+
+        dx = abs(ml_x - pog_x)
+        dy = abs(ml_y - pog_y)
+        d_euclid = float(np.hypot(dx, dy))
+
+        # Use sagittal_y extent as a scale proxy
+        face_height = (
+            float(np.max(sagittal_y) - np.min(sagittal_y)) if sagittal_y.size else 0.0
+        )
+
+        # Separate axis tolerances + Euclidean backup (with sensible minimums)
+        x_tol_px = max(
+            3, int(round(0.004 * face_height))
+        )  # ~4 px per 1000px face height
+        y_tol_px = max(
+            5, int(round(0.008 * face_height))
+        )  # ~8 px per 1000px face height
+        euclid_tol_px = max(
+            6, int(round(0.008 * face_height))
+        )  # ~8 px per 1000px face height
+
+        cond_axis = (dx <= x_tol_px) and (dy <= y_tol_px)
+        cond_euclid = d_euclid <= euclid_tol_px
+        overlap = bool(cond_axis or cond_euclid)
+
+        logger.debug(
+            "[ML-Pog overlap] ML=(%.1f, %.1f) Pog=(%.1f, %.1f) | dx=%.2f dy=%.2f d=%.2f "
+            "| x_tol=%d y_tol=%d euclid_tol=%d | cond_axis=%s cond_euclid=%s | overlap=%s",
+            ml_x,
+            ml_y,
+            pog_x,
+            pog_y,
+            dx,
+            dy,
+            d_euclid,
+            x_tol_px,
+            y_tol_px,
+            euclid_tol_px,
+            str(cond_axis),
+            str(cond_euclid),
+            str(overlap),
+        )
+
+        if overlap:
+            target_y_for_corner = float(landmarks_frontal[14][1])
+            logger.debug(
+                "[ML-Pog overlap] Recomputing Mento-labial via CORNER at frontal idx 14, target_y=%.1f (y_forward=False)",
+                target_y_for_corner,
+            )
+
+            ml_corner_pt = find_lateral_landmark(
+                sagittal_x=sagittal_x,
+                sagittal_y=sagittal_y,
+                max_indices=max_indices,
+                min_indices=min_indices,
+                corner_idxs=corner_idxs,
+                y_coord=target_y_for_corner,
+                mode=LateralSearchMode.CORNER,
+                y_forward=False,
+            )
+
+            if np.all(ml_corner_pt >= 0):
+                logger.debug(
+                    "[ML-Pog overlap] Moving ML from (%.1f, %.1f) -> (%.1f, %.1f)",
+                    ml_x,
+                    ml_y,
+                    float(ml_corner_pt[0]),
+                    float(ml_corner_pt[1]),
+                )
+                landmarks[4] = ml_corner_pt
+            else:
+                logger.debug(
+                    "[ML-Pog overlap] Corner-based fallback returned invalid point; keeping original ML"
+                )
+
+    # ---- Highest frontal landmark (smallest Y): dynamic Glabella anchor ----
+    highest_frontal_idx = int(np.argmin(landmarks_frontal[:, 1]))
+
+    # ---- Remaining via existing finder ----
     landmark_mapping = [
-        (0, highest_landmark_idx, LateralSearchMode.NEAREST, None),  # Glabella
+        (0, highest_frontal_idx, LateralSearchMode.NEAREST, None),  # Glabella
         (1, 51, LateralSearchMode.NEAREST, False),  # Nasion
         (2, 54, LateralSearchMode.MIN, None),  # Nasal tip
-        (4, 16, LateralSearchMode.MAX, False),  # Mento-labial
+        # (4, 14, LateralSearchMode.CORNER, False),  # optional: always try CORNER first
     ]
 
-    for out_idx, lm_index, mode, y_forward in landmark_mapping:
-        y_coord = float(landmarks_frontal[lm_index][1])
+    for out_idx, frontal_idx, mode, y_forward in landmark_mapping:
+        y_target = float(landmarks_frontal[frontal_idx][1])
         pt = find_lateral_landmark(
             sagittal_x=sagittal_x,
             sagittal_y=sagittal_y,
             max_indices=max_indices,
             min_indices=min_indices,
             corner_idxs=corner_idxs,
-            y_coord=y_coord,
+            y_coord=y_target,
             mode=mode,
             y_forward=y_forward,
         )
