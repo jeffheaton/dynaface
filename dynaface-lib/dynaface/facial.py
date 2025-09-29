@@ -319,9 +319,34 @@ class AnalyzeFace(ImageAnalysis):
                 flipped = cv2.flip(self.original_img, 1)
                 super().load_image(flipped)
                 landmarks, self._headpose = self._find_landmarks(flipped)
-                self.landmarks = landmarks
+                self.landmarks = [(int(x), int(y)) for x, y in landmarks]
             else:
                 self.flipped = False
+
+            # === Only change: widen canvas by 50% with black side bars (no stretch) ===
+            # Keep the face centered and adjust landmark Xs so downstream code remains aligned.
+            h, w = self.original_img.shape[:2]
+            new_w = int(round(w * 1.5))
+            total_pad = max(new_w - w, 0)
+            pad_left = total_pad // 2
+            pad_right = total_pad - pad_left
+
+            if total_pad > 0:
+                padded = cv2.copyMakeBorder(
+                    self.original_img,
+                    top=0,
+                    bottom=0,
+                    left=pad_left,
+                    right=pad_right,
+                    borderType=cv2.BORDER_CONSTANT,
+                    value=[0, 0, 0],  # black bars
+                )
+                # Keep images in sync
+                self.original_img = padded
+                self.render_img = padded.copy()
+                # Shift landmarks horizontally to match the new canvas
+                self.landmarks = [(x + pad_left, y) for (x, y) in self.landmarks]
+            # === end of the only functional change ===
 
             self.crop_lateral()
         elif (
