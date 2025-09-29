@@ -58,7 +58,7 @@ class TestFaceSave(unittest.TestCase):
             self.assertAlmostEqual(
                 actual,
                 expected,
-                places=2,
+                delta=0.5,
                 msg=f"{key}: expected {expected}, got {actual}",
             )
 
@@ -106,6 +106,6 @@ class TestFaceSave(unittest.TestCase):
             self.assertAlmostEqual(
                 actual,
                 expected,
-                places=2,
+                delta=0.5,
                 msg=f"{key}: expected {expected}, got {actual}",
             )

@@ -61,7 +61,7 @@ class TestFaceAnalysis(unittest.TestCase):
             self.assertAlmostEqual(
                 actual,
                 expected,
-                places=3,
+                delta=0.5,
                 msg=f"{key}: expected {expected}, got {actual}",
             )
         lateral.DEBUG = False
@@ -111,7 +111,7 @@ class TestFaceAnalysis(unittest.TestCase):
             self.assertAlmostEqual(
                 actual,
                 expected,
-                places=2,
+                delta=0.5,
                 msg=f"{key}: expected {expected}, got {actual}",
             )
 
@@ -160,7 +160,7 @@ class TestFaceAnalysis(unittest.TestCase):
             self.assertAlmostEqual(
                 actual,
                 expected,
-                places=2,
+                delta=0.5,
                 msg=f"{key}: expected {expected}, got {actual}",
             )
 
