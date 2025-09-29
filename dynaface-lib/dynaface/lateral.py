@@ -53,7 +53,7 @@ LATERAL_LM_MENTO_LABIAL_POINT = 4
 LATERAL_LM_SOFT_TISSUE_POGONION = 5
 
 
-def process_image(
+def _process_image(
     input_image: Image.Image,
 ) -> Tuple[Image.Image, NDArray[Any], int, int]:
     """
@@ -76,7 +76,7 @@ def process_image(
     return input_image, binary_np, width, height
 
 
-def shift_sagittal_profile(sagittal_x: NDArray[Any]) -> tuple[NDArray[Any], float]:
+def _shift_sagittal_profile(sagittal_x: NDArray[Any]) -> tuple[NDArray[Any], float]:
     """
     Shift so lowest x becomes 0.
     """
@@ -84,7 +84,7 @@ def shift_sagittal_profile(sagittal_x: NDArray[Any]) -> tuple[NDArray[Any], floa
     return sagittal_x - min_x, float(min_x)
 
 
-def extract_sagittal_profile(
+def _extract_sagittal_profile(
     binary_np: NDArray[np.uint8],
 ) -> Tuple[NDArray[np.int32], NDArray[np.int32]]:
     """
@@ -102,7 +102,7 @@ def extract_sagittal_profile(
     return np.array(sagittal_x, dtype=np.int32), np.array(sagittal_y, dtype=np.int32)
 
 
-def compute_derivatives(
+def _compute_derivatives(
     sagittal_x: NDArray[Any],
 ) -> Tuple[NDArray[Any], NDArray[Any], NDArray[Any], NDArray[Any]]:
     """
@@ -115,7 +115,7 @@ def compute_derivatives(
     return dx, ddx, dx_scaled, ddx_scaled
 
 
-def plot_sagittal_profile(
+def _plot_sagittal_profile(
     ax: Axes,
     sagittal_x: NDArray[Any],
     sagittal_y: NDArray[Any],
@@ -131,7 +131,7 @@ def plot_sagittal_profile(
     )
 
 
-def calculate_quarter_lines(start_y: int, end_y: int) -> tuple[float, float, float]:
+def _calculate_quarter_lines(start_y: int, end_y: int) -> tuple[float, float, float]:
     return (
         start_y + 0.25 * (end_y - start_y),
         start_y + 0.50 * (end_y - start_y),
@@ -139,14 +139,14 @@ def calculate_quarter_lines(start_y: int, end_y: int) -> tuple[float, float, flo
     )
 
 
-def plot_quarter_lines(ax: Axes, sagittal_y: NDArray[Any]) -> None:
+def _plot_quarter_lines(ax: Axes, sagittal_y: NDArray[Any]) -> None:
     start_y, end_y = sagittal_y[0], sagittal_y[-1]
-    q1, q2, q3 = calculate_quarter_lines(start_y, end_y)
+    q1, q2, q3 = _calculate_quarter_lines(start_y, end_y)
     for q, label in zip((q1, q2, q3), ("25% Line", "50% Line", "75% Line")):
         ax.axhline(q, color="green", linestyle="--", linewidth=1, label=label)  # type: ignore
 
 
-def find_local_max_min(sagittal_x: NDArray[Any]) -> Tuple[NDArray[Any], NDArray[Any]]:
+def _find_local_max_min(sagittal_x: NDArray[Any]) -> Tuple[NDArray[Any], NDArray[Any]]:
     """
     Local extrema of x(y).
     """
@@ -155,7 +155,7 @@ def find_local_max_min(sagittal_x: NDArray[Any]) -> Tuple[NDArray[Any], NDArray[
     return max_indices, min_indices
 
 
-def plot_sagittal_minmax(
+def _plot_sagittal_minmax(
     ax: Axes,
     sagittal_x: NDArray[Any],
     sagittal_y: NDArray[Any],
@@ -198,9 +198,6 @@ def plot_sagittal_minmax(
             va="center",
             color="red",
         )
-
-
-# ================= Corner detection (multi-scale, angle + curvature) =================
 
 
 def _exclude_near(
@@ -272,7 +269,7 @@ def _angle_change(theta: NDArray[np.floating], halfwin: int) -> NDArray[np.float
     return out
 
 
-def find_monotonic_corners(
+def _find_monotonic_corners(
     sagittal_x: NDArray[Any],
     *,
     scales: List[int] = [9, 13, 17],  # Savitzky–Golay windows (odd)
@@ -417,7 +414,7 @@ def find_monotonic_corners(
     return keep
 
 
-def plot_monotonic_corners(
+def _plot_monotonic_corners(
     ax: Axes,
     sagittal_x: NDArray[Any],
     sagittal_y: NDArray[Any],
@@ -446,7 +443,7 @@ def plot_monotonic_corners(
         )
 
 
-def plot_lateral_landmarks(ax: Axes, landmarks: NDArray[Any], shift_x: int) -> None:
+def _plot_lateral_landmarks(ax: Axes, landmarks: NDArray[Any], shift_x: int) -> None:
     """
     Plot the 6 lateral landmarks on the sagittal profile, shifted left by shift_x.
     """
@@ -467,23 +464,6 @@ def plot_lateral_landmarks(ax: Axes, landmarks: NDArray[Any], shift_x: int) -> N
             )
 
 
-# ---------------- Main Function ----------------
-
-
-def save_debug_plot(
-    sagittal_x: NDArray[Any], sagittal_y: NDArray[Any], filename: str
-) -> None:
-    fig, ax = plt.subplots(figsize=(6, 10))  # type: ignore
-    ax.plot(  # type: ignore
-        sagittal_x, sagittal_y, color="black", linewidth=2, label="Sagittal Profile"
-    )
-    ax.invert_yaxis()
-    ax.set_aspect("equal")
-    plt.tight_layout(pad=0)
-    plt.savefig(filename, dpi=300, bbox_inches="tight")  # type: ignore
-    plt.close(fig)
-
-
 def analyze_lateral(
     input_image: Image.Image,
     landmarks: List[Tuple[int, int]],
@@ -491,24 +471,24 @@ def analyze_lateral(
     """
     Render sagittal plot image and return it with landmarks and arrays.
     """
-    _, binary_np, _, _ = process_image(input_image)
+    _, binary_np, _, _ = _process_image(input_image)
 
-    sagittal_x, sagittal_y = extract_sagittal_profile(binary_np)
-    sagittal_x, shift_x = shift_sagittal_profile(sagittal_x)
+    sagittal_x, sagittal_y = _extract_sagittal_profile(binary_np)
+    sagittal_x, shift_x = _shift_sagittal_profile(sagittal_x)
 
-    dx, ddx, dx_scaled, ddx_scaled = compute_derivatives(sagittal_x)
+    dx, ddx, dx_scaled, ddx_scaled = _compute_derivatives(sagittal_x)
 
     fig, ax2 = plt.subplots(figsize=(6, 10))  # type: ignore
-    plot_sagittal_profile(ax2, sagittal_x, sagittal_y, dx_scaled, ddx_scaled)
+    _plot_sagittal_profile(ax2, sagittal_x, sagittal_y, dx_scaled, ddx_scaled)
 
     # Extrema
-    max_indices, min_indices = find_local_max_min(sagittal_x)
+    max_indices, min_indices = _find_local_max_min(sagittal_x)
     if DEBUG:
-        plot_sagittal_minmax(ax2, sagittal_x, sagittal_y, max_indices, min_indices)
+        _plot_sagittal_minmax(ax2, sagittal_x, sagittal_y, max_indices, min_indices)
 
     # Multi-scale “corners” (turning-angle + curvature under monotonic slope)
     extrema_set = set(map(int, np.concatenate([max_indices, min_indices])))
-    corner_idxs = find_monotonic_corners(
+    corner_idxs = _find_monotonic_corners(
         sagittal_x,
         scales=[9, 13, 17],  # try [11, 15, 19, 23] for broader bends
         polyorder=2,
@@ -522,10 +502,10 @@ def analyze_lateral(
         exclude_extrema=extrema_set,
     )
     if DEBUG:
-        plot_monotonic_corners(ax2, sagittal_x, sagittal_y, corner_idxs)
+        _plot_monotonic_corners(ax2, sagittal_x, sagittal_y, corner_idxs)
 
     # Compute/plot lateral landmarks
-    landmarks_np = find_lateral_landmarks(
+    landmarks_np = _find_lateral_landmarks(
         sagittal_x,
         sagittal_y,
         max_indices,
@@ -534,12 +514,12 @@ def analyze_lateral(
         int(shift_x),
         landmarks,
     )
-    plot_lateral_landmarks(ax2, landmarks_np, int(shift_x))
+    _plot_lateral_landmarks(ax2, landmarks_np, int(shift_x))
     logging.debug("Lateral Landmarks (x, y):")
     logging.debug(landmarks_np)
 
     if DEBUG:
-        plot_quarter_lines(ax2, sagittal_y)
+        _plot_quarter_lines(ax2, sagittal_y)
 
     ax2.set_ylim(1024, 0)
     ax2.set_xlim(-25, 512)
@@ -565,7 +545,7 @@ class LateralSearchMode(Enum):
     NEAREST = auto()  # ignore extrema/corners; nearest sagittal y
 
 
-def find_lateral_landmark(
+def _find_lateral_landmark(
     sagittal_x: NDArray[Any],
     sagittal_y: NDArray[Any],
     max_indices: NDArray[Any],
@@ -627,13 +607,7 @@ def find_lateral_landmark(
     return np.array([float(sagittal_x[idx]), float(sagittal_y[idx])], dtype=float)
 
 
-from typing import Any, Optional
-
-import numpy as np
-from numpy.typing import NDArray
-
-
-def find_corner_landmark_in_range(
+def _find_corner_landmark_in_range(
     sagittal_x: NDArray[Any],
     sagittal_y: NDArray[Any],
     corner_idxs: NDArray[Any],
@@ -736,7 +710,7 @@ def find_corner_landmark_in_range(
     return np.array([float(sagittal_x[chosen]), float(sagittal_y[chosen])], dtype=float)
 
 
-def find_lateral_landmark_in_range(
+def _find_lateral_landmark_in_range(
     sagittal_x: NDArray[Any],
     sagittal_y: NDArray[Any],
     idx_low: Optional[int] = None,
@@ -837,7 +811,7 @@ def find_lateral_landmark_in_range(
     return np.array([float(sagittal_x[idx]), float(sagittal_y[idx])], dtype=float)
 
 
-def find_lateral_landmark_minmax(
+def _find_lateral_landmark_minmax(
     sagittal_x: NDArray[Any],
     sagittal_y: NDArray[Any],
     idx_low: Optional[int] = None,
@@ -907,7 +881,7 @@ def find_lateral_landmark_minmax(
     return np.array([float(sagittal_x[idx]), float(sagittal_y[idx])], dtype=float)
 
 
-def find_lateral_landmarks(
+def _find_lateral_landmarks(
     sagittal_x: NDArray[Any],
     sagittal_y: NDArray[Any],
     max_indices: NDArray[Any],
@@ -938,7 +912,7 @@ def find_lateral_landmarks(
 
     # ---- Pogonion via frontal pair (14..16), pick MIN X ----
     if landmarks_frontal.shape[0] > 16:
-        pogonion_pt = find_lateral_landmark_in_range(
+        pogonion_pt = _find_lateral_landmark_in_range(
             sagittal_x=sagittal_x,
             sagittal_y=sagittal_y,
             pick=LateralSearchMode.MIN,
@@ -950,7 +924,7 @@ def find_lateral_landmarks(
 
     # ---- Subnasal via frontal pair (57..79), corner-or-max ----
     if landmarks_frontal.shape[0] > 79:
-        subnasal_pt = find_corner_landmark_in_range(
+        subnasal_pt = _find_corner_landmark_in_range(
             sagittal_x=sagittal_x,
             sagittal_y=sagittal_y,
             corner_idxs=corner_idxs,
@@ -978,7 +952,7 @@ def find_lateral_landmarks(
         search_lo = min(idx_upper_bound, idx_lower_bound)
         search_hi = max(idx_upper_bound, idx_lower_bound)
 
-        mentolabial_pt = find_lateral_landmark_minmax(
+        mentolabial_pt = _find_lateral_landmark_minmax(
             sagittal_x=sagittal_x,
             sagittal_y=sagittal_y,
             idx_low=search_lo,
@@ -1042,7 +1016,7 @@ def find_lateral_landmarks(
                 target_y_for_corner,
             )
 
-            ml_corner_pt = find_lateral_landmark(
+            ml_corner_pt = _find_lateral_landmark(
                 sagittal_x=sagittal_x,
                 sagittal_y=sagittal_y,
                 max_indices=max_indices,
@@ -1075,12 +1049,11 @@ def find_lateral_landmarks(
         (0, highest_frontal_idx, LateralSearchMode.NEAREST, None),  # Glabella
         (1, 51, LateralSearchMode.NEAREST, False),  # Nasion
         (2, 54, LateralSearchMode.MIN, None),  # Nasal tip
-        # (4, 14, LateralSearchMode.CORNER, False),  # optional: always try CORNER first
     ]
 
     for out_idx, frontal_idx, mode, y_forward in landmark_mapping:
         y_target = float(landmarks_frontal[frontal_idx][1])
-        pt = find_lateral_landmark(
+        pt = _find_lateral_landmark(
             sagittal_x=sagittal_x,
             sagittal_y=sagittal_y,
             max_indices=max_indices,
