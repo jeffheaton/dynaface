@@ -1,3 +1,6 @@
+# Load ONYX before anything else, to prevent DLL errors
+import onnxruntime as ort
+
 # Begin logging ASAP
 from jth_ui import app_const, utl_log
 

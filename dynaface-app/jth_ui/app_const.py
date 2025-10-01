@@ -1,5 +1,3 @@
-import datetime
-
 BUNDLE_ID = "com.test.testapp"
 APP_NAME = "App Name"
 APP_AUTHOR = "App Author"

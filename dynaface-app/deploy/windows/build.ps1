@@ -5,7 +5,7 @@ $InitialLocation = Get-Location
 
 # Constants
 $script:MODEL_BINARY_URL = "https://github.com/jeffheaton/dynaface-models/releases/download/v1/dynaface_models.zip"
-$script:DYNAFACE_WHL = "https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/library/dynaface-0.2.3-py3-none-any.whl"
+$script:DYNAFACE_WHL = "https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/library/dynaface-0.2.4-py3-none-any.whl"
 
 try {
     # ----------------------------
@@ -13,7 +13,7 @@ try {
     # ----------------------------
     Write-Host "** Updating version.py **"
     $versionFile = "..\..\version.py"
-    $currentVersion = "1.2.1"
+    $currentVersion = "1.2.2"
     $buildDate = (Get-Date -Format "yyyy-MM-ddTHH:mm:sszzz")
     $buildNum = $env:BUILD_NUMBER
     if (-not $buildNum) { $buildNum = 0 }
@@ -39,8 +39,8 @@ BUILD = $buildNum
     $venvPython = Join-Path (Get-Location) "venv/Scripts/python.exe"
     $venvPip = Join-Path (Get-Location) "venv/Scripts/pip.exe"
 
-    & $venvPip install -r requirements.txt --constraint ./deploy/windows/constraints.txt
-    & $venvPip install --constraint ./deploy/windows/constraints.txt --upgrade $script:DYNAFACE_WHL
+    & $venvPip install -r requirements.txt 
+    & $venvPip install --upgrade $script:DYNAFACE_WHL
 
     Set-Location deploy/windows
 
@@ -65,7 +65,9 @@ BUILD = $buildNum
     $ZIP_FILE = "$TEMP_ZIP.zip"
     Rename-Item -Path $TEMP_ZIP -NewName $ZIP_FILE
 
-    Invoke-WebRequest -Uri $script:MODEL_BINARY_URL -OutFile $ZIP_FILE
+    # Replaced Invoke-WebRequest with native curl.exe for speed/reliability
+    & curl.exe --fail --location --retry 5 --retry-delay 2 --connect-timeout 30 --max-time 600 -o $ZIP_FILE $script:MODEL_BINARY_URL
+
     Expand-Archive -Path $ZIP_FILE -DestinationPath $workingDataDir -Force
     Remove-Item -Force $ZIP_FILE
 
@@ -80,6 +82,8 @@ BUILD = $buildNum
     Copy-Item ./dynaface-windows.spec -Destination ./working
     Copy-Item ../../*.py -Destination ./working
     Copy-Item ../../jth_ui -Destination ./working/jth_ui -Recurse -Force
+    Copy-Item ./rthook_paths.py -Destination ./working
+    Copy-Item ./rthook_diag.py -Destination ./working
 
     # ----------------------------
     # Run PyInstaller
