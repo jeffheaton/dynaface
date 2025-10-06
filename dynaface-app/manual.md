@@ -2,11 +2,11 @@
 
 Dynaface is an application that measures key facial symmetry statistics using artificial intelligence. Dynaface can measure both individual images and recorded video. This program calculates the degree of Facial paralysis and asymmetry caused by Bell's Palsy, cranial tumor resection, or other factors. We released this program under the [MIT License](https://opensource.org/license/mit/); this program is for educational and research purposes only. [[likely include paper citation]]
 
-We have provided both Macintosh and Windows versions of Dynaface. The Macintosh version requires a Mac M1 or later. The Windows application requires Windows 11 or higher and can optionally utilize an NVIDIA CUDA-compatible GPU to speed processing. [[once this is released, provide links for downloading]]
+We have provided both Macintosh and Windows versions of Dynaface. The Macintosh version requires a Mac M1 or later. The Windows application requires Windows 11 or higher and can optionally utilize an NVIDIA CUDA-compatible GPU to speed processing.
 
 When you launch Dynaface, you will see the following.
 
-<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-splash.jpg" width="512">
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-splash.jpg?v=1" width="512">
 
 This window provides the following options:
 
@@ -21,7 +21,7 @@ Most likely you will begin by opening a video or image file.
 
 Whether you are analyzing a video or an image, you will see a window similar to what you see here.
 
-<img src="https://data.heatonresearch.com/images/facial/manual/1.0/app-controls.jpg" width="512">
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/app-controls.jpg?v=1" width="512">
 
 Let's review the controls and options that you see on this window. Some of these options will only be available when analyzing a video.
 
@@ -29,24 +29,27 @@ Let's review the controls and options that you see on this window. Some of these
 2. **Landmarks Toggle** - Toggle display of the 97 facial landmarks; AI detects these points and forms the foundation of all measurements done by this program.
 3. **Mesures Toggle** - Toggle display of any selected facial measures.
 4. **Chart Toggle** (video only) - Toggles a chart displaying the change of selected facial measures over time in a video.
-5. **Image Display Zoom** - Zooms the image/video area. You can also zoom in on this area by placing the mouse over it and using the mouse wheel or trackpad scroll gesture.
-6. **Chart Display Zoom** (video only) - Zooms the chart area. You can also zoom in on this area by placing the mouse over it and using the mouse wheel or trackpad scroll gesture.
-7. **Fit Image/Video and Graph** - Automatically expand or shrink the chart and video/image areas to fill the area defined by the chart/display slider.
-8. **Cut Left** (video only) - Remove all video frames before the playhead.
-9. **Cut Right** (video only) - Remove all video frames after the playhead.
-10. **Restore** (video only) - Undo any prior cuts to the video and restore the video to its original length.
-11. **Measurement Text Zoom** - Increase or decrease the text size used to label the measurements in the display area.
-12. **Select All Measures** - Enable all available measures.
-13. **Select No Measures** - Disable all available measures.
-14. **Display Area** - The area where the video or image is displayed.
-15. **Measure Toggle** - A hierarchical list of all measures and sub-measures allows each to be toggled.
-16. **Chart Display and Playhead** - Displays a chart of facial measures over time; the playhead, a red vertical line, represents the current location displayed.
-17. **Chart/Display Slider** - This allows the relative size of the display area and the chart adjustment by dragging.
-18. **Backward One Frame** (video only) - Move both playheads (chart and video slider) back by a frame.
-19. **Play** (video only) - Play the video from the current playhead position until the end of the video.
-20. **Forward One Frame** (video only) - Move both playheads (chart and video slider) forward by a frame.
-21. **Current and Total Frames** (video only) - Indicates the current frame location of the playheads.
-22. **Video Slider and Playhead** (video only) - Allows you to drag the current location of the playhead through the video.
+5. **Pose** - Inactive for videos; for images allows you to change between frontal and lateral if the program misclassifies the pose of the subject.
+6. **Image Display Zoom** - Zooms the image/video area. You can also zoom in on this area by placing the mouse over it and using the mouse wheel or trackpad scroll gesture.
+7. **Chart Display Zoom** (video only) - Zooms the chart area. You can also zoom in on this area by placing the mouse over it and using the mouse wheel or trackpad scroll gesture.
+8. **Fit Image/Video and Graph** - Automatically expand or shrink the chart and video/image areas to fill the area defined by the chart/display slider.
+9. **Cut Left** (video only) - Remove all video frames before the playhead.
+10. **Cut Right** (video only) - Remove all video frames after the playhead.
+11. **Restore** (video only) - Undo any prior cuts to the video and restore the video to its original length.
+12. **Measurement Text Zoom** - Increase or decrease the text size used to label the measurements in the display area.
+13. **Jump To** - For video, allows jump to max/min areas of the video.
+14. **Eval** - Performs several evaluation measures for video.
+15. **Select All Measures** - Enable all available measures.
+16. **Select No Measures** - Disable all available measures.
+17. **Display Area** - The area where the video or image is displayed.
+18. **Measure Toggle** - A hierarchical list of all measures and sub-measures allows each to be toggled.
+19. **Chart Display and Playhead** - Displays a chart of facial measures over time; the playhead, a red vertical line, represents the current location displayed.
+20. **Chart/Display Slider** - This allows the relative size of the display area and the chart adjustment by dragging.
+21. **Backward One Frame** (video only) - Move both playheads (chart and video slider) back by a frame.
+22. **Play** (video only) - Play the video from the current playhead position until the end of the video.
+23. **Forward One Frame** (video only) - Move both playheads (chart and video slider) forward by a frame.
+24. **Current and Total Frames** (video only) - Indicates the current frame location of the playheads.
+25. **Video Slider and Playhead** (video only) - Allows you to drag the current location of the playhead through the video.
 
 # Automatic Cropping and Scaling
 
@@ -56,15 +59,78 @@ Generally, video or images captured with a handheld mobile device should be suff
 
 <img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-crop.jpg" width="512">
 
-# Analyzing Images
+# Analyzing Frontal Images
 
 Dynaface allows you to open images of types: jpeg, png, and heif. To open an image, either select "Open" from the menu or drag an image file onto the application. Once the image is open, you can zoom and pan the image in the display area. The measures can be displayed or hidden. If you would like to utilize the individual measurements in a different application, you can use "Save As" to save the document as a CSV file. If you think you might have further analysis on an image, you can save the image as a Dynaface (.dyfc) document.
 
 When analyzing a single image, the window will appear as follows.
 
-<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-image.jpg" width="512">
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-image.jpg?v=1" width="512">
 
 You can select which messages you wish to see and notice that some measures have multiple sub-measures that you can turn on or off. You can copy and paste the measured image into other programs or save an image file with the measures.
+
+# Analyzing Lateral Images
+
+Dynafce can also measure lateral images.
+
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-lateral.jpg?v=1" width="512">
+
+The following underlying landmarks are detected:
+
+- **Soft Tissue Glabella:** The most prominent midline point on the forehead above the nasion. It marks the superior boundary of the nasofrontal region.
+
+- **Soft Tissue Nasion:** The deepest midline depression between the forehead and the nasal bridge. It serves as the junction where the glabellar contour transitions to the nasal dorsum.
+
+- **Nasal Tip:** The most anterior projecting point of the nose in the sagittal profile. It defines overall nasal projection and tip position.
+
+- **Subnasal Point:** The junction where the base of the nose meets the upper lip. It forms the inferior limit of the nose and the vertex of the nasolabial region.
+
+- **Mento Labial Point:** The deepest midline depression between the lower lip and the chin. It characterizes the curvature of the mentolabial fold.
+
+- **Soft Tissue Pogonion:** The most anterior midline point on the soft tissue chin. It represents the forward limit of the lower facial profile.
+
+- **Sagittal Line:** The vertical midline plane dividing the face into left and right halves in lateral view. All lateral (profile) measurements are projected and measured relative to this line.
+
+These landmarks can calculate the following measures:
+
+### 1. NFA – Nasofrontal Angle
+
+- **Definition:** Angle formed between the glabella–nasion line and the nasion–nasal tip line.
+- **Landmarks:** Soft Tissue Glabella, Soft Tissue Nasion, Nasal Tip
+- **Purpose:** Evaluates the depth of the nasion and the transition between the forehead and nose.
+- **Typical Range:** 115°–135°
+  - Larger angles → smoother, flatter nasal root
+  - Smaller angles → deeper nasion depression
+
+---
+
+### 2. NLA – Nasolabial Angle
+
+- **Definition:** Angle formed between the columella and the upper-lip line at the subnasale.
+- **Landmarks:** Columella Point, Subnasale, Labrale Superius
+- **Purpose:** Assesses nasal base rotation and the relationship between the nose and upper lip.
+- **Typical Range:** 90°–110°
+  - Larger angles → more upturned nasal base or retrusive upper lip
+  - Smaller angles → more downward-pointing nasal tip or protrusive upper lip
+
+---
+
+### 3. tip_proj – Nasal Tip Projection (Goode Method)
+
+- **Definition:** Ratio of nasal tip projection to nasal length.
+- **Formula:** tip_proj = AT / NT
+  - **AT:** perpendicular distance from nasal tip to a vertical line through the alar base
+  - **NT:** linear distance from nasion to nasal tip
+- **Purpose:** Quantifies how far the nasal tip extends from the face.
+- **Typical Ideal Ratio:** 0.55–0.60
+  - Higher ratio → more prominent nasal projection
+  - Lower ratio → flatter or shorter nasal contour
+
+# Automatic Pose Detection
+
+Dynaface uses AI to determine the pose; however, if the poses is not classified correctly, you can correct it with the "Pose" button.
+
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-mis-pose.jpg?v=1" width="512">
 
 # Analyzing Videos
 
