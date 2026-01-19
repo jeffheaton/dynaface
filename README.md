@@ -10,13 +10,10 @@ Dynaface is a computer application and Python library that measures facial symme
 - [Users Guide](https://github.com/jeffheaton/dynaface/blob/main/dynaface-app/manual.md)
 - [Dynaface Python Library](https://github.com/jeffheaton/dynaface/tree/main/dynaface-lib)
 
-# Artificial Intelligence References
+# To Cite Dynaface
 
-- Schroff, F., Kalenichenko, D., & Philbin, J. (2015). [Facenet: A unified embedding for face recognition and clustering.](https://www.cv-foundation.org/openaccess/content_cvpr_2015/html/Schroff_FaceNet_A_Unified_2015_CVPR_paper.html) _In Proceedings of the IEEE conference on computer vision and pattern recognition_ (pp. 815-823).
-
-- Prados-Torreblanca, Andrés, José M. Buenaposada, and Luis Baumela. "[Shape preserving facial landmarks with graph attention networks.](https://arxiv.org/abs/2210.07233)" _arXiv preprint arXiv:2210.07233_ (2022).
-
-- Wu, Wayne, et al. "[Look at boundary: A boundary-aware face alignment algorithm](https://openaccess.thecvf.com/content_cvpr_2018/papers/Wu_Look_at_Boundary_CVPR_2018_paper.pdf)." _Proceedings of the IEEE conference on computer vision and pattern recognition._ 2018.
+- Renne, A., Heaton, J., Derakhshan, A., Nellis, J. C., Desai, S. C., & Boahene, K. D. (2025). [Use of dynamic, automated facial analysis in quantifying oral-ocular synkinesis](https://doi.org/10.1177/26893614251395737). Facial Plastic Surgery & Aesthetic Medicine.
+- [Dynaface BibTex](CITATION.md)
 
 # License
 
