@@ -22,9 +22,14 @@ class AboutTab(QWidget):
 Produced in collaboration with: <br> 
 Jeffrey Heaton PhD; Angela Renne BS; Kofi Boahene MD <br>
 Johns Hopkins Medicine (Renne, Boahene), Washington University in St. Louis (Heaton)
-
 <br>
-This program is for education and research purposes only.
+This program is for education and research purposes only, published with:<br>
+<br>
+Renne, A., Heaton, J., Derakhshan, A., Nellis, J. C., Desai, S. C., & Boahene, K. D. (2025). <br>
+<a href="https://doi.org/10.1177/26893614251395737">Use of dynamic, automated facial analysis in quantifying oral-ocular synkinesis</a>. <br>
+ Facial Plastic Surgery & Aesthetic Medicine.
+
+
 <hr>
 The source code for this program is available at: <a href="https://github.com/jeffheaton/dynaface">Dynaface GitHub repository</a>
 <hr>
