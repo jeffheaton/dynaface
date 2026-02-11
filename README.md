@@ -15,6 +15,10 @@ Dynaface is a computer application and Python library that measures facial symme
 - Renne, A., Heaton, J., Derakhshan, A., Nellis, J. C., Desai, S. C., & Boahene, K. D. (2025). [Use of dynamic, automated facial analysis in quantifying oral-ocular synkinesis](https://doi.org/10.1177/26893614251395737). Facial Plastic Surgery & Aesthetic Medicine.
 - [Dynaface BibTex](https://github.com/jeffheaton/dynaface/blob/main/CITATION.bib)
 
+# Other works
+
+- Renne, A., Heaton, J., & Boahene, K. D. O. (2026). Associations of AI-based facial metrics with patient-reported outcomes in idiopathic facial paralysis. Laryngoscope. Advance online publication. [https://doi.org/10.1002/lary.70417](https://doi.org/10.1002/lary.70417)
+
 # License
 
 This application and Python library are licensed under the [Apache License Version 2.0](https://github.com/jeffheaton/dynaface/blob/main/LICENSE.txt).
