@@ -13,7 +13,6 @@ import numpy as np
 from matplotlib.axes import Axes
 from numpy.typing import NDArray
 from PIL import Image
-from rembg import remove  # type: ignore
 from scipy.signal import find_peaks, savgol_filter  # <-- Savitzky–Golay
 
 from dynaface import models, util
@@ -59,6 +58,7 @@ def _process_image(
     """
     Remove background, threshold, morph-close, invert.
     """
+    from rembg import remove  # type: ignore  # lazy import — pymatting metadata unavailable at module load in PyInstaller
     output_image: Image.Image = remove(input_image, session=models.rembg_session)  # type: ignore
     grayscale: Image.Image = output_image.convert("L")
 

@@ -2,6 +2,7 @@
 import os
 import platform
 import sys
+from PyInstaller.utils.hooks import copy_metadata
 
 version = os.getenv('version')
 
@@ -20,6 +21,8 @@ block_cipher = None
 added_files = [
     ("data/", "data"),  # existing files you're adding
     ("dynaface_doc_icon.icns", "."),  # path to your icon file
+    *copy_metadata("pymatting"),  # rembg/bg.py calls importlib.metadata.version("pymatting")
+    *copy_metadata("rembg"),
 ]
 
 a = Analysis(

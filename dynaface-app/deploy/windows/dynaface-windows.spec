@@ -8,6 +8,7 @@ from PyInstaller.utils.hooks import (
     collect_all,
     collect_dynamic_libs,
     collect_data_files,
+    copy_metadata,
 )
 
 # version from env (optional)
@@ -46,7 +47,7 @@ extra_hiddenimports = [
 ]
 
 # Final aggregates
-datas = added_datas + cv2_datas + pyqt_datas
+datas = added_datas + cv2_datas + pyqt_datas + copy_metadata("pymatting") + copy_metadata("rembg")
 binaries = cv2_binaries + pyqt_binaries + ort_bins
 hiddenimports = (cv2_hidden or []) + extra_hiddenimports
 
