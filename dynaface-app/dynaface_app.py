@@ -37,7 +37,6 @@ import sys
 logger = logging.getLogger(__name__)
 
 import jth_ui.utl_settings as utl_settings
-import torch
 from dynaface.const import DEFAULT_TILT_THRESHOLD, STD_PUPIL_DIST
 from dynaface_window import DynafaceWindow
 from jth_ui import app_const, utl_log
@@ -68,6 +67,7 @@ class AppDynaface(AppJTH):
     def __init__(self):
         try:
             super().__init__()
+            self.models_ready = False
             self.dynamic_adjust = DEFAULT_DYNAMIC_ADJUST
             self.data_smoothing = DEFAULT_SMOOTH
             self.tilt_threshold = DEFAULT_TILT_THRESHOLD
@@ -78,18 +78,19 @@ class AppDynaface(AppJTH):
             main_window = DynafaceWindow(app=self, app_name=app_const.APP_NAME)
             self.show_main_window(main_window)
 
-            self.load_dynaface_settings()
-
-            logging.info(f"Using device: {self.device}")
-            v = get_library_version("torch")
-            logging.info(f"Torch version: {v}")
-            v = get_library_version("facenet-pytorch")
-            logging.info(f"Facenet-pytorch version: {v}")
+            # Defer heavy initialization until the event loop is running so the
+            # window can appear immediately.
+            QTimer.singleShot(0, self.load_dynaface_settings)
 
         except Exception as e:
             logger.error("Error running app", exc_info=True)
 
     def load_dynaface_settings(self):
+        import torch
+        import dynaface.facial
+        import dynaface.models
+        import dynaface.config
+
         # Set logging level
         level = utl_settings.get_str(
             self.settings, key=SETTING_LOG_LEVEL, default="INFO"
@@ -138,9 +139,15 @@ class AppDynaface(AppJTH):
         else:
             self.device = "cpu"
 
-        #
+        logging.info(f"Using device: {self.device}")
+        v = get_library_version("torch")
+        logging.info(f"Torch version: {v}")
+        v = get_library_version("facenet-pytorch")
+        logging.info(f"Facenet-pytorch version: {v}")
 
-        # Use accelerator, if requested
+        # Initialize AI models on the main thread. PyTorch's MPS backend requires
+        # that models are created and used from the same thread, so a background
+        # thread is not safe here.
         try:
             dynaface.models.init_models(model_path=self.DATA_DIR, device=self.device)
         except Exception as e:
@@ -149,9 +156,12 @@ class AppDynaface(AppJTH):
             )
             if self.device != "cpu":
                 logger.info("Trying CPU as AI device.")
-            self.device = "cpu"
-            self.settings[SETTING_ACC] = "cpu"
-            dynaface.models.init_models(model_path=self.DATA_DIR, device=self.device)
+                self.device = "cpu"
+                self.settings[SETTING_ACC] = "cpu"
+                dynaface.models.init_models(model_path=self.DATA_DIR, device=self.device)
+
+        self.models_ready = True
+        logger.info("AI models ready.")
 
     def shutdown(self):
         try:

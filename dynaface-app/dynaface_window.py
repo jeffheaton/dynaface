@@ -8,7 +8,6 @@ from jth_ui.window_jth import MainWindowJTH
 from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtWidgets import QMenu, QMenuBar, QTabWidget
-from tab_eval import TabEval
 from jth_ui import app_const, utl_env, utl_log
 
 logger = logging.getLogger(__name__)
@@ -190,7 +189,7 @@ class DynafaceWindow(MainWindowJTH):
             if self._tab_widget.count() == 0:
                 self.add_tab(tab_splash.SplashTab(self), "Welcome to Dynaface")
 
-            if self.app.file_open_request:
+            if self.app.file_open_request and self.app.models_ready:
                 filename = self.app.file_open_request
                 self.app.file_open_request = None
                 self.open_file(filename)
@@ -212,6 +211,8 @@ class DynafaceWindow(MainWindowJTH):
 
     def show_eval(self):
         try:
+            from tab_eval import TabEval
+
             if not self.is_tab_open("Evaluation"):
                 self._eval = TabEval(self)
                 self.add_tab(self._eval, "Evaluation")

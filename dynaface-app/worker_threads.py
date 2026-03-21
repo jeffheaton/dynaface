@@ -22,6 +22,7 @@ class WorkerExport(QThread):
 
     def __init__(self, dlg, output_file):
         super().__init__()
+        self.setStackSize(16 * 1024 * 1024)  # 16 MB — same OpenBLAS requirement
         self._dialog = dlg
         self._output_file = output_file
 
@@ -109,6 +110,9 @@ class WorkerLoad(QThread):
 
     def __init__(self, target):
         super().__init__()
+        # OpenBLAS (used by numpy linalg inside SPIGA) needs a large stack.
+        # The default QThread stack (~512KB) overflows during dgetrf_parallel.
+        self.setStackSize(16 * 1024 * 1024)  # 16 MB
         self._target = target
         self._total = self._target.frame_count
         self.running = True

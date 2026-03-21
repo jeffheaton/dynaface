@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 import numpy as np
-import rembg  # type: ignore
 import requests
 import torch
 from dynaface.spiga.inference.config import ModelConfig
@@ -15,7 +14,6 @@ from dynaface.spiga.inference.framework import SPIGAFramework
 from dynaface.util import VERIFY_CERTS
 from facenet_pytorch import MTCNN  # type: ignore
 from facenet_pytorch.models.mtcnn import ONet, PNet, RNet  # type: ignore
-from rembg.sessions.u2net import U2netSession  # type: ignore
 from torch import nn
 from torch.nn.functional import interpolate  # type: ignore
 
@@ -36,7 +34,7 @@ _model_path: Optional[str] = None
 _device: str = "?"  # Default to CPU
 mtcnn_model: Optional[Union[MTCNN, "MTCNN2"]] = None
 spiga_model: Optional[SPIGAFramework] = None
-rembg_session: Optional[U2netSession] = None
+rembg_session: Optional[Any] = None
 
 SPIGA_MODEL = "wflw"
 
@@ -120,10 +118,14 @@ def _init_spiga() -> None:
     global spiga_model
     config = ModelConfig(dataset_name=SPIGA_MODEL, load_model_url=False)
     config.model_weights_path = _model_path
-    spiga_model = SPIGAFramework(config, device=torch.device(_device))
+    # MPS cannot be called from background threads (same issue as MTCNN above)
+    device = "cpu" if (_device == "mps" and FIX_MPS_ISSUE) else _device
+    spiga_model = SPIGAFramework(config, device=torch.device(device))
 
 
 def _init_rembg() -> None:
+    import rembg  # type: ignore
+
     global rembg_session
     if _model_path is None:
         raise ValueError("Model path not set. Call init_models() first.")
