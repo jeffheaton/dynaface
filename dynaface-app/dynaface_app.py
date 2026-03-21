@@ -86,6 +86,12 @@ class AppDynaface(AppJTH):
             logger.error("Error running app", exc_info=True)
 
     def load_dynaface_settings(self):
+        try:
+            self._load_dynaface_settings_impl()
+        except Exception as e:
+            logger.error("Error in load_dynaface_settings", exc_info=True)
+
+    def _load_dynaface_settings_impl(self):
         import torch
         import dynaface.facial
         import dynaface.models
