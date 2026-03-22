@@ -91,3 +91,8 @@ python ./examples/process_media.py --crop /Users/jeff/data/facial/samples/tracy_
 
 python ./examples/process_media.py --crop /Users/jeff/data/facial/samples/tracy-blink-single.mp4
 ```
+
+# To Cite Dynaface
+
+- Renne, A., Heaton, J., & Boahene, K. D. O. (2026). Associations of AI-based facial metrics with patient-reported outcomes in idiopathic facial paralysis. _Laryngoscope_. Advance online publication. https://doi.org/10.1002/lary.70417
+- BibTeX: https://github.com/jeffheaton/dynaface/blob/main/CITATION.bib
