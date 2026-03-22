@@ -22,8 +22,13 @@ cd ../..
 rm -rf ./venv || true
 python3.11 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt --constraint deploy/macos/constraints.txt
-pip install --upgrade https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/library/dynaface-0.2.4-py3-none-any.whl
+if [[ "$arch" == "x86_64" ]]; then
+    CONSTRAINT_FLAG="--constraint deploy/macos/constraints.txt"
+else
+    CONSTRAINT_FLAG=""
+fi
+pip install -r requirements.txt $CONSTRAINT_FLAG
+pip install --upgrade $CONSTRAINT_FLAG https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/library/dynaface-0.2.4-py3-none-any.whl
 cd deploy/macos
 
 # Build it
