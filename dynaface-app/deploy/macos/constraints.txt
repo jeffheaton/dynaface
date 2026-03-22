@@ -1,1 +1,9 @@
 pillow-heif==0.21.0
+
+# rembg -> pymatting -> numba -> llvmlite
+# llvmlite 0.46+ has no pre-built wheel for macosx x86_64 Python 3.11 and
+# fails to build from source (setuptools dropped 'dry_run' from spawn()).
+# Capping numba<0.63 forces llvmlite 0.45.x which ships pre-built wheels for
+# both arm64 and x86_64. pymatting requires numba>=0.60.0, so 0.62.x is fine.
+numba<0.63
+llvmlite<0.46
