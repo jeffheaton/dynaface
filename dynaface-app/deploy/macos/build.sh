@@ -28,7 +28,7 @@ else
     CONSTRAINT_FLAG=""
 fi
 pip install -r requirements.txt $CONSTRAINT_FLAG
-pip install --upgrade $CONSTRAINT_FLAG https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/library/dynaface-0.2.4-py3-none-any.whl
+pip install --upgrade $CONSTRAINT_FLAG https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/library/dynaface-0.3.0-py3-none-any.whl
 cd deploy/macos
 
 # Build it
