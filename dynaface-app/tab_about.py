@@ -25,9 +25,11 @@ Johns Hopkins Medicine (Renne, Boahene), Washington University in St. Louis (Hea
 <br>
 This program is for education and research purposes only, published with:<br>
 <br>
-Renne, A., Heaton, J., Derakhshan, A., Nellis, J. C., Desai, S. C., & Boahene, K. D. (2025). <br>
-<a href="https://doi.org/10.1177/26893614251395737">Use of dynamic, automated facial analysis in quantifying oral-ocular synkinesis</a>. <br>
- Facial Plastic Surgery & Aesthetic Medicine.
+Renne, A., Heaton, J., & Boahene, K. D. O. (2026). <br>
+<a href="https://doi.org/10.1002/lary.70417">
+Associations of AI-based facial metrics with patient-reported outcomes in idiopathic facial paralysis
+</a>. <br>
+<i>Laryngoscope</i>. https://doi.org/10.1002/lary.70417
 
 
 <hr>

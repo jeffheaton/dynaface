@@ -18,6 +18,7 @@ from dynaface.measures_frontal import (
     AnalyzeOuterEyeCorners,
     AnalyzePosition,
     AnalyzePose,
+    AnalyzeLandmarks,
 )
 from dynaface.measures_lateral import AnalyzeLateral
 
@@ -45,4 +46,5 @@ def all_measures() -> List["MeasureBase"]:
         AnalyzePosition(),
         AnalyzePose(),
         AnalyzeSkinTone(),
+        AnalyzeLandmarks(),
     ]

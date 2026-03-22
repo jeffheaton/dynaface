@@ -10,14 +10,16 @@ Dynaface is a computer application and Python library that measures facial symme
 - [Users Guide](https://github.com/jeffheaton/dynaface/blob/main/dynaface-app/manual.md)
 - [Dynaface Python Library](https://github.com/jeffheaton/dynaface/tree/main/dynaface-lib)
 
-# To Cite Dynaface
+## To Cite Dynaface
 
-- Renne, A., Heaton, J., Derakhshan, A., Nellis, J. C., Desai, S. C., & Boahene, K. D. (2025). [Use of dynamic, automated facial analysis in quantifying oral-ocular synkinesis](https://doi.org/10.1177/26893614251395737). Facial Plastic Surgery & Aesthetic Medicine.
-- [Dynaface BibTex](https://github.com/jeffheaton/dynaface/blob/main/CITATION.bib)
+- Renne, A., Heaton, J., & Boahene, K. D. O. (2026). Associations of AI-based facial metrics with patient-reported outcomes in idiopathic facial paralysis. _Laryngoscope_. Advance online publication. https://doi.org/10.1002/lary.70417
+- BibTeX: https://github.com/jeffheaton/dynaface/blob/main/CITATION.bib
 
-# Other works
+## Other Works
 
-- Renne, A., Heaton, J., & Boahene, K. D. O. (2026). Associations of AI-based facial metrics with patient-reported outcomes in idiopathic facial paralysis. Laryngoscope. Advance online publication. [https://doi.org/10.1002/lary.70417](https://doi.org/10.1002/lary.70417)
+- Renne, A., Heaton, J., Derakhshan, A., Nellis, J. C., Desai, S. C., & Boahene, K. D. (2025). Use of dynamic, automated facial analysis in quantifying oral-ocular synkinesis. _Facial Plastic Surgery & Aesthetic Medicine_. https://doi.org/10.1177/26893614251395737
+
+- Berges, A. J., Renne, A., Heaton, J., Leung, D. G., & Boahene, K. D. (2025). Facial weakness in facioscapulohumeral muscular dystrophy: Objective and patient-reported measures to guide reconstructive interventions. _Facial Plastic Surgery & Aesthetic Medicine_, Article 26893614251407675. https://doi.org/10.1177/26893614251407675
 
 # License
 

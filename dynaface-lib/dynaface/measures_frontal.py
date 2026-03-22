@@ -805,3 +805,42 @@ class AnalyzeOuterEyeCorners(MeasureBase):
             face.landmarks[60], face.landmarks[72], render=(render and render1), dir="r"
         )
         return filter_measurements({"oe": d1}, self.items)
+
+
+class AnalyzeLandmarks(MeasureBase):
+    """Output all facial landmark (x, y) coordinates as named CSV columns."""
+
+    # Number of SPIGA wflw landmarks
+    NUM_LANDMARKS = 97
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.enabled = True
+        self.items = [
+            item
+            for i in range(1, self.NUM_LANDMARKS + 1)
+            for item in (
+                MeasureItem(f"landmark-{i}-x"),
+                MeasureItem(f"landmark-{i}-y"),
+            )
+        ]
+        self.is_frontal = True
+        self.sync_items()
+
+    def abbrev(self) -> str:
+        return "Landmarks"
+
+    def calc(self, face: Any, render: bool = True) -> Dict[str, Any]:
+        if render:
+            # Draw black outline (radius 3) then white fill (radius 2) so dots
+            # are visible against any background colour.
+            face.draw_landmarks(size=1.0, color=(0, 0, 0))
+            face.draw_landmarks(size=0.5, color=(255, 255, 255))
+
+        data: Dict[str, Any] = {}
+        for i, (x, y) in enumerate(face.landmarks):
+            n = i + 1  # 1-indexed
+            data[f"landmark-{n}-x"] = x
+            data[f"landmark-{n}-y"] = y
+
+        return filter_measurements(data, self.items)
