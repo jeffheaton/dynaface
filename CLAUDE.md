@@ -9,6 +9,10 @@ Dynaface is a facial analysis tool for measuring facial symmetry and movement, p
 - **`dynaface-lib/`** — Python library (PyPI package `dynaface`)
 - **`dynaface-app/`** — Desktop GUI application (PyQt6)
 
+## Important: Always Use the venv
+
+Both components use Python virtual environments. **Never install packages or run tests using the system/base Python.** Always activate the venv first. If `venv/` doesn't exist in the component directory, create it before proceeding.
+
 ## Commands
 
 ### dynaface-lib (Python Library)

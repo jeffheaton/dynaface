@@ -23,15 +23,11 @@ jobs:
 
       - name: Install dependencies
         working-directory: dynaface-lib
-        run: |
-          pip install -e .
-          pip install --upgrade setuptools
-          pip install pytest pytest-cov
+        run: pip install -e ".[test,lint]"
 
       - name: Static code analysis
         working-directory: dynaface-lib
         run: |
-          pip install flake8 mypy bandit black isort
 
           echo "Running flake8..."
           flake8 dynaface --config $GITHUB_WORKSPACE/.flake8 --output-file=flake8-report.txt || true
