@@ -1,0 +1,134 @@
+name: Build Library
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build tools
+        run: pip install build wheel
+
+      - name: Install dependencies
+        working-directory: dynaface-lib
+        run: |
+          pip install -e .
+          pip install --upgrade setuptools
+          pip install pytest pytest-cov
+
+      - name: Static code analysis
+        working-directory: dynaface-lib
+        run: |
+          pip install flake8 mypy bandit black isort
+
+          echo "Running flake8..."
+          flake8 dynaface --config $GITHUB_WORKSPACE/.flake8 --output-file=flake8-report.txt || true
+
+          echo "Running mypy..."
+          mypy --install-types --non-interactive || true
+          mypy dynaface --show-error-codes --no-color-output --no-error-summary > mypy-report.txt || true
+
+          echo "Running bandit..."
+          bandit -r dynaface -f txt -o bandit-report.txt || true
+
+          echo "Checking formatting with black..."
+          black --check dynaface > black-report.txt 2>&1 || true
+
+          echo "Checking imports with isort..."
+          isort dynaface --check-only > isort-report.txt || true
+
+      - name: Upload static analysis reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-analysis-reports
+          path: dynaface-lib/*.txt
+          if-no-files-found: ignore
+
+      - name: Run tests
+        working-directory: dynaface-lib
+        run: |
+          python3.11 -m pytest tests \
+            --junitxml=unit_test_results.xml \
+            --cov=. \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html
+
+      - name: Check coverage thresholds
+        working-directory: dynaface-lib
+        continue-on-error: true
+        run: |
+          python3.11 -m pytest tests --cov=. --cov-fail-under=60 -q --no-header 2>&1 | tail -5
+
+      - name: Publish test results
+        if: always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: dynaface-lib/unit_test_results.xml
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            dynaface-lib/coverage.xml
+            dynaface-lib/htmlcov/
+          if-no-files-found: ignore
+
+      - name: Generate version file
+        working-directory: dynaface-lib
+        run: |
+          VERSION=$(python3.11 -c "import configparser; c = configparser.ConfigParser(); c.read('setup.cfg'); print(c['metadata']['version'])")
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%S%z")
+          BUILD="${{ github.run_number }}"
+
+          cat <<EOF > dynaface/version.py
+          VERSION = "$VERSION"
+          BUILD_DATE = "$BUILD_DATE"
+          BUILD = $BUILD
+          EOF
+
+          echo "Generated dynaface/version.py:"
+          cat dynaface/version.py
+
+      - name: Build wheel
+        working-directory: dynaface-lib
+        run: |
+          rm -rf dist/*
+          python3.11 -m build --wheel
+
+      - name: Validate with twine
+        working-directory: dynaface-lib
+        run: |
+          pip install --upgrade twine
+          twine check dist/*
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynaface-wheel
+          path: dynaface-lib/dist/*.whl
+
+      - name: Upload to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+        run: |
+          cd dynaface-lib/dist
+          aws s3 cp *.whl s3://data.heatonresearch.com/library/ --acl public-read
+
+      - name: Clean up build artifacts
+        if: always()
+        working-directory: dynaface-lib
+        run: rm -rf build dist dynaface.egg-info
