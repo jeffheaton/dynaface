@@ -3,15 +3,18 @@ name: Build Library
 on:
   workflow_dispatch:
 
+permissions:
+  checks: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -48,7 +51,7 @@ jobs:
 
       - name: Upload static analysis reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: static-analysis-reports
           path: dynaface-lib/*.txt
@@ -71,13 +74,13 @@ jobs:
 
       - name: Publish test results
         if: always()
-        uses: mikepenz/action-junit-report@v4
+        uses: mikepenz/action-junit-report@v6
         with:
           report_paths: dynaface-lib/unit_test_results.xml
 
       - name: Upload coverage reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-reports
           path: |
@@ -114,7 +117,7 @@ jobs:
           twine check dist/*
 
       - name: Upload wheel artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dynaface-wheel
           path: dynaface-lib/dist/*.whl
