@@ -1,3 +1,9 @@
+- Is Dynaface a registered medical device?
+
+  Dynaface is not a registered medical device and is not intended to diagnose, treat, cure, prevent, or monitor any disease or medical condition. Dynaface provides informational facial symmetry measurements only.
+
+  AI-based measurements may contain errors and can be affected by image quality, lighting, pose, facial expression, camera angle, and landmark detection accuracy. Always independently verify results before relying on them for clinical, research, or decision-making purposes.
+
 - When analyzing videos or images, are any files uploaded to an external server, cloud
   platform, or third-party data center?
 
