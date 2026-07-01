@@ -1,3 +1,7 @@
+- What is Dynaface?
+
+  Dynaface is a research tool, available as both a computer application and Python library, for measuring facial symmetry and facial movement from still images and videos using AI-based facial landmark detection. It has been used in peer-reviewed medical research to quantify oral-ocular synkinesis and to study how AI-derived facial metrics relate to patient-reported outcomes in idiopathic facial paralysis. Dynaface is intended to support objective measurement, data export, and research analysis, particularly where facial symmetry, movement, and asymmetry are being studied.
+
 - Is Dynaface a registered medical device?
 
   Dynaface is not a registered medical device and is not intended to diagnose, treat, cure, prevent, or monitor any disease or medical condition. Dynaface provides informational facial symmetry measurements only.
