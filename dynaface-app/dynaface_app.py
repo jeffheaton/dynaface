@@ -92,7 +92,6 @@ class AppDynaface(AppJTH):
             logger.error("Error in load_dynaface_settings", exc_info=True)
 
     def _load_dynaface_settings_impl(self):
-        import torch
         import dynaface.facial
         import dynaface.models
         import dynaface.config
@@ -133,27 +132,18 @@ class AppDynaface(AppJTH):
         acc = utl_settings.get_bool(self.settings, key=SETTING_ACC, default=True)
 
         if acc:
-            # Detect CUDA, MPS, or failing that, CPU
-            has_mps = False
-            if torch.backends.mps.is_available():
-                if torch.backends.mps.is_built():
-                    has_mps = True
-            self.device = (
-                "mps" if has_mps else "cuda" if torch.cuda.is_available() else "cpu"
-            )
-            logger.info(f"PyTorch Device: {self.device}")
+            # Detect CUDA, MPS (CoreML), or failing that, CPU
+            self.device = dynaface.models.detect_device()
+            logger.info(f"ONNX Runtime Device: {self.device}")
         else:
             self.device = "cpu"
 
         logging.info(f"Using device: {self.device}")
-        v = get_library_version("torch")
-        logging.info(f"Torch version: {v}")
-        v = get_library_version("facenet-pytorch")
-        logging.info(f"Facenet-pytorch version: {v}")
+        v = get_library_version("onnxruntime")
+        logging.info(f"ONNX Runtime version: {v}")
 
-        # Initialize AI models on the main thread. PyTorch's MPS backend requires
-        # that models are created and used from the same thread, so a background
-        # thread is not safe here.
+        # Initialize AI models on the main thread, kept in step with the
+        # deferred QTimer.singleShot(0, ...) startup used to load them.
         try:
             dynaface.models.init_models(model_path=self.DATA_DIR, device=self.device)
         except Exception as e:

@@ -15,7 +15,7 @@ if [ -z "${arch}" ]; then
 fi
 
 # Constants
-MODEL_BINARY_URL="https://github.com/jeffheaton/dynaface-models/releases/download/v1/dynaface_models.zip"
+MODEL_BINARY_URL="https://data.heatonresearch.com/dynaface/model/2/dynaface_models.zip"
 
 # Environment
 cd ../..
@@ -28,7 +28,7 @@ else
     CONSTRAINT_FLAG=""
 fi
 pip install -r requirements.txt $CONSTRAINT_FLAG
-pip install --upgrade $CONSTRAINT_FLAG https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/library/dynaface-0.3.0-py3-none-any.whl
+pip install --upgrade $CONSTRAINT_FLAG https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/library/dynaface-2.0.0-py3-none-any.whl
 cd deploy/macos
 
 # Build it
@@ -59,20 +59,6 @@ cp ../../*.py ./working
 cp -r ../../jth_ui ./working/jth_ui
 
 cd ./working
-echo "** Force PyTorch Upgrade **"
-
-if [[ "$arch" == "x86_64" ]]; then
-    echo "Detected MacOS Intel (x86_64)"
-
-    pip install /Users/jeff/output/wheel/torch-2.4.0a0+git1cd4199-cp311-cp311-macosx_14_0_x86_64.whl
-    pip install /Users/jeff/output/wheel/torchvision-0.9.0a0+761d09f-cp311-cp311-macosx_14_0_x86_64.whl
-elif [[ "$arch" == "arm64" ]]; then
-    echo "Detected MacOS ARM (arm64)"
-    pip install /Users/jeff/output/wheel/torch-2.4.0a0+git1cd4199-cp311-cp311-macosx_14_0_arm64.whl
-    pip install /Users/jeff/output/wheel/torchvision-0.9.0a0+761d09f-cp311-cp311-macosx_14_0_arm64.whl
-else
-    echo "Using existing PyTorch install"
-fi
 
 echo "** Pyinstaller **"
 pyinstaller --clean --noconfirm --distpath dist --workpath build dynaface-macos.spec
@@ -80,11 +66,6 @@ pyinstaller --clean --noconfirm --distpath dist --workpath build dynaface-macos.
 echo "** Sign Deep **"
 cp $provisionprofile dist/Dynaface-${arch}.app/Contents/embedded.provisionprofile
 codesign --force --timestamp --deep --verbose --options runtime --sign "${app_certificate}" dist/Dynaface-${arch}.app
-
-echo "** Sign nested **"
-codesign --force --timestamp --verbose --options runtime --entitlements entitlements-nest.plist --sign "${app_certificate}" dist/Dynaface-${arch}.app/Contents/Frameworks/torch/bin/protoc
-codesign --force --timestamp --verbose --options runtime --entitlements entitlements-nest.plist --sign "${app_certificate}" dist/Dynaface-${arch}.app/Contents/Frameworks/torch/bin/protoc-3.13.0.0
-codesign --force --timestamp --verbose --options runtime --entitlements entitlements-nest.plist --sign "${app_certificate}" dist/Dynaface-${arch}.app/Contents/Frameworks/torch/bin/torch_shm_manager
 
 echo "** Sign App **"
 codesign --force --timestamp --verbose --options runtime --entitlements entitlements.plist --sign "${app_certificate}" dist/Dynaface-${arch}.app/Contents/MacOS/dynaface

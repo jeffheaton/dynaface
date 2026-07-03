@@ -56,16 +56,20 @@ def _process_image(
     input_image: Image.Image,
 ) -> Tuple[Image.Image, NDArray[Any], int, int]:
     """
-    Remove background, threshold, morph-close, invert.
+    Remove background, threshold the foreground mask, morph-close, invert.
     """
-    from rembg import remove  # type: ignore  # lazy import — pymatting metadata unavailable at module load in PyInstaller
-    output_image: Image.Image = remove(input_image, session=models.rembg_session)  # type: ignore
-    grayscale: Image.Image = output_image.convert("L")
+    if models.onnx_model is None:
+        raise ValueError("Models not initialized, please call init_models()")
 
-    # Binary
+    image_bgr: NDArray[Any] = cv2.cvtColor(np.array(input_image), cv2.COLOR_RGB2BGR)
+    rgba: NDArray[Any] = models.onnx_model.remove_background(image_bgr)
+    alpha: NDArray[Any] = rgba[:, :, 3]
+
+    # Binary: alpha is the foreground (face) saliency mask.
     binary_threshold: int = 32
-    binary: Image.Image = grayscale.point(lambda p: 255 if p > binary_threshold else 0)  # type: ignore
-    binary_np: NDArray[Any] = np.array(binary)
+    binary_np: NDArray[Any] = np.where(alpha > binary_threshold, 255, 0).astype(
+        np.uint8
+    )
 
     # Morph close + invert
     kernel: NDArray[Any] = np.ones((10, 10), np.uint8)

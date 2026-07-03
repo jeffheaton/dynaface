@@ -4,8 +4,8 @@ $ErrorActionPreference = "Stop"
 $InitialLocation = Get-Location
 
 # Constants
-$script:MODEL_BINARY_URL = "https://github.com/jeffheaton/dynaface-models/releases/download/v1/dynaface_models.zip"
-$script:DYNAFACE_WHL = "https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/library/dynaface-0.3.0-py3-none-any.whl"
+$script:MODEL_BINARY_URL = "https://data.heatonresearch.com/dynaface/model/2/dynaface_models.zip"
+$script:DYNAFACE_WHL = "https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/library/dynaface-2.0.0-py3-none-any.whl"
 
 try {
     # ----------------------------
@@ -13,7 +13,7 @@ try {
     # ----------------------------
     Write-Host "** Updating version.py **"
     $versionFile = "..\..\version.py"
-    $currentVersion = "1.3.0"
+    $currentVersion = "2.0.0"
     $buildDate = (Get-Date -Format "yyyy-MM-ddTHH:mm:sszzz")
     $buildNum = $env:BUILD_NUMBER
     if (-not $buildNum) { $buildNum = 0 }
@@ -45,7 +45,7 @@ BUILD = $buildNum
 
     # onnxruntime loads onnxruntime_providers_shared.dll at import time.
     # PyInstaller's isolated analysis subprocess doesn't have this DLL in PATH,
-    # causing rembg/bg.py to call sys.exit(1) and crash the build.
+    # which crashes the build during analysis.
     # Adding the capi directory to PATH fixes DLL resolution during analysis.
     $ortCapi = Join-Path $appRoot "venv\Lib\site-packages\onnxruntime\capi"
     if (Test-Path $ortCapi) {

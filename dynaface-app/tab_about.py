@@ -13,8 +13,7 @@ class AboutTab(QWidget):
         self._window = window
         device = dynaface.models.detect_device()
         current_device = dynaface.models._device
-        v1 = get_library_version("torch")
-        v2 = get_library_version("facenet-pytorch")
+        v1 = get_library_version("onnxruntime")
         text = f"""
 <H1>{app_const.APP_NAME} {app_const.VERSION}</H1>
 {app_const.COPYRIGHT}
@@ -37,9 +36,8 @@ The source code for this program is available at: <a href="https://github.com/je
 <hr>
 Build Date: {BUILD_DATE} <br>
 Log path: {utl_log.get_log_dir()} <br>
-Torch version: {v1}<br>
+ONNX Runtime version: {v1}<br>
 Dynaface Library Version: {dynaface.__version__}<br>
-Facenet-pytorch version: {v2}<br>
 PyQt6 Version: {get_library_version("PyQt6")}<br>
 Processor in use: {current_device} (detected: {device})<br>
 Data Path: {self._window.app.DATA_DIR} <br>

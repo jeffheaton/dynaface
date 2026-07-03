@@ -6,10 +6,14 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, cast
 from urllib.parse import urlparse
 
 import cv2
-import dynaface.image
-import dynaface.measures
 import numpy as np
 import requests  # You may also use: # type: ignore[import]
+from numpy.typing import NDArray
+
+import dynaface
+import dynaface.image
+import dynaface.measures
+from dynaface import config, measures, models, util
 from dynaface.const import (
     DEFAULT_TILT_THRESHOLD,
     FILL_COLOR,
@@ -25,10 +29,6 @@ from dynaface.image import ImageAnalysis
 from dynaface.measures import MeasureBase
 from dynaface.models import are_models_init
 from dynaface.util import VERIFY_CERTS
-from numpy.typing import NDArray
-
-import dynaface
-from dynaface import config, measures, models, util
 
 logger = logging.getLogger(__name__)
 
@@ -124,44 +124,36 @@ class AnalyzeFace(ImageAnalysis):
                 "Models not initialized, please call dynaface.models.init_models()"
             )
 
-        # Ensure the mtcnn model is available.
-        if models.mtcnn_model is None:
-            raise ValueError("MTCNN model not initialized, please call init_models()")
+        # Ensure the onnx models are available.
+        if models.onnx_model is None:
+            raise ValueError("ONNX models not initialized, please call init_models()")
 
-        bbox, prob = models.mtcnn_model.detect(img)  # type: ignore
+        # dynaface stores images as RGB (see dynaface.image.load_image); the
+        # onnx wrapper's API is BGR (matches cv2's native convention).
+        img_bgr = cast(NDArray[np.uint8], cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+        bbox, score = models.onnx_model.detect_face(img_bgr)
 
-        if prob[0] is None or prob[0] < 0.9:
+        if bbox is None:
             # Return an ndarray for headpose instead of a list.
             return [], np.array([0, 0, 0])
 
         end_time = time.time()
-        mtcnn_duration = end_time - start_time
-        logger.debug(f"Detected bbox: {bbox}")
+        detect_duration = end_time - start_time
+        logger.debug(f"Detected bbox: {bbox}, score: {score}")
 
-        if bbox is None:
-            bbox = [0, 0, img.shape[1], img.shape[0]]
-            logging.info(
-                "MTCNN could not detect face area, passing entire image to SPIGA"
-            )
-        else:
-            bbox = bbox[0]
-        # Convert bbox from x1,y1,x2,y2 to x,y,w,h
-        bbox = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
-        logger.debug("Calling SPIGA")
+        logger.debug("Calling landmark model")
         start_time = time.time()
-        # Ensure the spiga model is available.
-        assert models.spiga_model is not None, "spiga_model is None"
-        features = models.spiga_model.inference(img, [bbox])  # type: ignore
+        landmarks_arr, pose = models.onnx_model.find_landmarks(img_bgr, bbox)
         end_time = time.time()
-        spiga_duration = end_time - start_time
+        landmark_duration = end_time - start_time
 
         logger.debug(
-            f"Elapsed time (sec): MTCNN={mtcnn_duration:,}, SPIGA={spiga_duration:,}"
+            f"Elapsed time (sec): detect={detect_duration:,}, landmarks={landmark_duration:,}"
         )
         # Prepare variables
-        landmarks2 = models.convert_landmarks(features)[0]
+        landmarks2 = [(int(round(x)), int(round(y))) for x, y in landmarks_arr]
 
-        headpose = np.array(features["headpose"][0])
+        headpose = pose.astype(np.float64)
         return landmarks2, headpose
 
     def _force_lateral(self) -> Tuple[bool, bool]:
@@ -363,7 +355,9 @@ class AnalyzeFace(ImageAnalysis):
         if lateral_pos:
             from dynaface.lateral import analyze_lateral
 
-            p = util.cv2_to_pil(self.render_img)
+            # self.render_img is RGB (dynaface's convention); cv2_to_pil expects
+            # a BGR (opencv-native) image, so convert before handing it off.
+            p = util.cv2_to_pil(cv2.cvtColor(self.render_img, cv2.COLOR_RGB2BGR))
             # Convert lateral_landmarks and sagittal data from analyze_lateral.
             c, self.lateral_landmarks, self.sagittal_x, self.sagittal_y = (
                 analyze_lateral(p, self.landmarks)
