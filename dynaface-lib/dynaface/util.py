@@ -151,20 +151,20 @@ def straighten(image: NDArray[Any], angle_radians: float) -> NDArray[Any]:
     center = (w // 2, h // 2)
 
     rotation_matrix = cv2.getRotationMatrix2D(center, angle_degrees, 1.0)
-    rotated_image = cv2.warpAffine(image, rotation_matrix, (w, h))
-
     avg_rgb = calculate_average_rgb(image)
-    result_image = np.full_like(rotated_image, avg_rgb, dtype=np.uint8)
 
-    result_center = (result_image.shape[1] // 2, result_image.shape[0] // 2)
-    top_left_x = result_center[0] - center[0]
-    top_left_y = result_center[1] - center[1]
-    result_image[top_left_y : top_left_y + h, top_left_x : top_left_x + w] = (
-        rotated_image
+    # Fill any corners exposed by the rotation with the image's own average
+    # color, per this function's own docstring — previously this was attempted
+    # via a separate avg-color canvas that got fully overwritten by the rotated
+    # image at a always-zero offset, so it never actually showed through.
+    rotated_image = cv2.warpAffine(
+        image,
+        rotation_matrix,
+        (w, h),
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=avg_rgb,
     )
-
-    cropped_image = result_image[:h, :w]
-    return cropped_image
+    return rotated_image
 
 
 def symmetry_ratio(a: float, b: float) -> float:

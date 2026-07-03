@@ -61,19 +61,21 @@ class AnalyzeSkinTone(MeasureBase):
     def __init__(self) -> None:
         super().__init__()
         self.enabled = True
-        self.items = [MeasureItem("hsv")]
+        self.items = [MeasureItem("hue"), MeasureItem("sat"), MeasureItem("brightness")]
         self.is_frontal = True
         self.sync_items()
 
     def abbrev(self) -> str:
         return "Skin Tone"
 
-    USE_MODE = True  # Set to False to use mean averaging instead
-
     def calc(self, face: Any, render: bool = True) -> Dict[str, Any]:
         results = {}
 
-        if render and self.is_enabled("hsv"):
+        if render and (
+            self.is_enabled("hue")
+            or self.is_enabled("sat")
+            or self.is_enabled("brightness")
+        ):
             try:
                 # Validate all required landmarks exist
                 for idx in [2, 3, 30, 55, 59]:
@@ -134,6 +136,10 @@ class AnalyzeSkinTone(MeasureBase):
                 hue_deg = int(h * 360)
                 sat_pct = int(s * 100)
                 bri_pct = int(v * 100)
+
+                results["hue"] = hue_deg
+                results["sat"] = sat_pct
+                results["brightness"] = bri_pct
 
                 lines = [
                     f"HUE: {hue_deg}",

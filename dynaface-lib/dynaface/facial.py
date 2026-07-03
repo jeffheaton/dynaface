@@ -52,6 +52,9 @@ def util_calc_pd(
 def util_get_pupils(
     landmarks: List[Tuple[int, int]],
 ) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+    # Returns (left_pupil, right_pupil) -- LEFT first, RIGHT second. Callers that
+    # feed this straight into calculate_face_rotation() depend on this exact
+    # order for the sign of the resulting tilt angle; don't reorder casually.
     return landmarks[LM_LEFT_PUPIL], landmarks[LM_RIGHT_PUPIL]
 
 

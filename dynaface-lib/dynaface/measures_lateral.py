@@ -27,6 +27,9 @@ class AnalyzeLateral(MeasureBase):
             MeasureItem("nfa"),
             MeasureItem("nla"),
             MeasureItem("tip_proj"),
+            MeasureItem("at"),
+            MeasureItem("nt"),
+            MeasureItem("at_nt"),
         ]
         self.is_frontal = False
         self.is_lateral = True

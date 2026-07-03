@@ -811,7 +811,7 @@ class AnalyzeLandmarks(MeasureBase):
     """Output all facial landmark (x, y) coordinates as named CSV columns."""
 
     # Number of SPIGA wflw landmarks
-    NUM_LANDMARKS = 97
+    NUM_LANDMARKS = 98
 
     def __init__(self) -> None:
         super().__init__()

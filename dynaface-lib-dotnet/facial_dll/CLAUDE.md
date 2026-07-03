@@ -1,0 +1,95 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Overview
+
+This is a pure C# face-processing pipeline with no Unity dependencies (`noEngineReferences: true` in `FacialDll.asmdef`). It targets `netstandard2.1` so it works both as a Unity package and as a regular .NET library. It's a contract-faithful port of the Python `dynaface-lib` package (see `../../dynaface-lib/`), adapted to .NET idioms (nullable types instead of sentinel tuples, PascalCase, typed DTOs instead of loose dicts) where Python's own idioms didn't fit.
+
+**Solution layout** (rooted at `dynaface-lib-dotnet/`):
+- `facial_dll/` — the core library (`FacialDll.csproj`, `netstandard2.1`)
+- `FacialDllConsole/` — standalone console app (`net10.0`), uses OnnxRuntime + SkiaSharp
+- `DynafaceTests/` — xUnit tests (`net10.0`); pure unit tests always run, model-gated integration tests self-skip without local `.onnx` files (see its own files for the env var)
+- `FacialDll.sln` — solution file covering all three projects
+
+## Build & Run
+
+```bash
+# From dynaface-lib-dotnet/
+dotnet build FacialDll.sln
+dotnet test DynafaceTests/DynafaceTests.csproj
+dotnet run --project FacialDllConsole -- photo.jpg blaze_face_short_range.onnx spiga_wflw.onnx u2net.onnx
+
+# Print auto-detected tensor names (useful when first using a new ONNX export)
+dotnet run --project FacialDllConsole -- photo.jpg blaze_face_short_range.onnx spiga_wflw.onnx u2net.onnx --list-tensors
+```
+
+The Unity adapter layer (model runners, camera source, app controller) lives in a separate `DynafaceRuntime` assembly.
+
+## Pipeline Architecture
+
+Mirrors dynaface-lib's `AnalyzeFace.load_image` order exactly (not the pipeline's own earlier design, which aligned directly off BlazeFace's eye keypoints before landmarks even ran):
+
+1. **`BlazeFaceDetector.TryDetectBbox`** — runs the BlazeFace short-range model (128×128 NHWC, values in [-1,1]) via `IDynafaceInference.RunBlazeFace`, decodes + NMS's all above-threshold anchors, and returns a face bbox in the source image's own raw pixel-index space. Rotation-retry (0/90/180/270) and the eye-keypoint sanity heuristic (`LastDetectionEyesOk`) are .NET-only additions with no Python equivalent — Python assumes a single, already-upright orientation.
+
+2. **`SpigaLandmarkDetector.Detect`** — given the bbox, builds SPIGA's own crop (pad to a square of `max(w,h)*1.6`, centered on the bbox, warped to 256×256 via `ImageUtils.WarpAffine`, nearest-neighbor + zero-fill), runs SPIGA via `IDynafaceInference.RunSpiga`, and inverse-maps the 98 landmarks back into the source image's own pixel space, converting to **top-left semantic coordinates** as the final step. Also returns SPIGA's raw 6-value headpose `[yaw,pitch,roll,tx,ty,tz]`.
+
+3. **`PoseClassifier`** — classifies frontal vs. lateral from headpose yaw + a nose-asymmetry ratio, gated by `DynafaceConfig.AutoLateral`.
+
+4. **Frontal: `StyleGanCropper.Crop`** — optional tilt-threshold rotation correction (off by default), yaw-based foreshortening correction, scales so pupil distance becomes 260px, crops to 1024×1024 with the right pupil at (380,480), white-filling anything outside the source. **Lateral: flip-to-facing-left (re-running bbox+landmark detection on the flipped image) → pad canvas ×1.5 → `LateralCropper.Crop`** (fits the full landmark vertical band into 1024px with padding, anchored horizontally to the right pupil).
+
+5. **Lateral only, separate call — `LateralAnalyzer.Analyze`** — runs U²-Net background removal (the 3rd network) on the cropped image, extracts the sagittal (silhouette) profile, and runs it through a from-scratch Savitzky-Golay filter + peak/corner detector (`Lateral/` folder) to find 6 anatomical landmarks (Glabella/Nasion/NasalTip/Subnasal/MentoLabial/Pogonion). Deliberately does not reproduce dynaface-lib's matplotlib debug chart — it's diagnostic only and never consumed by a measurement.
+
+6. **`FaceMeasureContext` / `Measures/*.cs`** — one context per analysis pass, holding the final crop, landmarks, `Pix2mm` (supplied by the pipeline — see the coordinate/units note below, never recomputed from post-crop landmarks internally), and (if lateral) the 6 lateral landmarks. Each `FaceMeasureBase` subclass declares named `MeasureItemInfo` sub-fields (mirroring dynaface-lib's `MeasureItem`/`is_enabled` system) and returns a `Dictionary<string, double>` from `Calc()`, in addition to whatever it draws.
+
+`FacePipeline` is the stateless entry point for steps 1–4. Call `Initialize(inference)` once at startup before calling `Run`. Step 5 (`LateralAnalyzer.Analyze`) is a separate call the caller makes when `FacePipelineResult.IsLateral` is true — matching dynaface-lib's own layering (it needs U²-Net + the already-cropped image, not raw pipeline internals).
+
+## Coordinate System Contract
+
+| Location | Convention |
+|---|---|
+| `FaceImage.Pixels` array | Bottom-left (y=0 at bottom) — Unity texture order |
+| Landmark/bbox VALUES passed between pipeline stages | Top-left (y=0 at top) — matches dynaface-lib's own cv2/numpy convention, ported formulas transcribe verbatim |
+| `FaceMeasureContext` inputs/API | Top-left; `BLY()` converts internally before calling `FaceRenderer` |
+| `FaceRenderer` public methods | Bottom-left |
+
+Mixing these up is the most common source of rendering bugs. `StyleGanCropper`/`LateralCropper`/`SagittalProfile` all follow the same pattern internally: flip the working pixel buffer to top-left ONCE at entry via `ImageUtils.FlipVertical` (so the ported Python formulas apply with zero sign changes), do all the math, flip the OUTPUT buffer back to bottom-left ONCE before constructing the returned `FaceImage`. Landmark VALUES never need a flip in that inner section — only pixel buffers do.
+
+`SpigaLandmarkDetector`'s own internal crop-affine math is the one exception: it works in the source image's raw array-index space throughout (matching the bbox's own space), with the top-left conversion happening only once, right at its own return boundary.
+
+## Units note: Pix2mm is not always what it looks like
+
+`FacePipelineResult.Pix2mm` (frontal case) is computed from the **pre-crop** pupil distance in the original source image — not re-derived from the post-crop landmarks that `FaceMeasureContext.Landmarks` actually holds, even though those end up close to (but not exactly) a 260px pupil distance by construction of `StyleGanCropper`. This exactly matches dynaface-lib's own `calc_pd()` timing (it runs before `crop_stylegan()`).
+
+`MeasurePosition` is the one exception: like dynaface-lib's `AnalyzePosition`, it recomputes its own `pd`/`px2mm` fresh from the **current** (post-crop) landmarks rather than using `ctx.Pix2mm` — these two numbers are deliberately different fields with different meanings. Getting this backwards produces a `px2mm` off by roughly the crop's own scale factor (a mistake this port made once and caught by actually running the pipeline against real images rather than reasoning about it in the abstract — see git history).
+
+## WFLW 98 Landmark Index Reference
+
+| Range | Region |
+|---|---|
+| 0–32 | Face contour |
+| 33–41 | Image-left eyebrow |
+| 42–50 | Image-right eyebrow |
+| 51–54 | Nose bridge/tip |
+| 55–59 | Nose base |
+| 60–67 | Image-left eye |
+| 68–75 | Image-right eye |
+| 76–87 | Outer lip |
+| 88–95 | Inner lip |
+| 96–97 | Pupil centres (96=right, 97=left) |
+
+Indices 96 and 97 are the inter-pupil baseline for `Pix2mm` (assumes a 63mm population-average IOD — `DynafaceConstants.StdPupilDistMm`).
+
+## Adding a New Measurement
+
+Subclass `FaceMeasureBase` in `facial_dll/Measures/`. In the constructor: add one `MeasureItemInfo` per named output field, set `IsFrontal`/`IsLateral`, call `SyncItems()`. Implement `Label` and `Calc(FaceMeasureContext ctx, bool render = true)`, gating each rendered piece by `IsEnabled("item-name")` (matching dynaface-lib's own per-field enable granularity — `Calc` should still return every declared item's value regardless of whether it's individually enabled, only rendering is gated). Use `ctx.Measure`/`ctx.MeasurePolygon` for geometry, `ctx.AddHeader`/`ctx.AddValue`/`ctx.AddSpacer` for the sidebar text, and `ctx.AddValue(key, value)` / `ctx.Values` for structured numeric output that doesn't belong in the sidebar (see `MeasureLandmarks`). Register the new class in `FacialDllConsole/Program.cs`'s `BuildMeasures()`.
+
+## Runtime Interface
+
+All 3 networks are defined on one interface, `IDynafaceInference` (`IDynafaceInference.cs`), kept as 3 independent methods (never fused into one call) so each can be swapped/tested on its own:
+
+- `RunBlazeFace` — face bbox detector. Input: `float[1×128×128×3]` NHWC in [-1,1]. Output: `(regressors float[896×stride], scores float[896])`.
+- `RunSpiga` — WFLW-98 landmark + headpose model. Input: `float[1×3×256×256]` NCHW in [0,1]. Output: `(landmarks float[98×2] normalized [0,1], pose float[6] raw [yaw,pitch,roll,tx,ty,tz])`.
+- `RunU2Net` — background/saliency segmentation. Input: `float[1×3×320×320]` NCHW, ImageNet-normalized. Output: `float[320×320]` raw sigmoid mask.
+
+`FacialDllConsole/OnnxDynafaceInference.cs` implements it via `Microsoft.ML.OnnxRuntime`, auto-detecting tensor names from model metadata (pass explicit overrides to the constructor, or use `--list-tensors`, if a new export uses unexpected names). The Unity adapter for the same interface lives in `DynafaceRuntime`, not here.
