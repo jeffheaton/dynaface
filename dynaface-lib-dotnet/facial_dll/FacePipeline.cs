@@ -1,19 +1,20 @@
-// Stateless face-processing service — orchestrates the 3 independent inference calls
-// (BlazeFace, SPIGA, and — separately, see LateralAnalyzer — U^2-Net) plus pose
-// classification and cropping, mirroring dynaface-lib's AnalyzeFace.load_image order:
+// Stateless face-processing service — orchestrates all 3 independent inference calls
+// (BlazeFace, SPIGA, U^2-Net) plus pose classification, cropping, and (when lateral)
+// the lateral numeric analysis, mirroring dynaface-lib's AnalyzeFace.load_image order:
 //
 //   BlazeFace (bbox only) -> SPIGA (landmarks+pose in original-image space)
 //     -> pose classification -> frontal: StyleGAN crop / lateral: flip+pad+lateral crop
+//        -> lateral only: LateralAnalyzer.Analyze (sagittal profile -> 6 landmarks)
 //
-// Initialize once at startup with Initialize(inference) before calling Run.
-// Lateral numeric analysis (sagittal profile -> 6 lateral landmarks) is deliberately
-// NOT part of this class — like dynaface-lib itself, it's a separate step (needs
-// U^2-Net + the already-cropped image), invoked by the caller after Run returns an
-// IsLateral result.
+// Initialize once at startup with Initialize(inference) before calling Run. Like
+// dynaface-lib's load_image(), the "run lateral analysis if lateral" decision lives
+// INSIDE the library, not in the caller — Run() returns a fully-populated result,
+// including LateralAnalysis when applicable, with no further pose-gated calls needed.
 public static class FacePipeline
 {
     static BlazeFaceDetector     _blazeFace;
     static SpigaLandmarkDetector _spiga;
+    static IDynafaceInference   _inference;
 
     public static bool IsReady => _blazeFace?.IsReady == true && _spiga?.IsReady == true;
 
@@ -23,6 +24,7 @@ public static class FacePipeline
 
     public static void Initialize(IDynafaceInference inference)
     {
+        _inference = inference;
         _blazeFace = new BlazeFaceDetector(inference);
         _spiga     = new SpigaLandmarkDetector(inference);
     }
@@ -33,11 +35,16 @@ public static class FacePipeline
     //             Frontal/Quarter force a frontal-style crop; Lateral forces lateral
     //             classification (still auto-resolving left/right facing from yaw).
     // tiltThreshold — off (-1) by default, matching dynaface-lib; only frontal crops use it.
+    // crop — false skips the frontal StyleGAN crop, returning the working image and
+    //        original-space landmarks (pix2mm still computed). Mirrors dynaface-lib's
+    //        load_image(crop=False), including its quirk that the LATERAL branch
+    //        always crops regardless of this flag.
     // Returns null if no face is detected or a model isn't ready.
     public static FacePipelineResult? Run(
         FaceImage photo, int rotationAngle, bool flipHorizontal,
         FacePose forcePose = FacePose.Detect,
-        float tiltThreshold = DynafaceConstants.DefaultTiltThreshold)
+        float tiltThreshold = DynafaceConstants.DefaultTiltThreshold,
+        bool crop = true)
     {
         LastDetectionEyesOk = false;
         if (!IsReady || !photo.IsValid) return null;
@@ -75,11 +82,12 @@ public static class FacePipeline
 
         return isLateral
             ? RunLateral(working, landmarks, headPose, facingLeft, resolvedPose)
-            : RunFrontal(working, landmarks, headPose, resolvedPose, tiltThreshold);
+            : RunFrontal(working, landmarks, headPose, resolvedPose, tiltThreshold, crop);
     }
 
     static FacePipelineResult? RunFrontal(
-        FaceImage working, Vec2[] landmarks, float[] headPose, FacePose resolvedPose, float tiltThreshold)
+        FaceImage working, Vec2[] landmarks, float[] headPose, FacePose resolvedPose,
+        float tiltThreshold, bool crop)
     {
         // Matches dynaface-lib's call order exactly: calc_pd() (from the ORIGINAL,
         // pre-crop landmarks) happens before crop_stylegan() rescales everything —
@@ -87,17 +95,23 @@ public static class FacePipeline
         // pupil distance ends up close to (but not exactly) the 260px crop target.
         float pupillaryDistance = ComputePupillaryDistance(landmarks);
         float pix2mm = pupillaryDistance > 0f
-            ? DynafaceConstants.StdPupilDistMm / pupillaryDistance
-            : DynafaceConstants.StdPupilDistMm / 256f;
+            ? DynafaceConfig.PupilDistMm / pupillaryDistance
+            : DynafaceConfig.PupilDistMm / 256f;
 
-        float yaw = headPose != null && headPose.Length > 0 ? headPose[0] : 0f;
-        var (crop, cropLandmarks, faceRotationRad) =
-            StyleGanCropper.Crop(working, landmarks, yaw, tiltThreshold);
+        FaceImage outImage      = working;
+        Vec2[]    outLandmarks  = landmarks;
+        float?    faceRotationRad = null;
+        if (crop)
+        {
+            float yaw = headPose != null && headPose.Length > 0 ? headPose[0] : 0f;
+            (outImage, outLandmarks, faceRotationRad) =
+                StyleGanCropper.Crop(working, landmarks, yaw, tiltThreshold);
+        }
 
         return new FacePipelineResult
         {
-            AlignedCrop        = crop,
-            Wflw98             = cropLandmarks,
+            AlignedCrop        = outImage,
+            Wflw98             = outLandmarks,
             HeadPose           = headPose,
             Pose               = resolvedPose,
             IsLateral          = false,
@@ -132,6 +146,16 @@ public static class FacePipeline
         var (padded, paddedLandmarks) = PadCanvasWidth(source, srcLandmarks, 1.5f);
         var (crop, cropLandmarks) = LateralCropper.Crop(padded, paddedLandmarks);
 
+        // Matches dynaface-lib's load_image(), which calls analyze_lateral() itself
+        // once lateral_pos is known — the caller never has to branch on IsLateral.
+        LateralAnalyzer.Result? lateralAnalysis = LateralAnalyzer.Analyze(_inference, crop, cropLandmarks);
+
+        // Also matches load_image(): the sagittal chart is composited onto the
+        // image inside the library (_overlay_lateral_analysis) before any measures
+        // draw, so the returned crop already includes it.
+        if (lateralAnalysis != null)
+            LateralChartRenderer.Overlay(crop, lateralAnalysis.Value);
+
         return new FacePipelineResult
         {
             AlignedCrop       = crop,
@@ -143,6 +167,7 @@ public static class FacePipeline
             Pix2mm            = DynafaceConstants.LateralPix2mm,
             PupillaryDistance = 0f, // dynaface-lib never calls calc_pd() in the lateral branch
             FaceRotationRad   = null,
+            LateralAnalysis   = lateralAnalysis,
         };
     }
 
@@ -215,4 +240,6 @@ public struct FacePipelineResult
     public float     Pix2mm;
     public float     PupillaryDistance; // pre-crop pupil pixel distance; 0 in lateral mode
     public float?    FaceRotationRad;   // null unless tilt correction triggered (frontal only)
+    public LateralAnalyzer.Result? LateralAnalysis; // lateral only; null if IsLateral is false
+                                                      // or if analysis failed (no sagittal profile)
 }

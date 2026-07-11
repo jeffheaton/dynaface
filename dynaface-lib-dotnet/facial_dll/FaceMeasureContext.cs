@@ -31,6 +31,12 @@ public class FaceMeasureContext
     // consumers (MeasurePose) fall back to 0 in that case.
     public float[] HeadPose { get; }
 
+    // Resolved pose and whether a lateral face was mirrored to face left —
+    // mirrors dynaface-lib's AnalyzeFace.pose / AnalyzeFace.flipped, consumed
+    // by DrawStatic()'s caption.
+    public FacePose Pose    { get; }
+    public bool     Flipped { get; }
+
     public readonly List<string> TextLines = new();
 
     // Structured numeric output (mirrors dynaface-lib's calc() -> Dict[str, Any]
@@ -46,7 +52,8 @@ public class FaceMeasureContext
 
     public FaceMeasureContext(
         FaceImage photo, Vec2[] landmarks, float pix2mm,
-        bool isLateral = false, Vec2[] lateralLandmarks = null, float[] headPose = null)
+        bool isLateral = false, Vec2[] lateralLandmarks = null, float[] headPose = null,
+        FacePose pose = FacePose.Frontal, bool flipped = false)
     {
         Width            = photo.Width;
         Height           = photo.Height;
@@ -56,6 +63,8 @@ public class FaceMeasureContext
         IsLateral        = isLateral;
         LateralLandmarks = lateralLandmarks;
         HeadPose         = headPose;
+        Pose             = pose;
+        Flipped          = flipped;
     }
 
     // Convenience overload for simple/test scenarios that don't have a
@@ -71,9 +80,34 @@ public class FaceMeasureContext
         if (lm != null && lm.Length > DynafaceConstants.LmLeftPupil)
         {
             float dist = Vec2.Distance(lm[DynafaceConstants.LmRightPupil], lm[DynafaceConstants.LmLeftPupil]);
-            if (dist > 1f) return DynafaceConstants.StdPupilDistMm / dist;
+            if (dist > 1f) return DynafaceConfig.PupilDistMm / dist;
         }
-        return DynafaceConstants.StdPupilDistMm / 256f;
+        return DynafaceConfig.PupilDistMm / 256f;
+    }
+
+    // -------------------------------------------------------------------------
+    // Analysis runner
+    // -------------------------------------------------------------------------
+
+    // Mirrors dynaface-lib's AnalyzeFace.analyze(): runs every enabled measure
+    // over this context and merges each Calc() result into one dictionary
+    // (later measures overwrite duplicate keys, matching Python's dict.update).
+    // Defaults to the full DynafaceMeasures.AllMeasures() registry — the same
+    // default AnalyzeFace's constructor applies. Returns null when there are no
+    // landmarks, matching analyze()'s None return.
+    public Dictionary<string, double> Analyze(
+        IEnumerable<FaceMeasureBase> measures = null, bool render = true)
+    {
+        if (Landmarks == null || Landmarks.Length == 0) return null;
+
+        var result = new Dictionary<string, double>();
+        foreach (var measure in measures ?? DynafaceMeasures.AllMeasures())
+        {
+            if (!measure.Enabled) continue;
+            foreach (var kv in measure.Calc(this, render))
+                result[kv.Key] = kv.Value;
+        }
+        return result;
     }
 
     // -------------------------------------------------------------------------
@@ -179,6 +213,75 @@ public class FaceMeasureContext
             }
         }
         return dist;
+    }
+
+    // Mirrors dynaface-lib's AnalyzeFace.measure_curve(): measures the curved
+    // distance along the sagittal polyline between the points on it closest to
+    // pt1 and pt2, optionally rendering the curve segment plus a mm label offset
+    // from its midpoint (dir "r" = right of midpoint, anything else = left).
+    public float MeasureCurve(Vec2 pt1, Vec2 pt2, float[] sagittalX, float[] sagittalY,
+        Rgba32 color = default, int thickness = 3, bool render = true, string dir = "r")
+    {
+        if (sagittalX == null || sagittalY == null || sagittalX.Length == 0) return 0f;
+        int n = MathHelpers.Min(sagittalX.Length, sagittalY.Length);
+
+        int idx1 = FindClosestIndex(pt1, sagittalX, sagittalY, n);
+        int idx2 = FindClosestIndex(pt2, sagittalX, sagittalY, n);
+        if (idx1 > idx2) (idx1, idx2) = (idx2, idx1);
+
+        var segment = new Vec2[idx2 - idx1 + 1];
+        for (int i = 0; i < segment.Length; i++)
+            segment[i] = new Vec2(sagittalX[idx1 + i], sagittalY[idx1 + i]);
+
+        float dist = 0f;
+        for (int i = 0; i + 1 < segment.Length; i++)
+            dist += Vec2.Distance(segment[i], segment[i + 1]);
+        dist *= Pix2mm;
+
+        if (render)
+        {
+            Rgba32 c = color.A == 0 ? MeasureColor : color;
+            DrawCurve(segment, c, thickness);
+
+            Vec2 mid = segment[segment.Length / 2];
+            float labelX = dir == "r" ? mid.X + 15 : mid.X - 15;
+            DrawImageText(new Vec2(labelX, mid.Y), $"{dist:F2}mm", new Rgba32(255, 255, 255, 255));
+        }
+        return dist;
+    }
+
+    static int FindClosestIndex(Vec2 point, float[] xs, float[] ys, int n)
+    {
+        int best = 0;
+        float bestDist = float.MaxValue;
+        for (int i = 0; i < n; i++)
+        {
+            float dx = xs[i] - point.X, dy = ys[i] - point.Y;
+            float d  = dx * dx + dy * dy;
+            if (d < bestDist) { bestDist = d; best = i; }
+        }
+        return best;
+    }
+
+    // Mirrors dynaface-lib's AnalyzeFace.draw_curve(): polyline through the points.
+    public void DrawCurve(Vec2[] segment, Rgba32 color, int thickness = 3)
+    {
+        for (int i = 0; i + 1 < segment.Length; i++)
+            DrawLine(segment[i], segment[i + 1], color, thickness);
+    }
+
+    // Mirrors dynaface-lib's AnalyzeFace.draw_static(): stamps the resolved pose
+    // caption near the bottom-left corner of the image.
+    public void DrawStatic()
+    {
+        string text = Pose switch
+        {
+            FacePose.Quarter => "Quarter",
+            FacePose.Lateral => Flipped ? "Lateral (right)" : "Lateral (left)",
+            _                => "Frontal",
+        };
+        var size = FaceRenderer.GetTextSize(text, FaceRenderer.TEXT_SIZE_MEASURE);
+        DrawImageText(new Vec2(10, Height - 20 - size.Y), text, new Rgba32(255, 255, 255, 255));
     }
 
     Vec2 CalcMeasureLabelPos(Vec2 pt1, Vec2 pt2, string dir)

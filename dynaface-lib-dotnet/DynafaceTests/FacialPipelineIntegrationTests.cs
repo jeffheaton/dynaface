@@ -60,7 +60,8 @@ public class FacialPipelineIntegrationTests
         Assert.NotNull(result);
         Assert.True(result.Value.IsLateral);
 
-        var lateral = LateralAnalyzer.Analyze(_fixture.Inference, result.Value.AlignedCrop, result.Value.Wflw98);
+        // FacePipeline.Run already performed lateral analysis internally.
+        var lateral = result.Value.LateralAnalysis;
         Assert.NotNull(lateral);
         Assert.Equal(6, lateral.Value.LateralLandmarks.Length);
     }
@@ -76,7 +77,8 @@ public class FacialPipelineIntegrationTests
         Assert.NotNull(result);
         Assert.True(result.Value.IsLateral);
 
-        var lateral = LateralAnalyzer.Analyze(_fixture.Inference, result.Value.AlignedCrop, result.Value.Wflw98);
+        // FacePipeline.Run already performed lateral analysis internally.
+        var lateral = result.Value.LateralAnalysis;
         Assert.NotNull(lateral);
         Assert.Equal(6, lateral.Value.LateralLandmarks.Length);
     }
@@ -101,22 +103,11 @@ public class FacialPipelineIntegrationTests
     internal static FaceMeasureContext BuildContext(FacePipelineResult result) =>
         new FaceMeasureContext(
             result.AlignedCrop, result.Wflw98, result.Pix2mm,
-            isLateral: result.IsLateral, lateralLandmarks: null, headPose: result.HeadPose);
+            isLateral: result.IsLateral, lateralLandmarks: null, headPose: result.HeadPose,
+            pose: result.Pose, flipped: result.Flipped);
 
-    internal static Dictionary<string, double> RunAllFrontalMeasures(FaceMeasureContext ctx)
-    {
-        var measures = new FaceMeasureBase[]
-        {
-            new MeasureFAI(), new MeasureOCE(), new MeasureBrows(), new MeasureDentalArea(),
-            new MeasureEyeArea(), new MeasurePosition(), new MeasurePose(),
-            new MeasureIntercanthalDistance(), new MeasureMouthLength(), new MeasureNoseFrontal(),
-            new MeasureOuterEyeCorners(),
-        };
-
-        var all = new Dictionary<string, double>();
-        foreach (var m in measures)
-            foreach (var kv in m.Calc(ctx, render: true))
-                all[kv.Key] = kv.Value;
-        return all;
-    }
+    // Runs the library's own registry + runner (DynafaceMeasures.AllMeasures via
+    // ctx.Analyze), the same path dynaface-lib's AnalyzeFace.analyze() takes.
+    internal static Dictionary<string, double> RunAllFrontalMeasures(FaceMeasureContext ctx) =>
+        ctx.Analyze();
 }

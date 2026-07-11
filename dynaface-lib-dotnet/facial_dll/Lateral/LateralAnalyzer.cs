@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 
 // Orchestrates the lateral numeric pipeline, replacing dynaface-lib's
-// lateral.py analyze_lateral() minus its matplotlib chart rendering (a deliberate,
-// user-approved scope decision — the chart is diagnostic only and never consumed by
-// any measurement; only the 6 lateral landmarks + sagittal arrays are).
+// lateral.py analyze_lateral() minus its matplotlib chart rendering — the chart
+// itself is never consumed by any measurement, only the 6 lateral landmarks +
+// sagittal arrays are. See LateralChartRenderer for the pixel-buffer equivalent
+// of that chart, composited onto the crop by FacePipeline.RunLateral (mirroring
+// load_image's own _overlay_lateral_analysis call).
 public static class LateralAnalyzer
 {
     public struct Result

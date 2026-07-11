@@ -1,4 +1,6 @@
+using System;
 using System.IO;
+using System.Net.Http;
 using SkiaSharp;
 
 // Converts between disk images (PNG/JPEG/etc. via SkiaSharp) and FaceImage.
@@ -6,9 +8,11 @@ using SkiaSharp;
 // standard image files are top-left (y=0 at top), so Load/Save both flip Y.
 public static class ImageLoader
 {
+    // Accepts a local path or an http(s) URL, mirroring dynaface-lib's
+    // load_face_image() (which downloads URL inputs before decoding).
     public static FaceImage Load(string path)
     {
-        using var bitmap = SKBitmap.Decode(path);
+        using var bitmap = IsUrl(path) ? DecodeFromUrl(path) : SKBitmap.Decode(path);
         int w = bitmap.Width, h = bitmap.Height;
         var pixels   = new Rgba32[w * h];
         var skPixels = bitmap.Pixels; // top-left row-major SKColor[]
@@ -24,6 +28,17 @@ public static class ImageLoader
         }
 
         return new FaceImage(pixels, w, h);
+    }
+
+    public static bool IsUrl(string path) =>
+        path.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+        path.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+
+    static SKBitmap DecodeFromUrl(string url)
+    {
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        byte[] bytes = http.GetByteArrayAsync(url).GetAwaiter().GetResult();
+        return SKBitmap.Decode(bytes);
     }
 
     public static void Save(FaceImage image, string path)

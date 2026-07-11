@@ -19,7 +19,8 @@ class Program
         string u2netPath     = args[3];
         bool listTensors     = Array.IndexOf(args, "--list-tensors") >= 0;
 
-        if (!File.Exists(imagePath))     { Console.Error.WriteLine($"Image not found: {imagePath}");              return 1; }
+        if (!ImageLoader.IsUrl(imagePath) && !File.Exists(imagePath))
+                                         { Console.Error.WriteLine($"Image not found: {imagePath}");              return 1; }
         if (!File.Exists(blazeFacePath)) { Console.Error.WriteLine($"BlazeFace model not found: {blazeFacePath}"); return 1; }
         if (!File.Exists(spigaPath))     { Console.Error.WriteLine($"SPIGA model not found: {spigaPath}");         return 1; }
         if (!File.Exists(u2netPath))     { Console.Error.WriteLine($"U2Net model not found: {u2netPath}");         return 1; }
@@ -34,10 +35,10 @@ class Program
         }
 
         FacePipeline.Initialize(inference);
-        return RunPipeline(imagePath, inference);
+        return RunPipeline(imagePath);
     }
 
-    static int RunPipeline(string imagePath, IDynafaceInference inference)
+    static int RunPipeline(string imagePath)
     {
         Console.WriteLine("Loading image...");
         var photo = ImageLoader.Load(imagePath);
@@ -67,30 +68,32 @@ class Program
         var crop = result.Value.AlignedCrop;
         Console.WriteLine($"Pose: {result.Value.Pose}{(result.Value.IsLateral && result.Value.Flipped ? " (flipped to face left)" : "")}");
 
-        Vec2[] lateralLandmarks = null;
-        if (result.Value.IsLateral)
-        {
-            Console.WriteLine("Running lateral background-removal analysis...");
-            var lateral = LateralAnalyzer.Analyze(inference, crop, result.Value.Wflw98);
-            if (lateral == null)
-                Console.WriteLine("  Lateral analysis failed (no sagittal profile) — lateral measures will be skipped.");
-            else
-                lateralLandmarks = lateral.Value.LateralLandmarks;
-        }
+        // FacePipeline.Run already ran lateral background-removal analysis internally
+        // when IsLateral is true (mirroring dynaface-lib's load_image) — just read it back.
+        var lateral = result.Value.LateralAnalysis;
+        Vec2[] lateralLandmarks = lateral?.LateralLandmarks;
+        if (result.Value.IsLateral && lateral == null)
+            Console.WriteLine("  Lateral analysis failed (no sagittal profile) — lateral measures will be skipped.");
 
         Console.WriteLine("Running measurements...");
         var ctx = new FaceMeasureContext(
             crop, result.Value.Wflw98, result.Value.Pix2mm,
             isLateral: result.Value.IsLateral, lateralLandmarks: lateralLandmarks,
-            headPose: result.Value.HeadPose);
+            headPose: result.Value.HeadPose,
+            pose: result.Value.Pose, flipped: result.Value.Flipped);
 
-        foreach (var m in BuildMeasures())
-            if (m.Enabled) m.Calc(ctx, render: true);
+        // Library-owned measure registry + loop, mirroring dynaface-lib's
+        // AnalyzeFace.analyze() over measures.all_measures().
+        ctx.Analyze();
 
         FaceRenderer.DisplayMode = FaceRenderer.LandmarkDisplayMode.Lm;
         FaceRenderer.DrawLandmarksOnto(crop.Pixels, crop.Width, crop.Height, result.Value.Wflw98);
+        ctx.DrawStatic();
 
-        string dir     = Path.GetDirectoryName(Path.GetFullPath(imagePath)) ?? ".";
+        // URL inputs save beside the working directory instead of "beside the URL".
+        string dir     = ImageLoader.IsUrl(imagePath)
+            ? "."
+            : Path.GetDirectoryName(Path.GetFullPath(imagePath)) ?? ".";
         string outPath = Path.Combine(dir, Path.GetFileNameWithoutExtension(imagePath) + "_annotated.png");
         Console.WriteLine($"Saving → {outPath}");
         ImageLoader.Save(ctx.ToImage(), outPath);
@@ -110,22 +113,4 @@ class Program
 
         return 0;
     }
-
-    static FaceMeasureBase[] BuildMeasures() => new FaceMeasureBase[]
-    {
-        new MeasurePose                 { Enabled = true },
-        new MeasureIntercanthalDistance { Enabled = true },
-        new MeasureOuterEyeCorners      { Enabled = true },
-        new MeasureEyeArea              { Enabled = true },
-        new MeasureBrows                { Enabled = true },
-        new MeasureNoseFrontal          { Enabled = true },
-        new MeasureMouthLength          { Enabled = true },
-        new MeasureDentalArea           { Enabled = true },
-        new MeasureOCE                  { Enabled = true },
-        new MeasureFAI                  { Enabled = true },
-        new MeasurePosition             { Enabled = true },
-        new MeasureLateral              { Enabled = true },
-        new MeasureSkinTone             { Enabled = true },
-        new MeasureLandmarks            { Enabled = true },
-    };
 }

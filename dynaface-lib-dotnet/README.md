@@ -45,7 +45,7 @@ or place them at `~/.dynaface/models` (dynaface-lib's own default download locat
 dotnet run --project FacialDllConsole -- <image> <blazeface.onnx> <spiga.onnx> <u2net.onnx>
 ```
 
-The console app detects the face, classifies frontal vs. lateral pose, runs the appropriate crop + measurements (including lateral-only nasofrontal/nasolabial angle and tip-projection measures when applicable), and writes an annotated PNG alongside the source image.
+The console app detects the face, classifies frontal vs. lateral pose, runs the appropriate crop + measurements (including lateral-only nasofrontal/nasolabial angle and tip-projection measures when applicable), and writes an annotated PNG alongside the source image. The image argument may also be an http(s) URL (mirroring dynaface-lib's `load_face_image`); the annotated PNG then lands in the current directory.
 
 ```bash
 # Example
@@ -112,27 +112,30 @@ if (result == null)
     result = FacePipeline.Run(image, rotationAngle: 90, flipHorizontal: false);
 }
 
-Vec2[] lateralLandmarks = null;
-if (result is { IsLateral: true })
-{
-    // Lateral analysis is a separate call — it needs U^2-Net + the already-cropped image
-    var lateral = LateralAnalyzer.Analyze(myInference, result.Value.AlignedCrop, result.Value.Wflw98);
-    lateralLandmarks = lateral?.LateralLandmarks;
-}
+// Run() already performed lateral background-removal analysis internally when the
+// pose came back lateral (mirroring dynaface-lib's load_image) — just read it back.
+Vec2[] lateralLandmarks = result?.LateralAnalysis?.LateralLandmarks;
 ```
 
 ### 4. Run measurements
 
 ```csharp
+// Optional: calibrate the pupillary distance (mm) used for px→mm conversion.
+// Mirrors dynaface-lib's settable AnalyzeFace.pd; defaults to the 63mm average.
+DynafaceConfig.PupilDistMm = 63f;
+
 var ctx = new FaceMeasureContext(
     result.Value.AlignedCrop, result.Value.Wflw98, result.Value.Pix2mm,
     isLateral: result.Value.IsLateral, lateralLandmarks: lateralLandmarks,
-    headPose: result.Value.HeadPose);
+    headPose: result.Value.HeadPose,
+    pose: result.Value.Pose, flipped: result.Value.Flipped);
 
-new MeasureIntercanthalDistance { Enabled = true }.Calc(ctx);
-new MeasureEyeArea              { Enabled = true }.Calc(ctx);
-new MeasureLateral              { Enabled = true }.Calc(ctx); // no-op unless ctx.IsLateral
-// ... add whichever measurements you need
+// Runs the full library measure registry (DynafaceMeasures.AllMeasures()) and
+// merges every measure's results — mirrors dynaface-lib's AnalyzeFace.analyze().
+Dictionary<string, double> results = ctx.Analyze();
+
+// Or pass an explicit subset:
+// ctx.Analyze(new FaceMeasureBase[] { new MeasureIntercanthalDistance(), new MeasureEyeArea() });
 
 // Annotated pixel buffer
 FaceImage annotated = ctx.ToImage();
