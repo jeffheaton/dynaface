@@ -4,10 +4,15 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
+    <!-- Example/driver only — not published to NuGet. -->
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.19.2" />
-    <PackageReference Include="SkiaSharp" Version="2.88.8" />
+    <!-- Both NuGet packages, referenced as projects here. FacialDll.Onnx brings in
+         the core FacialDll and Microsoft.ML.OnnxRuntime transitively; SkiaSharp is
+         used directly by the console's own ImageLoader. -->
+    <ProjectReference Include="../FacialDll.Onnx/FacialDll.Onnx.csproj" />
     <ProjectReference Include="../facial_dll/FacialDll.csproj" />
+    <PackageReference Include="SkiaSharp" Version="2.88.8" />
   </ItemGroup>
 </Project>

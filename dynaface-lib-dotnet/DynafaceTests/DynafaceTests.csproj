@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\facial_dll\FacialDll.csproj" />
+    <ProjectReference Include="..\FacialDll.Onnx\FacialDll.Onnx.csproj" />
+    <!-- Console project supplies the SkiaSharp-based ImageLoader used by integration tests. -->
     <ProjectReference Include="..\FacialDllConsole\FacialDllConsole.csproj" />
   </ItemGroup>
 

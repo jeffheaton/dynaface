@@ -4,6 +4,12 @@ obj/
 *.user
 .DS_Store
 
+# The repo-root .gitignore has "*.onnx" (for model weights); on case-insensitive
+# filesystems that also matches this project's directory name and would ignore the
+# whole project. Re-include the directory (bin/ and obj/ above still apply inside it,
+# and real *.onnx model files inside stay ignored via the root rule).
+!/FacialDll.Onnx/
+
 # Local/CI release build output (see .github/workflows/build-lib-dotnet.yml)
 dist/
 *.zip

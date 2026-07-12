@@ -9,6 +9,10 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Hoisted to job level so the "Push to NuGet.org" step's `if:` can test it
+      # (secrets can't be referenced directly in an `if:` expression).
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
 
     steps:
       - uses: actions/checkout@v7
@@ -113,7 +117,31 @@ jobs:
         run: |
           aws s3 cp dynaface-lib-dotnet/dynaface-dotnet-${VERSION}.zip s3://data.heatonresearch.com/library/ --acl public-read
 
+      - name: Pack NuGet packages (Dynaface + Dynaface.Onnx)
+        working-directory: dynaface-lib-dotnet
+        run: |
+          dotnet pack facial_dll/FacialDll.csproj -c Release --no-build \
+            -p:Version=$VERSION -o nupkgs
+          dotnet pack FacialDll.Onnx/FacialDll.Onnx.csproj -c Release --no-build \
+            -p:Version=$VERSION -o nupkgs
+          ls -l nupkgs
+
+      - name: Upload NuGet packages artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: dynaface-nupkgs
+          path: dynaface-lib-dotnet/nupkgs/*.nupkg
+
+      - name: Push to NuGet.org
+        if: ${{ env.NUGET_API_KEY != '' }}
+        working-directory: dynaface-lib-dotnet
+        run: |
+          dotnet nuget push "nupkgs/*.nupkg" \
+            --api-key "$NUGET_API_KEY" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+
       - name: Clean up build artifacts
         if: always()
         working-directory: dynaface-lib-dotnet
-        run: rm -rf dist TestResults format-report facial_dll/bin facial_dll/obj FacialDllConsole/bin FacialDllConsole/obj DynafaceTests/bin DynafaceTests/obj
+        run: rm -rf dist nupkgs TestResults format-report facial_dll/bin facial_dll/obj FacialDll.Onnx/bin FacialDll.Onnx/obj FacialDllConsole/bin FacialDllConsole/obj DynafaceTests/bin DynafaceTests/obj

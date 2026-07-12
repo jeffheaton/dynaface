@@ -4,10 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Solution Layout
 
-- `facial_dll/` — core library (`netstandard2.1`), no Unity or ONNX dependencies; ships as a Unity package
-- `FacialDllConsole/` — standalone CLI harness (`net10.0`) using `Microsoft.ML.OnnxRuntime` + `SkiaSharp`
+- `facial_dll/` — core library (`netstandard2.1`), no Unity or ONNX dependencies; ships as a Unity package and as the NuGet package **`Dynaface`**
+- `FacialDll.Onnx/` — ONNX Runtime inference backend (`netstandard2.1`): `OnnxDynafaceInference`, depends on the core + `Microsoft.ML.OnnxRuntime`; ships as the NuGet package **`Dynaface.Onnx`**
+- `FacialDllConsole/` — standalone CLI harness / example (`net10.0`, not packaged) using both projects + `SkiaSharp`
 - `DynafaceTests/` — xUnit tests (`net10.0`); pure unit tests always run, model-gated integration tests self-skip when the 3 real `.onnx` files aren't found locally (see `DynafaceTests/ModelPathResolver.cs`)
-- `FacialDll.sln` — solution covering all three projects
+- `FacialDll.sln` — solution covering all four projects
+
+`Dynaface` and `Dynaface.Onnx` are published to NuGet in lockstep at the same `<Version>`; the assembly names stay `FacialDll` / `FacialDll.Onnx` so existing prebuilt-DLL and Unity consumers are unaffected.
 
 See [`facial_dll/CLAUDE.md`](facial_dll/CLAUDE.md) for the full pipeline architecture, coordinate system contract, and WFLW-98 landmark index reference.
 
@@ -31,15 +34,15 @@ dotnet run --project FacialDllConsole -- photo.jpg blaze_face_short_range.onnx s
 
 ## Project Relationship
 
-`FacialDllConsole` provides the concrete ONNX implementation of `facial_dll`'s single inference interface:
+`facial_dll` defines the single inference interface; `FacialDll.Onnx` provides the concrete ONNX implementation; `FacialDllConsole` is an example that wires them together:
 
-| Interface (facial_dll) | Implementation (FacialDllConsole) |
+| Interface (facial_dll / `Dynaface`) | Implementation (FacialDll.Onnx / `Dynaface.Onnx`) |
 |---|---|
 | `IDynafaceInference` (`RunBlazeFace`/`RunSpiga`/`RunU2Net`) | `OnnxDynafaceInference` |
 
-The interface lives in `facial_dll/IDynafaceInference.cs`. `OnnxDynafaceInference` auto-detects tensor names from model metadata; pass explicit overrides to the constructor or use `--list-tensors` to inspect a model before running inference.
+The interface lives in `facial_dll/IDynafaceInference.cs`; `OnnxDynafaceInference` lives in `FacialDll.Onnx/`. It auto-detects tensor names from model metadata; pass explicit overrides to the constructor or use `--list-tensors` to inspect a model before running inference.
 
-The Unity runtime adapter layer (`DynafaceRuntime` assembly) implements the same interface for Unity Inference Engine — it lives outside this repo.
+The Unity runtime adapter layer (`DynafaceRuntime` assembly) implements the same interface for Unity Inference Engine — it lives outside this repo, and (unlike `Dynaface.Onnx`) is not a NuGet package.
 
 ## Adding a New Measurement
 

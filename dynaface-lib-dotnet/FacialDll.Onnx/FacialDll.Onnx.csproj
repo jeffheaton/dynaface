@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <!-- Assembly name matches the file/type names; NuGet PackageId is "Dynaface.Onnx". -->
+    <AssemblyName>FacialDll.Onnx</AssemblyName>
+    <!-- Ships in lockstep with the core Dynaface package (same version). -->
+    <Version>2.0.0</Version>
+  </PropertyGroup>
+
+  <!-- NuGet package metadata (package id "Dynaface.Onnx") -->
+  <PropertyGroup>
+    <PackageId>Dynaface.Onnx</PackageId>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Authors>Jeff Heaton</Authors>
+    <Description>ONNX Runtime inference backend for Dynaface. Provides OnnxDynafaceInference, a ready-made IDynafaceInference implementation over Microsoft.ML.OnnxRuntime for the BlazeFace, SPIGA, and U²-Net models. Install this instead of implementing IDynafaceInference yourself; it pulls in the core Dynaface package.</Description>
+    <PackageTags>facial-analysis;dynaface;onnx;onnxruntime;inference;computer-vision</PackageTags>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/jeffheaton/dynaface</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/jeffheaton/dynaface</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Emitted as a NuGet package dependency on "Dynaface" (same version) when packed. -->
+    <ProjectReference Include="../facial_dll/FacialDll.csproj" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.19.2" />
+  </ItemGroup>
+</Project>

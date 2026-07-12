@@ -7,10 +7,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a pure C# face-processing pipeline with no Unity dependencies (`noEngineReferences: true` in `FacialDll.asmdef`). It targets `netstandard2.1` so it works both as a Unity package and as a regular .NET library. It's a contract-faithful port of the Python `dynaface-lib` package (see `../../dynaface-lib/`), adapted to .NET idioms (nullable types instead of sentinel tuples, PascalCase, typed DTOs instead of loose dicts) where Python's own idioms didn't fit.
 
 **Solution layout** (rooted at `dynaface-lib-dotnet/`):
-- `facial_dll/` — the core library (`FacialDll.csproj`, `netstandard2.1`)
-- `FacialDllConsole/` — standalone console app (`net10.0`), uses OnnxRuntime + SkiaSharp
+- `facial_dll/` — the core library (`FacialDll.csproj`, `netstandard2.1`), NuGet package `Dynaface`
+- `FacialDll.Onnx/` — ONNX Runtime inference backend (`netstandard2.1`), NuGet package `Dynaface.Onnx`; holds `OnnxDynafaceInference`
+- `FacialDllConsole/` — standalone console app / example (`net10.0`), uses OnnxRuntime (via `FacialDll.Onnx`) + SkiaSharp
 - `DynafaceTests/` — xUnit tests (`net10.0`); pure unit tests always run, model-gated integration tests self-skip without local `.onnx` files (see its own files for the env var)
-- `FacialDll.sln` — solution file covering all three projects
+- `FacialDll.sln` — solution file covering all four projects
 
 ## Build & Run
 
@@ -92,4 +93,4 @@ All 3 networks are defined on one interface, `IDynafaceInference` (`IDynafaceInf
 - `RunSpiga` — WFLW-98 landmark + headpose model. Input: `float[1×3×256×256]` NCHW in [0,1]. Output: `(landmarks float[98×2] normalized [0,1], pose float[6] raw [yaw,pitch,roll,tx,ty,tz])`.
 - `RunU2Net` — background/saliency segmentation. Input: `float[1×3×320×320]` NCHW, ImageNet-normalized. Output: `float[320×320]` raw sigmoid mask.
 
-`FacialDllConsole/OnnxDynafaceInference.cs` implements it via `Microsoft.ML.OnnxRuntime`, auto-detecting tensor names from model metadata (pass explicit overrides to the constructor, or use `--list-tensors`, if a new export uses unexpected names). The Unity adapter for the same interface lives in `DynafaceRuntime`, not here.
+`FacialDll.Onnx/OnnxDynafaceInference.cs` (NuGet package `Dynaface.Onnx`) implements it via `Microsoft.ML.OnnxRuntime`, auto-detecting tensor names from model metadata (pass explicit overrides to the constructor, or use `--list-tensors`, if a new export uses unexpected names). The Unity adapter for the same interface lives in `DynafaceRuntime`, not here.

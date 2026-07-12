@@ -2,8 +2,29 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
     <LangVersion>9.0</LangVersion>
+    <!-- Assembly name stays FacialDll so the prebuilt-DLL / Unity consumers that
+         reference FacialDll.dll keep working; only the NuGet PackageId is "Dynaface". -->
+    <AssemblyName>FacialDll</AssemblyName>
     <!-- Source of truth for the build workflow's version stamping (mirrors
-         dynaface-lib's setup.cfg [metadata] version). Bump this for releases. -->
+         dynaface-lib's setup.cfg [metadata] version). Bump this for releases.
+         Dynaface + Dynaface.Onnx ship in lockstep at the same version. -->
     <Version>2.0.0</Version>
   </PropertyGroup>
+
+  <!-- NuGet package metadata (package id "Dynaface") -->
+  <PropertyGroup>
+    <PackageId>Dynaface</PackageId>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Authors>Jeff Heaton</Authors>
+    <Description>Contract-faithful C# port of the Python dynaface-lib facial-analysis pipeline: BlazeFace detection, SPIGA WFLW-98 landmarks + headpose, U²-Net background removal, frontal and lateral analysis, and the full measurement set. Backend-agnostic — supply neural-network inference by implementing IDynafaceInference (see the Dynaface.Onnx package for a ready-made ONNX Runtime backend).</Description>
+    <PackageTags>facial-analysis;face-landmarks;dynaface;spiga;blazeface;computer-vision</PackageTags>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/jeffheaton/dynaface</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/jeffheaton/dynaface</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 </Project>
