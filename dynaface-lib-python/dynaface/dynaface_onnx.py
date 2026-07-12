@@ -25,6 +25,8 @@ import numpy as np
 import onnxruntime as ort
 from numpy.typing import NDArray
 
+from dynaface import resample
+
 # ---------------------------------------------------------------------------
 # WFLW 98-landmark 3D template and camera intrinsics (ftmap 64x64, focal 1.5)
 # ---------------------------------------------------------------------------
@@ -302,7 +304,7 @@ class DynafaceOnnxInference:
     @staticmethod
     def _preprocess_face(image_bgr: NDArray[np.uint8]) -> NDArray[np.float32]:
         rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
-        rgb = cv2.resize(rgb, (128, 128))
+        rgb = resample.resize_bilinear(rgb, 128, 128)
         # BlazeFace expects pixels normalized to [-1, 1], not [0, 1].
         tensor = (rgb.astype(np.float32) / 127.5) - 1.0
         return tensor[None]  # [1, 128, 128, 3]
@@ -401,7 +403,7 @@ class DynafaceOnnxInference:
         landmarks_crop_px = landmarks_norm[0] * float(_SPIGA_CROP_SIZE)  # [98, 2]
 
         # Map landmarks from the crop's pixel space back to image_bgr's.
-        inv_affine = cv2.invertAffineTransform(crop_affine)
+        inv_affine = resample.invert_affine(crop_affine)
         ones = np.ones((landmarks_crop_px.shape[0], 1), dtype=np.float32)
         landmarks_h = np.hstack([landmarks_crop_px, ones])
         landmarks_img = landmarks_h @ inv_affine.T
@@ -443,13 +445,13 @@ class DynafaceOnnxInference:
         # Matches PIL's Image.transform(..., Image.AFFINE) default behavior
         # (nearest-neighbor resample, zero-fill outside the source image),
         # which is what SPIGA's own pretreatment pipeline uses at crop time.
-        crop = cv2.warpAffine(
+        crop = resample.warp_affine(
             rgb,
             affine,
-            (_SPIGA_CROP_SIZE, _SPIGA_CROP_SIZE),
-            flags=cv2.INTER_NEAREST,
-            borderMode=cv2.BORDER_CONSTANT,
-            borderValue=0,
+            _SPIGA_CROP_SIZE,
+            _SPIGA_CROP_SIZE,
+            bilinear=False,
+            fill=0,
         )
         tensor = crop.astype(np.float32) / 255.0
         return tensor.transpose(2, 0, 1)[None], affine  # [1, 3, 256, 256] CHW
@@ -473,7 +475,7 @@ class DynafaceOnnxInference:
             0, 0
         ]  # [320, 320], sigmoid saliency map
 
-        mask = cv2.resize(mask, (w, h))
+        mask = resample.resize_mask_bilinear(mask, w, h)
         alpha = (np.clip(mask, 0.0, 1.0) * 255).astype(np.uint8)
 
         bgra = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2BGRA)
@@ -483,7 +485,7 @@ class DynafaceOnnxInference:
     @staticmethod
     def _preprocess_background(image_bgr: NDArray[np.uint8]) -> NDArray[np.float32]:
         rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
-        rgb = cv2.resize(rgb, (320, 320)).astype(np.float32) / 255.0
+        rgb = resample.resize_bilinear(rgb, 320, 320).astype(np.float32) / 255.0
         # U^2-Net was trained with ImageNet normalization stats.
         mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
         std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
