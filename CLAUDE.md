@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Dynaface is a facial analysis tool for measuring facial symmetry and movement, primarily for assessing facial paralysis patients. It is organized as a monorepo with two components:
 
-- **`dynaface-lib/`** — Python library (PyPI package `dynaface`)
+- **`dynaface-lib-python/`** — Python library (PyPI package `dynaface`)
 - **`dynaface-app/`** — Desktop GUI application (PyQt6)
 
 ## Important: Always Use the venv
@@ -15,10 +15,10 @@ Both components use Python virtual environments. **Never install packages or run
 
 ## Commands
 
-### dynaface-lib (Python Library)
+### dynaface-lib-python (Python Library)
 
 ```bash
-cd dynaface-lib
+cd dynaface-lib-python
 python3.11 -m venv venv && source venv/bin/activate
 pip install -e ".[dev]"
 
@@ -67,7 +67,7 @@ python -m unittest discover -s tests
 
 ## Architecture
 
-### Library (`dynaface-lib/dynaface/`)
+### Library (`dynaface-lib-python/dynaface/`)
 
 The library has two main analysis paths: **frontal** (face-on) and **lateral** (side-profile).
 
@@ -104,4 +104,4 @@ The library has two main analysis paths: **frontal** (face-on) and **lateral** (
 - **Plugin architecture** for measurements: add a new `MeasureBase` subclass and register it in `measures.py`
 - **Lazy model loading**: models are downloaded on first use and cached
 - **Dual-view analysis**: frontal and lateral are separate code paths that share base infrastructure
-- **MVC separation**: `dynaface-lib` handles all computation; `dynaface-app` handles presentation
+- **MVC separation**: `dynaface-lib-python` handles all computation; `dynaface-app` handles presentation

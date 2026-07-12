@@ -14,7 +14,7 @@ python3.12 -m venv venv
 source venv/bin/activate   
 pip install setuptools wheel
 # Build it
-cd ./dynaface-lib
+cd ./dynaface-lib-python
 python3.12 setup.py bdist_wheel
 mkdir -p ../dynaface-app/wheels/
 cp ./dist/*.whl ../dynaface-app/wheels/

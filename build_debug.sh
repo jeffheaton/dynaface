@@ -10,5 +10,5 @@ curl -L -o ./data/dynaface_models.zip https://github.com/jeffheaton/dynaface-mod
 unzip -o ./data/dynaface_models.zip -d ./data/
 rm ./data/dynaface_models.zip
 
-cd ../dynaface-lib
+cd ../dynaface-lib-python
 pip install -e .[dev]

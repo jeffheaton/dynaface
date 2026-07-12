@@ -45,11 +45,11 @@ git clone https://github.com/jeffheaton/dynaface.git "$TMP_DIR/dynaface"
 mkdir "$TMP_DIR/temp_tests"
 
 # Copy over the test files from the cloned repository.
-cp -r "$TMP_DIR/dynaface/dynaface-lib/tests/"* "$TMP_DIR/temp_tests/"
+cp -r "$TMP_DIR/dynaface/dynaface-lib-python/tests/"* "$TMP_DIR/temp_tests/"
 
 # Also copy the tests_data folder if it exists.
-if [ -d "$TMP_DIR/dynaface/dynaface-lib/tests_data" ]; then
-    cp -r "$TMP_DIR/dynaface/dynaface-lib/tests_data" "$TMP_DIR/temp_tests/"
+if [ -d "$TMP_DIR/dynaface/dynaface-lib-python/tests_data" ]; then
+    cp -r "$TMP_DIR/dynaface/dynaface-lib-python/tests_data" "$TMP_DIR/temp_tests/"
 fi
 
 # Change into the temporary tests directory and run the tests using the specified Python interpreter.

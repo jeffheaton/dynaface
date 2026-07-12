@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 See [`facial_dll/CLAUDE.md`](facial_dll/CLAUDE.md) for the full pipeline architecture, coordinate system contract, and WFLW-98 landmark index reference.
 
-This is a contract-faithful C# port of the Python `dynaface-lib` package (`../dynaface-lib/`) — same measurement formulas and pipeline order, adapted to .NET idioms (nullable types, PascalCase, typed DTOs) where Python's idioms didn't fit. When porting new functionality from there, treat `dynaface-lib`'s Python source as the reference implementation.
+This is a contract-faithful C# port of the Python `dynaface-lib` package (`../dynaface-lib-python/`) — same measurement formulas and pipeline order, adapted to .NET idioms (nullable types, PascalCase, typed DTOs) where Python's idioms didn't fit. When porting new functionality from there, treat `dynaface-lib`'s Python source as the reference implementation.
 
 ## Build & Run
 

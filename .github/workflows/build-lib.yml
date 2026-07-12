@@ -22,11 +22,11 @@ jobs:
         run: pip install build wheel
 
       - name: Install dependencies
-        working-directory: dynaface-lib
+        working-directory: dynaface-lib-python
         run: pip install -e ".[test,lint]"
 
       - name: Static code analysis
-        working-directory: dynaface-lib
+        working-directory: dynaface-lib-python
         run: |
 
           echo "Running flake8..."
@@ -50,11 +50,11 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: static-analysis-reports
-          path: dynaface-lib/*.txt
+          path: dynaface-lib-python/*.txt
           if-no-files-found: ignore
 
       - name: Run tests
-        working-directory: dynaface-lib
+        working-directory: dynaface-lib-python
         run: |
           python3.11 -m pytest tests \
             --junitxml=unit_test_results.xml \
@@ -63,7 +63,7 @@ jobs:
             --cov-report=html
 
       - name: Check coverage thresholds
-        working-directory: dynaface-lib
+        working-directory: dynaface-lib-python
         continue-on-error: true
         run: |
           python3.11 -m pytest tests --cov=. --cov-fail-under=60 -q --no-header 2>&1 | tail -5
@@ -72,7 +72,7 @@ jobs:
         if: always()
         uses: mikepenz/action-junit-report@v6
         with:
-          report_paths: dynaface-lib/unit_test_results.xml
+          report_paths: dynaface-lib-python/unit_test_results.xml
 
       - name: Upload coverage reports
         if: always()
@@ -80,12 +80,12 @@ jobs:
         with:
           name: coverage-reports
           path: |
-            dynaface-lib/coverage.xml
-            dynaface-lib/htmlcov/
+            dynaface-lib-python/coverage.xml
+            dynaface-lib-python/htmlcov/
           if-no-files-found: ignore
 
       - name: Generate version file
-        working-directory: dynaface-lib
+        working-directory: dynaface-lib-python
         run: |
           VERSION=$(python3.11 -c "import configparser; c = configparser.ConfigParser(); c.read('setup.cfg'); print(c['metadata']['version'])")
           BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%S%z")
@@ -101,13 +101,13 @@ jobs:
           cat dynaface/version.py
 
       - name: Build wheel
-        working-directory: dynaface-lib
+        working-directory: dynaface-lib-python
         run: |
           rm -rf dist/*
           python3.11 -m build --wheel
 
       - name: Validate with twine
-        working-directory: dynaface-lib
+        working-directory: dynaface-lib-python
         run: |
           pip install --upgrade twine
           twine check dist/*
@@ -116,7 +116,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: dynaface-wheel
-          path: dynaface-lib/dist/*.whl
+          path: dynaface-lib-python/dist/*.whl
 
       - name: Upload to S3
         env:
@@ -124,10 +124,10 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: |
-          cd dynaface-lib/dist
+          cd dynaface-lib-python/dist
           aws s3 cp *.whl s3://data.heatonresearch.com/library/ --acl public-read
 
       - name: Clean up build artifacts
         if: always()
-        working-directory: dynaface-lib
+        working-directory: dynaface-lib-python
         run: rm -rf build dist dynaface.egg-info

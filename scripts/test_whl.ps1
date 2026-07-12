@@ -51,10 +51,10 @@ git clone https://github.com/jeffheaton/dynaface.git "$($tmp_dir.FullName)\dynaf
 # Copy test files
 $temp_tests = "$($tmp_dir.FullName)\temp_tests"
 New-Item -ItemType Directory -Path $temp_tests | Out-Null
-Copy-Item -Recurse "$($tmp_dir.FullName)\dynaface\dynaface-lib\tests\*" $temp_tests
+Copy-Item -Recurse "$($tmp_dir.FullName)\dynaface\dynaface-lib-python\tests\*" $temp_tests
 
 # Optionally copy test_data
-$tests_data = "$($tmp_dir.FullName)\dynaface\dynaface-lib\tests_data"
+$tests_data = "$($tmp_dir.FullName)\dynaface\dynaface-lib-python\tests_data"
 if (Test-Path $tests_data) {
     Copy-Item -Recurse $tests_data "$temp_tests\tests_data"
 }

@@ -13,10 +13,10 @@ python3.11 -m venv venv
 # Install Python dependencies from requirements.txt
 pip install -r .\requirements.txt
 
-# Change directory to dynaface-lib
-Set-Location -Path "..\dynaface-lib"
+# Change directory to dynaface-lib-python
+Set-Location -Path "..\dynaface-lib-python"
 
-# Install the dynaface-lib package in editable mode
+# Install the dynaface-lib-python package in editable mode
 pip install -e .
 
 
