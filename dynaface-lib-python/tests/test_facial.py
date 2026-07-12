@@ -41,25 +41,26 @@ class TestFaceAnalysis(unittest.TestCase):
         assert isinstance(items, list), "Expected a list"
 
         # Expected values (rounded to 2 decimals)
-        # Recalibrated for the ONNX (BlazeFace + SPIGA-onnx) inference pipeline
-        # on opencv-python>=5.0.0; see dynaface.dynaface_onnx.DynafaceOnnxInference.
+        # Calibrated with the first-principles resamplers (dynaface.resample,
+        # replacing cv2.resize/warpAffine) under the CPU execution provider; other
+        # providers/platforms stay within _tolerance(). See dynaface.resample.
         expected_values = {
-            "fai": 1.53,
+            "fai": 2.18,
             "oce.l": 84.78,
             "oce.r": 107.0,
             "brow.d": 4.39,
-            "dental_area": 3109.23,
-            "dental_left": 1429.91,
-            "dental_right": 1679.32,
-            "dental_ratio": 0.85,
-            "dental_diff": 249.4,
+            "dental_area": 3073.29,
+            "dental_left": 1447.08,
+            "dental_right": 1626.22,
+            "dental_ratio": 0.89,
+            "dental_diff": 179.14,
             "eye.left": 644.69,
             "eye.right": 644.96,
             "eye.diff": 0.27,
             "eye.ratio": 1.0,
-            "id": 79.84,
-            "ml": 169.25,
-            "oe": 205.86,
+            "id": 77.64,
+            "ml": 170.72,
+            "oe": 203.66,
             "tilt": 1.16,
             "px2mm": 0.32,
             "pd": 198.04,
@@ -93,28 +94,29 @@ class TestFaceAnalysis(unittest.TestCase):
         face.draw_landmarks()
 
         # Expected values (rounded to 2 decimals)
-        # Recalibrated for the ONNX (BlazeFace + SPIGA-onnx) inference pipeline
-        # on opencv-python>=5.0.0; see dynaface.dynaface_onnx.DynafaceOnnxInference.
+        # Calibrated with the first-principles resamplers (dynaface.resample,
+        # replacing cv2.resize/warpAffine) under the CPU execution provider; other
+        # providers/platforms stay within _tolerance(). See dynaface.resample.
         expected_values = {
-            "fai": 5.76,
-            "oce.l": 20.82,
-            "oce.r": 16.42,
-            "brow.d": 10.08,
-            "dental_area": 49.71,
-            "dental_left": 48.93,
-            "dental_right": 0.78,
-            "dental_ratio": 0.02,
-            "dental_diff": 48.15,
-            "eye.left": 72.46,
-            "eye.right": 0.81,
-            "eye.diff": 71.65,
+            "fai": 6.25,
+            "oce.l": 21.04,
+            "oce.r": 16.71,
+            "brow.d": 9.84,
+            "dental_area": 53.42,
+            "dental_left": 53.34,
+            "dental_right": 0.09,
+            "dental_ratio": 0.0,
+            "dental_diff": 53.25,
+            "eye.left": 69.58,
+            "eye.right": 0.98,
+            "eye.diff": 68.6,
             "eye.ratio": 0.01,
-            "id": 13.69,
-            "ml": 19.41,
-            "oe": 30.08,
-            "tilt": -4.09,
+            "id": 12.96,
+            "ml": 20.16,
+            "oe": 30.3,
+            "tilt": -5.55,
             "px2mm": 0.24,
-            "pd": 70.18,
+            "pd": 72.34,
         }
 
         # Check expected values (rounded)
@@ -144,28 +146,29 @@ class TestFaceAnalysis(unittest.TestCase):
         stats = face.analyze()
 
         # Expected values (rounded to 2 decimals)
-        # Recalibrated for the ONNX (BlazeFace + SPIGA-onnx) inference pipeline
-        # on opencv-python>=5.0.0; see dynaface.dynaface_onnx.DynafaceOnnxInference.
+        # Calibrated with the first-principles resamplers (dynaface.resample,
+        # replacing cv2.resize/warpAffine) under the CPU execution provider; other
+        # providers/platforms stay within _tolerance(). See dynaface.resample.
         expected_values = {
-            "fai": 1.99,
-            "oce.l": 22.24,
-            "oce.r": 15.89,
+            "fai": 2.19,
+            "oce.l": 22.68,
+            "oce.r": 16.65,
             "brow.d": 8.64,
-            "dental_area": 12.21,
-            "dental_left": 10.31,
-            "dental_right": 1.9,
-            "dental_ratio": 0.18,
-            "dental_diff": 8.41,
-            "eye.left": 73.21,
-            "eye.right": 0.03,
-            "eye.diff": 73.18,
+            "dental_area": 16.39,
+            "dental_left": 13.8,
+            "dental_right": 2.59,
+            "dental_ratio": 0.19,
+            "dental_diff": 11.2,
+            "eye.left": 73.87,
+            "eye.right": 0.17,
+            "eye.diff": 73.7,
             "eye.ratio": 0.0,
-            "id": 14.53,
-            "ml": 19.68,
-            "oe": 30.26,
-            "tilt": 1.59,
+            "id": 15.0,
+            "ml": 20.16,
+            "oe": 30.49,
+            "tilt": 0.78,
             "px2mm": 0.24,
-            "pd": 72.03,
+            "pd": 73.01,
         }
 
         # Check expected values (rounded)
@@ -222,8 +225,7 @@ class TestFaceAnalysis(unittest.TestCase):
 
         # Load image
         face = facial.load_face_image("./tests_data/img1-512.jpg")
-        # Recalibrated for the ONNX (BlazeFace + SPIGA-onnx) inference pipeline;
-        # see dynaface.dynaface_onnx.DynafaceOnnxInference.
+        # Calibrated with the first-principles resamplers (dynaface.resample).
         self.assertAlmostEqual(
             face.calculate_face_rotation(), 1.16, delta=_tolerance(1.16)
         )

@@ -38,25 +38,26 @@ class TestFaceSave(unittest.TestCase):
         stats = face2.analyze()
 
         # Expected values (rounded to 2 decimals)
-        # Recalibrated for the ONNX (BlazeFace + SPIGA-onnx) inference pipeline
-        # on opencv-python>=5.0.0; see dynaface.dynaface_onnx.DynafaceOnnxInference.
+        # Calibrated with the first-principles resamplers (dynaface.resample,
+        # replacing cv2.resize/warpAffine) under the CPU execution provider; other
+        # providers/platforms stay within _tolerance(). See dynaface.resample.
         expected_values = {
-            "fai": 1.53,
+            "fai": 2.18,
             "oce.l": 84.78,
             "oce.r": 107.0,
             "brow.d": 4.39,
-            "dental_area": 3109.23,
-            "dental_left": 1429.91,
-            "dental_right": 1679.32,
-            "dental_ratio": 0.85,
-            "dental_diff": 249.4,
+            "dental_area": 3073.29,
+            "dental_left": 1447.08,
+            "dental_right": 1626.22,
+            "dental_ratio": 0.89,
+            "dental_diff": 179.14,
             "eye.left": 644.69,
             "eye.right": 644.96,
             "eye.diff": 0.27,
             "eye.ratio": 1.0,
-            "id": 79.84,
-            "ml": 169.25,
-            "oe": 205.86,
+            "id": 77.64,
+            "ml": 170.72,
+            "oe": 203.66,
             "tilt": 1.16,
             "px2mm": 0.32,
             "pd": 198.04,
@@ -93,24 +94,25 @@ class TestFaceSave(unittest.TestCase):
         stats = face2.analyze()
 
         # Expected values (rounded to 2 decimals)
-        # Recalibrated for the ONNX (BlazeFace + SPIGA-onnx) inference pipeline
-        # on opencv-python>=5.0.0; see dynaface.dynaface_onnx.DynafaceOnnxInference.
+        # Calibrated with the first-principles resamplers (dynaface.resample,
+        # replacing cv2.resize/warpAffine) under the CPU execution provider; other
+        # providers/platforms stay within _tolerance(). See dynaface.resample.
         expected_values = {
-            "fai": 1.99,
-            "oce.l": 22.24,
-            "oce.r": 15.89,
+            "fai": 2.19,
+            "oce.l": 22.68,
+            "oce.r": 16.65,
             "brow.d": 8.64,
-            "dental_area": 12.21,
-            "dental_left": 10.31,
-            "dental_right": 1.9,
-            "dental_ratio": 0.18,
-            "dental_diff": 8.41,
-            "eye.left": 73.21,
-            "eye.right": 0.03,
-            "eye.diff": 73.18,
+            "dental_area": 16.39,
+            "dental_left": 13.8,
+            "dental_right": 2.59,
+            "dental_ratio": 0.19,
+            "dental_diff": 11.2,
+            "eye.left": 73.87,
+            "eye.right": 0.17,
+            "eye.diff": 73.7,
             "eye.ratio": 0.0,
-            "id": 14.53,
-            "tilt": 1.59,
+            "id": 15.0,
+            "tilt": 0.78,
         }
 
         # Check expected values (rounded)
