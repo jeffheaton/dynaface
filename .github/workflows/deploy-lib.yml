@@ -30,5 +30,8 @@ jobs:
         env:
           PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         run: |
-          pip install --upgrade twine
+          # Upgrade packaging too: the wheel uses Metadata-Version 2.4 (PEP 639
+          # License-File), which the runner's system packaging (24.0) doesn't
+          # recognize, causing twine to reject a valid field. packaging>=24.2 fixes it.
+          pip install --upgrade twine "packaging>=24.2"
           twine upload --non-interactive -u __token__ -p "$PYPI_API_TOKEN" dist/*
