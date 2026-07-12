@@ -12,7 +12,9 @@ obj/
 
 # Local/CI release build output (see .github/workflows/build-lib-dotnet.yml)
 dist/
+nupkgs/
 *.zip
+*.nupkg
 TestResults/
 format-report/
 vulnerable-packages-report.txt

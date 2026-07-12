@@ -4,15 +4,15 @@ on:
   workflow_dispatch:
 
 permissions:
+  contents: read
   checks: write
+  # Required for NuGet Trusted Publishing: lets the NuGet/login action request a
+  # short-lived OIDC token from GitHub to exchange for a temporary NuGet API key.
+  id-token: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      # Hoisted to job level so the "Push to NuGet.org" step's `if:` can test it
-      # (secrets can't be referenced directly in an `if:` expression).
-      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
 
     steps:
       - uses: actions/checkout@v7
@@ -132,12 +132,20 @@ jobs:
           name: dynaface-nupkgs
           path: dynaface-lib-dotnet/nupkgs/*.nupkg
 
+      # Trusted Publishing: exchange GitHub's OIDC token for a short-lived NuGet
+      # API key (no long-lived secret stored in the repo). Requires a matching
+      # trusted-publishing policy on NuGet.org for both package IDs — see README.
+      - name: NuGet login (Trusted Publishing / OIDC)
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: jeffheaton
+
       - name: Push to NuGet.org
-        if: ${{ env.NUGET_API_KEY != '' }}
         working-directory: dynaface-lib-dotnet
         run: |
           dotnet nuget push "nupkgs/*.nupkg" \
-            --api-key "$NUGET_API_KEY" \
+            --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
             --source https://api.nuget.org/v3/index.json \
             --skip-duplicate
 

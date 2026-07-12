@@ -52,6 +52,20 @@ dotnet pack FacialDll.Onnx/FacialDll.Onnx.csproj -c Release -o ./nupkgs # Dynafa
 
 Both take `<Version>` from their own `.csproj`; keep the two in lockstep.
 
+### Publishing to NuGet (maintainers)
+
+Releases are published by manually running the [Build Library (.NET)](../.github/workflows/build-lib-dotnet.yml)
+workflow (`workflow_dispatch`). It packs both packages and pushes them to NuGet.org
+via **Trusted Publishing** — GitHub's OIDC token is exchanged for a short-lived
+key by the `NuGet/login` action, so there is **no long-lived API key stored in the repo**.
+
+One-time setup on NuGet.org (Account → **Trusted Publishing**): add a policy for
+each package ID (`Dynaface`, `Dynaface.Onnx`) bound to this repository
+(`jeffheaton/dynaface`) and the `Build Library (.NET)` workflow. To cut a release,
+bump `<Version>` in both `.csproj` files (kept in lockstep), then dispatch the
+workflow. Pushes use `--skip-duplicate`, so re-running at an already-published
+version is a no-op rather than an error.
+
 ## Test
 
 ```bash
