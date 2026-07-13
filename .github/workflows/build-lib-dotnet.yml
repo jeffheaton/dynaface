@@ -36,6 +36,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: format-report
+          retention-days: 7
           path: dynaface-lib-dotnet/format-report
           if-no-files-found: ignore
 
@@ -49,6 +50,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: vulnerability-report
+          retention-days: 7
           path: dynaface-lib-dotnet/vulnerable-packages-report.txt
           if-no-files-found: ignore
 
@@ -107,6 +109,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: dynaface-dotnet-dll
+          retention-days: 7
           path: dynaface-lib-dotnet/dynaface-dotnet-*.zip
 
       - name: Upload to S3
@@ -130,6 +133,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: dynaface-nupkgs
+          retention-days: 7
           path: dynaface-lib-dotnet/nupkgs/*.nupkg
 
       # Trusted Publishing: exchange GitHub's OIDC token for a short-lived NuGet

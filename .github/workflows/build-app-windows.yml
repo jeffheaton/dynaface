@@ -32,13 +32,6 @@ jobs:
           BUILD_NUMBER: ${{ github.run_number }}
         run: ./build.ps1
 
-      - name: Upload exe artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: dynaface-windows-exe
-          path: dynaface-app/deploy/windows/working/dist/dynaface.exe
-          if-no-files-found: error
-
       - name: Package and publish to S3
         working-directory: dynaface-app/deploy/windows
         shell: pwsh

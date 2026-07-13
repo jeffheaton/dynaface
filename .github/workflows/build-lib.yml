@@ -50,6 +50,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: static-analysis-reports
+          retention-days: 7
           path: dynaface-lib-python/*.txt
           if-no-files-found: ignore
 
@@ -79,6 +80,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: coverage-reports
+          retention-days: 7
           path: |
             dynaface-lib-python/coverage.xml
             dynaface-lib-python/htmlcov/
@@ -116,6 +118,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: dynaface-wheel
+          retention-days: 7
           path: dynaface-lib-python/dist/*.whl
 
       - name: Upload to S3
