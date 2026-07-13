@@ -5,7 +5,7 @@ $InitialLocation = Get-Location
 
 # Constants
 $script:MODEL_BINARY_URL = "https://data.heatonresearch.com/dynaface/model/2/dynaface_models.zip"
-$script:DYNAFACE_WHL = "https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/library/dynaface-2.0.0-py3-none-any.whl"
+$script:DYNAFACE_VERSION = "2.0.0"
 
 try {
     # ----------------------------
@@ -36,12 +36,17 @@ BUILD = $buildNum
         Remove-Item -Recurse -Force "./venv"
     }
 
-    python3.11 -m venv venv
+    # Resolve the Python 3.11 interpreter. Local dev machines expose it as
+    # `python3.11`; a fresh Windows install / GitHub runner exposes `python.exe`.
+    # CI sets PYTHON_EXE to the interpreter path from actions/setup-python.
+    $python = if ($env:PYTHON_EXE) { $env:PYTHON_EXE } else { "python3.11" }
+    Write-Host "** Using Python: $python **"
+    & $python -m venv venv
     $venvPython = Join-Path $appRoot "venv/Scripts/python.exe"
     $venvPip = Join-Path $appRoot "venv/Scripts/pip.exe"
 
     & $venvPip install -r requirements.txt
-    & $venvPip install --upgrade $script:DYNAFACE_WHL
+    & $venvPip install --upgrade "dynaface==$script:DYNAFACE_VERSION"
 
     # onnxruntime loads onnxruntime_providers_shared.dll at import time.
     # PyInstaller's isolated analysis subprocess doesn't have this DLL in PATH,
@@ -95,6 +100,7 @@ BUILD = $buildNum
     Copy-Item ../../jth_ui -Destination ./working/jth_ui -Recurse -Force
     Copy-Item ./rthook_paths.py -Destination ./working
     Copy-Item ./rthook_diag.py -Destination ./working
+    Copy-Item ./vcredist -Destination ./working/vcredist -Recurse -Force
 
     # ----------------------------
     # Run PyInstaller

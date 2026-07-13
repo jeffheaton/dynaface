@@ -76,12 +76,19 @@ def _maybe(src, dest_subdir="ort"):
 py_dll_dir = Path(sys.executable).parent              # venv ...\Scripts
 base_py      = Path(sys.base_prefix)                  # base Python root
 sys32_dir    = Path(os.environ.get("WINDIR", r"C:\Windows")) / "System32"
+# Newer MSVC runtime DLLs bundled with the build (see deploy/windows/vcredist).
+# Modern onnxruntime requires a VS2022-era CRT (>=14.40); the build machine's
+# System32 copy may be older, so we prefer this staged copy and ship it in the
+# exe. This makes the frozen app portable to end-user machines with an old CRT.
+local_vc     = Path(os.path.abspath("vcredist"))
 
 extra_ort_bins = []
 
-# MSVC CRTs commonly required by onnxruntime
+# MSVC CRTs commonly required by onnxruntime. Prefer the staged newer copy in
+# vcredist/ over whatever (possibly stale) copy is on the build machine.
 for name in ("vcruntime140_1.dll", "vcruntime140.dll", "msvcp140.dll"):
     candidates = [
+        str(local_vc / name),
         str(py_dll_dir / name),
         str(base_py / name),
         str(sys32_dir / name),
@@ -146,7 +153,25 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    upx_exclude=[],
+    upx_exclude=[
+        # onnxruntime — UPX corrupts these and breaks import/load at runtime
+        'onnxruntime.dll',
+        'onnxruntime_providers_shared.dll',
+        'onnxruntime_pybind11_state.pyd',
+        'onnxruntime*.dll',
+        'onnxruntime*.pyd',
+        # MSVC / OpenMP runtimes onnxruntime depends on
+        'vcruntime140.dll',
+        'vcruntime140_1.dll',
+        'msvcp140.dll',
+        'vcruntime*.dll',
+        'libiomp5md.dll',
+        'vcomp140.dll',
+        # Qt6 — UPX can corrupt Qt DLLs/plugins
+        'Qt6*.dll',
+        # Python runtime DLL
+        'python3*.dll',
+    ],
     runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,

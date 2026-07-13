@@ -1,0 +1,40 @@
+name: Build Windows App
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python 3.11
+        id: py
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install UPX
+        run: choco install upx -y --no-progress
+
+      - name: Build Windows exe
+        working-directory: dynaface-app/deploy/windows
+        shell: pwsh
+        env:
+          # build.ps1 defaults to `python3.11`, which the runner doesn't expose;
+          # point it at the interpreter actions/setup-python installed.
+          PYTHON_EXE: ${{ steps.py.outputs.python-path }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: ./build.ps1
+
+      - name: Upload exe artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: dynaface-windows-exe
+          path: dynaface-app/deploy/windows/working/dist/dynaface.exe
+          if-no-files-found: error
