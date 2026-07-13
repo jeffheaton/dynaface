@@ -38,3 +38,18 @@ jobs:
           name: dynaface-windows-exe
           path: dynaface-app/deploy/windows/working/dist/dynaface.exe
           if-no-files-found: error
+
+      - name: Package and publish to S3
+        working-directory: dynaface-app/deploy/windows
+        shell: pwsh
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+        run: |
+          $ver = (Select-String -Path ../../version.py -Pattern 'VERSION\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          $zip = "dynaface-$ver.zip"
+          Compress-Archive -Path working/dist/dynaface.exe -DestinationPath $zip -Force
+          $dest = "s3://data.heatonresearch.com/library/$zip"
+          Write-Host "Uploading $zip -> $dest"
+          aws s3 cp $zip $dest --acl public-read
