@@ -19,7 +19,9 @@ class DynafaceWindow(MainWindowJTH):
     def __init__(self, app, app_name):
         super().__init__(app)
         self.running = False
-        self.setWindowTitle(app_name)
+        self._base_title = app_name
+        # Models load on a background thread; show progress until they're ready.
+        self.setWindowTitle(f"{app_name} — Loading AI models…")
         self.setGeometry(100, 100, 1100, 500)
 
         self.render_buffer = None
@@ -272,8 +274,34 @@ class DynafaceWindow(MainWindowJTH):
             "https://github.com/jeffheaton/dynaface/blob/main/dynaface-app/manual.md"
         )
 
+    def on_models_ready(self):
+        """Called on the main thread once the AI models finish loading."""
+        self.setWindowTitle(self._base_title)
+        # If the user queued a file while models were loading, background_timer
+        # opens it now that app.models_ready is set.
+
+    def on_models_error(self, message):
+        """Called on the main thread if the AI models failed to initialize."""
+        self.setWindowTitle(self._base_title)
+        self.display_message_box(
+            "Dynaface was unable to start its AI models, so analysis features "
+            f"are unavailable.\n\n{message}"
+        )
+
     def open_file(self, file_path):
         try:
+            if not self.app.models_ready:
+                # Models are still loading on a background thread. Queue the
+                # request; background_timer opens it once app.models_ready is
+                # set. This guards every open path (Open dialog, drag-drop,
+                # recent files) from running analysis before models exist.
+                logger.info(f"Deferring open until models ready: {file_path}")
+                self.app.file_open_request = file_path
+                self.display_message_box(
+                    "Dynaface is still loading its AI models. Your file will "
+                    "open automatically in a moment."
+                )
+                return
             super().open_file(file_path)
             logger.info(f"Open File: {file_path}")
 

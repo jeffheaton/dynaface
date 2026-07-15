@@ -42,7 +42,7 @@ from dynaface_window import DynafaceWindow
 from jth_ui import app_const, utl_log
 from jth_ui.app_jth import AppJTH, get_library_version
 from pillow_heif import register_heif_opener
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QObject, QThread, QTimer, pyqtSignal
 
 import dynaface
 
@@ -61,6 +61,53 @@ DEFAULT_SMOOTH = 2
 register_heif_opener()
 
 # https://stackoverflow.com/questions/75746637/how-to-suppress-qt-pointer-dispatch-warning
+
+
+class _ModelLoaderWorker(QObject):
+    """Loads the ONNX AI models off the GUI thread.
+
+    ``init_models()`` builds several ONNX Runtime inference sessions, which is
+    heavy native work (~20s). ONNX Runtime releases the GIL during that work,
+    so running it here keeps the main window responsive during startup instead
+    of freezing it right after the splash closes (which looked like a crash).
+    See ``AppDynaface._start_model_loader``.
+    """
+
+    # Emits the device actually used (may be "cpu" if we fell back).
+    finished = pyqtSignal(str)
+    # Emits an error message if the models could not be initialized at all.
+    failed = pyqtSignal(str)
+
+    def __init__(self, model_path: str, device: str):
+        super().__init__()
+        self._model_path = model_path
+        self._device = device
+
+    def run(self):
+        import dynaface.models
+
+        try:
+            dynaface.models.init_models(model_path=self._model_path, device=self._device)
+            self.finished.emit(self._device)
+            return
+        except Exception:
+            logger.error(
+                f"Error starting AI models on device {self._device}", exc_info=True
+            )
+
+        # Fall back to CPU if a hardware accelerator failed to initialize.
+        if self._device != "cpu":
+            logger.info("Trying CPU as AI device.")
+            try:
+                dynaface.models.init_models(model_path=self._model_path, device="cpu")
+                self.finished.emit("cpu")
+                return
+            except Exception as e:
+                logger.error("Error starting AI models on CPU", exc_info=True)
+                self.failed.emit(str(e))
+                return
+
+        self.failed.emit("Unable to initialize AI models.")
 
 
 class AppDynaface(AppJTH):
@@ -142,25 +189,65 @@ class AppDynaface(AppJTH):
         v = get_library_version("onnxruntime")
         logging.info(f"ONNX Runtime version: {v}")
 
-        # Initialize AI models on the main thread, kept in step with the
-        # deferred QTimer.singleShot(0, ...) startup used to load them.
-        try:
-            dynaface.models.init_models(model_path=self.DATA_DIR, device=self.device)
-        except Exception as e:
-            logger.error(
-                f"Error starting AI models on device {self.device}", exc_info=True
-            )
-            if self.device != "cpu":
-                logger.info("Trying CPU as AI device.")
-                self.device = "cpu"
-                self.settings[SETTING_ACC] = "cpu"
-                dynaface.models.init_models(model_path=self.DATA_DIR, device=self.device)
+        # Initialize AI models on a worker thread so the GUI stays responsive.
+        # Building the ONNX Runtime sessions is ~20s of native work; doing it on
+        # the main thread froze the window right after the splash closed, which
+        # users mistook for a crash. models_ready is flipped in the completion
+        # slot on the main thread.
+        self._start_model_loader(self.device)
 
-        self.models_ready = True
-        logger.info("AI models ready.")
+    def _start_model_loader(self, device: str):
+        self._model_thread = QThread()
+        self._model_worker = _ModelLoaderWorker(model_path=self.DATA_DIR, device=device)
+        self._model_worker.moveToThread(self._model_thread)
+        self._model_thread.started.connect(self._model_worker.run)
+        self._model_worker.finished.connect(self._on_models_loaded)
+        self._model_worker.failed.connect(self._on_models_failed)
+        self._model_thread.start()
+
+    def _stop_model_thread(self):
+        thread = getattr(self, "_model_thread", None)
+        if thread is None:
+            return
+        thread.quit()
+        thread.wait()
+        self._model_worker.deleteLater()
+        thread.deleteLater()
+        self._model_thread = None
+        self._model_worker = None
+
+    def _on_models_loaded(self, device: str):
+        try:
+            if device != self.device:
+                # A hardware accelerator failed and we fell back to CPU. Persist
+                # the choice so we don't retry the failing accelerator on the
+                # next launch.
+                logger.info(f"AI device fell back to {device}.")
+                self.device = device
+                self.settings[SETTING_ACC] = False
+            self.models_ready = True
+            logger.info("AI models ready.")
+            if self.main_window is not None:
+                self.main_window.on_models_ready()
+        finally:
+            self._stop_model_thread()
+
+    def _on_models_failed(self, message: str):
+        logger.error(f"AI models failed to initialize: {message}")
+        try:
+            # Drop any file the user queued while waiting; it can't be analyzed
+            # without models.
+            self.file_open_request = None
+            if self.main_window is not None:
+                self.main_window.on_models_error(message)
+        finally:
+            self._stop_model_thread()
 
     def shutdown(self):
         try:
+            # Ensure the model-loader thread is stopped before we tear down, or
+            # Qt aborts on a QThread destroyed while still running.
+            self._stop_model_thread()
             super().shutdown()
             sys.exit(0)
         except Exception as e:
