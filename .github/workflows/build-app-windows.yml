@@ -32,6 +32,30 @@ jobs:
           BUILD_NUMBER: ${{ github.run_number }}
         run: ./build.ps1
 
+      - name: Sign Windows exe (SSL.com eSigner)
+        uses: sslcom/esigner-codesign@develop
+        with:
+          command: sign
+          username: ${{ secrets.SSL_COM_USERNAME }}
+          password: ${{ secrets.SSL_COM_PASSWORD }}
+          totp_secret: ${{ secrets.SSL_COM_TOTP_SECRET }}
+          credential_id: ${{ secrets.SSL_COM_CREDENTIAL_ID }}
+          file_path: ${{ github.workspace }}/dynaface-app/deploy/windows/working/dist/dynaface.exe
+          override: true
+          malware_block: false
+          environment_name: PROD
+
+      - name: Verify signature
+        working-directory: dynaface-app/deploy/windows
+        shell: pwsh
+        run: |
+          $signtool = Get-ChildItem `
+            "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName | Select-Object -Last 1
+          if (-not $signtool) { throw "signtool.exe not found" }
+          Write-Host "Using $($signtool.FullName)"
+          & $signtool.FullName verify /pa /v working/dist/dynaface.exe
+
       - name: Package and publish to S3
         working-directory: dynaface-app/deploy/windows
         shell: pwsh
