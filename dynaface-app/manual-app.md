@@ -1,111 +1,185 @@
 # Dynaface User Guide
 
-Dynaface is an iOS app that uses on-device artificial intelligence to detect a face in a photo and measure aspects of its symmetry, such as eye spacing, mouth width, brow height, and more. You can take a new photo with your camera or import one from your Photo Library, and Dynaface will automatically find the face, align it, and display a set of measurements you can turn on or off.
+Dynaface is an application that measures key facial symmetry statistics using artificial intelligence. Dynaface can measure both individual images and recorded video. This program calculates the degree of Facial paralysis and asymmetry caused by Bell's Palsy, cranial tumor resection, or other factors. We released this program under the [MIT License](https://opensource.org/license/mit/); this program is for educational and research purposes only. [[likely include paper citation]]
 
-All photos and measurements stay on your device — nothing is uploaded anywhere.
+We have provided both Macintosh and Windows versions of Dynaface. The Macintosh version requires a Mac M1 or later. The Windows application requires Windows 11 or higher and can optionally utilize an NVIDIA CUDA-compatible GPU to speed processing.
 
----
+When you launch Dynaface, you will see the following.
 
-## Getting Started
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-splash.jpg?v=1" width="512">
 
-When you open Dynaface, you'll see your **Photo Library** — a grid of every photo you've previously captured or imported. The first time you launch the app, this screen will be empty.
+This window provides the following options:
 
-<img src="https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/images/facial/manual/2.0/dynaface-catalog.jpg" width="512">
+- **Open File** - Open a new video, image, or Dynaface document file for editing.
+- **About** - Information about Dynaface or
+- **Settings** - Allows you to customize the program.
+- **Exit** - Quit the program.
 
-Two buttons sit at the bottom of the screen:
+Most likely you will begin by opening a video or image file.
 
-- **Camera** — Opens the live camera view so you can take a new photo.
-- **Import** — Opens your device's Photo Library so you can choose an existing picture.
+# Analyzing a Video or Image
 
-## Taking a Photo
+Whether you are analyzing a video or an image, you will see a window similar to what you see here.
 
-Tapping the Camera button opens a live preview from your device's camera.
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/app-controls.jpg?v=1" width="512">
 
-<img src="https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/images/facial/manual/2.0/dynaface-camera.jpg" width="512">
+Let's review the controls and options that you see on this window. Some of these options will only be available when analyzing a video.
 
-From this screen you can:
+1. **Tab Bar** - Select which tabs/windows you have open.
+2. **Landmarks Toggle** - Toggle display of the 97 facial landmarks; AI detects these points and forms the foundation of all measurements done by this program.
+3. **Mesures Toggle** - Toggle display of any selected facial measures.
+4. **Chart Toggle** (video only) - Toggles a chart displaying the change of selected facial measures over time in a video.
+5. **Pose** - Inactive for videos; for images allows you to change between frontal and lateral if the program misclassifies the pose of the subject.
+6. **Image Display Zoom** - Zooms the image/video area. You can also zoom in on this area by placing the mouse over it and using the mouse wheel or trackpad scroll gesture.
+7. **Chart Display Zoom** (video only) - Zooms the chart area. You can also zoom in on this area by placing the mouse over it and using the mouse wheel or trackpad scroll gesture.
+8. **Fit Image/Video and Graph** - Automatically expand or shrink the chart and video/image areas to fill the area defined by the chart/display slider.
+9. **Cut Left** (video only) - Remove all video frames before the playhead.
+10. **Cut Right** (video only) - Remove all video frames after the playhead.
+11. **Restore** (video only) - Undo any prior cuts to the video and restore the video to its original length.
+12. **Measurement Text Zoom** - Increase or decrease the text size used to label the measurements in the display area.
+13. **Jump To** - For video, allows jump to max/min areas of the video.
+14. **Eval** - Performs several evaluation measures for video.
+15. **Select All Measures** - Enable all available measures.
+16. **Select No Measures** - Disable all available measures.
+17. **Display Area** - The area where the video or image is displayed.
+18. **Measure Toggle** - A hierarchical list of all measures and sub-measures allows each to be toggled.
+19. **Chart Display and Playhead** - Displays a chart of facial measures over time; the playhead, a red vertical line, represents the current location displayed.
+20. **Chart/Display Slider** - This allows the relative size of the display area and the chart adjustment by dragging.
+21. **Backward One Frame** (video only) - Move both playheads (chart and video slider) back by a frame.
+22. **Play** (video only) - Play the video from the current playhead position until the end of the video.
+23. **Forward One Frame** (video only) - Move both playheads (chart and video slider) forward by a frame.
+24. **Current and Total Frames** (video only) - Indicates the current frame location of the playheads.
+25. **Video Slider and Playhead** (video only) - Allows you to drag the current location of the playhead through the video.
 
-- **Capture** (center button) — Takes a photo and sends it to Dynaface for analysis.
-- **Flip Camera** (right button) — Switches between the front and back camera.
-- **Import** (left button) — Lets you pick a photo from your library instead.
-- **Back** (top-left arrow) — Returns to the Photo Library.
-- **Pinch to zoom** — Pinch with two fingers on the preview to zoom in before capturing.
+# Automatic Cropping and Scaling
 
-The first time you use the camera, Dynaface will ask for permission to access it. If you decline, you can still import photos from your library, or re-enable camera access later from your device's Settings.
+Whether you analyze an image or video, cropping and scaling are very important. Based on the patient's eyes, the program will automatically zoom and crop to a 1024 x 1024 rectangle. Ideally, it would help if you centered the patient in the picture/video, stayed a consistent distance from the patient, and minimized any shaking of the camera/mobile camera device. However, autocropping is reasonably resilient to small movements of the patient and recording equipment. The patient should always be looking directly at the camera.
 
-For best results, look directly at the camera, keep your face centered in the frame, and try to keep the camera steady.
+Generally, video or images captured with a handheld mobile device should be sufficient for Dynaface. Consider the image below; you can see how the program cropped and zoomed the patient to a consistent size and location within the frame.
 
-## Importing a Photo
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-crop.jpg" width="512">
 
-Tapping **Import** (from either the Photo Library screen or the camera screen) opens your device's photo picker. Choose any photo containing a face, and Dynaface will analyze it the same way it would a freshly captured photo.
+# Analyzing Frontal Images
 
-## Automatic Face Detection
+Dynaface allows you to open images of types: jpeg, png, and heif. To open an image, either select "Open" from the menu or drag an image file onto the application. Once the image is open, you can zoom and pan the image in the display area. The measures can be displayed or hidden. If you would like to utilize the individual measurements in a different application, you can use "Save As" to save the document as a CSV file. If you think you might have further analysis on an image, you can save the image as a Dynaface (.dyfc) document.
 
-After you capture or import a photo, Dynaface automatically locates the face, straightens it, and crops it to a consistent size before measuring it — you don't need to do any manual cropping or alignment.
+When analyzing a single image, the window will appear as follows.
 
-If Dynaface can't find a clear, forward-facing face in the photo, it will show a **Face Not Found** message with the option to try again.
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-image.jpg?v=1" width="512">
 
-## Viewing Your Measurements
+You can select which messages you wish to see and notice that some measures have multiple sub-measures that you can turn on or off. You can copy and paste the measured image into other programs or save an image file with the measures.
 
-Once a face is detected, Dynaface displays the photo along with a panel of measurements below or beside it.
+# Analyzing Lateral Images
 
-<img src="https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/images/facial/manual/2.0/dynaface-measure.jpg" width="512">
+Dynafce can also measure lateral images.
 
-Along the bottom of this screen are five buttons:
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-lateral.jpg?v=1" width="512">
 
-- **Share/Export** — Opens export options for the photo and its measurements (see below).
-- **Measurement Settings** (chart icon) — Opens a list of every available measurement so you can turn individual ones on or off. Your choices are remembered for that photo.
-- **Landmarks Toggle** (labeled OFF/LM) — Shows or hides the underlying facial reference points the AI used to calculate the measurements.
-- **Recalculate** (circular arrows) — Re-runs the measurement analysis on the photo, useful if you've changed which measurements are enabled or want a fresh calculation.
-- **Delete** (trash icon) — Removes the photo from your library, after a confirmation prompt.
+The following underlying landmarks are detected:
 
-The **Back** arrow in the top-left returns you to the Photo Library (or the camera, if you just took the photo).
+- **Soft Tissue Glabella:** The most prominent midline point on the forehead above the nasion. It marks the superior boundary of the nasofrontal region.
 
-## Choosing Which Measurements to Show
+- **Soft Tissue Nasion:** The deepest midline depression between the forehead and the nasal bridge. It serves as the junction where the glabellar contour transitions to the nasal dorsum.
 
-Tap the measurement-settings button to see the full list of available measurements, each with its own on/off switch:
+- **Nasal Tip:** The most anterior projecting point of the nose in the sagittal profile. It defines overall nasal projection and tip position.
 
-- **Position** — Head tilt, pupil distance, and the pixel-to-millimeter scale used for other measurements.
-- **Pose** — Estimated pitch, roll, and yaw of the head in the photo.
-- **Intercanthal Distance** — The distance between the inner corners of the eyes.
-- **Mouth Length** — The width of the mouth.
-- **Outer Eye Corners** — The distance between the outer corners of the eyes.
-- **FAI (Facial Asymmetry Index)** — A single score that summarizes how closely the left and right sides of the face match one another, based on published facial-symmetry research.
-- **Oral CE** — Compares the position of the left and right corners of the mouth.
-- **Brow** — Compares eyebrow height between the left and right sides.
-- **Eye Area** — Compares the visible eye-opening area between the left and right sides.
-- **Dental Display** — Compares how much of the teeth are visible on the left and right sides of a smile.
-- **Nose Frontal** — Measurements describing the nose as seen from the front.
+- **Subnasal Point:** The junction where the base of the nose meets the upper lip. It forms the inferior limit of the nose and the vertex of the nasolabial region.
 
-Turning a measurement on adds it to both the on-screen overlay and the measurement panel; turning it off hides it. These settings are saved per photo, so returning to an earlier photo later will show the same selections you left it with.
+- **Mento Labial Point:** The deepest midline depression between the lower lip and the chin. It characterizes the curvature of the mentolabial fold.
 
-## Facial Landmarks
+- **Soft Tissue Pogonion:** The most anterior midline point on the soft tissue chin. It represents the forward limit of the lower facial profile.
 
-Tapping the landmarks toggle switches between:
+- **Sagittal Line:** The vertical midline plane dividing the face into left and right halves in lateral view. All lateral (profile) measurements are projected and measured relative to this line.
 
-- **OFF** — Just the photo and your selected measurements.
-- **LM** — The photo with the underlying reference points (used to calculate every measurement) drawn on top, so you can see exactly what the AI detected.
+These landmarks can calculate the following measures:
 
-## Recalculating
+### 1. NFA – Nasofrontal Angle
 
-If you'd like Dynaface to reprocess a photo — for example after enabling a measurement you'd previously left off — tap the **Recalculate** button. This re-runs face detection and measurement on the already-cropped photo.
-
-## Exporting Your Results
-
-Tap the **Share/Export** button to see your export options:
-
-- **Image to Clipboard** — Copies the annotated photo (with visible measurements/landmarks) so you can paste it into another app.
-- **Image to Photos** — Saves the annotated photo to your device's Photos app.
-- **Text to Clipboard** — Copies the measurement values as plain text so you can paste them into notes, messages, or a spreadsheet.
-
-## Managing Your Photo Library
-
-Every photo you capture or import is saved to your on-device Photo Library, shown as a scrolling grid with the date each photo was taken.
-
-<img src="https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/images/facial/manual/2.0/dynaface-catalog-1.jpg" width="512">
-
-Tap any thumbnail to reopen it and view or adjust its measurements. To remove a photo permanently, open it and tap the **Delete** button, then confirm.
+- **Definition:** Angle formed between the glabella–nasion line and the nasion–nasal tip line.
+- **Landmarks:** Soft Tissue Glabella, Soft Tissue Nasion, Nasal Tip
+- **Purpose:** Evaluates the depth of the nasion and the transition between the forehead and nose.
+- **Typical Range:** 115°–135°
+  - Larger angles → smoother, flatter nasal root
+  - Smaller angles → deeper nasion depression
 
 ---
 
-*Dynaface is provided for educational and informational purposes only under the MIT License. It is not a registered medical device and is not intended to diagnose, treat, cure, or prevent any disease or medical condition.*
+### 2. NLA – Nasolabial Angle
+
+- **Definition:** Angle formed between the columella and the upper-lip line at the subnasale.
+- **Landmarks:** Columella Point, Subnasale, Labrale Superius
+- **Purpose:** Assesses nasal base rotation and the relationship between the nose and upper lip.
+- **Typical Range:** 90°–110°
+  - Larger angles → more upturned nasal base or retrusive upper lip
+  - Smaller angles → more downward-pointing nasal tip or protrusive upper lip
+
+---
+
+### 3. tip_proj – Nasal Tip Projection (Goode Method)
+
+- **Definition:** Ratio of nasal tip projection to nasal length.
+- **Formula:** tip_proj = AT / NT
+  - **AT:** perpendicular distance from nasal tip to a vertical line through the alar base
+  - **NT:** linear distance from nasion to nasal tip
+- **Purpose:** Quantifies how far the nasal tip extends from the face.
+- **Typical Ideal Ratio:** 0.55–0.60
+  - Higher ratio → more prominent nasal projection
+  - Lower ratio → flatter or shorter nasal contour
+
+# Automatic Pose Detection
+
+Dynaface uses AI to determine the pose; however, if the poses is not classified correctly, you can correct it with the "Pose" button.
+
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-mis-pose.jpg?v=1" width="512">
+
+# Analyzing Videos
+
+Videos work very similarly to images, except there is the element of time. The AI must analyze every video frame to find the facial features of a video. Processing a video can take considerable time; a 2-minute video can take around 20 minutes to analyze thoroughly. Because of this processing need, we suggest you trim your videos to just the clips you need to study. While Dynaface does have basic video editing capabilities that allow you to cut the video to smaller sizes, Dynaface is not designed to process large videos.
+
+Videos add the element of time. In the video shown above, you can see a blink cycle from someone with facial paralysis. You can see that the patient's left eye does not close fully during the blink cycle, while the unaffected right eye has a normal blink cycle.
+
+Once you have loaded a video, you should save it to a Dynaface (.dyfc) document file so that you do not have to wait for the video to be processed the next time you use Dynaface. To save the document, choose "Save As" from the menu, and the program will present you with these options.
+
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-save-options.jpg" width="512">
+
+Analyzing a video is similar to an image. You can click the chart checkbox to see a graph of the selected measures. You can also cut sections of the video. Use the video slider to move around the video to see different sections. You can also save a video MP4 file with all of the measures visible. Sound is not preserved during the analysis.
+
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-video-graph.jpg" width="512">
+
+You can produce a variety of graphs with Dynaface by removing and adding the various measures. For example, the following chat shows multiple blink cycles and smiles over 2 minutes.
+
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-2min-graph.jpg" width="1024">
+
+Though you can produce a variety of graphs with Dynaface, it is not a graphing package. You may wish to export these measures to a CSV for detailed analysis in other software programs. Below is a Dynaface CSV file opened in Microsoft Excel. As you can see, the measures are presented for each of the frames.
+
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-csv-file.jpg" width="512">
+
+# Facial Measurements
+
+Dynaface supports several predefined facial measures, which are based on 96 facial landmarks that neural networks are designed to detect. These landmarks are presented here, giving you an idea of the types of measures Dynaface can provide.
+
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/face-landmarks.jpg" width="512">
+
+## FAI
+
+The [Facial Asymmetry Index (FAI)](https://pubmed.ncbi.nlm.nih.gov/30041270/) is an objective measure of facial asymmetry and validate its use and reliability across numerous reanimation techniques.
+
+[[We can fill in exact details for each of these, we may add additional for the paper]]
+
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-measure-fai.jpg" width="512">
+
+## Oral CE
+
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-measure-oral.jpg" width="512">
+
+## Brow
+
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-measure-brow.jpg" width="512">
+
+## Dental Display
+
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-measure-dental.jpg" width="512">
+
+## Eye Area
+
+<img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-measure-fissure.jpg" width="512">
