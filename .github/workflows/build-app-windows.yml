@@ -13,6 +13,30 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # eSigner reports every credential problem as "The OTP is invalid", so
+      # check the secrets are present and un-padded before the 5-minute build.
+      - name: Check signing secrets
+        shell: pwsh
+        env:
+          SSL_COM_USERNAME: ${{ secrets.SSL_COM_USERNAME }}
+          SSL_COM_PASSWORD: ${{ secrets.SSL_COM_PASSWORD }}
+          SSL_COM_TOTP_SECRET: ${{ secrets.SSL_COM_TOTP_SECRET }}
+          SSL_COM_CREDENTIAL_ID: ${{ secrets.SSL_COM_CREDENTIAL_ID }}
+        run: |
+          $bad = @()
+          foreach ($n in 'SSL_COM_USERNAME','SSL_COM_PASSWORD','SSL_COM_TOTP_SECRET','SSL_COM_CREDENTIAL_ID') {
+            $v = [Environment]::GetEnvironmentVariable($n)
+            if ([string]::IsNullOrEmpty($v)) { $bad += "$n is not set"; continue }
+            if ($v -ne $v.Trim()) { $bad += "$n has leading/trailing whitespace" }
+          }
+          $totp = ($env:SSL_COM_TOTP_SECRET).Trim()
+          Write-Host "TOTP secret length: $($totp.Length)"
+          if ($totp.Length -lt 20) {
+            $bad += "SSL_COM_TOTP_SECRET looks too short - it must be the base64 TOTP secret from eSigner, not a 6-digit code"
+          }
+          if ($bad) { throw ($bad -join "`n") }
+          Write-Host "Signing secrets look well-formed."
+
       - name: Set up Python 3.11
         id: py
         uses: actions/setup-python@v6
