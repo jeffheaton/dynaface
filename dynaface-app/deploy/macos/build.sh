@@ -78,7 +78,7 @@ cd ./working
 echo "** Pyinstaller **"
 pyinstaller --clean --noconfirm --distpath dist --workpath build dynaface-macos.spec
 
-APP="dist/Dynaface-${arch}.app"
+APP="dist/Dynaface.app"
 
 # Sign inside-out: every Mach-O inside the bundle, then the bundle itself.
 # Apple discourages --deep for distribution and notarization rejects bundles
@@ -116,7 +116,7 @@ codesign --verify --deep --strict --verbose=2 "$APP"
 # ----------------------------
 # Notarize
 # ----------------------------
-ZIP_NAME="dynaface-mac-${DYNAFACE_VERSION}.zip"
+ZIP_NAME="dynaface-app-mac-${DYNAFACE_VERSION}.zip"
 
 if [ -n "${AC_API_KEY_PATH}" ]; then
     echo "** Notarize **"

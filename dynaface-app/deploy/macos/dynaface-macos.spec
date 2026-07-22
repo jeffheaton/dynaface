@@ -74,7 +74,7 @@ coll = COLLECT(
 
 app = BUNDLE(
     coll,
-    name=f'Dynaface-{arch}.app',
+    name='Dynaface.app',
     icon="dynaface_icon.icns",
     bundle_identifier="com.heatonresearch.dynaface",
     info_plist={

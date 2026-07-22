@@ -64,7 +64,7 @@ jobs:
           password: ${{ secrets.SSL_COM_PASSWORD }}
           totp_secret: ${{ secrets.SSL_COM_TOTP_SECRET }}
           credential_id: ${{ secrets.SSL_COM_CREDENTIAL_ID }}
-          file_path: ${{ github.workspace }}/dynaface-app/deploy/windows/working/dist/dynaface.exe
+          file_path: ${{ github.workspace }}/dynaface-app/deploy/windows/working/dist/Dynaface.exe
           override: true
           malware_block: false
           environment_name: PROD
@@ -78,7 +78,7 @@ jobs:
             Sort-Object FullName | Select-Object -Last 1
           if (-not $signtool) { throw "signtool.exe not found" }
           Write-Host "Using $($signtool.FullName)"
-          & $signtool.FullName verify /pa /v working/dist/dynaface.exe
+          & $signtool.FullName verify /pa /v working/dist/Dynaface.exe
 
       - name: Package and publish to S3
         working-directory: dynaface-app/deploy/windows
@@ -89,8 +89,8 @@ jobs:
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: |
           $ver = (Select-String -Path ../../version.py -Pattern 'VERSION\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
-          $zip = "dynaface-$ver.zip"
-          Compress-Archive -Path working/dist/dynaface.exe -DestinationPath $zip -Force
-          $dest = "s3://data.heatonresearch.com/library/$zip"
+          $zip = "dynaface-app-win-$ver.zip"
+          Compress-Archive -Path working/dist/Dynaface.exe -DestinationPath $zip -Force
+          $dest = "s3://data.heatonresearch.com/app/$zip"
           Write-Host "Uploading $zip -> $dest"
           aws s3 cp $zip $dest --acl public-read

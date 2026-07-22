@@ -76,8 +76,8 @@ jobs:
           # Unanchored so a UTF-8 BOM on version.py doesn't defeat the match.
           ver=$(sed -n 's/.*VERSION = "\([^"]*\)".*/\1/p' ../../version.py | head -1)
           if [ -z "$ver" ]; then echo "could not parse VERSION"; exit 1; fi
-          zip="dynaface-mac-$ver.zip"
-          dest="s3://data.heatonresearch.com/library/$zip"
+          zip="dynaface-app-mac-$ver.zip"
+          dest="s3://data.heatonresearch.com/app/$zip"
           echo "Uploading $zip -> $dest"
           aws s3 cp "working/dist/$zip" "$dest" --acl public-read
 
