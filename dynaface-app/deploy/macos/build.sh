@@ -83,11 +83,26 @@ APP="dist/Dynaface-${arch}.app"
 # Sign inside-out: every Mach-O inside the bundle, then the bundle itself.
 # Apple discourages --deep for distribution and notarization rejects bundles
 # whose nested code was not signed independently.
+#
+# Match on file type rather than extension: PyInstaller ad-hoc signs the bundled
+# Qt and Python frameworks, whose binaries are named e.g. `QtCore` and `Python`,
+# so an extension filter silently leaves them ad-hoc signed and notarization
+# comes back Invalid.
 echo "** Sign nested code **"
-find "$APP" -type f \( -name "*.so" -o -name "*.dylib" \) -print0 |
-    while IFS= read -r -d '' lib; do
+find "$APP" -type f -print0 |
+    while IFS= read -r -d '' f; do
+        if file -b "$f" | grep -q 'Mach-O'; then
+            codesign --force --timestamp --options runtime \
+                --sign "${app_certificate}" "$f"
+        fi
+    done
+
+# Framework bundles must also be sealed as bundles, deepest first.
+echo "** Sign frameworks **"
+find "$APP" -depth -type d -name "*.framework" -print0 |
+    while IFS= read -r -d '' fw; do
         codesign --force --timestamp --options runtime \
-            --sign "${app_certificate}" "$lib"
+            --sign "${app_certificate}" "$fw"
     done
 
 echo "** Sign App **"
@@ -109,12 +124,29 @@ if [ -n "${AC_API_KEY_PATH}" ]; then
     # Use ditto, not zip: ditto preserves the symlinks, extended attributes and
     # signature structure that `zip` quietly mangles inside a bundle.
     ditto -c -k --keepParent "$APP" "dist/notarize.zip"
-    xcrun notarytool submit "dist/notarize.zip" \
+
+    # `notarytool submit --wait` exits 0 even when the verdict is Invalid; it
+    # only fails on upload errors. Check the status explicitly, or a rejected
+    # build sails on to stapler and dies with an unrelated Error 65.
+    SUBMIT_JSON=$(xcrun notarytool submit "dist/notarize.zip" \
         --key "${AC_API_KEY_PATH}" \
         --key-id "${AC_API_KEY_ID}" \
         --issuer "${AC_API_ISSUER_ID}" \
-        --wait --timeout 30m
+        --wait --timeout 30m --output-format json)
+    echo "$SUBMIT_JSON"
     rm -f "dist/notarize.zip"
+
+    SUBMISSION_ID=$(echo "$SUBMIT_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+    STATUS=$(echo "$SUBMIT_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')
+
+    if [ "$STATUS" != "Accepted" ]; then
+        echo "** Notarization returned '${STATUS}' -- fetching the reason **"
+        xcrun notarytool log "${SUBMISSION_ID}" \
+            --key "${AC_API_KEY_PATH}" \
+            --key-id "${AC_API_KEY_ID}" \
+            --issuer "${AC_API_ISSUER_ID}" || true
+        exit 1
+    fi
 
     # The ticket staples to the .app and can never be stapled to a zip, so the
     # zip that users download has to be built AFTER this step. An unstapled app
