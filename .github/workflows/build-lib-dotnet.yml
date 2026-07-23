@@ -28,8 +28,7 @@ jobs:
 
       - name: Check formatting
         working-directory: dynaface-lib-dotnet
-        continue-on-error: true
-        run: dotnet format FacialDll.sln --verify-no-changes --report format-report || true
+        run: dotnet format FacialDll.sln --verify-no-changes --report format-report
 
       - name: Upload formatting report
         if: always()
