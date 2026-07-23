@@ -26,12 +26,19 @@ public static class FaceRenderer
     public enum LandmarkDisplayMode { Off, Lm }
     public static LandmarkDisplayMode DisplayMode = LandmarkDisplayMode.Off;
 
-    public const int TEXT_SIZE_MEASURE = 3;
+    // Measure-label glyph scale. MUTABLE (like DisplayMode) so a host app's text-size
+    // setting can grow the on-image labels — the C# counterpart of dynaface-lib's
+    // mutable AnalyzeFace.text_size. Every measure/context call site reads it at draw
+    // time; 3 is the historical default.
+    public static int TEXT_SIZE_MEASURE = 3;
     public const int TEXT_SIZE_STATS   = 32;
     public const int ARROW_THICKNESS   = 3;
 
+    // Landmark-number glyph scale — mutable for the same text-size setting (Python's
+    // draw_landmarks size follows its text zoom too); 2 is the historical default.
+    public static int NumberScale = 2;
+
     const int DotRadius = 4;
-    const int NumberScale    = 2;
     const int NumberDistance = 15;
     const int GlyphWidth     = 5;
     public const int GlyphHeight  = 7;
