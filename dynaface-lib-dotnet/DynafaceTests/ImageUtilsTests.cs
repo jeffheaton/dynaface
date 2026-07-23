@@ -112,8 +112,8 @@ public class ImageUtilsTests
         // so dst(dx,dy) should sample src(dx-1, dy-1).
         var src = new Rgba32[4 * 4];
         for (int y = 0; y < 4; y++)
-        for (int x = 0; x < 4; x++)
-            src[y * 4 + x] = new Rgba32((byte)(y * 4 + x), 0, 0, 255);
+            for (int x = 0; x < 4; x++)
+                src[y * 4 + x] = new Rgba32((byte)(y * 4 + x), 0, 0, 255);
 
         var fill = new Rgba32(9, 9, 9, 9);
         var dst = ImageUtils.WarpAffine(src, 4, 4, 1, 0, 1, 0, 1, 1, 4, 4, bilinear: false, fillColor: fill);

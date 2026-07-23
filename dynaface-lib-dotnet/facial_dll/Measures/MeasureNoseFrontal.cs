@@ -28,7 +28,7 @@ public class MeasureNoseFrontal : FaceMeasureBase
 
         var lm = ctx.Landmarks;
         float x1 = lm[55].X, x2 = lm[59].X;
-        float w  = 0.1f * MathHelpers.Abs(x2 - x1);
+        float w = 0.1f * MathHelpers.Abs(x2 - x1);
 
         float nostril = ctx.Measure(
             new Vec2(x1 - w, lm[55].Y), new Vec2(x2 + w, lm[59].Y),
@@ -58,9 +58,9 @@ public class MeasureNoseFrontal : FaceMeasureBase
 
         return new Dictionary<string, double>
         {
-            ["nostril"]      = nostril,
-            ["nose.tip"]     = noseTip,
-            ["dorsal.base"]  = dorsalBase,
+            ["nostril"] = nostril,
+            ["nose.tip"] = noseTip,
+            ["dorsal.base"] = dorsalBase,
             ["dorsal.bridge"] = dorsalBridge,
         };
     }

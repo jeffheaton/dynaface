@@ -14,9 +14,9 @@ internal static class ColorUtils
         float s = delta / max;
 
         float h;
-        if (max == r)      h = (g - b) / delta;
+        if (max == r) h = (g - b) / delta;
         else if (max == g) h = 2f + (b - r) / delta;
-        else               h = 4f + (r - g) / delta;
+        else h = 4f + (r - g) / delta;
 
         h = (h / 6f) % 1f;
         if (h < 0f) h += 1f;

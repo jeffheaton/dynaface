@@ -13,17 +13,17 @@ class Program
             return 1;
         }
 
-        string imagePath     = args[0];
+        string imagePath = args[0];
         string blazeFacePath = args[1];
-        string spigaPath     = args[2];
-        string u2netPath     = args[3];
-        bool listTensors     = Array.IndexOf(args, "--list-tensors") >= 0;
+        string spigaPath = args[2];
+        string u2netPath = args[3];
+        bool listTensors = Array.IndexOf(args, "--list-tensors") >= 0;
 
         if (!ImageLoader.IsUrl(imagePath) && !File.Exists(imagePath))
-                                         { Console.Error.WriteLine($"Image not found: {imagePath}");              return 1; }
+        { Console.Error.WriteLine($"Image not found: {imagePath}"); return 1; }
         if (!File.Exists(blazeFacePath)) { Console.Error.WriteLine($"BlazeFace model not found: {blazeFacePath}"); return 1; }
-        if (!File.Exists(spigaPath))     { Console.Error.WriteLine($"SPIGA model not found: {spigaPath}");         return 1; }
-        if (!File.Exists(u2netPath))     { Console.Error.WriteLine($"U2Net model not found: {u2netPath}");         return 1; }
+        if (!File.Exists(spigaPath)) { Console.Error.WriteLine($"SPIGA model not found: {spigaPath}"); return 1; }
+        if (!File.Exists(u2netPath)) { Console.Error.WriteLine($"U2Net model not found: {u2netPath}"); return 1; }
 
         Console.WriteLine("Initializing models...");
         using var inference = new OnnxDynafaceInference(blazeFacePath, spigaPath, u2netPath);
@@ -91,7 +91,7 @@ class Program
         ctx.DrawStatic();
 
         // URL inputs save beside the working directory instead of "beside the URL".
-        string dir     = ImageLoader.IsUrl(imagePath)
+        string dir = ImageLoader.IsUrl(imagePath)
             ? "."
             : Path.GetDirectoryName(Path.GetFullPath(imagePath)) ?? ".";
         string outPath = Path.Combine(dir, Path.GetFileNameWithoutExtension(imagePath) + "_annotated.png");

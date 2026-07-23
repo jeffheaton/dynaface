@@ -15,11 +15,11 @@ internal static class ImageUtils
     internal static void FlipHorizontal(Rgba32[] px, int width, int height)
     {
         for (int y = 0; y < height; y++)
-        for (int x = 0; x < width / 2; x++)
-        {
-            int a = y * width + x, b = y * width + (width - 1 - x);
-            (px[a], px[b]) = (px[b], px[a]);
-        }
+            for (int x = 0; x < width / 2; x++)
+            {
+                int a = y * width + x, b = y * width + (width - 1 - x);
+                (px[a], px[b]) = (px[b], px[a]);
+            }
     }
 
     // Reverses row order (flips the image vertically). Used at the boundary between
@@ -43,13 +43,13 @@ internal static class ImageUtils
         int w = src.Width, h = src.Height, mid = w / 2;
         var dst = new Rgba32[w * h];
         for (int y = 0; y < h; y++)
-        for (int x = 0; x < w; x++)
-        {
-            int srcX = mirrorLeft
-                ? (x < mid ? x : w - 1 - x)   // right mirrors left
-                : (x >= mid ? x : w - 1 - x);  // left mirrors right
-            dst[y * w + x] = src.Pixels[y * w + srcX];
-        }
+            for (int x = 0; x < w; x++)
+            {
+                int srcX = mirrorLeft
+                    ? (x < mid ? x : w - 1 - x)   // right mirrors left
+                    : (x >= mid ? x : w - 1 - x);  // left mirrors right
+                dst[y * w + x] = src.Pixels[y * w + srcX];
+            }
         return new FaceImage(dst, w, h);
     }
 
@@ -78,27 +78,27 @@ internal static class ImageUtils
         float yMax = roiY + roiH - 1f;
 
         for (int dy = 0; dy < dstHeight; dy++)
-        for (int dx = 0; dx < dstWidth;  dx++)
-        {
-            float sx = Clamp(roiX + (dx + 0.5f) * xScale - 0.5f, roiX, xMax);
-            float sy = Clamp(roiY + (dy + 0.5f) * yScale - 0.5f, roiY, yMax);
+            for (int dx = 0; dx < dstWidth; dx++)
+            {
+                float sx = Clamp(roiX + (dx + 0.5f) * xScale - 0.5f, roiX, xMax);
+                float sy = Clamp(roiY + (dy + 0.5f) * yScale - 0.5f, roiY, yMax);
 
-            int x0 = (int)sx;
-            int y0 = (int)sy;
-            int x1 = x0 + 1 < srcWidth  ? x0 + 1 : x0;
-            int y1 = y0 + 1 < srcHeight  ? y0 + 1 : y0;
+                int x0 = (int)sx;
+                int y0 = (int)sy;
+                int x1 = x0 + 1 < srcWidth ? x0 + 1 : x0;
+                int y1 = y0 + 1 < srcHeight ? y0 + 1 : y0;
 
-            float tx = sx - x0;
-            float ty = sy - y0;
+                float tx = sx - x0;
+                float ty = sy - y0;
 
-            Rgba32 c00 = src[y0 * srcWidth + x0];
-            Rgba32 c10 = src[y0 * srcWidth + x1];
-            Rgba32 c01 = src[y1 * srcWidth + x0];
-            Rgba32 c11 = src[y1 * srcWidth + x1];
+                Rgba32 c00 = src[y0 * srcWidth + x0];
+                Rgba32 c10 = src[y0 * srcWidth + x1];
+                Rgba32 c01 = src[y1 * srcWidth + x0];
+                Rgba32 c11 = src[y1 * srcWidth + x1];
 
-            dst[dy * dstWidth + dx] =
-                LerpColor(LerpColor(c00, c10, tx), LerpColor(c01, c11, tx), ty);
-        }
+                dst[dy * dstWidth + dx] =
+                    LerpColor(LerpColor(c00, c10, tx), LerpColor(c01, c11, tx), ty);
+            }
         return dst;
     }
 
@@ -140,15 +140,15 @@ internal static class ImageUtils
         var (i00, i01, i02, i10, i11, i12) = InvertAffine(m00, m01, m02, m10, m11, m12);
 
         for (int dy = 0; dy < dstHeight; dy++)
-        for (int dx = 0; dx < dstWidth; dx++)
-        {
-            float sx = i00 * dx + i01 * dy + i02;
-            float sy = i10 * dx + i11 * dy + i12;
+            for (int dx = 0; dx < dstWidth; dx++)
+            {
+                float sx = i00 * dx + i01 * dy + i02;
+                float sy = i10 * dx + i11 * dy + i12;
 
-            dst[dy * dstWidth + dx] = bilinear
-                ? SampleBilinearOrFill(src, srcWidth, srcHeight, sx, sy, fillColor)
-                : SampleNearestOrFill(src, srcWidth, srcHeight, sx, sy, fillColor);
-        }
+                dst[dy * dstWidth + dx] = bilinear
+                    ? SampleBilinearOrFill(src, srcWidth, srcHeight, sx, sy, fillColor)
+                    : SampleNearestOrFill(src, srcWidth, srcHeight, sx, sy, fillColor);
+            }
         return dst;
     }
 
@@ -163,8 +163,8 @@ internal static class ImageUtils
         if (System.MathF.Abs(det) < 1e-12f) return (1f, 0f, 0f, 0f, 1f, 0f);
 
         float invDet = 1f / det;
-        float i00 =  m11 * invDet, i01 = -m01 * invDet;
-        float i10 = -m10 * invDet, i11 =  m00 * invDet;
+        float i00 = m11 * invDet, i01 = -m01 * invDet;
+        float i10 = -m10 * invDet, i11 = m00 * invDet;
         float i02 = -(i00 * m02 + i01 * m12);
         float i12 = -(i10 * m02 + i11 * m12);
         return (i00, i01, i02, i10, i11, i12);
@@ -181,9 +181,9 @@ internal static class ImageUtils
     {
         int xStart = MathHelpers.Max(x, 0);
         int yStart = MathHelpers.Max(y, 0);
-        int xEnd   = MathHelpers.Min(x + width,  srcWidth);
-        int yEnd   = MathHelpers.Min(y + height, srcHeight);
-        int clippedWidth  = xEnd - xStart;
+        int xEnd = MathHelpers.Min(x + width, srcWidth);
+        int yEnd = MathHelpers.Min(y + height, srcHeight);
+        int clippedWidth = xEnd - xStart;
         int clippedHeight = yEnd - yStart;
 
         var dst = new Rgba32[width * height];
@@ -248,9 +248,9 @@ internal static class ImageUtils
         else if (angleDegrees < -45f) angleDegrees += 180f;
 
         int cx = width / 2, cy = height / 2;
-        float rad   = angleDegrees * MathHelpers.Deg2Rad;
+        float rad = angleDegrees * MathHelpers.Deg2Rad;
         float alpha = MathHelpers.Cos(rad);
-        float beta  = MathHelpers.Sin(rad);
+        float beta = MathHelpers.Sin(rad);
 
         float m02 = (1f - alpha) * cx - beta * cy;
         float m12 = beta * cx + (1f - alpha) * cy;

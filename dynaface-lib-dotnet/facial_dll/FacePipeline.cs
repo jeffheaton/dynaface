@@ -12,9 +12,9 @@
 // including LateralAnalysis when applicable, with no further pose-gated calls needed.
 public static class FacePipeline
 {
-    static BlazeFaceDetector     _blazeFace;
+    static BlazeFaceDetector _blazeFace;
     static SpigaLandmarkDetector _spiga;
-    static IDynafaceInference   _inference;
+    static IDynafaceInference _inference;
 
     public static bool IsReady => _blazeFace?.IsReady == true && _spiga?.IsReady == true;
 
@@ -26,7 +26,7 @@ public static class FacePipeline
     {
         _inference = inference;
         _blazeFace = new BlazeFaceDetector(inference);
-        _spiga     = new SpigaLandmarkDetector(inference);
+        _spiga = new SpigaLandmarkDetector(inference);
     }
 
     // Run the full face-detection, pose-classification, and crop pipeline.
@@ -98,9 +98,9 @@ public static class FacePipeline
             ? DynafaceConfig.PupilDistMm / pupillaryDistance
             : DynafaceConfig.PupilDistMm / 256f;
 
-        FaceImage outImage      = working;
-        Vec2[]    outLandmarks  = landmarks;
-        float?    faceRotationRad = null;
+        FaceImage outImage = working;
+        Vec2[] outLandmarks = landmarks;
+        float? faceRotationRad = null;
         if (crop)
         {
             float yaw = headPose != null && headPose.Length > 0 ? headPose[0] : 0f;
@@ -110,15 +110,15 @@ public static class FacePipeline
 
         return new FacePipelineResult
         {
-            AlignedCrop        = outImage,
-            Wflw98             = outLandmarks,
-            HeadPose           = headPose,
-            Pose               = resolvedPose,
-            IsLateral          = false,
-            Flipped            = false,
-            Pix2mm             = pix2mm,
-            PupillaryDistance  = pupillaryDistance,
-            FaceRotationRad    = faceRotationRad,
+            AlignedCrop = outImage,
+            Wflw98 = outLandmarks,
+            HeadPose = headPose,
+            Pose = resolvedPose,
+            IsLateral = false,
+            Flipped = false,
+            Pix2mm = pix2mm,
+            PupillaryDistance = pupillaryDistance,
+            FaceRotationRad = faceRotationRad,
         };
     }
 
@@ -126,9 +126,9 @@ public static class FacePipeline
         FaceImage working, Vec2[] landmarks, float[] headPose, bool facingLeft, FacePose resolvedPose)
     {
         bool flipped = !facingLeft;
-        FaceImage source     = working;
-        Vec2[]    srcLandmarks = landmarks;
-        float[]   srcHeadPose  = headPose;
+        FaceImage source = working;
+        Vec2[] srcLandmarks = landmarks;
+        float[] srcHeadPose = headPose;
 
         if (flipped)
         {
@@ -158,16 +158,16 @@ public static class FacePipeline
 
         return new FacePipelineResult
         {
-            AlignedCrop       = crop,
-            Wflw98            = cropLandmarks,
-            HeadPose          = srcHeadPose,
-            Pose              = resolvedPose,
-            IsLateral         = true,
-            Flipped           = flipped,
-            Pix2mm            = DynafaceConstants.LateralPix2mm,
+            AlignedCrop = crop,
+            Wflw98 = cropLandmarks,
+            HeadPose = srcHeadPose,
+            Pose = resolvedPose,
+            IsLateral = true,
+            Flipped = flipped,
+            Pix2mm = DynafaceConstants.LateralPix2mm,
             PupillaryDistance = 0f, // dynaface-lib never calls calc_pd() in the lateral branch
-            FaceRotationRad   = null,
-            LateralAnalysis   = lateralAnalysis,
+            FaceRotationRad = null,
+            LateralAnalysis = lateralAnalysis,
         };
     }
 
@@ -232,14 +232,14 @@ public static class FacePipeline
 public struct FacePipelineResult
 {
     public FaceImage AlignedCrop;       // final 1024x1024 crop (StyleGAN or lateral)
-    public Vec2[]    Wflw98;            // 98 landmarks, remapped into AlignedCrop's pixel space
-    public float[]   HeadPose;          // raw 6-value [yaw,pitch,roll,tx,ty,tz] passthrough
-    public FacePose  Pose;
-    public bool      IsLateral;
-    public bool      Flipped;           // true if lateral and originally facing right
-    public float     Pix2mm;
-    public float     PupillaryDistance; // pre-crop pupil pixel distance; 0 in lateral mode
-    public float?    FaceRotationRad;   // null unless tilt correction triggered (frontal only)
+    public Vec2[] Wflw98;            // 98 landmarks, remapped into AlignedCrop's pixel space
+    public float[] HeadPose;          // raw 6-value [yaw,pitch,roll,tx,ty,tz] passthrough
+    public FacePose Pose;
+    public bool IsLateral;
+    public bool Flipped;           // true if lateral and originally facing right
+    public float Pix2mm;
+    public float PupillaryDistance; // pre-crop pupil pixel distance; 0 in lateral mode
+    public float? FaceRotationRad;   // null unless tilt correction triggered (frontal only)
     public LateralAnalyzer.Result? LateralAnalysis; // lateral only; null if IsLateral is false
-                                                      // or if analysis failed (no sagittal profile)
+                                                    // or if analysis failed (no sagittal profile)
 }

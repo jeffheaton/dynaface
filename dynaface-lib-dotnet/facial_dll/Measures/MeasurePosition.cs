@@ -20,9 +20,9 @@ public class MeasurePosition : FaceMeasureBase
 
     public override Dictionary<string, double> Calc(FaceMeasureContext ctx, bool render = true)
     {
-        bool render2Tilt  = IsEnabled("tilt");
+        bool render2Tilt = IsEnabled("tilt");
         bool render2Px2mm = IsEnabled("px2mm");
-        bool render2Pd    = IsEnabled("pd");
+        bool render2Pd = IsEnabled("pd");
 
         // Matches dynaface-lib: tilt is only actually computed when both render and
         // its own item are enabled (otherwise it stays 0) — a quirk of the Python
@@ -55,8 +55,8 @@ public class MeasurePosition : FaceMeasureBase
         if (render && (render2Tilt || render2Pd || render2Px2mm))
         {
             ctx.AddHeader(Label);
-            if (render2Tilt)  ctx.AddValue($"tilt:   {tilt:F2}°");
-            if (render2Pd)    ctx.AddValue($"pd:     {pd:F0} px");
+            if (render2Tilt) ctx.AddValue($"tilt:   {tilt:F2}°");
+            if (render2Pd) ctx.AddValue($"pd:     {pd:F0} px");
             if (render2Px2mm) ctx.AddValue($"px2mm:  {pix2mm:F3}");
             ctx.AddSpacer();
         }

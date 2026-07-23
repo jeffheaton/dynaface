@@ -42,12 +42,12 @@ public class MeasureSkinTone : FaceMeasureBase
         int offsetX = (int)(ctx.Width * 0.02f);
         int offsetY = (int)(ctx.Height * 0.02f);
 
-        var swatchTopLeft     = new Vec2(ctx.Width - offsetX - squareSize, offsetY);
+        var swatchTopLeft = new Vec2(ctx.Width - offsetX - squareSize, offsetY);
         var swatchBottomRight = new Vec2(ctx.Width - offsetX, offsetY + squareSize);
 
-        var cheek1TopLeft     = new Vec2(lm[3].X, lm[2].Y);
+        var cheek1TopLeft = new Vec2(lm[3].X, lm[2].Y);
         var cheek1BottomRight = new Vec2(lm[55].X, lm[55].Y);
-        var cheek2TopLeft     = new Vec2(lm[30].X, lm[59].Y);
+        var cheek2TopLeft = new Vec2(lm[30].X, lm[59].Y);
         var cheek2BottomRight = new Vec2(lm[59].X, lm[30].Y);
 
         Rgba32[] sample1 = ctx.SampleRectangleTopLeft(cheek1TopLeft, cheek1BottomRight);
@@ -95,10 +95,10 @@ public class MeasureSkinTone : FaceMeasureBase
 
     static void DrawRectTopLeft(FaceMeasureContext ctx, Vec2 topLeft, Vec2 bottomRight, Rgba32 color, bool filled)
     {
-        int left     = MathHelpers.RoundToInt(topLeft.X);
-        int right    = MathHelpers.RoundToInt(bottomRight.X);
+        int left = MathHelpers.RoundToInt(topLeft.X);
+        int right = MathHelpers.RoundToInt(bottomRight.X);
         int bottomBL = ctx.Height - 1 - MathHelpers.RoundToInt(bottomRight.Y);
-        int topBL    = ctx.Height - 1 - MathHelpers.RoundToInt(topLeft.Y);
+        int topBL = ctx.Height - 1 - MathHelpers.RoundToInt(topLeft.Y);
         FaceRenderer.DrawRect(ctx.Pixels, ctx.Width, ctx.Height, left, bottomBL, right, topBL, color, filled: filled);
     }
 }

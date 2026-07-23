@@ -6,8 +6,8 @@ public class MeasureDentalArea : FaceMeasureBase
 {
     public override string Label => "DENTAL";
 
-    static readonly Rgba32 RightColor = new Rgba32(255,  60,  60, 255);
-    static readonly Rgba32 LeftColor  = new Rgba32( 60,  60, 255, 255);
+    static readonly Rgba32 RightColor = new Rgba32(255, 60, 60, 255);
+    static readonly Rgba32 LeftColor = new Rgba32(60, 60, 255, 255);
 
     public MeasureDentalArea()
     {
@@ -22,11 +22,11 @@ public class MeasureDentalArea : FaceMeasureBase
 
     public override Dictionary<string, double> Calc(FaceMeasureContext ctx, bool render = true)
     {
-        bool renderArea  = IsEnabled("dental_area");
-        bool renderLeft  = IsEnabled("dental_left");
+        bool renderArea = IsEnabled("dental_area");
+        bool renderLeft = IsEnabled("dental_left");
         bool renderRight = IsEnabled("dental_right");
         bool renderRatio = IsEnabled("dental_ratio");
-        bool renderDiff  = IsEnabled("dental_diff");
+        bool renderDiff = IsEnabled("dental_diff");
 
         var poly = Slice(ctx.Landmarks, 88, 95);
 
@@ -38,33 +38,33 @@ public class MeasureDentalArea : FaceMeasureBase
         try
         {
             var (leftPoly, rightPoly) = FaceMeasureContext.SplitPolygonByX(poly, midX);
-            rightArea = leftPoly.Length  >= 3 ? ctx.MeasurePolygon(leftPoly,  render && renderRight, RightColor) : 0f;
-            leftArea  = rightPoly.Length >= 3 ? ctx.MeasurePolygon(rightPoly, render && renderLeft,  LeftColor)  : 0f;
+            rightArea = leftPoly.Length >= 3 ? ctx.MeasurePolygon(leftPoly, render && renderRight, RightColor) : 0f;
+            leftArea = rightPoly.Length >= 3 ? ctx.MeasurePolygon(rightPoly, render && renderLeft, LeftColor) : 0f;
         }
         catch { /* malformed polygon — skip fill */ }
 
         float total = rightArea + leftArea;
         float ratio = FaceMeasureContext.SymmetryRatio(leftArea, rightArea);
-        float diff  = MathHelpers.Abs(leftArea - rightArea);
+        float diff = MathHelpers.Abs(leftArea - rightArea);
 
         if (render)
         {
             ctx.AddHeader(Label);
-            if (renderArea)  ctx.AddValue($"total: {total:F1} mm²");
-            if (renderLeft)  ctx.AddValue($"left:  {leftArea:F1} mm²");
+            if (renderArea) ctx.AddValue($"total: {total:F1} mm²");
+            if (renderLeft) ctx.AddValue($"left:  {leftArea:F1} mm²");
             if (renderRight) ctx.AddValue($"right: {rightArea:F1} mm²");
             if (renderRatio) ctx.AddValue($"ratio: {ratio:F2}");
-            if (renderDiff)  ctx.AddValue($"diff:  {diff:F2} mm²");
+            if (renderDiff) ctx.AddValue($"diff:  {diff:F2} mm²");
             ctx.AddSpacer();
         }
 
         return new Dictionary<string, double>
         {
-            ["dental_area"]  = total,
-            ["dental_left"]  = leftArea,
+            ["dental_area"] = total,
+            ["dental_left"] = leftArea,
             ["dental_right"] = rightArea,
             ["dental_ratio"] = ratio,
-            ["dental_diff"]  = diff,
+            ["dental_diff"] = diff,
         };
     }
 

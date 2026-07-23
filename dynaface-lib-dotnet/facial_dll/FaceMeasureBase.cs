@@ -6,13 +6,13 @@ using System.Collections.Generic;
 public class MeasureItemInfo
 {
     public string Name;
-    public bool   Enabled = true;
-    public bool   IsLateral;
-    public bool   IsFrontal;
+    public bool Enabled = true;
+    public bool IsLateral;
+    public bool IsFrontal;
 
     public MeasureItemInfo(string name, bool enabled = true)
     {
-        Name    = name;
+        Name = name;
         Enabled = enabled;
     }
 

@@ -72,11 +72,11 @@ public static class LateralLandmarkFinder
             float dEuclid = MathF.Sqrt(dx * dx + dy * dy);
 
             float faceHeight = nSag > 0 ? (MaxOf(sagittalY) - MinOf(sagittalY)) : 0f;
-            int xTolPx      = Math.Max(3, MathHelpers.RoundToInt(0.004f * faceHeight));
-            int yTolPx      = Math.Max(5, MathHelpers.RoundToInt(0.008f * faceHeight));
+            int xTolPx = Math.Max(3, MathHelpers.RoundToInt(0.004f * faceHeight));
+            int yTolPx = Math.Max(5, MathHelpers.RoundToInt(0.008f * faceHeight));
             int euclidTolPx = Math.Max(6, MathHelpers.RoundToInt(0.008f * faceHeight));
 
-            bool condAxis   = dx <= xTolPx && dy <= yTolPx;
+            bool condAxis = dx <= xTolPx && dy <= yTolPx;
             bool condEuclid = dEuclid <= euclidTolPx;
 
             if (condAxis || condEuclid)
@@ -181,11 +181,11 @@ public static class LateralLandmarkFinder
 
             float yLo = landmarksFrontal[frontalLoIdx.Value].Y;
             float yHi = landmarksFrontal[frontalHiIdx.Value].Y;
-            int computedLow  = ArgMinAbsDiff(sagittalY, yLo);
+            int computedLow = ArgMinAbsDiff(sagittalY, yLo);
             int computedHigh = ArgMinAbsDiff(sagittalY, yHi);
             if (computedLow == computedHigh && widenIfSame > 0)
             {
-                computedLow  = Math.Max(0, computedLow - widenIfSame);
+                computedLow = Math.Max(0, computedLow - widenIfSame);
                 computedHigh = Math.Min(n - 1, computedHigh + widenIfSame);
             }
             lo = computedLow;
@@ -245,11 +245,11 @@ public static class LateralLandmarkFinder
 
             float yLo = landmarksFrontal[frontalLoIdx.Value].Y;
             float yHi = landmarksFrontal[frontalHiIdx.Value].Y;
-            int computedLow  = ArgMinAbsDiff(sagittalY, yLo);
+            int computedLow = ArgMinAbsDiff(sagittalY, yLo);
             int computedHigh = ArgMinAbsDiff(sagittalY, yHi);
             if (computedLow == computedHigh && widenIfSame > 0)
             {
-                computedLow  = Math.Max(0, computedLow - widenIfSame);
+                computedLow = Math.Max(0, computedLow - widenIfSame);
                 computedHigh = Math.Min(n - 1, computedHigh + widenIfSame);
             }
             lo = computedLow;

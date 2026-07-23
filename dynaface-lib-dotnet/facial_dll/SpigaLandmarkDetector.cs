@@ -19,7 +19,7 @@ public class SpigaLandmarkDetector
     public const int NumWflwLandmarks = 98;
 
     const float SpigaTargetDist = 1.6f;
-    const int   SpigaCropSize   = 256;
+    const int SpigaCropSize = 256;
 
     readonly IDynafaceInference _runner;
 
@@ -38,19 +38,19 @@ public class SpigaLandmarkDetector
     {
         if (!IsReady || !photo.IsValid) return null;
 
-        int width  = photo.Width;
+        int width = photo.Width;
         int height = photo.Height;
 
         // Forward affine: photo's raw pixel-index space -> 256x256 crop, itself still
         // in raw/array-index orientation (no top/bottom semantics attached here).
-        float side   = MathHelpers.Max(bbox.w, bbox.h) * SpigaTargetDist;
-        float cx     = bbox.x + bbox.w / 2f;
-        float cy     = bbox.y + bbox.h / 2f;
-        float scale  = SpigaCropSize / side;
+        float side = MathHelpers.Max(bbox.w, bbox.h) * SpigaTargetDist;
+        float cx = bbox.x + bbox.w / 2f;
+        float cy = bbox.y + bbox.h / 2f;
+        float scale = SpigaCropSize / side;
         float center = SpigaCropSize / 2f;
 
-        float m00 = scale, m01 = 0f,   m02 = center - scale * cx;
-        float m10 = 0f,    m11 = scale, m12 = center - scale * cy;
+        float m00 = scale, m01 = 0f, m02 = center - scale * cx;
+        float m10 = 0f, m11 = scale, m12 = center - scale * cy;
 
         // Nearest-neighbor + zero-fill, matching cv2.warpAffine(..., flags=INTER_NEAREST,
         // borderMode=BORDER_CONSTANT, borderValue=0) — distinct from the bilinear/white-fill
@@ -66,15 +66,15 @@ public class SpigaLandmarkDetector
         int n = SpigaCropSize;
         float[] tensor = new float[3 * n * n];
         for (int tensorY = 0; tensorY < n; tensorY++)
-        for (int tensorX = 0; tensorX < n; tensorX++)
-        {
-            int readY    = n - 1 - tensorY;
-            Rgba32 color = cropRaw[readY * n + tensorX];
-            int idx      = tensorY * n + tensorX;
-            tensor[0 * n * n + idx] = color.R / 255f;
-            tensor[1 * n * n + idx] = color.G / 255f;
-            tensor[2 * n * n + idx] = color.B / 255f;
-        }
+            for (int tensorX = 0; tensorX < n; tensorX++)
+            {
+                int readY = n - 1 - tensorY;
+                Rgba32 color = cropRaw[readY * n + tensorX];
+                int idx = tensorY * n + tensorX;
+                tensor[0 * n * n + idx] = color.R / 255f;
+                tensor[1 * n * n + idx] = color.G / 255f;
+                tensor[2 * n * n + idx] = color.B / 255f;
+            }
 
         var result = _runner.RunSpiga(tensor);
         if (result == null) return null;
@@ -87,7 +87,7 @@ public class SpigaLandmarkDetector
         var landmarks = new Vec2[NumWflwLandmarks];
         for (int i = 0; i < NumWflwLandmarks; i++)
         {
-            float modelX = landmarksNorm[i * 2]     * SpigaCropSize;
+            float modelX = landmarksNorm[i * 2] * SpigaCropSize;
             float modelY = landmarksNorm[i * 2 + 1] * SpigaCropSize;
 
             // Undo the tensor's Y-flip to get back into cropRaw's own raw/array

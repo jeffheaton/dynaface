@@ -24,16 +24,16 @@ public static class LateralChartRenderer
         "Soft Tissue Pogonion",
     };
 
-    static readonly Rgba32 White        = new Rgba32(255, 255, 255, 255);
-    static readonly Rgba32 Black        = new Rgba32(0, 0, 0, 255);
-    static readonly Rgba32 LandmarkDot  = new Rgba32(20, 160, 20, 255);
+    static readonly Rgba32 White = new Rgba32(255, 255, 255, 255);
+    static readonly Rgba32 Black = new Rgba32(0, 0, 0, 255);
+    static readonly Rgba32 LandmarkDot = new Rgba32(20, 160, 20, 255);
 
-    const int LineThickness  = 3;
-    const int DotRadius      = 6;
+    const int LineThickness = 3;
+    const int DotRadius = 6;
     const int LabelTextScale = 2;
-    const int LabelGap       = 12;
-    const int PanelLeftPad   = 25; // matches Python's xlim(-25, ...) left margin
-    const int PanelRightPad  = 220; // room for the widest landmark label text
+    const int LabelGap = 12;
+    const int PanelLeftPad = 25; // matches Python's xlim(-25, ...) left margin
+    const int PanelRightPad = 220; // room for the widest landmark label text
 
     // Draws the sagittal profile line and the 6 labeled lateral landmarks onto
     // `image` (mutated in place), right-aligned exactly as Python's
@@ -98,20 +98,20 @@ public static class LateralChartRenderer
     // is the profile line itself (ax2.legend(frameon=True, loc="upper left")).
     static void DrawLegend(FaceImage image, int panelXOffset)
     {
-        const string entry   = "Sagittal Profile";
-        const int    margin  = 10; // inset from the panel's top-left corner
-        const int    pad     = 8;  // inner box padding
-        const int    swatchW = 24; // line swatch width
-        const int    gap     = 8;  // swatch-to-text gap
+        const string entry = "Sagittal Profile";
+        const int margin = 10; // inset from the panel's top-left corner
+        const int pad = 8;  // inner box padding
+        const int swatchW = 24; // line swatch width
+        const int gap = 8;  // swatch-to-text gap
 
         var textSize = FaceRenderer.GetTextSize(entry, LabelTextScale);
         int boxW = pad + swatchW + gap + textSize.X + pad;
         int boxH = pad + textSize.Y + pad;
 
-        int left   = panelXOffset + margin;
-        int top    = image.Height - 1 - margin;         // bottom-left coords
+        int left = panelXOffset + margin;
+        int top = image.Height - 1 - margin;         // bottom-left coords
         int bottom = top - boxH;
-        int right  = left + boxW;
+        int right = left + boxW;
 
         FaceRenderer.DrawRect(image.Pixels, image.Width, image.Height,
             left, bottom, right, top, White, filled: true, alpha: 0.8f);
