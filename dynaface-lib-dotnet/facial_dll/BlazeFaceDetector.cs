@@ -14,10 +14,10 @@ using System.Collections.Generic;
 // available, matching dynaface-lib's own pipeline order.
 public class BlazeFaceDetector
 {
-    const int   InputSize      = 128;
-    const int   AnchorCount    = 896;
+    const int InputSize = 128;
+    const int AnchorCount = 896;
     const float ScoreThreshold = 0.5f;
-    const float NmsIouThresh   = 0.3f;
+    const float NmsIouThresh = 0.3f;
 
     readonly IDynafaceInference _runner;
     float[,] _anchors;
@@ -41,21 +41,21 @@ public class BlazeFaceDetector
         int index = 0;
 
         AddAnchorGrid(ref index, gridSize: 16, anchorsPerCell: 2);
-        AddAnchorGrid(ref index, gridSize: 8,  anchorsPerCell: 6);
+        AddAnchorGrid(ref index, gridSize: 8, anchorsPerCell: 6);
     }
 
     void AddAnchorGrid(ref int index, int gridSize, int anchorsPerCell)
     {
         for (int row = 0; row < gridSize; row++)
-        for (int col = 0; col < gridSize; col++)
-        for (int anchor = 0; anchor < anchorsPerCell; anchor++)
-        {
-            _anchors[index, 0] = (col + 0.5f) / gridSize;
-            _anchors[index, 1] = (row + 0.5f) / gridSize;
-            _anchors[index, 2] = 1f;
-            _anchors[index, 3] = 1f;
-            index++;
-        }
+            for (int col = 0; col < gridSize; col++)
+                for (int anchor = 0; anchor < anchorsPerCell; anchor++)
+                {
+                    _anchors[index, 0] = (col + 0.5f) / gridSize;
+                    _anchors[index, 1] = (row + 0.5f) / gridSize;
+                    _anchors[index, 2] = 1f;
+                    _anchors[index, 3] = 1f;
+                    index++;
+                }
     }
 
     // Detects the highest-confidence face and returns its bbox (x,y,w,h) in `photo`'s
@@ -73,18 +73,18 @@ public class BlazeFaceDetector
         int W = photo.Width;
         int H = photo.Height;
 
-        bool  sideways = rotation == 90 || rotation == 270;
+        bool sideways = rotation == 90 || rotation == 270;
         float uprightW = sideways ? H : W;
         float uprightH = sideways ? W : H;
 
         int squarePx = MathHelpers.Min(W, H);
-        float rawCropOffX   = (W - squarePx) * 0.5f / W;
-        float rawCropOffY   = (H - squarePx) * 0.5f / H;
+        float rawCropOffX = (W - squarePx) * 0.5f / W;
+        float rawCropOffY = (H - squarePx) * 0.5f / H;
         float rawCropScaleX = (float)squarePx / W;
         float rawCropScaleY = (float)squarePx / H;
 
-        float uprightCropOffX   = sideways ? rawCropOffY   : rawCropOffX;
-        float uprightCropOffY   = sideways ? rawCropOffX   : rawCropOffY;
+        float uprightCropOffX = sideways ? rawCropOffY : rawCropOffX;
+        float uprightCropOffY = sideways ? rawCropOffX : rawCropOffY;
         float uprightCropScaleX = sideways ? rawCropScaleY : rawCropScaleX;
         float uprightCropScaleY = sideways ? rawCropScaleX : rawCropScaleY;
 
@@ -97,29 +97,29 @@ public class BlazeFaceDetector
 
         float[] inputData = new float[N * N * 3];
         for (int tensorY = 0; tensorY < N; tensorY++)
-        for (int tensorX = 0; tensorX < N; tensorX++)
-        {
-            int sourceY, sourceX;
-            switch (rotation)
+            for (int tensorX = 0; tensorX < N; tensorX++)
             {
-                case 90:  sourceY = N - 1 - tensorX; sourceX = tensorY;         break;
-                case 180: sourceY = tensorY;          sourceX = N - 1 - tensorX; break;
-                case 270: sourceY = tensorX;          sourceX = N - 1 - tensorY; break;
-                default:  sourceY = N - 1 - tensorY; sourceX = tensorX;          break;
-            }
+                int sourceY, sourceX;
+                switch (rotation)
+                {
+                    case 90: sourceY = N - 1 - tensorX; sourceX = tensorY; break;
+                    case 180: sourceY = tensorY; sourceX = N - 1 - tensorX; break;
+                    case 270: sourceY = tensorX; sourceX = N - 1 - tensorY; break;
+                    default: sourceY = N - 1 - tensorY; sourceX = tensorX; break;
+                }
 
-            Rgba32 color = modelPixels[sourceY * N + sourceX];
-            int dest = (tensorY * N + tensorX) * 3;
-            inputData[dest]     = color.R / 255f * 2f - 1f;
-            inputData[dest + 1] = color.G / 255f * 2f - 1f;
-            inputData[dest + 2] = color.B / 255f * 2f - 1f;
-        }
+                Rgba32 color = modelPixels[sourceY * N + sourceX];
+                int dest = (tensorY * N + tensorX) * 3;
+                inputData[dest] = color.R / 255f * 2f - 1f;
+                inputData[dest + 1] = color.G / 255f * 2f - 1f;
+                inputData[dest + 2] = color.B / 255f * 2f - 1f;
+            }
 
         var runResult = _runner.RunBlazeFace(inputData);
         if (runResult == null) return false;
 
         var (regsArr, scoresArr) = runResult.Value;
-        int totalRegs   = regsArr.Length;
+        int totalRegs = regsArr.Length;
         int totalScores = scoresArr.Length;
         if (totalRegs % AnchorCount != 0 || totalScores < AnchorCount) return false;
 
@@ -145,8 +145,8 @@ public class BlazeFaceDetector
             float anchorX128 = _anchors[i, 0] * N;
             float anchorY128 = _anchors[i, 1] * N;
 
-            float centerX128  = regsArr[baseOffset + 0] + anchorX128;
-            float centerY128  = regsArr[baseOffset + 1] + anchorY128;
+            float centerX128 = regsArr[baseOffset + 0] + anchorX128;
+            float centerY128 = regsArr[baseOffset + 1] + anchorY128;
             float boxWidth128 = regsArr[baseOffset + 2];
             float boxHeight128 = regsArr[baseOffset + 3];
 
@@ -196,7 +196,7 @@ public class BlazeFaceDetector
         int iy1 = MathHelpers.Clamp(MathHelpers.RoundToInt(yMax), 0, H);
         if (ix1 <= ix0 || iy1 <= iy0) return false;
 
-        bbox  = (ix0, iy0, ix1 - ix0, iy1 - iy0);
+        bbox = (ix0, iy0, ix1 - ix0, iy1 - iy0);
         score = boxScore[best];
         return true;
     }
@@ -227,25 +227,25 @@ public class BlazeFaceDetector
 
         Vec2 rightEye, leftEye;
         if (eye0.X <= eye1.X) { rightEye = eye0; leftEye = eye1; }
-        else                  { rightEye = eye1; leftEye = eye0; }
+        else { rightEye = eye1; leftEye = eye0; }
 
         float faceW = bx2 - bx1, faceH = by2 - by1;
-        Vec2  rightEyePx    = new Vec2(rightEye.X * uprightW, rightEye.Y * uprightH);
-        Vec2  leftEyePx     = new Vec2(leftEye.X  * uprightW, leftEye.Y  * uprightH);
+        Vec2 rightEyePx = new Vec2(rightEye.X * uprightW, rightEye.Y * uprightH);
+        Vec2 leftEyePx = new Vec2(leftEye.X * uprightW, leftEye.Y * uprightH);
         float eyeDistancePx = Vec2.Distance(rightEyePx, leftEyePx);
 
-        float marginX   = faceW * 0.35f;
-        float marginY   = faceH * 0.35f;
-        bool  withinBox =
+        float marginX = faceW * 0.35f;
+        float marginY = faceH * 0.35f;
+        bool withinBox =
             rightEye.X > bx1 - marginX && rightEye.X < bx2 + marginX &&
-            leftEye.X  > bx1 - marginX && leftEye.X  < bx2 + marginX &&
+            leftEye.X > bx1 - marginX && leftEye.X < bx2 + marginX &&
             rightEye.Y > by1 - marginY && rightEye.Y < by2 + marginY &&
-            leftEye.Y  > by1 - marginY && leftEye.Y  < by2 + marginY;
+            leftEye.Y > by1 - marginY && leftEye.Y < by2 + marginY;
 
-        float eyeBoxTopLimit  = by1 + faceH * 0.70f;
-        bool  eyesInUpperFace = rightEye.Y < eyeBoxTopLimit && leftEye.Y < eyeBoxTopLimit;
-        float boxWidthPx      = MathHelpers.Max(1f, faceW * uprightW);
-        bool  eyeDistanceOk   = eyeDistancePx >= MathHelpers.Max(6f, boxWidthPx * 0.12f) &&
+        float eyeBoxTopLimit = by1 + faceH * 0.70f;
+        bool eyesInUpperFace = rightEye.Y < eyeBoxTopLimit && leftEye.Y < eyeBoxTopLimit;
+        float boxWidthPx = MathHelpers.Max(1f, faceW * uprightW);
+        bool eyeDistanceOk = eyeDistancePx >= MathHelpers.Max(6f, boxWidthPx * 0.12f) &&
                                 eyeDistancePx <= boxWidthPx * 0.90f;
 
         return withinBox && eyesInUpperFace && eyeDistanceOk;
@@ -264,14 +264,14 @@ public class BlazeFaceDetector
         float uprightX, float uprightY,
         int rotation, int width, int height)
     {
-        float maxX = MathHelpers.Max(0, width  - 1);
+        float maxX = MathHelpers.Max(0, width - 1);
         float maxY = MathHelpers.Max(0, height - 1);
         switch (rotation)
         {
-            case 90:  return new Vec2(uprightY * maxX,        (1f - uprightX) * maxY);
+            case 90: return new Vec2(uprightY * maxX, (1f - uprightX) * maxY);
             case 180: return new Vec2((1f - uprightX) * maxX, uprightY * maxY);
             case 270: return new Vec2((1f - uprightY) * maxX, uprightX * maxY);
-            default:  return new Vec2(uprightX * maxX,        (1f - uprightY) * maxY);
+            default: return new Vec2(uprightX * maxX, (1f - uprightY) * maxY);
         }
     }
 
@@ -310,7 +310,7 @@ public class BlazeFaceDetector
                 float xx2 = MathHelpers.Min(x1[i], x1[j]);
 
                 float inter = MathHelpers.Max(0f, xx2 - xx1) * MathHelpers.Max(0f, yy2 - yy1);
-                float iou   = inter / (areas[i] + areas[j] - inter + 1e-9f);
+                float iou = inter / (areas[i] + areas[j] - inter + 1e-9f);
                 if (iou > iouThresh) suppressed[j] = true;
             }
         }

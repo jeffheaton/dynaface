@@ -6,9 +6,9 @@ using System.Collections.Generic;
 // bottom-left happens internally before calling FaceRenderer helpers.
 public class FaceMeasureContext
 {
-    public Rgba32[] Pixels    { get; }
-    public int      Width     { get; }
-    public int      Height    { get; }
+    public Rgba32[] Pixels { get; }
+    public int Width { get; }
+    public int Height { get; }
 
     // WFLW landmarks in top-left pixel coordinates.
     public Vec2[] Landmarks { get; }
@@ -22,7 +22,7 @@ public class FaceMeasureContext
     // True for a lateral-view analysis. When true, LateralLandmarks holds the 6
     // points from LateralAnalyzer (Glabella/Nasion/NasalTip/Subnasal/MentoLabial/
     // Pogonion — see LateralLandmarkFinder's index constants), otherwise null.
-    public bool   IsLateral        { get; }
+    public bool IsLateral { get; }
     public Vec2[] LateralLandmarks { get; }
 
     // Raw SPIGA headpose passthrough [yaw, pitch, roll, tx, ty, tz] from
@@ -34,8 +34,8 @@ public class FaceMeasureContext
     // Resolved pose and whether a lateral face was mirrored to face left —
     // mirrors dynaface-lib's AnalyzeFace.pose / AnalyzeFace.flipped, consumed
     // by DrawStatic()'s caption.
-    public FacePose Pose    { get; }
-    public bool     Flipped { get; }
+    public FacePose Pose { get; }
+    public bool Flipped { get; }
 
     public readonly List<string> TextLines = new();
 
@@ -44,8 +44,8 @@ public class FaceMeasureContext
     // model, e.g. MeasureLandmarks' 194 flat landmark-coordinate fields.
     public readonly Dictionary<string, double> Values = new();
 
-    static readonly Rgba32 MeasureColor = new Rgba32(255, 215,   0, 255); // gold arrows
-    static readonly Rgba32 LineColor    = new Rgba32(200, 200, 200, 180); // faint white
+    static readonly Rgba32 MeasureColor = new Rgba32(255, 215, 0, 255); // gold arrows
+    static readonly Rgba32 LineColor = new Rgba32(200, 200, 200, 180); // faint white
 
     const int ImageLabelX = 20;
     int _imageLabelY = 20;
@@ -55,16 +55,16 @@ public class FaceMeasureContext
         bool isLateral = false, Vec2[] lateralLandmarks = null, float[] headPose = null,
         FacePose pose = FacePose.Frontal, bool flipped = false)
     {
-        Width            = photo.Width;
-        Height           = photo.Height;
-        Pixels           = photo.Pixels; // caller must ensure this array is not shared
-        Landmarks        = landmarks;
-        Pix2mm           = pix2mm;
-        IsLateral        = isLateral;
+        Width = photo.Width;
+        Height = photo.Height;
+        Pixels = photo.Pixels; // caller must ensure this array is not shared
+        Landmarks = landmarks;
+        Pix2mm = pix2mm;
+        IsLateral = isLateral;
         LateralLandmarks = lateralLandmarks;
-        HeadPose         = headPose;
-        Pose             = pose;
-        Flipped          = flipped;
+        HeadPose = headPose;
+        Pose = pose;
+        Flipped = flipped;
     }
 
     // Convenience overload for simple/test scenarios that don't have a
@@ -140,13 +140,13 @@ public class FaceMeasureContext
     public Vec2? LineToEdge(Vec2 start, float angleDeg)
     {
         float rad = angleDeg * MathHelpers.Deg2Rad;
-        float dx  = MathHelpers.Cos(rad);
-        float dy  = MathHelpers.Sin(rad);
+        float dx = MathHelpers.Cos(rad);
+        float dy = MathHelpers.Sin(rad);
 
         float tMax = float.MaxValue;
-        if (dx >  1e-6f) tMax = MathHelpers.Min(tMax, (Width  - 1 - start.X) / dx);
+        if (dx > 1e-6f) tMax = MathHelpers.Min(tMax, (Width - 1 - start.X) / dx);
         if (dx < -1e-6f) tMax = MathHelpers.Min(tMax, -start.X / dx);
-        if (dy >  1e-6f) tMax = MathHelpers.Min(tMax, (Height - 1 - start.Y) / dy);
+        if (dy > 1e-6f) tMax = MathHelpers.Min(tMax, (Height - 1 - start.Y) / dy);
         if (dy < -1e-6f) tMax = MathHelpers.Min(tMax, -start.Y / dy);
 
         if (tMax <= 0f || tMax >= float.MaxValue) return null;
@@ -157,7 +157,7 @@ public class FaceMeasureContext
     // Returns (leftPoly, rightPoly) in top-left coords.
     public static (Vec2[] left, Vec2[] right) SplitPolygonByX(Vec2[] poly, float midX)
     {
-        var leftPts  = new List<Vec2>();
+        var leftPts = new List<Vec2>();
         var rightPts = new List<Vec2>();
         int n = poly.Length;
 
@@ -170,8 +170,8 @@ public class FaceMeasureContext
             bool aCross = a.X <= midX, bCross = b.X <= midX;
             if (aCross != bCross)
             {
-                float t     = (midX - a.X) / (b.X - a.X);
-                var   cross = new Vec2(midX, a.Y + t * (b.Y - a.Y));
+                float t = (midX - a.X) / (b.X - a.X);
+                var cross = new Vec2(midX, a.Y + t * (b.Y - a.Y));
                 leftPts.Add(cross);
                 rightPts.Add(cross);
             }
@@ -257,7 +257,7 @@ public class FaceMeasureContext
         for (int i = 0; i < n; i++)
         {
             float dx = xs[i] - point.X, dy = ys[i] - point.Y;
-            float d  = dx * dx + dy * dy;
+            float d = dx * dx + dy * dy;
             if (d < bestDist) { bestDist = d; best = i; }
         }
         return best;
@@ -278,7 +278,7 @@ public class FaceMeasureContext
         {
             FacePose.Quarter => "Quarter",
             FacePose.Lateral => Flipped ? "Lateral (right)" : "Lateral (left)",
-            _                => "Frontal",
+            _ => "Frontal",
         };
         var size = FaceRenderer.GetTextSize(text, FaceRenderer.TEXT_SIZE_MEASURE);
         DrawImageText(new Vec2(10, Height - 20 - size.Y), text, new Rgba32(255, 255, 255, 255));
@@ -292,16 +292,16 @@ public class FaceMeasureContext
         return dir switch
         {
             "r" => new Vec2(midX + offset, midY),
-            "s" => new Vec2(pt2.X  + offset, pt2.Y),
+            "s" => new Vec2(pt2.X + offset, pt2.Y),
             "a" => new Vec2(MathHelpers.Min(pt1.X, pt2.X) + offset, midY - 20),
-            _   => new Vec2(pt1.X  + offset, midY),
+            _ => new Vec2(pt1.X + offset, midY),
         };
     }
 
     public void DrawImageText(Vec2 topLeftPos, string text, Rgba32 color)
     {
         var size = FaceRenderer.GetTextSize(text, FaceRenderer.TEXT_SIZE_MEASURE);
-        int blY  = BLY(MathHelpers.RoundToInt(topLeftPos.Y) + size.Y);
+        int blY = BLY(MathHelpers.RoundToInt(topLeftPos.Y) + size.Y);
         FaceRenderer.DrawText(Pixels, Width, Height,
             MathHelpers.RoundToInt(topLeftPos.X), blY,
             text, color, scale: FaceRenderer.TEXT_SIZE_MEASURE);
@@ -354,9 +354,9 @@ public class FaceMeasureContext
     // (n,3 conceptually — flattened as an Rgba32[] here). Used by MeasureSkinTone.
     public Rgba32[] SampleRectangleTopLeft(Vec2 topLeft, Vec2 bottomRight)
     {
-        int left   = MathHelpers.RoundToInt(topLeft.X);
-        int right  = MathHelpers.RoundToInt(bottomRight.X);
-        int top    = BLY(topLeft.Y);
+        int left = MathHelpers.RoundToInt(topLeft.X);
+        int right = MathHelpers.RoundToInt(bottomRight.X);
+        int top = BLY(topLeft.Y);
         int bottom = BLY(bottomRight.Y);
         if (bottom > top) (bottom, top) = (top, bottom); // BLY flips vertical order
         return FaceRenderer.SampleRectangle(Pixels, Width, Height, left, bottom, right, top + 1);
@@ -367,8 +367,8 @@ public class FaceMeasureContext
     // -------------------------------------------------------------------------
 
     public void AddHeader(string label) { TextLines.Add(label); }
-    public void AddValue(string text)   { TextLines.Add("  " + text); }
-    public void AddSpacer()             { TextLines.Add(""); }
+    public void AddValue(string text) { TextLines.Add("  " + text); }
+    public void AddSpacer() { TextLines.Add(""); }
 
     public void AddValue(string key, double value) { Values[key] = value; }
 

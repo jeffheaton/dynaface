@@ -147,7 +147,7 @@ exe = EXE(
     splash,
     splash.binaries,
     [],
-    name='dynaface',
+    name='Dynaface',
     icon='dynaface_icon.ico',
     debug=False,
     bootloader_ignore_signals=False,

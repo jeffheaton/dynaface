@@ -5,7 +5,7 @@
     <!-- Assembly name matches the file/type names; NuGet PackageId is "Dynaface.Onnx". -->
     <AssemblyName>FacialDll.Onnx</AssemblyName>
     <!-- Ships in lockstep with the core Dynaface package (same version). -->
-    <Version>2.0.0</Version>
+    <Version>2.0.1</Version>
   </PropertyGroup>
 
   <!-- NuGet package metadata (package id "Dynaface.Onnx") -->

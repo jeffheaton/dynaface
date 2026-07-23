@@ -14,7 +14,7 @@ public static class ImageLoader
     {
         using var bitmap = IsUrl(path) ? DecodeFromUrl(path) : SKBitmap.Decode(path);
         int w = bitmap.Width, h = bitmap.Height;
-        var pixels   = new Rgba32[w * h];
+        var pixels = new Rgba32[w * h];
         var skPixels = bitmap.Pixels; // top-left row-major SKColor[]
 
         for (int y = 0; y < h; y++)

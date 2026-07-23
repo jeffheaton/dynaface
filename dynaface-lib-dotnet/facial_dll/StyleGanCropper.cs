@@ -20,14 +20,14 @@ public static class StyleGanCropper
         float tiltThreshold = DynafaceConstants.DefaultTiltThreshold,
         Vec2? pupilLeftOverride = null, Vec2? pupilRightOverride = null)
     {
-        Vec2 pupilLeft  = pupilLeftOverride  ?? landmarks[DynafaceConstants.LmLeftPupil];
+        Vec2 pupilLeft = pupilLeftOverride ?? landmarks[DynafaceConstants.LmLeftPupil];
         Vec2 pupilRight = pupilRightOverride ?? landmarks[DynafaceConstants.LmRightPupil];
 
         var workingLandmarks = (Vec2[])landmarks.Clone();
 
         // calculate_face_rotation(pupils) with pupils=(left,right) — that exact
         // argument order is what determines tilt's sign; matches Python precisely.
-        float rotRad  = MathHelpers.Atan2(pupilRight.Y - pupilLeft.Y, pupilRight.X - pupilLeft.X);
+        float rotRad = MathHelpers.Atan2(pupilRight.Y - pupilLeft.Y, pupilRight.X - pupilLeft.X);
         float tiltDeg = ToDegrees(rotRad);
 
         float? faceRotationRad = null;
@@ -56,9 +56,9 @@ public static class StyleGanCropper
             topLeftPixels = ImageUtils.Straighten(topLeftPixels, width, height, faceRotationRad.Value);
 
         float ar = (float)width / height;
-        int   newWidth  = (int)(width * (DynafaceConstants.StyleganPupilDist / d));
-        int   newHeight = (int)(newWidth / ar);
-        float scale     = newWidth / (float)width;
+        int newWidth = (int)(width * (DynafaceConstants.StyleganPupilDist / d));
+        int newHeight = (int)(newWidth / ar);
+        float scale = newWidth / (float)width;
 
         int cropX = (int)(workingLandmarks[DynafaceConstants.LmRightPupil].X * scale - DynafaceConstants.StyleganRightPupilX);
         int cropY = (int)(workingLandmarks[DynafaceConstants.LmRightPupil].Y * scale - DynafaceConstants.StyleganRightPupilY);

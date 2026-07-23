@@ -1,0 +1,5 @@
+# Commits to skip in git blame (GitHub honors this file automatically;
+# locally: git config blame.ignoreRevsFile .git-blame-ignore-revs)
+
+# Apply dotnet format (whitespace only) — mechanical reformat of dynaface-lib-dotnet
+bd30d202a95c7c5587a8444f645b32373dff9959

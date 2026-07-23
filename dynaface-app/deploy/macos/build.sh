@@ -4,31 +4,47 @@ set -o pipefail
 
 trap 'echo "An error occurred. Exiting..."; exit 1;' ERR
 
+# Constants
+MODEL_BINARY_URL="https://data.heatonresearch.com/dynaface/model/2/dynaface_models.zip"
+DYNAFACE_VERSION="2.0.0"
+
+# Apple Silicon only as of 2.0.0. Intel users are directed to the Unity build,
+# which ships universal. The spec file reads `arch` from the environment.
+export arch="arm64"
+
 if [ -z "${app_certificate}" ]; then
     echo "Error: Environment variable app_certificate is not set."
     exit 1  # Exit with a non-zero value to indicate an error
 fi
 
-if [ -z "${arch}" ]; then
-    echo "Error: Environment variable arch is not set."
-    exit 1  # Exit with a non-zero value to indicate an error
-fi
+# ----------------------------
+# Update version.py
+# ----------------------------
+echo "** Updating version.py **"
+BUILD_DATE=$(date +"%Y-%m-%dT%H:%M:%S%z")
+BUILD_NUM="${BUILD_NUMBER:-0}"
+cat > ../../version.py <<EOF
+VERSION = "${DYNAFACE_VERSION}"
+BUILD_DATE = "${BUILD_DATE}"
+BUILD = ${BUILD_NUM}
+EOF
+echo "** version.py updated: VERSION=${DYNAFACE_VERSION}, BUILD=${BUILD_NUM}, DATE=${BUILD_DATE} **"
 
-# Constants
-MODEL_BINARY_URL="https://data.heatonresearch.com/dynaface/model/2/dynaface_models.zip"
+# The spec file stamps CFBundleVersion / CFBundleShortVersionString from this.
+export version="${DYNAFACE_VERSION}"
 
 # Environment
 cd ../..
 rm -rf ./venv || true
-python3.11 -m venv venv
+
+# Local dev machines expose the interpreter as `python3.11`; CI sets PYTHON_EXE
+# to the interpreter path from actions/setup-python.
+PYTHON="${PYTHON_EXE:-python3.11}"
+echo "** Using Python: ${PYTHON} **"
+"$PYTHON" -m venv venv
 source venv/bin/activate
-if [[ "$arch" == "x86_64" ]]; then
-    CONSTRAINT_FLAG="--constraint deploy/macos/constraints.txt"
-else
-    CONSTRAINT_FLAG=""
-fi
-pip install -r requirements.txt $CONSTRAINT_FLAG
-pip install --upgrade $CONSTRAINT_FLAG https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/library/dynaface-2.0.0-py3-none-any.whl
+pip install -r requirements.txt
+pip install --upgrade "dynaface==${DYNAFACE_VERSION}"
 cd deploy/macos
 
 # Build it
@@ -50,7 +66,6 @@ rm "$TEMP_ZIP"
 
 # Copy other files
 cp ./entitlements.plist ./working
-cp ./entitlements-nest.plist ./working
 cp ./dynaface_icon.icns ./working
 cp ./dynaface_doc_icon.icns ./working
 cp ./dynaface-macos.spec ./working
@@ -63,23 +78,92 @@ cd ./working
 echo "** Pyinstaller **"
 pyinstaller --clean --noconfirm --distpath dist --workpath build dynaface-macos.spec
 
-echo "** Sign Deep **"
-cp $provisionprofile dist/Dynaface-${arch}.app/Contents/embedded.provisionprofile
-codesign --force --timestamp --deep --verbose --options runtime --sign "${app_certificate}" dist/Dynaface-${arch}.app
+APP="dist/Dynaface.app"
+
+# Sign inside-out: every Mach-O inside the bundle, then the bundle itself.
+# Apple discourages --deep for distribution and notarization rejects bundles
+# whose nested code was not signed independently.
+#
+# Match on file type rather than extension: PyInstaller ad-hoc signs the bundled
+# Qt and Python frameworks, whose binaries are named e.g. `QtCore` and `Python`,
+# so an extension filter silently leaves them ad-hoc signed and notarization
+# comes back Invalid.
+echo "** Sign nested code **"
+find "$APP" -type f -print0 |
+    while IFS= read -r -d '' f; do
+        if file -b "$f" | grep -q 'Mach-O'; then
+            codesign --force --timestamp --options runtime \
+                --sign "${app_certificate}" "$f"
+        fi
+    done
+
+# Framework bundles must also be sealed as bundles, deepest first.
+echo "** Sign frameworks **"
+find "$APP" -depth -type d -name "*.framework" -print0 |
+    while IFS= read -r -d '' fw; do
+        codesign --force --timestamp --options runtime \
+            --sign "${app_certificate}" "$fw"
+    done
 
 echo "** Sign App **"
-codesign --force --timestamp --verbose --options runtime --entitlements entitlements.plist --sign "${app_certificate}" dist/Dynaface-${arch}.app/Contents/MacOS/dynaface
+codesign --force --timestamp --options runtime \
+    --entitlements entitlements.plist \
+    --sign "${app_certificate}" "$APP"
 
 echo "** Verify Sign **"
-codesign --verify --verbose dist/Dynaface-${arch}.app
+codesign --verify --deep --strict --verbose=2 "$APP"
 
-# Set permissions, sometimes the transport app will complain about this
-echo "** Set Permissions **"
-find dist/Dynaface-${arch}.app -type f -exec chmod a=u {} \;
-find dist/Dynaface-${arch}.app -type d -exec chmod a=u {} \;
+# ----------------------------
+# Notarize
+# ----------------------------
+ZIP_NAME="dynaface-app-mac-${DYNAFACE_VERSION}.zip"
 
-echo "** Package **"
-productbuild --component dist/Dynaface-${arch}.app /Applications --sign "${installer_certificate}" --version "${version}" dist/Dynaface-${arch}.pkg
+if [ -n "${AC_API_KEY_PATH}" ]; then
+    echo "** Notarize **"
+    # notarytool takes an archive, so the .app has to be zipped to submit it.
+    # Use ditto, not zip: ditto preserves the symlinks, extended attributes and
+    # signature structure that `zip` quietly mangles inside a bundle.
+    ditto -c -k --keepParent "$APP" "dist/notarize.zip"
+
+    # `notarytool submit --wait` exits 0 even when the verdict is Invalid; it
+    # only fails on upload errors. Check the status explicitly, or a rejected
+    # build sails on to stapler and dies with an unrelated Error 65.
+    SUBMIT_JSON=$(xcrun notarytool submit "dist/notarize.zip" \
+        --key "${AC_API_KEY_PATH}" \
+        --key-id "${AC_API_KEY_ID}" \
+        --issuer "${AC_API_ISSUER_ID}" \
+        --wait --timeout 30m --output-format json)
+    echo "$SUBMIT_JSON"
+    rm -f "dist/notarize.zip"
+
+    SUBMISSION_ID=$(echo "$SUBMIT_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+    STATUS=$(echo "$SUBMIT_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')
+
+    if [ "$STATUS" != "Accepted" ]; then
+        echo "** Notarization returned '${STATUS}' -- fetching the reason **"
+        xcrun notarytool log "${SUBMISSION_ID}" \
+            --key "${AC_API_KEY_PATH}" \
+            --key-id "${AC_API_KEY_ID}" \
+            --issuer "${AC_API_ISSUER_ID}" || true
+        exit 1
+    fi
+
+    # The ticket staples to the .app and can never be stapled to a zip, so the
+    # zip that users download has to be built AFTER this step. An unstapled app
+    # fails Gatekeeper for anyone offline or behind a slow network.
+    echo "** Staple **"
+    xcrun stapler staple "$APP"
+    xcrun stapler validate "$APP"
+
+    echo "** Gatekeeper check **"
+    spctl -a -vvv "$APP"
+else
+    echo "** WARNING: AC_API_KEY_PATH not set, skipping notarization. **"
+    echo "** Gatekeeper will block this build on any machine but this one. **"
+fi
+
+echo "** Package ${ZIP_NAME} **"
+ditto -c -k --keepParent "$APP" "dist/${ZIP_NAME}"
 
 echo "Build of application executed successfully."
 exit 0

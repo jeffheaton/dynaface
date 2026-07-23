@@ -6,8 +6,8 @@ public class MeasureEyeArea : FaceMeasureBase
 {
     public override string Label => "EYE AREA";
 
-    static readonly Rgba32 RightColor = new Rgba32(255,  60,  60, 255);
-    static readonly Rgba32 LeftColor  = new Rgba32( 60,  60, 255, 255);
+    static readonly Rgba32 RightColor = new Rgba32(255, 60, 60, 255);
+    static readonly Rgba32 LeftColor = new Rgba32(60, 60, 255, 255);
 
     public MeasureEyeArea()
     {
@@ -21,17 +21,17 @@ public class MeasureEyeArea : FaceMeasureBase
 
     public override Dictionary<string, double> Calc(FaceMeasureContext ctx, bool render = true)
     {
-        bool renderEyeL    = IsEnabled("eye.left");
-        bool renderEyeR    = IsEnabled("eye.right");
+        bool renderEyeL = IsEnabled("eye.left");
+        bool renderEyeR = IsEnabled("eye.right");
         bool renderEyeDiff = IsEnabled("eye.diff");
         bool renderEyeRatio = IsEnabled("eye.ratio");
 
         var rightContour = Slice(ctx.Landmarks, 60, 67);
-        var leftContour  = Slice(ctx.Landmarks, 68, 75);
+        var leftContour = Slice(ctx.Landmarks, 68, 75);
 
         float rightArea = ctx.MeasurePolygon(rightContour, render: render && renderEyeR, color: RightColor);
-        float leftArea  = ctx.MeasurePolygon(leftContour,  render: render && renderEyeL, color: LeftColor);
-        float diff  = MathHelpers.Abs(rightArea - leftArea);
+        float leftArea = ctx.MeasurePolygon(leftContour, render: render && renderEyeL, color: LeftColor);
+        float diff = MathHelpers.Abs(rightArea - leftArea);
         float ratio = FaceMeasureContext.SymmetryRatio(rightArea, leftArea);
 
         if (render && renderEyeR)
@@ -54,18 +54,18 @@ public class MeasureEyeArea : FaceMeasureBase
         if (render)
         {
             ctx.AddHeader(Label);
-            if (renderEyeR)     ctx.AddValue($"eye.r: {rightArea:F1} mm²");
-            if (renderEyeL)     ctx.AddValue($"eye.l: {leftArea:F1} mm²");
-            if (renderEyeDiff)  ctx.AddValue($"diff:  {diff:F2} mm²");
+            if (renderEyeR) ctx.AddValue($"eye.r: {rightArea:F1} mm²");
+            if (renderEyeL) ctx.AddValue($"eye.l: {leftArea:F1} mm²");
+            if (renderEyeDiff) ctx.AddValue($"diff:  {diff:F2} mm²");
             if (renderEyeRatio) ctx.AddValue($"ratio: {ratio:F2}");
             ctx.AddSpacer();
         }
 
         return new Dictionary<string, double>
         {
-            ["eye.left"]  = leftArea,
+            ["eye.left"] = leftArea,
             ["eye.right"] = rightArea,
-            ["eye.diff"]  = diff,
+            ["eye.diff"] = diff,
             ["eye.ratio"] = ratio,
         };
     }

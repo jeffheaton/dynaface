@@ -18,7 +18,7 @@ public static class PoseClassifier
         float yaw = headpose[0];
         float noseDistanceRatio = NoseDistanceRatio(landmarks, imageWidth);
 
-        bool isLateral  = MathHelpers.Abs(yaw) > YawLateralThresholdDeg && noseDistanceRatio < 0f;
+        bool isLateral = MathHelpers.Abs(yaw) > YawLateralThresholdDeg && noseDistanceRatio < 0f;
         bool facingLeft = yaw < 0f;
         return (isLateral, facingLeft);
     }

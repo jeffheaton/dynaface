@@ -1,0 +1,88 @@
+name: Build macOS App
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # Apple Silicon only. macos-15 is arm64; Intel users get the Unity build.
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python 3.11
+        id: py
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Import signing certificate
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/build.keychain"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+
+          echo "$MACOS_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" \
+            -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+          # Without this, codesign blocks on a GUI authorization prompt that can
+          # never be answered on a runner, and the job hangs until it times out.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+
+          security list-keychain -d user -s "$KEYCHAIN" login.keychain
+          security find-identity -v -p codesigning "$KEYCHAIN"
+
+      - name: Write App Store Connect API key
+        env:
+          AC_API_KEY_P8: ${{ secrets.AC_API_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          echo "$AC_API_KEY_P8" | base64 --decode > "$RUNNER_TEMP/ac_api_key.p8"
+
+      - name: Build, sign and notarize
+        working-directory: dynaface-app/deploy/macos
+        env:
+          # build.sh defaults to `python3.11`, which the runner doesn't expose;
+          # point it at the interpreter actions/setup-python installed.
+          PYTHON_EXE: ${{ steps.py.outputs.python-path }}
+          BUILD_NUMBER: ${{ github.run_number }}
+          app_certificate: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          AC_API_KEY_PATH: ${{ runner.temp }}/ac_api_key.p8
+          AC_API_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
+          AC_API_ISSUER_ID: ${{ secrets.AC_API_ISSUER_ID }}
+        run: ./build.sh
+
+      - name: Publish to S3
+        working-directory: dynaface-app/deploy/macos
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+        run: |
+          set -euo pipefail
+          # Unanchored so a UTF-8 BOM on version.py doesn't defeat the match.
+          ver=$(sed -n 's/.*VERSION = "\([^"]*\)".*/\1/p' ../../version.py | head -1)
+          if [ -z "$ver" ]; then echo "could not parse VERSION"; exit 1; fi
+          zip="dynaface-app-mac-$ver.zip"
+          dest="s3://data.heatonresearch.com/app/$zip"
+          echo "Uploading $zip -> $dest"
+          aws s3 cp "working/dist/$zip" "$dest" --acl public-read
+
+      - name: Clean up keychain
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/build.keychain" || true
+          rm -f "$RUNNER_TEMP/ac_api_key.p8"

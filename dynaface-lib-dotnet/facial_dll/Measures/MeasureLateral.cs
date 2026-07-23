@@ -38,11 +38,11 @@ public class MeasureLateral : FaceMeasureBase
             return new Dictionary<string, double>();
 
         var lm = ctx.LateralLandmarks;
-        Vec2 glabella    = lm[LateralLandmarkFinder.Glabella];
-        Vec2 nasion      = lm[LateralLandmarkFinder.Nasion];
-        Vec2 nasalTip    = lm[LateralLandmarkFinder.NasalTip];
-        Vec2 subnasal    = lm[LateralLandmarkFinder.Subnasal];
-        Vec2 pogonion    = lm[LateralLandmarkFinder.Pogonion];
+        Vec2 glabella = lm[LateralLandmarkFinder.Glabella];
+        Vec2 nasion = lm[LateralLandmarkFinder.Nasion];
+        Vec2 nasalTip = lm[LateralLandmarkFinder.NasalTip];
+        Vec2 subnasal = lm[LateralLandmarkFinder.Subnasal];
+        Vec2 pogonion = lm[LateralLandmarkFinder.Pogonion];
 
         float nfa = AngleAt(nasion, glabella, nasalTip);
         float nla = AngleAt(subnasal, nasalTip, pogonion);
@@ -88,10 +88,10 @@ public class MeasureLateral : FaceMeasureBase
 
         return new Dictionary<string, double>
         {
-            ["nfa"]   = nfa,
-            ["nla"]   = nla,
-            ["at"]    = at,
-            ["nt"]    = nt,
+            ["nfa"] = nfa,
+            ["nla"] = nla,
+            ["at"] = at,
+            ["nt"] = nt,
             ["at_nt"] = atNtRatio,
         };
     }

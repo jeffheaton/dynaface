@@ -26,25 +26,32 @@ public static class FaceRenderer
     public enum LandmarkDisplayMode { Off, Lm }
     public static LandmarkDisplayMode DisplayMode = LandmarkDisplayMode.Off;
 
-    public const int TEXT_SIZE_MEASURE = 3;
-    public const int TEXT_SIZE_STATS   = 32;
-    public const int ARROW_THICKNESS   = 3;
+    // Measure-label glyph scale. MUTABLE (like DisplayMode) so a host app's text-size
+    // setting can grow the on-image labels — the C# counterpart of dynaface-lib's
+    // mutable AnalyzeFace.text_size. Every measure/context call site reads it at draw
+    // time; 3 is the historical default.
+    public static int TEXT_SIZE_MEASURE = 3;
+    public const int TEXT_SIZE_STATS = 32;
+    public const int ARROW_THICKNESS = 3;
+
+    // Landmark-number glyph scale — mutable for the same text-size setting (Python's
+    // draw_landmarks size follows its text zoom too); 2 is the historical default.
+    public static int NumberScale = 2;
 
     const int DotRadius = 4;
-    const int NumberScale    = 2;
     const int NumberDistance = 15;
-    const int GlyphWidth     = 5;
-    public const int GlyphHeight  = 7;
-    const int GlyphSpacing   = 1;
+    const int GlyphWidth = 5;
+    public const int GlyphHeight = 7;
+    const int GlyphSpacing = 1;
 
-    static readonly Rgba32 ContourColor       = new Rgba32( 25, 235,  50, 255);
-    static readonly Rgba32 EyebrowColor       = new Rgba32( 35,  70, 255, 255);
-    static readonly Rgba32 NoseColor          = new Rgba32(245,  25, 230, 255);
-    static readonly Rgba32 EyeColor           = new Rgba32(255,  35,  35, 255);
-    static readonly Rgba32 OuterLipColor      = new Rgba32( 20, 225, 225, 255);
-    static readonly Rgba32 InnerLipColor      = new Rgba32(235, 225,  25, 255);
-    static readonly Rgba32 NumberColor        = new Rgba32(255, 255, 255, 255);
-    static readonly Rgba32 NumberOutlineColor = new Rgba32( 20,  20,  20, 255);
+    static readonly Rgba32 ContourColor = new Rgba32(25, 235, 50, 255);
+    static readonly Rgba32 EyebrowColor = new Rgba32(35, 70, 255, 255);
+    static readonly Rgba32 NoseColor = new Rgba32(245, 25, 230, 255);
+    static readonly Rgba32 EyeColor = new Rgba32(255, 35, 35, 255);
+    static readonly Rgba32 OuterLipColor = new Rgba32(20, 225, 225, 255);
+    static readonly Rgba32 InnerLipColor = new Rgba32(235, 225, 25, 255);
+    static readonly Rgba32 NumberColor = new Rgba32(255, 255, 255, 255);
+    static readonly Rgba32 NumberOutlineColor = new Rgba32(20, 20, 20, 255);
 
     static readonly byte[,] DigitRows =
     {
@@ -145,7 +152,7 @@ public static class FaceRenderer
         int x0, int y0, int x1, int y1,
         Rgba32 color, int thickness = 1)
     {
-        int r  = (thickness - 1) / 2;
+        int r = (thickness - 1) / 2;
         int dx = MathHelpers.Abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
         int dy = MathHelpers.Abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
         int err = dx - dy;
@@ -153,11 +160,11 @@ public static class FaceRenderer
         while (true)
         {
             if (r <= 0) SetPixelSafe(pixels, width, height, x, y, color);
-            else        DrawCircle(pixels, width, height, x, y, color, r);
+            else DrawCircle(pixels, width, height, x, y, color, r);
             if (x == x1 && y == y1) break;
             int e2 = 2 * err;
             if (e2 > -dy) { err -= dy; x += sx; }
-            if (e2 <  dx) { err += dx; y += sy; }
+            if (e2 < dx) { err += dx; y += sy; }
         }
     }
 
@@ -167,8 +174,8 @@ public static class FaceRenderer
         Rgba32 color, int par = 15, int thickness = 2)
     {
         float angle = MathHelpers.Atan2(tipY - tailY, tipX - tailX);
-        float cosA  = MathHelpers.Cos(angle);
-        float sinA  = MathHelpers.Sin(angle);
+        float cosA = MathHelpers.Cos(angle);
+        float sinA = MathHelpers.Sin(angle);
 
         int w1x = tipX + MathHelpers.RoundToInt(-par * cosA - (par / 2f) * sinA);
         int w1y = tipY + MathHelpers.RoundToInt(-par * sinA + (par / 2f) * cosA);
@@ -187,7 +194,7 @@ public static class FaceRenderer
     {
         DrawLine(pixels, width, height, x0, y0, x1, y1, color, thickness);
         if (arrowAtStart) DrawArrowHead(pixels, width, height, x0, y0, x1, y1, color, 15, thickness);
-        if (arrowAtEnd)   DrawArrowHead(pixels, width, height, x1, y1, x0, y0, color, 15, thickness);
+        if (arrowAtEnd) DrawArrowHead(pixels, width, height, x1, y1, x0, y0, color, 15, thickness);
     }
 
     public static void DrawRect(
@@ -197,29 +204,29 @@ public static class FaceRenderer
     {
         if (filled)
         {
-            int x0 = MathHelpers.Clamp(left,   0, width  - 1);
-            int x1 = MathHelpers.Clamp(right,  0, width  - 1);
+            int x0 = MathHelpers.Clamp(left, 0, width - 1);
+            int x1 = MathHelpers.Clamp(right, 0, width - 1);
             int y0 = MathHelpers.Clamp(bottom, 0, height - 1);
-            int y1 = MathHelpers.Clamp(top,    0, height - 1);
+            int y1 = MathHelpers.Clamp(top, 0, height - 1);
             float inv = 1f - alpha;
             for (int y = y0; y <= y1; y++)
-            for (int x = x0; x <= x1; x++)
-            {
-                int idx = y * width + x;
-                Rgba32 src = pixels[idx];
-                pixels[idx] = new Rgba32(
-                    (byte)(color.R * alpha + src.R * inv),
-                    (byte)(color.G * alpha + src.G * inv),
-                    (byte)(color.B * alpha + src.B * inv),
-                    255);
-            }
+                for (int x = x0; x <= x1; x++)
+                {
+                    int idx = y * width + x;
+                    Rgba32 src = pixels[idx];
+                    pixels[idx] = new Rgba32(
+                        (byte)(color.R * alpha + src.R * inv),
+                        (byte)(color.G * alpha + src.G * inv),
+                        (byte)(color.B * alpha + src.B * inv),
+                        255);
+                }
         }
         else
         {
-            DrawLine(pixels, width, height, left,  bottom, right, bottom, color, thickness);
-            DrawLine(pixels, width, height, right, bottom, right, top,    color, thickness);
-            DrawLine(pixels, width, height, right, top,    left,  top,    color, thickness);
-            DrawLine(pixels, width, height, left,  top,    left,  bottom, color, thickness);
+            DrawLine(pixels, width, height, left, bottom, right, bottom, color, thickness);
+            DrawLine(pixels, width, height, right, bottom, right, top, color, thickness);
+            DrawLine(pixels, width, height, right, top, left, top, color, thickness);
+            DrawLine(pixels, width, height, left, top, left, bottom, color, thickness);
         }
     }
 
@@ -228,11 +235,11 @@ public static class FaceRenderer
         int cx, int cy, Rgba32 color, int radius = 4)
     {
         for (int dy = -radius; dy <= radius; dy++)
-        for (int dx = -radius; dx <= radius; dx++)
-        {
-            if (dx * dx + dy * dy <= radius * radius)
-                SetPixelSafe(pixels, width, height, cx + dx, cy + dy, color);
-        }
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                if (dx * dx + dy * dy <= radius * radius)
+                    SetPixelSafe(pixels, width, height, cx + dx, cy + dy, color);
+            }
     }
 
     public static void DrawText(
@@ -247,11 +254,11 @@ public static class FaceRenderer
         {
             var shadow = new Rgba32(20, 20, 20, 255);
             for (int oy = -1; oy <= 1; oy++)
-            for (int ox = -1; ox <= 1; ox++)
-            {
-                if (ox == 0 && oy == 0) continue;
-                DrawTextRaw(pixels, width, height, originX + ox, originY + oy, upper, scale, shadow);
-            }
+                for (int ox = -1; ox <= 1; ox++)
+                {
+                    if (ox == 0 && oy == 0) continue;
+                    DrawTextRaw(pixels, width, height, originX + ox, originY + oy, upper, scale, shadow);
+                }
         }
         DrawTextRaw(pixels, width, height, originX, originY, upper, scale, color);
     }
@@ -291,7 +298,7 @@ public static class FaceRenderer
         if (x2 < 0) x2 = width;
         x1 = MathHelpers.Clamp(x1, 0, width);
         x2 = MathHelpers.Clamp(x2, 0, width);
-        y  = MathHelpers.Clamp(y,  0, height - 1);
+        y = MathHelpers.Clamp(y, 0, height - 1);
         int count = MathHelpers.Max(0, x2 - x1);
         var result = new Rgba32[count];
         Array.Copy(pixels, y * width + x1, result, 0, count);
@@ -302,13 +309,13 @@ public static class FaceRenderer
         Rgba32[] pixels, int width, int height,
         int left, int bottom, int right, int top)
     {
-        left   = MathHelpers.Clamp(left,   0, width);
-        right  = MathHelpers.Clamp(right,  0, width);
+        left = MathHelpers.Clamp(left, 0, width);
+        right = MathHelpers.Clamp(right, 0, width);
         bottom = MathHelpers.Clamp(bottom, 0, height);
-        top    = MathHelpers.Clamp(top,    0, height);
+        top = MathHelpers.Clamp(top, 0, height);
 
-        int w = MathHelpers.Max(0, right  - left);
-        int h = MathHelpers.Max(0, top    - bottom);
+        int w = MathHelpers.Max(0, right - left);
+        int h = MathHelpers.Max(0, top - bottom);
         var result = new Rgba32[w * h];
         for (int row = 0; row < h; row++)
             Array.Copy(pixels, (bottom + row) * width + left, result, row * w, w);
@@ -323,25 +330,25 @@ public static class FaceRenderer
         Rgba32[] pixels, int width, int height,
         Vec2[] points, int landmarkIndex)
     {
-        Vec2 point        = points[landmarkIndex];
+        Vec2 point = points[landmarkIndex];
         Vec2 regionCenter = GetLabelRegionCenter(points, landmarkIndex);
-        Vec2 direction    = point - regionCenter;
+        Vec2 direction = point - regionCenter;
 
         if (direction.SqrMagnitude < 1f)
             direction = GetFallbackLabelDirection(landmarkIndex);
         else
             direction = direction.Normalized();
 
-        string text      = landmarkIndex.ToString();
-        int    textWidth  = GetTextWidth(text, NumberScale);
-        int    textHeight = GlyphHeight * NumberScale;
+        string text = landmarkIndex.ToString();
+        int textWidth = GetTextWidth(text, NumberScale);
+        int textHeight = GlyphHeight * NumberScale;
 
-        float   labelRadius = NumberDistance + MathHelpers.Max(textWidth, textHeight) * 0.5f;
-        Vec2    labelCenter = point + direction * labelRadius;
+        float labelRadius = NumberDistance + MathHelpers.Max(textWidth, textHeight) * 0.5f;
+        Vec2 labelCenter = point + direction * labelRadius;
 
         int originX = MathHelpers.Clamp(
-            MathHelpers.RoundToInt(labelCenter.X - textWidth  * 0.5f),
-            1, MathHelpers.Max(1, width  - textWidth  - 2));
+            MathHelpers.RoundToInt(labelCenter.X - textWidth * 0.5f),
+            1, MathHelpers.Max(1, width - textWidth - 2));
         int originY = MathHelpers.Clamp(
             MathHelpers.RoundToInt(labelCenter.Y - textHeight * 0.5f),
             1, MathHelpers.Max(1, height - textHeight - 2));
@@ -351,7 +358,7 @@ public static class FaceRenderer
 
     static Vec2 GetLabelRegionCenter(Vec2[] points, int index)
     {
-        if (index <= 32) return AverageRange(points,  0, 32);
+        if (index <= 32) return AverageRange(points, 0, 32);
         if (index <= 41) return AverageRange(points, 33, 41);
         if (index <= 50) return AverageRange(points, 42, 50);
         if (index <= 59) return AverageRange(points, 51, 59);
@@ -375,8 +382,8 @@ public static class FaceRenderer
 
     static Vec2 AverageRange(Vec2[] points, int firstInclusive, int lastInclusive)
     {
-        Vec2 sum   = Vec2.Zero;
-        int  count = 0;
+        Vec2 sum = Vec2.Zero;
+        int count = 0;
         for (int i = firstInclusive; i <= lastInclusive; i++) { sum += points[i]; count++; }
         return count > 0 ? sum / count : Vec2.Zero;
     }
@@ -406,11 +413,11 @@ public static class FaceRenderer
         int originX, int originY, string text, int scale)
     {
         for (int oy = -1; oy <= 1; oy++)
-        for (int ox = -1; ox <= 1; ox++)
-        {
-            if (ox == 0 && oy == 0) continue;
-            DrawNumberRaw(pixels, width, height, originX + ox, originY + oy, text, scale, NumberOutlineColor);
-        }
+            for (int ox = -1; ox <= 1; ox++)
+            {
+                if (ox == 0 && oy == 0) continue;
+                DrawNumberRaw(pixels, width, height, originX + ox, originY + oy, text, scale, NumberOutlineColor);
+            }
         DrawNumberRaw(pixels, width, height, originX, originY, text, scale, NumberColor);
     }
 
@@ -441,8 +448,8 @@ public static class FaceRenderer
                 int blockX = originX + col * scale;
                 int blockY = originY + (GlyphHeight - 1 - row) * scale;
                 for (int py = 0; py < scale; py++)
-                for (int px = 0; px < scale; px++)
-                    SetPixelSafe(pixels, width, height, blockX + px, blockY + py, color);
+                    for (int px = 0; px < scale; px++)
+                        SetPixelSafe(pixels, width, height, blockX + px, blockY + py, color);
             }
         }
     }
@@ -473,8 +480,8 @@ public static class FaceRenderer
                 int blockX = originX + col * scale;
                 int blockY = originY + (GlyphHeight - 1 - row) * scale;
                 for (int py = 0; py < scale; py++)
-                for (int px = 0; px < scale; px++)
-                    SetPixelSafe(pixels, width, height, blockX + px, blockY + py, color);
+                    for (int px = 0; px < scale; px++)
+                        SetPixelSafe(pixels, width, height, blockX + px, blockY + py, color);
             }
         }
     }
@@ -509,7 +516,7 @@ public static class FaceRenderer
             xs.Sort();
             for (int i = 0; i + 1 < xs.Count; i += 2)
             {
-                int xLeft  = MathHelpers.Clamp(xs[i],     0, width - 1);
+                int xLeft = MathHelpers.Clamp(xs[i], 0, width - 1);
                 int xRight = MathHelpers.Clamp(xs[i + 1], 0, width - 1);
                 int rowBase = y * width;
                 for (int x = xLeft; x <= xRight; x++)

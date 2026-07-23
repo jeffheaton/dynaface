@@ -20,7 +20,7 @@ public static class MonotonicCornerFinder
         int n = x.Length;
         if (n < 7) return Array.Empty<int>();
 
-        var allIdx    = new List<int>();
+        var allIdx = new List<int>();
         var allScores = new List<double>();
         int halfNeigh = Math.Max(1, minRun / 2);
 
@@ -29,7 +29,7 @@ public static class MonotonicCornerFinder
             int w = EnsureOdd(rawW);
             if (w >= n) continue;
 
-            double[] dx  = SavitzkyGolay.Filter(x, w, polyOrder, 1);
+            double[] dx = SavitzkyGolay.Filter(x, w, polyOrder, 1);
             double[] ddx = SavitzkyGolay.Filter(x, w, polyOrder, 2);
 
             var kappa = new double[n];
@@ -54,7 +54,7 @@ public static class MonotonicCornerFinder
             {
                 for (int i = 0; i < n; i++)
                 {
-                    int leftIdx  = ((i - off) % n + n) % n;
+                    int leftIdx = ((i - off) % n + n) % n;
                     int rightIdx = ((i + off) % n + n) % n;
                     same[i] = same[i] && signDx[i] == signDx[leftIdx] && signDx[i] == signDx[rightIdx];
                 }
@@ -94,14 +94,14 @@ public static class MonotonicCornerFinder
             var scoreK = new Dictionary<int, double>();
             for (int i = 0; i < peaksK.Length; i++) scoreK[peaksK[i]] = heightsK[i];
 
-            double maxA  = heightsA.Length > 0 ? MaxOf(heightsA) : 0.0;
+            double maxA = heightsA.Length > 0 ? MaxOf(heightsA) : 0.0;
             double maxKv = heightsK.Length > 0 ? MaxOf(heightsK) : 0.0;
 
             foreach (int i in idxSet)
             {
                 double sa = Norm(scoreA.TryGetValue(i, out double va) ? va : 0.0, maxA);
                 double sk = Norm(scoreK.TryGetValue(i, out double vk) ? vk : 0.0, maxKv);
-                double s  = mixWeightAngle * sa + (1.0 - mixWeightAngle) * sk;
+                double s = mixWeightAngle * sa + (1.0 - mixWeightAngle) * sk;
                 allIdx.Add(i);
                 allScores.Add(s);
             }
@@ -110,7 +110,7 @@ public static class MonotonicCornerFinder
         if (allIdx.Count == 0) return Array.Empty<int>();
 
         var excludeSet = new HashSet<int>(excludeExtrema ?? Array.Empty<int>());
-        var survivingIdx    = new List<int>();
+        var survivingIdx = new List<int>();
         var survivingScores = new List<double>();
         for (int i = 0; i < allIdx.Count; i++)
         {
@@ -185,7 +185,7 @@ public static class MonotonicCornerFinder
         Array.Sort(order, (a, b) => scores[b].CompareTo(scores[a])); // descending
 
         var taken = new bool[n];
-        var kept  = new List<int>();
+        var kept = new List<int>();
         foreach (int o in order)
         {
             if (taken[o]) continue;

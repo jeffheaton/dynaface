@@ -29,24 +29,24 @@ public class OnnxDynafaceInference : IDynafaceInference
     public bool IsReady => _blazeFaceSession != null && _spigaSession != null && _u2netSession != null;
 
     public OnnxDynafaceInference(string blazeFacePath, string spigaPath, string u2netPath,
-        string blazeInputName      = null,
+        string blazeInputName = null,
         string blazeRegressorsName = null,
-        string blazeScoresName     = null)
+        string blazeScoresName = null)
     {
-        _blazeFaceSession   = new InferenceSession(blazeFacePath);
-        _spigaSession       = new InferenceSession(spigaPath);
-        _u2netSession       = new InferenceSession(u2netPath);
-        _blazeInputName      = blazeInputName      ?? _blazeFaceSession.InputMetadata.Keys.First();
-        string[] outs        = _blazeFaceSession.OutputMetadata.Keys.ToArray();
+        _blazeFaceSession = new InferenceSession(blazeFacePath);
+        _spigaSession = new InferenceSession(spigaPath);
+        _u2netSession = new InferenceSession(u2netPath);
+        _blazeInputName = blazeInputName ?? _blazeFaceSession.InputMetadata.Keys.First();
+        string[] outs = _blazeFaceSession.OutputMetadata.Keys.ToArray();
         _blazeRegressorsName = blazeRegressorsName ?? outs[0];
-        _blazeScoresName     = blazeScoresName     ?? outs[1];
-        _u2netInputName       = _u2netSession.InputMetadata.Keys.First();
-        _u2netOutputName      = _u2netSession.OutputMetadata.Keys.First();
+        _blazeScoresName = blazeScoresName ?? outs[1];
+        _u2netInputName = _u2netSession.InputMetadata.Keys.First();
+        _u2netOutputName = _u2netSession.OutputMetadata.Keys.First();
     }
 
     public string DescribeTensors()
     {
-        var spigaIns  = string.Join(", ", _spigaSession.InputMetadata.Keys);
+        var spigaIns = string.Join(", ", _spigaSession.InputMetadata.Keys);
         var spigaOuts = string.Join(", ", _spigaSession.OutputMetadata.Keys);
         return $"BlazeFace: input={_blazeInputName}  regressors={_blazeRegressorsName}  scores={_blazeScoresName}\n" +
                $"SPIGA:     inputs=[{spigaIns}]  outputs=[{spigaOuts}]\n" +
@@ -57,10 +57,10 @@ public class OnnxDynafaceInference : IDynafaceInference
     {
         try
         {
-            var t      = new DenseTensor<float>(tensor, new[] { 1, 128, 128, 3 });
+            var t = new DenseTensor<float>(tensor, new[] { 1, 128, 128, 3 });
             var inputs = new[] { NamedOnnxValue.CreateFromTensor(_blazeInputName, t) };
             using var results = _blazeFaceSession.Run(inputs);
-            float[] regs   = results.First(r => r.Name == _blazeRegressorsName).AsTensor<float>().ToArray();
+            float[] regs = results.First(r => r.Name == _blazeRegressorsName).AsTensor<float>().ToArray();
             float[] scores = results.First(r => r.Name == _blazeScoresName).AsTensor<float>().ToArray();
             return (regs, scores);
         }
@@ -72,8 +72,8 @@ public class OnnxDynafaceInference : IDynafaceInference
         try
         {
             var imgT = new DenseTensor<float>(imageTensor, new[] { 1, 3, 256, 256 });
-            var m3dT = new DenseTensor<float>(_model3d,    new[] { 1, 98, 3 });
-            var camT = new DenseTensor<float>(_camMatrix,  new[] { 1, 3, 3 });
+            var m3dT = new DenseTensor<float>(_model3d, new[] { 1, 98, 3 });
+            var camT = new DenseTensor<float>(_camMatrix, new[] { 1, 3, 3 });
 
             var inputs = new[]
             {
@@ -84,7 +84,7 @@ public class OnnxDynafaceInference : IDynafaceInference
 
             using var results = _spigaSession.Run(inputs);
             float[] landmarks = results.First(r => r.Name == "landmarks").AsTensor<float>().ToArray();
-            float[] pose      = results.First(r => r.Name == "pose").AsTensor<float>().ToArray();
+            float[] pose = results.First(r => r.Name == "pose").AsTensor<float>().ToArray();
             return (landmarks, pose);
         }
         catch { return null; }
@@ -94,7 +94,7 @@ public class OnnxDynafaceInference : IDynafaceInference
     {
         try
         {
-            var t      = new DenseTensor<float>(imageTensor, new[] { 1, 3, 320, 320 });
+            var t = new DenseTensor<float>(imageTensor, new[] { 1, 3, 320, 320 });
             var inputs = new[] { NamedOnnxValue.CreateFromTensor(_u2netInputName, t) };
             using var results = _u2netSession.Run(inputs);
             return results.First(r => r.Name == _u2netOutputName).AsTensor<float>().ToArray();

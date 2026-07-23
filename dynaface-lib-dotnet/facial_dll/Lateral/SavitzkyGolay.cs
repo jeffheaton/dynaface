@@ -66,29 +66,29 @@ public static class SavitzkyGolay
 
         var AtA = new double[m, m];
         for (int i = 0; i < m; i++)
-        for (int j = 0; j < m; j++)
-        {
-            double sum = 0;
-            for (int k = 0; k < w; k++)
+            for (int j = 0; j < m; j++)
             {
-                double t = k - halfWin;
-                sum += Math.Pow(t, i) * Math.Pow(t, j);
+                double sum = 0;
+                for (int k = 0; k < w; k++)
+                {
+                    double t = k - halfWin;
+                    sum += Math.Pow(t, i) * Math.Pow(t, j);
+                }
+                AtA[i, j] = sum;
             }
-            AtA[i, j] = sum;
-        }
 
         double[,] AtAInv = Invert(AtA, m);
 
         var H = new double[m, w];
         for (int i = 0; i < m; i++)
-        for (int k = 0; k < w; k++)
-        {
-            double t = k - halfWin;
-            double sum = 0;
-            for (int j = 0; j < m; j++)
-                sum += AtAInv[i, j] * Math.Pow(t, j);
-            H[i, k] = sum;
-        }
+            for (int k = 0; k < w; k++)
+            {
+                double t = k - halfWin;
+                double sum = 0;
+                for (int j = 0; j < m; j++)
+                    sum += AtAInv[i, j] * Math.Pow(t, j);
+                H[i, k] = sum;
+            }
         return H;
     }
 
@@ -124,7 +124,7 @@ public static class SavitzkyGolay
     // (polyOrder+1)-square matrices (3x3 for dynaface-lib's fixed polyorder=2).
     static double[,] Invert(double[,] m, int size)
     {
-        var a   = (double[,])m.Clone();
+        var a = (double[,])m.Clone();
         var inv = new double[size, size];
         for (int i = 0; i < size; i++) inv[i, i] = 1.0;
 
@@ -141,7 +141,7 @@ public static class SavitzkyGolay
             {
                 for (int c = 0; c < size; c++)
                 {
-                    (a[col, c], a[pivotRow, c])     = (a[pivotRow, c], a[col, c]);
+                    (a[col, c], a[pivotRow, c]) = (a[pivotRow, c], a[col, c]);
                     (inv[col, c], inv[pivotRow, c]) = (inv[pivotRow, c], inv[col, c]);
                 }
             }
@@ -156,7 +156,7 @@ public static class SavitzkyGolay
                 if (factor == 0.0) continue;
                 for (int c = 0; c < size; c++)
                 {
-                    a[r, c]   -= factor * a[col, c];
+                    a[r, c] -= factor * a[col, c];
                     inv[r, c] -= factor * inv[col, c];
                 }
             }

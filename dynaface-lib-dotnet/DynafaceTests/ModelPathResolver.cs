@@ -10,8 +10,8 @@ namespace DynafaceTests;
 public static class ModelPathResolver
 {
     public const string BlazeFaceFileName = "blaze_face_short_range.onnx";
-    public const string SpigaFileName     = "spiga_wflw.onnx";
-    public const string U2NetFileName     = "u2net.onnx";
+    public const string SpigaFileName = "spiga_wflw.onnx";
+    public const string U2NetFileName = "u2net.onnx";
 
     // Checked in order: DYNAFACE_ONNX_MODELS env var, dynaface-lib's own default
     // download location, then this repo's sibling dynaface-app/data (known to have

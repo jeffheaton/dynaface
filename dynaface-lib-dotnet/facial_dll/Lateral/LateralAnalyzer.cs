@@ -62,8 +62,8 @@ public static class LateralAnalyzer
         return new Result
         {
             LateralLandmarks = lateralLandmarks,
-            SagittalX         = sagittalXFull,
-            SagittalY         = sagittalYFloat,
+            SagittalX = sagittalXFull,
+            SagittalY = sagittalYFloat,
         };
     }
 }

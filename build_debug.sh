@@ -6,7 +6,7 @@ pip install -r requirements.txt --constraint ../constraints.txt
 
 # Download and unzip dynaface_models.zip
 mkdir -p ./data
-curl -L -o ./data/dynaface_models.zip https://github.com/jeffheaton/dynaface-models/releases/download/v1/dynaface_models.zip
+curl -L -o ./data/dynaface_models.zip https://data.heatonresearch.com/dynaface/model/2/dynaface_models.zip
 unzip -o ./data/dynaface_models.zip -d ./data/
 rm ./data/dynaface_models.zip
 

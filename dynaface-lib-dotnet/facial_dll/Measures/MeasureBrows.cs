@@ -29,7 +29,7 @@ public class MeasureBrows : FaceMeasureBase
         float tilt = ctx.CalcFaceRotationDeg();
 
         Vec2? rightEdge = ctx.LineToEdge(ctx.Landmarks[35], 180f + tilt);
-        Vec2? leftEdge  = ctx.LineToEdge(ctx.Landmarks[44], tilt);
+        Vec2? leftEdge = ctx.LineToEdge(ctx.Landmarks[44], tilt);
 
         if (rightEdge == null || leftEdge == null)
             return new Dictionary<string, double>();
@@ -39,7 +39,7 @@ public class MeasureBrows : FaceMeasureBase
         if (render && render2)
         {
             ctx.DrawArrow(ctx.Landmarks[36], rightEdge.Value, ArrowColor, arrowAtEnd: true);
-            ctx.DrawArrow(ctx.Landmarks[44], leftEdge.Value,  ArrowColor, arrowAtEnd: true);
+            ctx.DrawArrow(ctx.Landmarks[44], leftEdge.Value, ArrowColor, arrowAtEnd: true);
 
             ctx.AddHeader(Label);
             ctx.AddValue($"d.brow: {diff:F2} mm");

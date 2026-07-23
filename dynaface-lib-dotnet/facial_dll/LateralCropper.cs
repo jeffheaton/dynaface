@@ -35,15 +35,15 @@ public static class LateralCropper
 
         int bandH = MathHelpers.Max(1, maxY - minY);
 
-        int padTopT   = MathHelpers.RoundToInt(target * DynafaceConstants.LateralPadTopRatio);
-        int padBotT   = MathHelpers.RoundToInt(target * DynafaceConstants.LateralPadBottomRatio);
+        int padTopT = MathHelpers.RoundToInt(target * DynafaceConstants.LateralPadTopRatio);
+        int padBotT = MathHelpers.RoundToInt(target * DynafaceConstants.LateralPadBottomRatio);
         int padTotalT = MathHelpers.Min(padTopT + padBotT, target - 1);
 
         float sVert = MathHelpers.Max(1e-6f, (target - padTotalT) / (float)bandH);
         float sFill = MathHelpers.Max(target / (float)width, target / (float)height);
         float scale = MathHelpers.Min(sFill, sVert);
 
-        int newWidth  = MathHelpers.Max(1, MathHelpers.RoundToInt(width * scale));
+        int newWidth = MathHelpers.Max(1, MathHelpers.RoundToInt(width * scale));
         int newHeight = MathHelpers.Max(1, MathHelpers.RoundToInt(height * scale));
 
         Rgba32[] topLeftPixels = ImageUtils.FlipVertical(photo.Pixels, width, height);

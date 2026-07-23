@@ -11,11 +11,11 @@
 public sealed class FaceAnalysisState
 {
     public FaceImage PostCropImage;
-    public float[]   HeadPose;
-    public Vec2[]    Landmarks;
-    public float     PupillaryDistance;
-    public float     Pix2mm;
-    public float?    FaceRotationRad;
+    public float[] HeadPose;
+    public Vec2[] Landmarks;
+    public float PupillaryDistance;
+    public float Pix2mm;
+    public float? FaceRotationRad;
 }
 
 public static class FaceAnalysisPersistence
@@ -31,12 +31,12 @@ public static class FaceAnalysisPersistence
 
         return new FaceAnalysisState
         {
-            PostCropImage     = new FaceImage(clonedPixels, crop.Width, crop.Height),
-            HeadPose          = result.HeadPose != null ? (float[])result.HeadPose.Clone() : null,
-            Landmarks         = result.Wflw98   != null ? (Vec2[])result.Wflw98.Clone()    : null,
+            PostCropImage = new FaceImage(clonedPixels, crop.Width, crop.Height),
+            HeadPose = result.HeadPose != null ? (float[])result.HeadPose.Clone() : null,
+            Landmarks = result.Wflw98 != null ? (Vec2[])result.Wflw98.Clone() : null,
             PupillaryDistance = result.PupillaryDistance,
-            Pix2mm            = result.Pix2mm,
-            FaceRotationRad   = result.FaceRotationRad,
+            Pix2mm = result.Pix2mm,
+            FaceRotationRad = result.FaceRotationRad,
         };
     }
 

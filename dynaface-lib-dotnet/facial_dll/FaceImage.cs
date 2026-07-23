@@ -4,13 +4,13 @@
 public struct FaceImage
 {
     public Rgba32[] Pixels;
-    public int      Width;
-    public int      Height;
+    public int Width;
+    public int Height;
 
     public FaceImage(Rgba32[] pixels, int width, int height)
     {
         Pixels = pixels;
-        Width  = width;
+        Width = width;
         Height = height;
     }
 
