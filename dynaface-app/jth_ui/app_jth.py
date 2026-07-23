@@ -6,6 +6,7 @@ import logging.handlers
 import os
 import platform
 import plistlib
+import shutil
 import sys
 
 import appdirs
@@ -20,6 +21,71 @@ logger = logging.getLogger(__name__)
 
 STATE_LAST_FOLDER = "last_folder"
 STATE_LAST_FILES = "recent"
+
+
+def settings_paths_for(app_id):
+    """Settings dir and settings file for a given app id, per platform."""
+    if utl_env.get_system_name() == "osx":
+        if utl_env.is_sandboxed():
+            setting_dir = os.path.expanduser("~/preferences")
+        else:
+            setting_dir = os.path.expanduser(f"~/Library/Application Support/{app_id}/")
+        setting_file = os.path.join(setting_dir, f"{app_id}.plist")
+    elif utl_env.get_system_name() == "windows":
+        base_dir = appdirs.user_config_dir(
+            app_const.APP_NAME, app_const.APP_AUTHOR, roaming=False
+        )
+        setting_dir = os.path.join(base_dir, "preferences")
+        setting_file = os.path.join(setting_dir, f"{app_id}.json")
+    else:
+        setting_dir = os.path.join(os.path.expanduser("~"), app_id, "preferences")
+        setting_file = os.path.join(setting_dir, f"{app_id}.json")
+    return setting_dir, setting_file
+
+
+def migrate_legacy_settings(legacy_app_id="testapp"):
+    """One-time adoption of settings written while APP_ID was stuck at the
+    framework placeholder id. Safe to call every launch: does nothing once
+    settings exist under the current id. Must run before anything (e.g.
+    logging setup) creates directories under the new id, or the whole-dir
+    move degrades to the file-by-file fallback. Returns messages describing
+    what was migrated, for the caller to log once logging is configured."""
+    actions = []
+    try:
+        if app_const.APP_ID == legacy_app_id:
+            return actions
+        new_dir, new_file = settings_paths_for(app_const.APP_ID)
+        if os.path.exists(new_file):
+            return actions
+        legacy_dir, legacy_file = settings_paths_for(legacy_app_id)
+        if (
+            legacy_dir != new_dir
+            and os.path.isdir(legacy_dir)
+            and not os.path.exists(new_dir)
+        ):
+            os.makedirs(os.path.dirname(os.path.normpath(new_dir)), exist_ok=True)
+            shutil.move(legacy_dir, new_dir)
+            actions.append(f"Migrated legacy settings dir {legacy_dir} -> {new_dir}")
+        carried = os.path.join(new_dir, os.path.basename(legacy_file))
+        if os.path.isfile(carried):
+            os.replace(carried, new_file)
+            actions.append(f"Renamed legacy settings file {carried} -> {new_file}")
+        elif os.path.isfile(legacy_file):
+            # The new dir already existed, so the dir was not moved; bring the
+            # settings and window state over individually instead.
+            os.makedirs(new_dir, exist_ok=True)
+            shutil.copy2(legacy_file, new_file)
+            actions.append(f"Copied legacy settings file {legacy_file} -> {new_file}")
+            legacy_state = os.path.join(legacy_dir, "state.json")
+            new_state = os.path.join(new_dir, "state.json")
+            if os.path.isfile(legacy_state) and not os.path.exists(new_state):
+                shutil.copy2(legacy_state, new_state)
+                actions.append(
+                    f"Copied legacy state file {legacy_state} -> {new_state}"
+                )
+    except Exception:
+        logger.error("Failed to migrate legacy settings", exc_info=True)
+    return actions
 
 
 def get_library_version(library_name):
@@ -40,36 +106,12 @@ class AppJTH(QApplication):
         self.file_open_request = None
 
         self.settings = {}
-        if utl_env.get_system_name() == "osx":
-            if utl_env.is_sandboxed():
-                self.SETTING_DIR = os.path.expanduser(f"~/preferences")
-            else:
-                self.SETTING_DIR = os.path.expanduser(
-                    f"~/Library/Application Support/{app_const.APP_ID}/"
-                )
-            self.SETTING_FILE = os.path.join(
-                self.SETTING_DIR, f"{app_const.APP_ID}.plist"
-            )
-            self.STATE_FILE = os.path.join(self.SETTING_DIR, "state.json")
-        elif utl_env.get_system_name() == "windows":
-            base_dir = appdirs.user_config_dir(
-                app_const.APP_NAME, app_const.APP_AUTHOR, roaming=False
-            )
-            self.SETTING_DIR = os.path.join(base_dir, "preferences")
-            self.SETTING_FILE = os.path.join(
-                self.SETTING_DIR, f"{app_const.APP_ID}.json"
-            )
-            self.STATE_FILE = os.path.join(self.SETTING_DIR, "state.json")
-        else:
-            home_dir = os.path.expanduser("~")
-            base_dir = os.path.join(home_dir, app_const.APP_ID)
+        self.SETTING_DIR, self.SETTING_FILE = settings_paths_for(app_const.APP_ID)
+        self.STATE_FILE = os.path.join(self.SETTING_DIR, "state.json")
+        if utl_env.get_system_name() not in ("osx", "windows"):
+            base_dir = os.path.dirname(self.SETTING_DIR)
             os.makedirs(base_dir, exist_ok=True)
             self.LOG_DIR = os.path.join(base_dir, "logs")
-            self.SETTING_DIR = os.path.join(base_dir, "preferences")
-            self.SETTING_FILE = os.path.join(
-                self.SETTING_DIR, f"{app_const.APP_ID}.json"
-            )
-            self.STATE_FILE = os.path.join(self.SETTING_DIR, "state.json")
 
         print(f"Settings path: {self.SETTING_DIR}")
         print(f"Settings file: {self.SETTING_FILE}")

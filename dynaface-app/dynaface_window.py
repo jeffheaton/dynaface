@@ -161,8 +161,10 @@ class DynafaceWindow(MainWindowJTH):
         logs_action.triggered.connect(self.open_logs)
         self._help_menu.addAction(logs_action)
 
-        #
-        self.menubar.addMenu(app_menu)
+        # The app menu only has items on macOS; adding it elsewhere leaves an
+        # empty "Dynaface" menu in the menu bar.
+        if utl_env.get_system_name() == "osx":
+            self.menubar.addMenu(app_menu)
         self.menubar.addMenu(self._file_menu)
         self.menubar.addMenu(self._edit_menu)
         self.menubar.addMenu(self._help_menu)

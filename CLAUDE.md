@@ -4,14 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Dynaface is a facial analysis tool for measuring facial symmetry and movement, primarily for assessing facial paralysis patients. It is organized as a monorepo with two components:
+Dynaface is a facial analysis tool for measuring facial symmetry and movement, primarily for assessing facial paralysis patients. It is organized as a monorepo with three components:
 
 - **`dynaface-lib-python/`** — Python library (PyPI package `dynaface`)
 - **`dynaface-app/`** — Desktop GUI application (PyQt6)
+- **`dynaface-lib-dotnet/`** — C#/.NET port of the library (NuGet packages `Dynaface`/`Dynaface.Onnx`; also ships as a Unity package); see `dynaface-lib-dotnet/CLAUDE.md`
 
 ## Important: Always Use the venv
 
-Both components use Python virtual environments. **Never install packages or run tests using the system/base Python.** Always activate the venv first. If `venv/` doesn't exist in the component directory, create it before proceeding.
+The two Python components use Python virtual environments. **Never install packages or run tests using the system/base Python.** Always activate the venv first. If `venv/` doesn't exist in the component directory, create it before proceeding.
 
 ## Commands
 
@@ -52,9 +53,22 @@ pip install -r requirements.txt && pip install dynaface
 
 # Run the application
 python dynaface_app.py
+```
 
-# Run tests
-python -m unittest discover -s tests
+(The app has no automated test suite; verify changes by running the app.)
+
+### dynaface-lib-dotnet (C#/.NET Library)
+
+C# port of the Python library: `facial_dll/` core (netstandard2.1, NuGet package `Dynaface`, Unity package via `FacialDll.asmdef`), `FacialDll.Onnx/` ONNX Runtime backend (NuGet `Dynaface.Onnx`), `FacialDllConsole/` CLI harness, and `DynafaceTests/` xUnit suite. Requires the .NET 10 SDK; no venv. See `dynaface-lib-dotnet/CLAUDE.md` for architecture and the full command list.
+
+```bash
+cd dynaface-lib-dotnet
+
+# Build everything
+dotnet build FacialDll.sln
+
+# Run tests (model-gated integration tests self-skip if the ONNX models aren't found)
+dotnet test DynafaceTests/DynafaceTests.csproj
 ```
 
 ## Code Style

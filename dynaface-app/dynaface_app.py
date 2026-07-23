@@ -8,6 +8,13 @@ app_const.BUNDLE_ID = "com.heatonresearch.dynaface"
 app_const.APP_NAME = "Dynaface"
 app_const.APP_AUTHOR = "Jeff Heaton"
 app_const.COPYRIGHT = "Copyright 2026 by Jeff Heaton, released under the <a href='https://www.apache.org/licenses/LICENSE-2.0'>Apache 2.0 License</a>"
+app_const.APP_ID = app_const.BUNDLE_ID.split(".")[-1]
+
+# Adopt settings saved while APP_ID was stuck at the framework placeholder
+# ("testapp"); must run before logging creates directories under the new id.
+from jth_ui.app_jth import migrate_legacy_settings
+
+_migration_actions = migrate_legacy_settings()
 
 utl_log.delete_old_logs()
 utl_log.setup_logging()
@@ -16,7 +23,6 @@ utl_log.setup_logging()
 import version as v
 
 app_const.VERSION = v.VERSION
-app_const.BUNDLE_ID.split(".")[-1]
 
 # Need the above thread setting because of this issue:
 # https://github.com/numpy/numpy/issues/654
@@ -35,6 +41,9 @@ import os
 import sys
 
 logger = logging.getLogger(__name__)
+
+for _msg in _migration_actions:
+    logger.info(_msg)
 
 import jth_ui.utl_settings as utl_settings
 from dynaface.const import DEFAULT_TILT_THRESHOLD, STD_PUPIL_DIST
