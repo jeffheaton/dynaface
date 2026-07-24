@@ -35,6 +35,9 @@ logger = logging.getLogger(__name__)
 LATERAL_Y_DOWN_BIAS = int(STYLEGAN_WIDTH * 0.18)
 LATERAL_PAD_TOP_RATIO = 0.12  # fraction of the 1024 crop height
 LATERAL_PAD_BOTTOM_RATIO = 0.10
+# Fraction of the 1024 crop width kept clear left of the profile's leading edge
+# (nose tip); must clear the analysis text column drawn at the left.
+LATERAL_LEFT_MARGIN_RATIO = 0.20
 
 
 def util_calc_pd(
@@ -560,7 +563,10 @@ class AnalyzeFace(ImageAnalysis):
         are visible vertically, plus configurable top/bottom padding.
 
         - Scale is chosen so (landmark_band + pads) fits within 1024 px height.
-        - Horizontal anchoring to LM 96 is kept.
+        - Horizontally, the profile's leading edge (leftmost landmark; the face
+        always faces left here) is placed LATERAL_LEFT_MARGIN_RATIO from the
+        left, so the face uses the space at the left and the sagittal chart
+        overlaid at the right cuts off near the front of the ear.
         - If the source is narrow, side padding is allowed (pillarbox) so that
         vertical padding is never silently squeezed away.
         """
@@ -600,13 +606,13 @@ class AnalyzeFace(ImageAnalysis):
         # Resize first
         img2 = cv2.resize(self.render_img, (new_width, new_height))
 
-        # --- Horizontal crop: anchor to right pupil (LM 96) as before ---
-        if not self.landmarks or len(self.landmarks) <= 96:
+        # --- Horizontal crop: leading edge (nose tip) at a fixed left margin ---
+        if not self.landmarks:
             crop_x = (new_width - target) // 2
         else:
-            rp_x, _ = self.landmarks[96]
-            rp_x_s = int(round(rp_x * scale))
-            crop_x = rp_x_s - STYLEGAN_RIGHT_PUPIL[0]
+            min_x = int(min(x for (x, _) in self.landmarks if x is not None))
+            min_x_s = int(round(min_x * scale))
+            crop_x = min_x_s - int(round(target * LATERAL_LEFT_MARGIN_RATIO))
 
         # If the scaled width is wide enough, clamp inside; otherwise let safe_clip pad.
         if new_width >= target:

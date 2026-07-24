@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `DynafaceTests/` — xUnit tests (`net10.0`); pure unit tests always run, model-gated integration tests self-skip when the 3 real `.onnx` files aren't found locally (see `DynafaceTests/ModelPathResolver.cs`)
 - `FacialDll.sln` — solution covering all four projects
 
-`Dynaface` and `Dynaface.Onnx` are published to NuGet in lockstep at the same `<Version>`; the assembly names stay `FacialDll` / `FacialDll.Onnx` so existing prebuilt-DLL and Unity consumers are unaffected.
+`Dynaface` and `Dynaface.Onnx` are published to NuGet in lockstep at the same `<Version>`. As of 2.0.2 the assembly names match the package ids (`Dynaface.dll` / `Dynaface.Onnx.dll`); before that they were `FacialDll` / `FacialDll.Onnx`, so prebuilt-DLL and Unity consumers (the external `DynafaceRuntime` asmdef) must update their references when crossing 2.0.2.
 
 See [`facial_dll/CLAUDE.md`](facial_dll/CLAUDE.md) for the full pipeline architecture, coordinate system contract, and WFLW-98 landmark index reference.
 

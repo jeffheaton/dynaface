@@ -10,6 +10,14 @@ Dynaface is a facial analysis tool for measuring facial symmetry and movement, p
 - **`dynaface-app/`** — Desktop GUI application (PyQt6)
 - **`dynaface-lib-dotnet/`** — C#/.NET port of the library (NuGet packages `Dynaface`/`Dynaface.Onnx`; also ships as a Unity package); see `dynaface-lib-dotnet/CLAUDE.md`
 
+## Versioning
+
+The three components are typically released in lockstep at the same version. When bumping a version, update every location for that component:
+
+- **dynaface-lib-python** — `setup.cfg` `[metadata] version` is the source of truth (the build workflow regenerates `dynaface/version.py` from it). Also bump the checked-in `dynaface/version.py` `VERSION` so local/editable installs report correctly.
+- **dynaface-lib-dotnet** — `facial_dll/FacialDll.csproj` `<Version>` is the source of truth (CI greps it, generates `facial_dll/Version.cs`, and packs both NuGet packages with it). Keep `FacialDll.Onnx/FacialDll.Onnx.csproj` `<Version>` in lockstep for local builds.
+- **dynaface-app** — `deploy/macos/build.sh` `DYNAFACE_VERSION`, and `deploy/windows/build.ps1` **both** `$script:DYNAFACE_VERSION` and `$currentVersion`. These stamp the app bundle version and regenerate the checked-in `version.py` at build time, and they also pin the PyPI `dynaface` lib version the app is built against — so the lib must be published to PyPI at that version before the app can build. Also bump the checked-in `version.py` `VERSION` for local runs.
+
 ## Important: Always Use the venv
 
 The two Python components use Python virtual environments. **Never install packages or run tests using the system/base Python.** Always activate the venv first. If `venv/` doesn't exist in the component directory, create it before proceeding.
@@ -59,7 +67,7 @@ python dynaface_app.py
 
 ### dynaface-lib-dotnet (C#/.NET Library)
 
-C# port of the Python library: `facial_dll/` core (netstandard2.1, NuGet package `Dynaface`, Unity package via `FacialDll.asmdef`), `FacialDll.Onnx/` ONNX Runtime backend (NuGet `Dynaface.Onnx`), `FacialDllConsole/` CLI harness, and `DynafaceTests/` xUnit suite. Requires the .NET 10 SDK; no venv. See `dynaface-lib-dotnet/CLAUDE.md` for architecture and the full command list.
+C# port of the Python library: `facial_dll/` core (netstandard2.1, NuGet package `Dynaface`, Unity package via `Dynaface.asmdef`), `FacialDll.Onnx/` ONNX Runtime backend (NuGet `Dynaface.Onnx`), `FacialDllConsole/` CLI harness, and `DynafaceTests/` xUnit suite. Requires the .NET 10 SDK; no venv. See `dynaface-lib-dotnet/CLAUDE.md` for architecture and the full command list.
 
 ```bash
 cd dynaface-lib-dotnet

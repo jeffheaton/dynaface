@@ -34,6 +34,7 @@ public static class LateralChartRenderer
     const int LabelGap = 12;
     const int PanelLeftPad = 25; // matches Python's xlim(-25, ...) left margin
     const int PanelRightPad = 220; // room for the widest landmark label text
+    const int PanelMaxDataWidth = 512; // matches Python's xlim(..., 512) right clip
 
     // Draws the sagittal profile line and the 6 labeled lateral landmarks onto
     // `image` (mutated in place), right-aligned exactly as Python's
@@ -54,7 +55,10 @@ public static class LateralChartRenderer
             if (shifted > maxShiftedX) maxShiftedX = shifted;
         }
 
+        // Deep profiles (neck/shoulder rows) would otherwise grow the panel far
+        // past what Python's fixed xlim window ever shows, eating into the face.
         int panelWidth = PanelLeftPad + MathHelpers.RoundToInt(maxShiftedX) + PanelRightPad;
+        panelWidth = MathHelpers.Min(panelWidth, PanelLeftPad + PanelMaxDataWidth);
         panelWidth = MathHelpers.Clamp(panelWidth, 1, image.Width);
         int xOffset = image.Width - panelWidth;
 

@@ -100,8 +100,8 @@ jobs:
         working-directory: dynaface-lib-dotnet
         run: |
           mkdir -p dist
-          cp facial_dll/bin/Release/netstandard2.1/FacialDll.dll dist/
-          cp facial_dll/bin/Release/netstandard2.1/FacialDll.pdb dist/ 2>/dev/null || true
+          cp facial_dll/bin/Release/netstandard2.1/Dynaface.dll dist/
+          cp facial_dll/bin/Release/netstandard2.1/Dynaface.pdb dist/ 2>/dev/null || true
           cd dist && zip -r "../dynaface-dotnet-${VERSION}.zip" .
 
       - name: Upload library artifact

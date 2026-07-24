@@ -6,7 +6,7 @@ trap 'echo "An error occurred. Exiting..."; exit 1;' ERR
 
 # Constants
 MODEL_BINARY_URL="https://data.heatonresearch.com/dynaface/model/2/dynaface_models.zip"
-DYNAFACE_VERSION="2.0.0"
+DYNAFACE_VERSION="2.0.2"
 
 # Apple Silicon only as of 2.0.0. Intel users are directed to the Unity build,
 # which ships universal. The spec file reads `arch` from the environment.

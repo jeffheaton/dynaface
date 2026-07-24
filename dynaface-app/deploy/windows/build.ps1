@@ -5,7 +5,7 @@ $InitialLocation = Get-Location
 
 # Constants
 $script:MODEL_BINARY_URL = "https://data.heatonresearch.com/dynaface/model/2/dynaface_models.zip"
-$script:DYNAFACE_VERSION = "2.0.0"
+$script:DYNAFACE_VERSION = "2.0.2"
 
 try {
     # ----------------------------
@@ -13,7 +13,7 @@ try {
     # ----------------------------
     Write-Host "** Updating version.py **"
     $versionFile = "..\..\version.py"
-    $currentVersion = "2.0.0"
+    $currentVersion = "2.0.2"
     $buildDate = (Get-Date -Format "yyyy-MM-ddTHH:mm:sszzz")
     $buildNum = $env:BUILD_NUMBER
     if (-not $buildNum) { $buildNum = 0 }

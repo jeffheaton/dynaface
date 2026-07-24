@@ -29,4 +29,7 @@ public static class DynafaceConstants
 
     public const float LateralPadTopRatio = 0.12f;
     public const float LateralPadBottomRatio = 0.10f;
+    // Fraction of the 1024 crop width kept clear left of the profile's leading
+    // edge (nose tip); must clear the analysis text column drawn at the left.
+    public const float LateralLeftMarginRatio = 0.20f;
 }

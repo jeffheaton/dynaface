@@ -34,7 +34,7 @@ dotnet build FacialDll.sln -c Release
 
 # Build just the core library (e.g. to produce a DLL for Unity)
 dotnet build facial_dll/FacialDll.csproj -c Release
-# Output: facial_dll/bin/Release/netstandard2.1/FacialDll.dll
+# Output: facial_dll/bin/Release/netstandard2.1/Dynaface.dll
 
 # Build just the ONNX backend
 dotnet build FacialDll.Onnx/FacialDll.Onnx.csproj -c Release
@@ -116,15 +116,17 @@ workflow publishes a zipped `netstandard2.1` build to:
 
     https://data.heatonresearch.com/library/dynaface-dotnet-<VERSION>.zip
 
-where `<VERSION>` is the `<Version>` in `facial_dll/FacialDll.csproj` (currently `2.0.1`).
+where `<VERSION>` is the `<Version>` in `facial_dll/FacialDll.csproj` (currently `2.0.2`).
 The zip contains:
 
 | File | Needed? | Purpose |
 |---|---|---|
-| `FacialDll.dll` | Required | The library — reference this to use it |
-| `FacialDll.pdb` | Optional | Debug symbols (source file/line info for stack traces and debugging) |
+| `Dynaface.dll` | Required | The library — reference this to use it |
+| `Dynaface.pdb` | Optional | Debug symbols (source file/line info for stack traces and debugging) |
 
-Unzip and reference `FacialDll.dll` directly instead of building from source or
+Zips prior to `2.0.2` shipped the same assembly under its old name, `FacialDll.dll`.
+
+Unzip and reference `Dynaface.dll` directly instead of building from source or
 using a `ProjectReference`. Note the S3 filename is version-only (no build-number
 suffix), so re-running the workflow at the same version overwrites the same URL —
 there is no stable `latest` alias.
@@ -136,7 +138,7 @@ Skip this if you installed `Dynaface.Onnx` above. To build your own backend, ref
 ```xml
 <!-- In your .csproj -->
 <ItemGroup>
-  <PackageReference Include="Dynaface" Version="2.0.1" />
+  <PackageReference Include="Dynaface" Version="2.0.2" />
   <!-- Plus your inference runtime, e.g.: -->
   <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.19.2" />
 </ItemGroup>

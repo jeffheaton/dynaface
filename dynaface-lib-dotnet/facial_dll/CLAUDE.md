@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-This is a pure C# face-processing pipeline with no Unity dependencies (`noEngineReferences: true` in `FacialDll.asmdef`). It targets `netstandard2.1` so it works both as a Unity package and as a regular .NET library. It's a contract-faithful port of the Python `dynaface-lib` package (see `../../dynaface-lib-python/`), adapted to .NET idioms (nullable types instead of sentinel tuples, PascalCase, typed DTOs instead of loose dicts) where Python's own idioms didn't fit.
+This is a pure C# face-processing pipeline with no Unity dependencies (`noEngineReferences: true` in `Dynaface.asmdef`). It targets `netstandard2.1` so it works both as a Unity package and as a regular .NET library. It's a contract-faithful port of the Python `dynaface-lib` package (see `../../dynaface-lib-python/`), adapted to .NET idioms (nullable types instead of sentinel tuples, PascalCase, typed DTOs instead of loose dicts) where Python's own idioms didn't fit.
 
 **Solution layout** (rooted at `dynaface-lib-dotnet/`):
 - `facial_dll/` — the core library (`FacialDll.csproj`, `netstandard2.1`), NuGet package `Dynaface`
@@ -37,7 +37,7 @@ Mirrors dynaface-lib's `AnalyzeFace.load_image` order exactly (not the pipeline'
 
 3. **`PoseClassifier`** — classifies frontal vs. lateral from headpose yaw + a nose-asymmetry ratio, gated by `DynafaceConfig.AutoLateral`.
 
-4. **Frontal: `StyleGanCropper.Crop`** — optional tilt-threshold rotation correction (off by default), yaw-based foreshortening correction, scales so pupil distance becomes 260px, crops to 1024×1024 with the right pupil at (380,480), white-filling anything outside the source. **Lateral: flip-to-facing-left (re-running bbox+landmark detection on the flipped image) → pad canvas ×1.5 → `LateralCropper.Crop`** (fits the full landmark vertical band into 1024px with padding, anchored horizontally to the right pupil).
+4. **Frontal: `StyleGanCropper.Crop`** — optional tilt-threshold rotation correction (off by default), yaw-based foreshortening correction, scales so pupil distance becomes 260px, crops to 1024×1024 with the right pupil at (380,480), white-filling anything outside the source. **Lateral: flip-to-facing-left (re-running bbox+landmark detection on the flipped image) → pad canvas ×1.5 → `LateralCropper.Crop`** (fits the full landmark vertical band into 1024px with padding, horizontally placing the profile's leading edge a fixed margin from the left).
 
 5. **Lateral only — `LateralAnalyzer.Analyze`, called internally by `FacePipeline.RunLateral`** — runs U²-Net background removal (the 3rd network) on the cropped image, extracts the sagittal (silhouette) profile, and runs it through a from-scratch Savitzky-Golay filter + peak/corner detector (`Lateral/` folder) to find 6 anatomical landmarks (Glabella/Nasion/NasalTip/Subnasal/MentoLabial/Pogonion). `RunLateral` then composites the sagittal chart onto the crop via `LateralChartRenderer` (the pixel-buffer equivalent of dynaface-lib's matplotlib chart + `_overlay_lateral_analysis`), so the returned crop already contains the chart, with measures drawing on top of it later — same layering as Python.
 

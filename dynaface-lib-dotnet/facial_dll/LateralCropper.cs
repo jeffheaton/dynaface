@@ -1,8 +1,11 @@
 // Direct port of dynaface-lib's AnalyzeFace.crop_lateral.
 //
 // Fits the full landmark vertical band into the 1024 target with configurable
-// top/bottom padding, horizontally anchored to the right-pupil landmark — a
-// different scale/crop strategy than StyleGanCropper's pupil-distance targeting.
+// top/bottom padding. Horizontally, the profile's leading edge (leftmost
+// landmark; the face always faces left here) is placed a fixed margin from the
+// left, so the face uses the space at the left and the sagittal chart overlaid
+// at the right cuts off near the front of the ear — a different scale/crop
+// strategy than StyleGanCropper's pupil-distance targeting.
 //
 // Coordinate note: same top-left-internally, bottom-left-at-the-boundary convention
 // as StyleGanCropper (see its header comment).
@@ -16,19 +19,23 @@ public static class LateralCropper
         const int target = DynafaceConstants.StyleganWidth;
         int width = photo.Width, height = photo.Height;
 
-        int minY, maxY;
+        int minX, minY, maxY;
         if (landmarks != null && landmarks.Length > 0)
         {
+            minX = (int)landmarks[0].X;
             minY = maxY = (int)landmarks[0].Y;
             foreach (var p in landmarks)
             {
+                int x = (int)p.X;
                 int y = (int)p.Y;
+                if (x < minX) minX = x;
                 if (y < minY) minY = y;
                 if (y > maxY) maxY = y;
             }
         }
         else
         {
+            minX = 0;
             minY = 0;
             maxY = height - 1;
         }
@@ -49,15 +56,16 @@ public static class LateralCropper
         Rgba32[] topLeftPixels = ImageUtils.FlipVertical(photo.Pixels, width, height);
         Rgba32[] resized = ImageUtils.ResizeBilinear(topLeftPixels, width, height, newWidth, newHeight);
 
+        // Horizontal crop: leading edge (nose tip) at a fixed left margin.
         int cropX;
-        if (landmarks == null || landmarks.Length <= DynafaceConstants.LmRightPupil)
+        if (landmarks == null || landmarks.Length == 0)
         {
             cropX = (newWidth - target) / 2;
         }
         else
         {
-            int rpXScaled = MathHelpers.RoundToInt(landmarks[DynafaceConstants.LmRightPupil].X * scale);
-            cropX = rpXScaled - MathHelpers.RoundToInt(DynafaceConstants.StyleganRightPupilX);
+            int minXScaled = MathHelpers.RoundToInt(minX * scale);
+            cropX = minXScaled - MathHelpers.RoundToInt(target * DynafaceConstants.LateralLeftMarginRatio);
         }
         if (newWidth >= target)
             cropX = MathHelpers.Clamp(cropX, 0, newWidth - target);
