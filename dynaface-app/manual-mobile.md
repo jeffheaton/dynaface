@@ -2,7 +2,7 @@
 
 Dynaface is an iOS app that uses on-device artificial intelligence to detect a face in a photo and measure aspects of its symmetry, such as eye spacing, mouth width, brow height, and more. You can take a new photo with your camera or import one from your Photo Library, and Dynaface will automatically find the face, align it, and display a set of measurements you can turn on or off.
 
-All photos and measurements stay on your device — nothing is uploaded anywhere.
+All photos and measurements stay on your device — nothing is uploaded anywhere. For questions about privacy and how Dynaface handles your data, see the [Dynaface FAQ](https://github.com/jeffheaton/dynaface/blob/main/FAQ.md).
 
 ---
 
@@ -108,4 +108,4 @@ Tap any thumbnail to reopen it and view or adjust its measurements. To remove a 
 
 ---
 
-*Dynaface is provided for educational and informational purposes only under the MIT License. It is not a registered medical device and is not intended to diagnose, treat, cure, or prevent any disease or medical condition.*
+*Dynaface is provided for educational and informational purposes only under the Apache 2.0 License. It is not a registered medical device and is not intended to diagnose, treat, cure, or prevent any disease or medical condition.*

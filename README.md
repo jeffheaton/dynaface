@@ -44,4 +44,4 @@ If you use Dynaface in academic work, please also cite their original authors:
 
 # License
 
-This application and Python library are licensed under the [Apache License Version 2.0](https://github.com/jeffheaton/dynaface/blob/main/LICENSE.txt).
+This application and Python library are licensed under the [Apache License Version 2.0](https://github.com/jeffheaton/dynaface/blob/main/LICENSE).

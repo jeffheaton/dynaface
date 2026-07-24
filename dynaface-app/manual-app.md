@@ -207,4 +207,4 @@ Everything stays on your computer: your originals, the analysis, and your settin
 
 ---
 
-*Dynaface is provided for educational and informational purposes only under the MIT License. It is not a registered medical device and is not intended to diagnose, treat, cure, or prevent any disease or medical condition.*
+*Dynaface is provided for educational and informational purposes only under the Apache 2.0 License. It is not a registered medical device and is not intended to diagnose, treat, cure, or prevent any disease or medical condition.*
