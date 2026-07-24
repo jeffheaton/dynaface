@@ -181,8 +181,7 @@ Save As and Print are available while you're viewing a photo or video.
 
 Open Settings from the **MENU** button on the Photo Library screen, or from the menu bar — **File > Settings…** on Windows, **Dynaface > Settings…** (`⌘,`) on a Mac.
 
-<!-- SCREENSHOT 9 — Settings dialog. The Settings overlay showing the pupillary-distance field, its explanatory text, and the Reset to Default button. -->
-<img src="IMAGE_URL_9_SETTINGS" width="700">
+<img src="https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/dynaface/manual/app/2/dynaface_9_settings.jpg" width="1024">
 
 - **Pupillary Distance** — The real-world distance between the subject's pupils, in millimeters (40–85; the population average of 63 is the default). Dynaface uses this to convert pixels into millimeters, so entering the subject's actual measured value makes the millimeter measurements more accurate. It applies to new photos and video imports; use **Recalculate** to apply a change to an existing photo (videos keep the value from when they were imported). **Reset to Default** returns it to 63.
 
@@ -192,8 +191,7 @@ The measurement **text size** setting lives in the measurement-settings panel in
 
 Every photo and video you analyze is saved to your on-device library, shown as a scrolling grid with dates.
 
-<!-- SCREENSHOT 10 — Filled Photo Library. The grid with a healthy mix of photo and video entries (6+), dates visible. -->
-<img src="IMAGE_URL_10_LIBRARY_FILLED" width="700">
+<img src="https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/dynaface/manual/app/2/dynaface_10_catalog.jpg" width="1024">
 
 Click any thumbnail to reopen it with the same measurement selections and trim you left it with. To remove an entry permanently, open it, click the **Delete** button, and confirm.
 
