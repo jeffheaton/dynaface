@@ -4,7 +4,7 @@ Dynaface is a computer application and Python library that measures facial symme
 
 [The story behind Dynaface, from RGA](https://bit.ly/4201i3j)
 
-![Dynaface Screenshot](https://s3.amazonaws.com/data.heatonresearch.com/images/facial/site/dynaface-1.jpg?v=1)
+![Dynaface Screenshot](https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/images/facial/site/dynaface-2.jpg)
 
 # Get Dynaface
 - [Dynaface at Apple Store - MacOS/iPhone/iPad](https://apps.apple.com/us/app/dynaface/id6475224118) 
