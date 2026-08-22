@@ -2,7 +2,7 @@
 
 # Dynaface Python Library
 
-[![PyPI version](https://badge.fury.io/py/dynaface.svg)](https://badge.fury.io/py/dynaface)
+[![PyPI version](https://img.shields.io/pypi/v/dynaface?style=flat-square)](https://pypi.org/project/dynaface/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE)
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/jeffheaton/dynaface/blob/main/dynaface-lib-python/examples/dynaface_intro.ipynb)
 
