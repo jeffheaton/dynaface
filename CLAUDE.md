@@ -86,6 +86,12 @@ dotnet test DynafaceTests/DynafaceTests.csproj
 - Import sorter: isort
 - Linter: flake8 (configured in `.flake8` at repo root)
 - Python: 3.10+ required, tested on 3.11
+- **Spelling: American English everywhere** — identifiers, comments, docstrings, log
+  and UI strings, Markdown docs, and commit messages. Use `color`, `canceled`,
+  `center`, `behavior`, `gray`, `analyze`, `normalize`, `initialize`, `modeling`,
+  `labeled`, `license`, `defense`, `millimeter` — never their British forms. The only
+  exception is an external API that dictates the spelling: mirror those exactly and do
+  not "fix" them (e.g. Unity's `MonoBehaviour`).
 
 ## Architecture
 

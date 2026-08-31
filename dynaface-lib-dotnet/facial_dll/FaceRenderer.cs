@@ -20,7 +20,7 @@ using System.Collections.Generic;
 //   60-75 eyes           → red
 //   76-87 outer lip      → cyan
 //   88-95 inner lip      → yellow
-//   96-97 pupil centres  → red
+//   96-97 pupil centers  → red
 public static class FaceRenderer
 {
     public enum LandmarkDisplayMode { Off, Lm }

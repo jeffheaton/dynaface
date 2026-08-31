@@ -13,7 +13,7 @@ public class FaceMeasureContext
     // WFLW landmarks in top-left pixel coordinates.
     public Vec2[] Landmarks { get; }
 
-    // Millimetres per pixel. For frontal faces this must be computed from the
+    // Millimeters per pixel. For frontal faces this must be computed from the
     // ORIGINAL (pre-StyleGAN-crop) pupil distance — see FacePipeline.RunFrontal —
     // not re-derived from these (post-crop) landmarks, so it's always supplied
     // explicitly rather than computed internally from Landmarks.

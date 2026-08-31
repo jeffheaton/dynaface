@@ -833,7 +833,7 @@ class AnalyzeLandmarks(MeasureBase):
     def calc(self, face: Any, render: bool = True) -> Dict[str, Any]:
         if render:
             # Draw black outline (radius 3) then white fill (radius 2) so dots
-            # are visible against any background colour.
+            # are visible against any background color.
             face.draw_landmarks(size=1.0, color=(0, 0, 0))
             face.draw_landmarks(size=0.5, color=(255, 255, 255))
 

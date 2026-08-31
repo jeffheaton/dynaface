@@ -77,7 +77,7 @@ Mixing these up is the most common source of rendering bugs. `StyleGanCropper`/`
 | 68–75 | Image-right eye |
 | 76–87 | Outer lip |
 | 88–95 | Inner lip |
-| 96–97 | Pupil centres (96=right, 97=left) |
+| 96–97 | Pupil centers (96=right, 97=left) |
 
 Indices 96 and 97 are the inter-pupil baseline for `Pix2mm`. The assumed IOD is `DynafaceConfig.PupilDistMm` — runtime-settable (mirrors dynaface-lib's mutable `AnalyzeFace.pd`, which the desktop app sets from user preferences), defaulting to the 63mm population average (`DynafaceConstants.StdPupilDistMm`).
 

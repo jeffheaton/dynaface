@@ -277,7 +277,7 @@ class SelectPoseDialog(QDialog):
     """
     Modal dialog for choosing a face pose. Shows three images (Frontal, Profile, 3/4),
     one of which is selected by default.  Call get_choice() after exec() to retrieve
-    a Pose enum member, or None if cancelled.
+    a Pose enum member, or None if canceled.
     """
 
     def __init__(self, window, default_pose: Pose = Pose.FRONTAL):
@@ -364,6 +364,6 @@ class SelectPoseDialog(QDialog):
     def get_choice(self) -> Optional[Pose]:
         """
         Returns the chosen Pose enum member (Pose.FRONTAL, Pose.LATERAL or Pose.QUARTER),
-        or None if the dialog was cancelled.
+        or None if the dialog was canceled.
         """
         return self.user_choice

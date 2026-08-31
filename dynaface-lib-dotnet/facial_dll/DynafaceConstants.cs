@@ -16,7 +16,7 @@ public static class DynafaceConstants
     // explicitly passes a threshold >= 0.
     public const float DefaultTiltThreshold = -1f;
 
-    // WFLW landmark indices for the two pupil centres.
+    // WFLW landmark indices for the two pupil centers.
     public const int LmRightPupil = 96;
     public const int LmLeftPupil = 97;
 
