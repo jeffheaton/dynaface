@@ -1,0 +1,115 @@
+name: Sign Unity Windows Player
+
+# The Unity (dynaface-unity) Windows player is built on a Windows box with
+# CIBuild.Windows; this job gives its Dynaface.exe the same SSL.com eSigner
+# signature the PyQt app gets in build-app-windows.yml, so the direct-download
+# zip on the GitHub release is Authenticode-signed. Input: an HTTPS URL of the
+# unsigned zip (the player folder: Dynaface.exe, Dynaface_Data, UnityPlayer.dll
+# ... — leave the *_DoNotShip folders out). Output: the signed zip as a workflow
+# artifact (gh run download) and, when the AWS secrets are present, a copy in
+# the data bucket's app/ folder like the PyQt zips.
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_url:
+        description: HTTPS URL of the unsigned Windows player zip
+        required: true
+        type: string
+      output_name:
+        description: File name for the signed zip
+        required: true
+        default: Dynaface-2.0.2-windows.zip
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  sign:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check signing secrets
+        shell: pwsh
+        env:
+          SSL_COM_USERNAME: ${{ secrets.SSL_COM_USERNAME }}
+          SSL_COM_PASSWORD: ${{ secrets.SSL_COM_PASSWORD }}
+          SSL_COM_TOTP_SECRET: ${{ secrets.SSL_COM_TOTP_SECRET }}
+          SSL_COM_CREDENTIAL_ID: ${{ secrets.SSL_COM_CREDENTIAL_ID }}
+        run: |
+          $bad = @()
+          foreach ($n in 'SSL_COM_USERNAME','SSL_COM_PASSWORD','SSL_COM_TOTP_SECRET','SSL_COM_CREDENTIAL_ID') {
+            $v = [Environment]::GetEnvironmentVariable($n)
+            if ([string]::IsNullOrEmpty($v)) { $bad += "$n is not set"; continue }
+            if ($v -ne $v.Trim()) { $bad += "$n has leading/trailing whitespace" }
+          }
+          if ($bad) { throw ($bad -join "`n") }
+          Write-Host "Signing secrets look well-formed."
+
+      - name: Download the unsigned player zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path work | Out-Null
+          Invoke-WebRequest -Uri "${{ inputs.source_url }}" -OutFile work/unsigned.zip
+          $size = (Get-Item work/unsigned.zip).Length
+          Write-Host "Downloaded $size bytes"
+          Expand-Archive -Path work/unsigned.zip -DestinationPath work/player -Force
+          $exe = Get-ChildItem -Path work/player -Recurse -Filter Dynaface.exe | Select-Object -First 1
+          if (-not $exe) { throw "Dynaface.exe not found inside the zip" }
+          Write-Host "Player exe: $($exe.FullName)"
+          "EXE_PATH=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "PLAYER_DIR=$($exe.DirectoryName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Sign Dynaface.exe (SSL.com eSigner)
+        uses: sslcom/esigner-codesign@develop
+        with:
+          command: sign
+          username: ${{ secrets.SSL_COM_USERNAME }}
+          password: ${{ secrets.SSL_COM_PASSWORD }}
+          totp_secret: ${{ secrets.SSL_COM_TOTP_SECRET }}
+          credential_id: ${{ secrets.SSL_COM_CREDENTIAL_ID }}
+          file_path: ${{ env.EXE_PATH }}
+          override: true
+          malware_block: false
+          environment_name: PROD
+
+      - name: Verify signature
+        shell: pwsh
+        run: |
+          $signtool = Get-ChildItem `
+            "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName | Select-Object -Last 1
+          if (-not $signtool) { throw "signtool.exe not found" }
+          Write-Host "Using $($signtool.FullName)"
+          & $signtool.FullName verify /pa /v "$env:EXE_PATH"
+
+      - name: Re-zip the signed player
+        shell: pwsh
+        run: |
+          $out = Join-Path (Get-Location) "${{ inputs.output_name }}"
+          Get-ChildItem -Path "$env:PLAYER_DIR" -Directory -Filter '*_DoNotShip' | Remove-Item -Recurse -Force
+          Compress-Archive -Path (Join-Path "$env:PLAYER_DIR" '*') -DestinationPath $out -Force
+          Write-Host "Signed zip: $out ($((Get-Item $out).Length) bytes)"
+          Get-FileHash -Algorithm SHA256 $out | Format-List
+
+      - name: Upload signed zip as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.output_name }}
+          path: ${{ inputs.output_name }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Copy to S3 (app/ folder)
+        if: ${{ env.AWS_ACCESS_KEY_ID != '' }}
+        shell: pwsh
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+        run: |
+          $dest = "s3://data.heatonresearch.com/app/${{ inputs.output_name }}"
+          Write-Host "Uploading -> $dest"
+          aws s3 cp "${{ inputs.output_name }}" $dest --acl public-read
