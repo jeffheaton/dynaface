@@ -9,7 +9,8 @@
 # Get Dynaface
 - [Apple Store - MacOS/iPhone/iPad](https://apps.apple.com/us/app/dynaface/id6475224118) 
 - [Microsoft Store - Windows 10/11](https://apps.microsoft.com/detail/9ng0gpsmktb2)
-- Other versions: [Download Latest Version](https://github.com/jeffheaton/dynaface/releases/tag/v1.3.0) or [All Versions](https://github.com/jeffheaton/dynaface/releases)
+- [Android - direct download](https://www.dynaface.org/android/)
+- Other versions: [Download Latest Version](https://github.com/jeffheaton/dynaface/releases/tag/v2.0.2) or [All Versions](https://github.com/jeffheaton/dynaface/releases)
 
 # Helpful Links
 - [Users Guide](https://github.com/jeffheaton/dynaface/blob/main/dynaface-app/manual.md)
