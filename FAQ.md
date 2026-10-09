@@ -25,8 +25,9 @@
 
   Dynaface does not perform internet access during image or video analysis; all
   processing is performed locally. The only internet access initiated by Dynaface is
-  to open an external web browser to view the online user manual
-  (https://github.com/jeffheaton/dynaface/blob/main/dynaface-app/manual.md). Users
+  to open an external web browser to view the online user manual, when the user
+  chooses it from the app's menu. The manuals are hosted on GitHub alongside this
+  FAQ (https://github.com/jeffheaton/dynaface/tree/main/dynaface-app). Users
   should be aware that standard browser telemetry or network activity from their
   browser is outside the scope of Dynaface.
 

@@ -1,6 +1,6 @@
 # Dynaface
 
-[Dynaface](https://www.dynaface.org) is a computer application and Python library that measures facial symmetry. It utilizes advanced AI for both symmetric and asymmetric faces. AI allows Dynaface to locate 97 facial landmarks automatically to conduct a variety of measures on still images and videos. Researchers can export all data from pictures and videos to CSV/Excel format for further analysis.
+[Dynaface](https://www.dynaface.org) is a computer application and Python library that measures facial symmetry. It utilizes advanced AI for both symmetric and asymmetric faces. AI allows Dynaface to locate 98 facial landmarks automatically to conduct a variety of measures on still images and videos. Researchers can export all data from pictures and videos to CSV/Excel format for further analysis.
 
 [The story behind Dynaface, from RGA](https://bit.ly/4201i3j)
 
@@ -36,14 +36,14 @@ If you use Dynaface in academic work, please also cite their original authors:
 
 ## To Cite Dynaface
 
-- Renne, A., Heaton, J., & Boahene, K. D. O. (2026). Associations of AI-based facial metrics with patient-reported outcomes in idiopathic facial paralysis. _Laryngoscope_. Advance online publication. https://doi.org/10.1002/lary.70417
+- Renne, A., Heaton, J., & Boahene, K. D. O. (2026). Associations of AI-based facial metrics with patient-reported outcomes in idiopathic facial paralysis. _Laryngoscope, 136_(7), 2991–3001. https://doi.org/10.1002/lary.70417
 - BibTeX: https://github.com/jeffheaton/dynaface/blob/main/CITATION.bib
 
 ## Other Works
 
-- Renne, A., Heaton, J., Derakhshan, A., Nellis, J. C., Desai, S. C., & Boahene, K. D. (2025). Use of dynamic, automated facial analysis in quantifying oral-ocular synkinesis. _Facial Plastic Surgery & Aesthetic Medicine_. https://doi.org/10.1177/26893614251395737
+- Renne, A., Heaton, J., Derakhshan, A., Nellis, J. C., Desai, S. C., & Boahene, K. D. O. (2026). Use of dynamic, automated facial analysis in quantifying oral-ocular synkinesis. _Facial Plastic Surgery & Aesthetic Medicine, 28_(3), 305–314. https://doi.org/10.1177/26893614251395737
 
-- Berges, A. J., Renne, A., Heaton, J., Leung, D. G., & Boahene, K. D. (2025). Facial weakness in facioscapulohumeral muscular dystrophy: Objective and patient-reported measures to guide reconstructive interventions. _Facial Plastic Surgery & Aesthetic Medicine_, Article 26893614251407675. https://doi.org/10.1177/26893614251407675
+- Berges, A. J., Renne, A., Heaton, J., Leung, D. G., & Boahene, K. D. O. (2026). Facial weakness in facioscapulohumeral muscular dystrophy: Objective and patient-reported measures to guide reconstructive interventions. _Facial Plastic Surgery & Aesthetic Medicine_. Advance online publication. https://doi.org/10.1177/26893614251407675
 
 # License
 
