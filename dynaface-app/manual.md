@@ -1,10 +1,12 @@
-# Dynaface User Guide
+# Dynaface Classic User Guide
 
-Dynaface is an application that measures key facial symmetry statistics using artificial intelligence. Dynaface can measure both individual images and recorded video. This program calculates the degree of Facial paralysis and asymmetry caused by Bell's Palsy, cranial tumor resection, or other factors. We released this program under the [Apache 2.0 License](https://www.apache.org/licenses/LICENSE-2.0); this program is for educational and research purposes only. [[likely include paper citation]]
+> **Looking for the current app?** This guide covers Dynaface Classic, the original desktop app. The current Dynaface app has its own guides: [Windows & macOS](https://github.com/jeffheaton/dynaface/blob/main/dynaface-app/manual-app.md) and [iPhone, iPad & Android](https://github.com/jeffheaton/dynaface/blob/main/dynaface-app/manual-mobile.md).
+
+Dynaface Classic is an application that measures key facial symmetry statistics using artificial intelligence. It can measure both individual images and recorded video, including asymmetry caused by Bell's palsy, cranial tumor resection, or other factors. We released this program under the [Apache 2.0 License](https://www.apache.org/licenses/LICENSE-2.0); this program is for educational and research purposes only. For the peer-reviewed research that uses Dynaface, and how to cite it, see [dynaface.org/research](https://www.dynaface.org/research/).
 
 For questions about privacy and how Dynaface handles your data, see the [Dynaface FAQ](https://github.com/jeffheaton/dynaface/blob/main/FAQ.md).
 
-We have provided both Macintosh and Windows versions of Dynaface. The Macintosh version requires a Mac M1 or later. The Windows application requires Windows 11 or higher and can optionally utilize an NVIDIA CUDA-compatible GPU to speed processing.
+Dynaface Classic is available for macOS and Windows. The macOS version requires an Apple silicon Mac (Intel Macs should use the current app). The Windows version requires 64-bit Windows 10 or 11 and can optionally utilize an NVIDIA CUDA-compatible GPU to speed processing.
 
 When you launch Dynaface, you will see the following.
 
@@ -13,7 +15,7 @@ When you launch Dynaface, you will see the following.
 This window provides the following options:
 
 - **Open File** - Open a new video, image, or Dynaface document file for editing.
-- **About** - Information about Dynaface or
+- **About** - Information about Dynaface.
 - **Settings** - Allows you to customize the program.
 - **Exit** - Quit the program.
 
@@ -28,8 +30,8 @@ Whether you are analyzing a video or an image, you will see a window similar to 
 Let's review the controls and options that you see on this window. Some of these options will only be available when analyzing a video.
 
 1. **Tab Bar** - Select which tabs/windows you have open.
-2. **Landmarks Toggle** - Toggle display of the 97 facial landmarks; AI detects these points and forms the foundation of all measurements done by this program.
-3. **Mesures Toggle** - Toggle display of any selected facial measures.
+2. **Landmarks Toggle** - Toggle display of the 98 facial landmarks; AI detects these points and forms the foundation of all measurements done by this program.
+3. **Measures Toggle** - Toggle display of any selected facial measures.
 4. **Chart Toggle** (video only) - Toggles a chart displaying the change of selected facial measures over time in a video.
 5. **Pose** - Inactive for videos; for images allows you to change between frontal and lateral if the program misclassifies the pose of the subject.
 6. **Image Display Zoom** - Zooms the image/video area. You can also zoom in on this area by placing the mouse over it and using the mouse wheel or trackpad scroll gesture.
@@ -69,11 +71,11 @@ When analyzing a single image, the window will appear as follows.
 
 <img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-image.jpg?v=1" width="512">
 
-You can select which messages you wish to see and notice that some measures have multiple sub-measures that you can turn on or off. You can copy and paste the measured image into other programs or save an image file with the measures.
+You can select which measures you wish to see and notice that some measures have multiple sub-measures that you can turn on or off. You can copy and paste the measured image into other programs or save an image file with the measures.
 
 # Analyzing Lateral Images
 
-Dynafce can also measure lateral images.
+Dynaface can also measure lateral images.
 
 <img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-lateral.jpg?v=1" width="512">
 
@@ -108,29 +110,26 @@ These landmarks can calculate the following measures:
 
 ### 2. NLA – Nasolabial Angle
 
-- **Definition:** Angle formed between the columella and the upper-lip line at the subnasale.
-- **Landmarks:** Columella Point, Subnasale, Labrale Superius
-- **Purpose:** Assesses nasal base rotation and the relationship between the nose and upper lip.
-- **Typical Range:** 90°–110°
-  - Larger angles → more upturned nasal base or retrusive upper lip
-  - Smaller angles → more downward-pointing nasal tip or protrusive upper lip
+- **Definition:** Angle at the subnasal point between the line to the nasal tip and the line to the soft tissue pogonion.
+- **Landmarks:** Nasal Tip, Subnasal Point, Soft Tissue Pogonion
+- **Purpose:** Describes the angle of the nasal base relative to the lower face in profile.
 
 ---
 
-### 3. tip_proj – Nasal Tip Projection (Goode Method)
+### 3. AT/NT – Nasal Tip Projection
 
-- **Definition:** Ratio of nasal tip projection to nasal length.
-- **Formula:** tip_proj = AT / NT
-  - **AT:** perpendicular distance from nasal tip to a vertical line through the alar base
-  - **NT:** linear distance from nasion to nasal tip
+- **Definition:** Ratio of how far the nasal tip projects forward to the vertical length of the nose.
+- **Formula:** AT / NT
+  - **AT:** horizontal distance from the nasal tip to a vertical line through the soft tissue nasion
+  - **NT:** vertical distance from the soft tissue nasion down to the level of the nasal tip
 - **Purpose:** Quantifies how far the nasal tip extends from the face.
-- **Typical Ideal Ratio:** 0.55–0.60
+- **Units:** AT and NT are in pixels of the standardized image; the ratio has no units. Both distances follow the image's horizontal and vertical axes, so keep the head level in profile photos.
   - Higher ratio → more prominent nasal projection
   - Lower ratio → flatter or shorter nasal contour
 
 # Automatic Pose Detection
 
-Dynaface uses AI to determine the pose; however, if the poses is not classified correctly, you can correct it with the "Pose" button.
+Dynaface uses AI to determine the pose; however, if the pose is not classified correctly, you can correct it with the "Pose" button.
 
 <img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-mis-pose.jpg?v=1" width="512">
 
@@ -148,7 +147,7 @@ Analyzing a video is similar to an image. You can click the chart checkbox to se
 
 <img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-video-graph.jpg" width="512">
 
-You can produce a variety of graphs with Dynaface by removing and adding the various measures. For example, the following chat shows multiple blink cycles and smiles over 2 minutes.
+You can produce a variety of graphs with Dynaface by removing and adding the various measures. For example, the following chart shows multiple blink cycles and smiles over 2 minutes.
 
 <img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-2min-graph.jpg" width="1024">
 
@@ -158,30 +157,36 @@ Though you can produce a variety of graphs with Dynaface, it is not a graphing p
 
 # Facial Measurements
 
-Dynaface supports several predefined facial measures, which are based on 96 facial landmarks that neural networks are designed to detect. These landmarks are presented here, giving you an idea of the types of measures Dynaface can provide.
+Dynaface supports several predefined facial measures, which are based on 98 facial landmarks that neural networks are designed to detect. These landmarks are presented here, giving you an idea of the types of measures Dynaface can provide. Full definitions of every measurement, including units and CSV column names, are at [dynaface.org/measurements](https://www.dynaface.org/measurements/).
 
 <img src="https://data.heatonresearch.com/images/facial/manual/1.0/face-landmarks.jpg" width="512">
 
 ## FAI
 
-The [Facial Asymmetry Index (FAI)](https://pubmed.ncbi.nlm.nih.gov/30041270/) is an objective measure of facial asymmetry and validate its use and reliability across numerous reanimation techniques.
-
-[[We can fill in exact details for each of these, we may add additional for the paper]]
+The Facial Asymmetry Index (FAI) compares the distance from the inner corner of each eye (medial canthus) to the corner of the mouth (oral commissure) on the same side. FAI is the absolute difference between the left and right distances, in millimeters, so 0 means the two sides match. For the index's validation across smile restoration techniques, see [Malm et al., 2018](https://pubmed.ncbi.nlm.nih.gov/30041270/).
 
 <img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-measure-fai.jpg" width="512">
 
 ## Oral CE
 
+Oral commissure excursion is the distance from each corner of the mouth to the midpoint of the lower lip, in millimeters, reported separately for the left and right sides.
+
 <img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-measure-oral.jpg" width="512">
 
 ## Brow
+
+The difference in height between the left and right eyebrows, in millimeters, measured at the middle of each brow along lines parallel to the line between the pupils.
 
 <img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-measure-brow.jpg" width="512">
 
 ## Dental Display
 
+The area of the mouth opening inside the inner edges of the lips, where the teeth show during a smile, in mm². The opening is split at the facial midline, and Dynaface reports the total, each side, the difference between the sides, and their symmetry ratio (smaller side divided by larger).
+
 <img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-measure-dental.jpg" width="512">
 
 ## Eye Area
+
+The area of each eye opening (palpebral fissure), in mm², with the difference and symmetry ratio between the left and right sides.
 
 <img src="https://data.heatonresearch.com/images/facial/manual/1.0/dynaface-measure-fissure.jpg" width="512">
