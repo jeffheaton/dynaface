@@ -13,7 +13,7 @@
 - Other versions: [Download Latest Version](https://github.com/jeffheaton/dynaface/releases/tag/v2.0.2) or [All Versions](https://github.com/jeffheaton/dynaface/releases)
 
 # Helpful Links
-- [Users Guide](https://github.com/jeffheaton/dynaface/blob/main/dynaface-app/manual.md)
+- [Users Guide (Windows and macOS)](https://github.com/jeffheaton/dynaface/blob/main/dynaface-app/manual-app.md)
 - Dynaface Library: [Python Library](https://github.com/jeffheaton/dynaface/tree/main/dynaface-lib-python), [DotNet Library](https://github.com/jeffheaton/dynaface/tree/main/dynaface-lib-dotnet)
 
 ## Neural Network Models
