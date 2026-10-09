@@ -332,17 +332,16 @@ def line_to_edge(
         if 0 <= x <= img_size and 0 <= y <= img_size:
             possible_endpoints.append((int(x), int(y)))
 
-    # Right edge (x = img_size)
-    if slope != 0:
-        x_right = img_size
-        y_right = slope * (x_right - x0) + y0
-        safe_append(x_right, y_right)
+    # Right edge (x = img_size). No slope guard: a horizontal line (slope 0) still
+    # meets the side edges, only the top/bottom tests below divide by the slope.
+    x_right = img_size
+    y_right = slope * (x_right - x0) + y0
+    safe_append(x_right, y_right)
 
     # Left edge (x = 0)
-    if slope != 0:
-        x_left = 0
-        y_left = slope * (x_left - x0) + y0
-        safe_append(x_left, y_left)
+    x_left = 0
+    y_left = slope * (x_left - x0) + y0
+    safe_append(x_left, y_left)
 
     # Top edge (y = 0)
     if slope != 0:

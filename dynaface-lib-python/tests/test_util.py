@@ -184,7 +184,7 @@ class TestFunctions(unittest.TestCase):
     def test_line_to_edge(self):
         # Start at (5,5), angle=0 => horizontal line to the right edge
         endpoint = line_to_edge(10, (5, 5), 0)
-        self.assertIsNone(endpoint)
+        self.assertEqual(endpoint, (10, 5))
 
         # Start at (2,2), angle=45 deg => line to bottom or right edge
         endpoint_45 = line_to_edge(10, (2, 2), math.radians(45))
