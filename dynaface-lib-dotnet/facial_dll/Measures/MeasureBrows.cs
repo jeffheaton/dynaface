@@ -1,15 +1,19 @@
 using System.Collections.Generic;
 
-// Brow Asymmetry: vertical difference between the heights of brow inner landmarks
-// after projecting horizontally (accounting for face tilt) to the image edges.
-// WFLW: 35=right brow medial, 36=right brow ref, 44=left brow medial.
+// Brow Asymmetry: vertical gap between two parallel lines drawn through the brow
+// landmarks at the head-tilt angle, which cancels head tilt (a symmetric face scores
+// ~0 at any tilt). WFLW: 35=image-left brow, 36=image-left brow ref, 44=image-right brow.
 //
-// NOTE: this ray-casting uses ctx.LineToEdge, a directional-ray boundary intersection
-// (cos/sin against the 4 edges, nearest hit wins) — a different algorithm in kind
-// from dynaface-lib's util.line_to_edge (an undirected slope test against all 4
-// edges in a fixed right/left/top/bottom priority order). The two aren't a clean
-// 1:1 match; this was already the case before this port and is left as-is rather
-// than risk a mismatched "fix" with no reference run to verify against.
+// dynaface-lib's AnalyzeBrows extends both lines with util.line_to_edge, which lands
+// both on the RIGHT image edge, and compares their y values there — i.e. at the same
+// x. Because the lines are parallel that gap is the same at every x, so it's computed
+// here directly: |(y44 - y35) - tan(tilt) * (x44 - x35)|. Python truncates the two
+// edge points to ints first, so the two ports can differ by up to 1px.
+//
+// ctx.LineToEdge (a directional ray-cast, not a port of util.line_to_edge) is used only
+// to draw the arrows, which point outward to opposite edges. Their tips therefore sit
+// at different x and their y difference is NOT brow.d; comparing y values at opposite
+// edges was a past bug that added ~1023*|tan(tilt)| px for a tilted face.
 public class MeasureBrows : FaceMeasureBase
 {
     public override string Label => "BROW";
@@ -28,18 +32,20 @@ public class MeasureBrows : FaceMeasureBase
         bool render2 = IsEnabled("brow.d");
         float tilt = ctx.CalcFaceRotationDeg();
 
-        Vec2? rightEdge = ctx.LineToEdge(ctx.Landmarks[35], 180f + tilt);
-        Vec2? leftEdge = ctx.LineToEdge(ctx.Landmarks[44], tilt);
-
-        if (rightEdge == null || leftEdge == null)
-            return new Dictionary<string, double>();
-
-        float diff = MathHelpers.Abs(rightEdge.Value.Y - leftEdge.Value.Y) * ctx.Pix2mm;
+        Vec2 rightBrow = ctx.Landmarks[35];
+        Vec2 leftBrow = ctx.Landmarks[44];
+        float slope = MathHelpers.Tan(tilt * MathHelpers.Deg2Rad);
+        float diffPx = MathHelpers.Abs((leftBrow.Y - rightBrow.Y) - slope * (leftBrow.X - rightBrow.X));
+        float diff = diffPx * ctx.Pix2mm;
 
         if (render && render2)
         {
-            ctx.DrawArrow(ctx.Landmarks[36], rightEdge.Value, ArrowColor, arrowAtEnd: true);
-            ctx.DrawArrow(ctx.Landmarks[44], leftEdge.Value, ArrowColor, arrowAtEnd: true);
+            Vec2? rightEdge = ctx.LineToEdge(rightBrow, 180f + tilt);
+            Vec2? leftEdge = ctx.LineToEdge(leftBrow, tilt);
+            if (rightEdge != null)
+                ctx.DrawArrow(ctx.Landmarks[36], rightEdge.Value, ArrowColor, arrowAtEnd: true);
+            if (leftEdge != null)
+                ctx.DrawArrow(leftBrow, leftEdge.Value, ArrowColor, arrowAtEnd: true);
 
             ctx.AddHeader(Label);
             ctx.AddValue($"d.brow: {diff:F2} mm");

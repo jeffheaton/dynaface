@@ -27,6 +27,7 @@ internal static class MathHelpers
     public static float Atan2(float y, float x) => System.MathF.Atan2(y, x);
     public static float Cos(float f) => System.MathF.Cos(f);
     public static float Sin(float f) => System.MathF.Sin(f);
+    public static float Tan(float f) => System.MathF.Tan(f);
     public static float Acos(float f) => System.MathF.Acos(System.MathF.Max(-1f, System.MathF.Min(1f, f)));
     public static float Sqrt(float f) => System.MathF.Sqrt(f);
     public static float Exp(float f) => System.MathF.Exp(f);
