@@ -14,6 +14,7 @@
 
 # Helpful Links
 - [Users Guide (Windows and macOS)](https://github.com/jeffheaton/dynaface/blob/main/dynaface-app/manual-app.md)
+- [Users Guide (iPhone, iPad, and Android)](https://github.com/jeffheaton/dynaface/blob/main/dynaface-app/manual-mobile.md)
 - Dynaface Library: [Python Library](https://github.com/jeffheaton/dynaface/tree/main/dynaface-lib-python), [DotNet Library](https://github.com/jeffheaton/dynaface/tree/main/dynaface-lib-dotnet)
 
 ## Neural Network Models
