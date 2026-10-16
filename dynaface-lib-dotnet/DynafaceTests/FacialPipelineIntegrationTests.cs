@@ -43,9 +43,13 @@ public class FacialPipelineIntegrationTests
         Assert.True(all["fai"] >= 0);
         Assert.InRange(all["pd"], 100, 400);
         Assert.InRange(all["px2mm"], 0.1, 1.0);
+        // Pix2mm must come from the post-crop pupils, i.e. match the px2mm that
+        // MeasurePosition derives from the landmarks every measure uses. A pre-crop
+        // scale inflated img1's intercanthal distance to ~78mm.
+        Assert.Equal(all["px2mm"], result.Value.Pix2mm, 5);
         Assert.True(all["eye.left"] > 0);
         Assert.True(all["eye.right"] > 0);
-        Assert.True(all["id"] > 0);
+        Assert.InRange(all["id"], 20, 50);
         Assert.True(all["ml"] > 0);
     }
 

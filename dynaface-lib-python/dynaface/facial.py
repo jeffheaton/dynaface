@@ -351,12 +351,15 @@ class AnalyzeFace(ImageAnalysis):
             self.landmarks
         ):  # Changed check from "is not None" since landmarks is always a list.
             logger.debug("Landmarks located")
-            self.calc_pd()
             self.lateral = False
 
             if crop:
                 logger.debug("Cropping")
                 self.crop_stylegan(pupils=pupils)
+
+            # After the crop, so pix2mm matches the (rescaled) landmarks that
+            # every measure multiplies it by.
+            self.calc_pd()
 
         if lateral_pos:
             from dynaface.lateral import analyze_lateral

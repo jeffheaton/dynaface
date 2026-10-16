@@ -89,15 +89,6 @@ public static class FacePipeline
         FaceImage working, Vec2[] landmarks, float[] headPose, FacePose resolvedPose,
         float tiltThreshold, bool crop)
     {
-        // Matches dynaface-lib's call order exactly: calc_pd() (from the ORIGINAL,
-        // pre-crop landmarks) happens before crop_stylegan() rescales everything —
-        // Pix2mm is NOT recomputed from the post-crop landmarks, even though their
-        // pupil distance ends up close to (but not exactly) the 260px crop target.
-        float pupillaryDistance = ComputePupillaryDistance(landmarks);
-        float pix2mm = pupillaryDistance > 0f
-            ? DynafaceConfig.PupilDistMm / pupillaryDistance
-            : DynafaceConfig.PupilDistMm / 256f;
-
         FaceImage outImage = working;
         Vec2[] outLandmarks = landmarks;
         float? faceRotationRad = null;
@@ -107,6 +98,14 @@ public static class FacePipeline
             (outImage, outLandmarks, faceRotationRad) =
                 StyleGanCropper.Crop(working, landmarks, yaw, tiltThreshold);
         }
+
+        // Matches dynaface-lib's call order: calc_pd() runs after crop_stylegan(), so
+        // Pix2mm is measured in the same (post-crop) pixel space as the landmarks
+        // every measure multiplies it by.
+        float pupillaryDistance = ComputePupillaryDistance(outLandmarks);
+        float pix2mm = pupillaryDistance > 0f
+            ? DynafaceConfig.PupilDistMm / pupillaryDistance
+            : DynafaceConfig.PupilDistMm / 256f;
 
         return new FacePipelineResult
         {
@@ -238,7 +237,7 @@ public struct FacePipelineResult
     public bool IsLateral;
     public bool Flipped;           // true if lateral and originally facing right
     public float Pix2mm;
-    public float PupillaryDistance; // pre-crop pupil pixel distance; 0 in lateral mode
+    public float PupillaryDistance; // pupil pixel distance in AlignedCrop's space; 0 in lateral mode
     public float? FaceRotationRad;   // null unless tilt correction triggered (frontal only)
     public LateralAnalyzer.Result? LateralAnalysis; // lateral only; null if IsLateral is false
                                                     // or if analysis failed (no sagittal profile)

@@ -35,6 +35,10 @@ class TestFaceAnalysis(unittest.TestCase):
         face.draw_static()
         face.draw_landmarks()
 
+        # The measures' pix2mm must come from the post-crop pupils, i.e. agree
+        # with the px2mm AnalyzePosition derives from those same landmarks.
+        self.assertAlmostEqual(face.pix2mm, stats["px2mm"], places=6)
+
         # test all items
         items = face.get_all_items()
         assert "fai" in items
@@ -45,22 +49,22 @@ class TestFaceAnalysis(unittest.TestCase):
         # replacing cv2.resize/warpAffine) under the CPU execution provider; other
         # providers/platforms stay within _tolerance(). See dynaface.resample.
         expected_values = {
-            "fai": 2.18,
-            "oce.l": 84.78,
-            "oce.r": 107.0,
-            "brow.d": 4.39,
-            "dental_area": 3073.29,
-            "dental_left": 1447.08,
-            "dental_right": 1626.22,
+            "fai": 0.95,
+            "oce.l": 36.83,
+            "oce.r": 46.48,
+            "brow.d": 1.91,
+            "dental_area": 579.87,
+            "dental_left": 273.03,
+            "dental_right": 306.83,
             "dental_ratio": 0.89,
-            "dental_diff": 179.14,
-            "eye.left": 644.69,
-            "eye.right": 644.96,
-            "eye.diff": 0.27,
+            "dental_diff": 33.8,
+            "eye.left": 121.64,
+            "eye.right": 121.69,
+            "eye.diff": 0.05,
             "eye.ratio": 1.0,
-            "id": 77.64,
-            "ml": 170.72,
-            "oe": 203.66,
+            "id": 33.73,
+            "ml": 74.15,
+            "oe": 88.46,
             "tilt": 1.16,
             "px2mm": 0.32,
             "pd": 198.04,

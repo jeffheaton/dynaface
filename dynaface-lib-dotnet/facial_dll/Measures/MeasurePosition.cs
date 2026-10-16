@@ -30,11 +30,10 @@ public class MeasurePosition : FaceMeasureBase
         float tilt = (render && render2Tilt) ? ctx.CalcFaceRotationDeg() : 0f;
 
         // dynaface-lib's AnalyzePosition recomputes pd/pix2mm FRESH from whatever
-        // landmarks are current when this measure runs (i.e. the post-crop ones) —
-        // a deliberately separate calculation from ctx.Pix2mm (which reflects the
-        // pre-crop pupil distance used for every OTHER measure's mm conversions;
-        // see FacePipeline.RunFrontal). In lateral mode only pd gets recomputed;
-        // pix2mm keeps the fixed lateral value.
+        // landmarks are current when this measure runs, rather than reading
+        // ctx.Pix2mm. For a context built straight from FacePipeline.RunFrontal the
+        // two agree (both come from the post-crop pupils). In lateral mode only pd
+        // gets recomputed; pix2mm keeps the fixed lateral value.
         float pix2mm = DynafaceConstants.LateralPix2mm;
         float pd = 260f;
         bool havePupils = ctx.Landmarks != null && ctx.Landmarks.Length > DynafaceConstants.LmLeftPupil;
