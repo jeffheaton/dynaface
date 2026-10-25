@@ -6,7 +6,7 @@ from scipy.stats import mode
 import math
 
 from dynaface import facial, util
-from dynaface.measures_base import MeasureBase, MeasureItem, filter_measurements
+from dynaface.measures_base import MeasureBase, MeasureItem, select_outputs
 import colorsys
 
 USE_MODE = False  # Set to False to use mean averaging instead
@@ -160,4 +160,4 @@ class AnalyzeSkinTone(MeasureBase):
         except Exception as e:
             logger.exception(f"Unexpected error during skin tone analysis: {e}")
 
-        return filter_measurements(results, self.items)
+        return select_outputs(results, self.items)

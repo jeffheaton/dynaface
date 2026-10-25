@@ -110,7 +110,7 @@ class AnalyzeFace(ImageAnalysis):
             for obj in self.measures
             if obj.enabled
             for stat in obj.items
-            if stat.enabled
+            if stat.enabled and not stat.display_only
         ]
 
     def is_no_face(self) -> bool:

@@ -4,7 +4,7 @@ from typing import Any, Dict, List
 import numpy as np
 
 from dynaface import facial, util
-from dynaface.measures_base import MeasureBase, MeasureItem, filter_measurements
+from dynaface.measures_base import MeasureBase, MeasureItem, select_outputs
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ class AnalyzeFAI(MeasureBase):
             txt = f"FAI={fai:.2f}"
             pos = face.analyze_next_pt(txt)
             face.write_text(pos, txt)
-        return filter_measurements({"fai": fai}, self.items)
+        return select_outputs({"fai": fai}, self.items)
 
 
 class AnalyzeOralCommissureExcursion(MeasureBase):
@@ -109,7 +109,7 @@ class AnalyzeOralCommissureExcursion(MeasureBase):
             render=(render and render2_l),
             dir="r",
         )
-        return filter_measurements({"oce.l": oce_l, "oce.r": oce_r}, self.items)
+        return select_outputs({"oce.l": oce_l, "oce.r": oce_r}, self.items)
 
 
 class AnalyzeBrows(MeasureBase):
@@ -181,7 +181,7 @@ class AnalyzeBrows(MeasureBase):
                 txt,
             )
 
-        return filter_measurements({"brow.d": diff}, self.items)
+        return select_outputs({"brow.d": diff}, self.items)
 
 
 DENTAL_MIN_AREA_MM2 = 1e-6
@@ -309,7 +309,7 @@ class AnalyzeDentalArea(MeasureBase):
             pos = face.analyze_next_pt(txt)
             face.write_text_sq(pos, txt)
 
-        return filter_measurements(
+        return select_outputs(
             {
                 "dental_area": dental_area,
                 "dental_left": dental_area_left,
@@ -421,7 +421,7 @@ class AnalyzeEyeArea(MeasureBase):
             pos = face.analyze_next_pt(txt)
             face.write_text(pos, txt)
 
-        return filter_measurements(
+        return select_outputs(
             {
                 "eye.left": left_eye_area,
                 "eye.right": right_eye_area,
@@ -506,9 +506,7 @@ class AnalyzePosition(MeasureBase):
                 pos = face.analyze_next_pt(txt)
                 face.write_text(pos, txt)
 
-        return filter_measurements(
-            {"tilt": tilt, "px2mm": pix2mm, "pd": pd}, self.items
-        )
+        return select_outputs({"tilt": tilt, "px2mm": pix2mm, "pd": pd}, self.items)
 
 
 class AnalyzePose(MeasureBase):
@@ -576,9 +574,7 @@ class AnalyzePose(MeasureBase):
             pos = face.analyze_next_pt(txt)
             face.write_text_sq(pos, txt, mark="o", up=15)
 
-        return filter_measurements(
-            {"pitch": pitch, "roll": roll, "yaw": yaw}, self.items
-        )
+        return select_outputs({"pitch": pitch, "roll": roll, "yaw": yaw}, self.items)
 
 
 class AnalyzeIntercanthalDistance(MeasureBase):
@@ -620,7 +616,7 @@ class AnalyzeIntercanthalDistance(MeasureBase):
         d1: float = face.measure(
             face.landmarks[64], face.landmarks[68], render=(render and render1), dir="r"
         )
-        return filter_measurements({"id": d1}, self.items)
+        return select_outputs({"id": d1}, self.items)
 
 
 class AnalyzeMouthLength(MeasureBase):
@@ -662,7 +658,7 @@ class AnalyzeMouthLength(MeasureBase):
         d1: float = face.measure(
             face.landmarks[88], face.landmarks[92], render=(render and render1), dir="r"
         )
-        return filter_measurements({"ml": d1}, self.items)
+        return select_outputs({"ml": d1}, self.items)
 
 
 class AnalyzeNoseFrontal(MeasureBase):
@@ -735,9 +731,7 @@ class AnalyzeNoseFrontal(MeasureBase):
                 pos = face.analyze_next_pt(txt)
                 face.write_text(pos, txt)
 
-        return filter_measurements(
-            {"nose.alar": alar, "nose.nostril": nostril}, self.items
-        )
+        return select_outputs({"nose.alar": alar, "nose.nostril": nostril}, self.items)
 
 
 class AnalyzeOuterEyeCorners(MeasureBase):
@@ -780,7 +774,7 @@ class AnalyzeOuterEyeCorners(MeasureBase):
         d1: float = face.measure(
             face.landmarks[60], face.landmarks[72], render=(render and render1), dir="r"
         )
-        return filter_measurements({"oe": d1}, self.items)
+        return select_outputs({"oe": d1}, self.items)
 
 
 class AnalyzeLandmarks(MeasureBase):
@@ -819,4 +813,4 @@ class AnalyzeLandmarks(MeasureBase):
             data[f"landmark-{n}-x"] = x
             data[f"landmark-{n}-y"] = y
 
-        return filter_measurements(data, self.items)
+        return select_outputs(data, self.items)

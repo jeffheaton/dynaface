@@ -26,7 +26,8 @@ public static class DynafaceMeasures
     };
 
     // Mirrors dynaface-lib's AnalyzeFace.get_all_items(): the names of every
-    // enabled item across every enabled measure (e.g. for CSV export headers).
+    // enabled output across every enabled measure (e.g. for CSV export headers).
+    // Display-only items are drawing switches, not outputs, so they're skipped.
     public static List<string> GetAllItems(IEnumerable<FaceMeasureBase> measures)
     {
         var result = new List<string>();
@@ -34,7 +35,7 @@ public static class DynafaceMeasures
         {
             if (!measure.Enabled) continue;
             foreach (var item in measure.Items)
-                if (item.Enabled)
+                if (item.Enabled && !item.DisplayOnly)
                     result.Add(item.Name);
         }
         return result;

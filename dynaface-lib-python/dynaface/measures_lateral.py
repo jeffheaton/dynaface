@@ -7,7 +7,7 @@ from dynaface import lateral, util
 
 logger = logging.getLogger(__name__)
 
-from dynaface.measures_base import MeasureBase, MeasureItem, filter_measurements
+from dynaface.measures_base import MeasureBase, MeasureItem, select_outputs
 
 
 class AnalyzeLateral(MeasureBase):
@@ -27,7 +27,7 @@ class AnalyzeLateral(MeasureBase):
         self.items = [
             MeasureItem("nfa"),
             MeasureItem("nla"),
-            MeasureItem("tip_proj"),
+            MeasureItem("tip_proj", display_only=True),  # draws AT/NT
             MeasureItem("at"),
             MeasureItem("nt"),
             MeasureItem("at_nt"),
@@ -149,7 +149,7 @@ class AnalyzeLateral(MeasureBase):
             pos = face.analyze_next_pt(ratio_txt)
             face.write_text(pos, ratio_txt)
 
-        return filter_measurements(
+        return select_outputs(
             {
                 "nfa": nfa,
                 "nla": nla,

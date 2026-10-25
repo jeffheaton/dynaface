@@ -1,23 +1,42 @@
+"""
+Measurement plugin base classes.
+
+Contract for measures (mirrored by dynaface-lib-dotnet's FaceMeasureBase):
+
+- calc() always returns every declared output, whether or not its item is enabled
+  and whether or not render is True. A value that can't be determined is NaN, or
+  None when the measure couldn't run at all.
+- An item's enabled flag only controls drawing. Choosing which outputs to show or
+  export is the caller's job: AnalyzeFace.get_all_items() lists the enabled
+  outputs, which is what the desktop app uses for its chart and CSV columns.
+- An item marked display_only (such as AnalyzeLateral's tip_proj) is a drawing
+  switch, not an output: calc() never returns it and get_all_items() never lists it.
+"""
+
 import logging
 from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
 
-def filter_measurements(
-    data: Dict[str, Any], items: List["MeasureItem"]
-) -> Dict[str, Any]:
+def select_outputs(data: Dict[str, Any], items: List["MeasureItem"]) -> Dict[str, Any]:
     """
-    Filter measurements from a data dictionary based on the provided measurement items.
+    Return a measure's outputs: every declared item that isn't display-only, whether
+    or not it is enabled, with None for any the measure didn't compute.
 
     Args:
-        data (Dict[str, Any]): Dictionary containing measurement values.
-        items (List[MeasureItem]): List of measurement items to filter.
+        data (Dict[str, Any]): Values computed by the measure.
+        items (List[MeasureItem]): The measure's declared items.
 
     Returns:
-        Dict[str, Any]: A dictionary with keys from measurement item names and their corresponding values from data.
+        Dict[str, Any]: One entry per non-display-only item.
     """
-    return {item.name: data.get(item.name, None) for item in items}
+    return {item.name: data.get(item.name) for item in items if not item.display_only}
+
+
+# Earlier name, kept for callers outside this package. It never filtered by the
+# enabled flag; see the module docstring for the contract.
+filter_measurements = select_outputs
 
 
 class MeasureItem:
@@ -25,16 +44,22 @@ class MeasureItem:
     Represents an individual measurement item with a name and enabled state.
     """
 
-    def __init__(self, name: str, enabled: bool = True) -> None:
+    def __init__(
+        self, name: str, enabled: bool = True, display_only: bool = False
+    ) -> None:
         """
         Initialize a MeasureItem.
 
         Args:
             name (str): The name of the measurement.
-            enabled (bool): Whether the measurement is enabled.
+            enabled (bool): Whether the item is drawn (and, for callers that honor
+                it, shown or exported).
+            display_only (bool): True for a drawing switch that has no value of its
+                own; it is never returned or listed as an output.
         """
         self.name: str = name
         self.enabled: bool = enabled
+        self.display_only: bool = display_only
         self.is_lateral: bool = False
         self.is_frontal: bool = False
 

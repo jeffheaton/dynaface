@@ -126,7 +126,7 @@ class TestAnalyzeLandmarksCalc(unittest.TestCase):
 
     def test_set_item_enabled_affects_is_enabled(self):
         # set_item_enabled controls rendering gating via is_enabled(),
-        # not the return dict of calc() — filter_measurements returns all
+        # not the return dict of calc() — select_outputs returns all
         # items regardless of enabled state; exclusion from CSV happens via
         # get_all_items() on the AnalyzeFace side.
         self.measure.set_item_enabled("landmark-1-x", False)

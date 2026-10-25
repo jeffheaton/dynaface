@@ -8,7 +8,7 @@ using System.Collections.Generic;
 // AT/NT/AT_NT-ratio now have their own items and are returned (dynaface-lib used
 // to declare only a "tip_proj" item that matched none of its computed dict keys,
 // so these were drawn but never actually returned — fixed upstream; "tip_proj"
-// is kept as the shared render-gate for the tip-projection drawing). Note AT/NT
+// is kept as the display-only switch for the tip-projection drawing). Note AT/NT
 // are in raw pixels, not mm — dynaface-lib never multiplies them by pix2mm.
 public class MeasureLateral : FaceMeasureBase
 {
@@ -20,7 +20,7 @@ public class MeasureLateral : FaceMeasureBase
     {
         Items.Add(new MeasureItemInfo("nfa"));
         Items.Add(new MeasureItemInfo("nla"));
-        Items.Add(new MeasureItemInfo("tip_proj"));
+        Items.Add(new MeasureItemInfo("tip_proj", displayOnly: true)); // draws AT/NT
         Items.Add(new MeasureItemInfo("at"));
         Items.Add(new MeasureItemInfo("nt"));
         Items.Add(new MeasureItemInfo("at_nt"));
