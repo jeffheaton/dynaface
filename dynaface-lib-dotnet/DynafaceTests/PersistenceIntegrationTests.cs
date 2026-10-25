@@ -22,10 +22,14 @@ public class PersistenceIntegrationTests
         var result = FacialPipelineIntegrationTests.RunWithRotationRetry(photo);
         Assert.NotNull(result);
 
+        // Capture before anything draws: the context below draws on the result's own
+        // pixel array, and a capture taken afterwards would save the overlays too (which
+        // MeasureSkinTone, sampling the restored image, would then measure).
+        var state = FaceAnalysisPersistence.Capture(result.Value);
+
         var originalCtx = FacialPipelineIntegrationTests.BuildContext(result.Value);
         var originalValues = FacialPipelineIntegrationTests.RunAllFrontalMeasures(originalCtx);
 
-        var state = FaceAnalysisPersistence.Capture(result.Value);
         var restoredCtx = FaceAnalysisPersistence.Restore(state);
         var restoredValues = FacialPipelineIntegrationTests.RunAllFrontalMeasures(restoredCtx);
 

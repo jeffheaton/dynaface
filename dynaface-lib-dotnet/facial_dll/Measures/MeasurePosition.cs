@@ -24,10 +24,8 @@ public class MeasurePosition : FaceMeasureBase
         bool render2Px2mm = IsEnabled("px2mm");
         bool render2Pd = IsEnabled("pd");
 
-        // Matches dynaface-lib: tilt is only actually computed when both render and
-        // its own item are enabled (otherwise it stays 0) — a quirk of the Python
-        // original, replicated here rather than silently "fixed".
-        float tilt = (render && render2Tilt) ? ctx.CalcFaceRotationDeg() : 0f;
+        // Always computed, whether or not it's drawn (like dynaface-lib's AnalyzePosition).
+        float tilt = ctx.CalcFaceRotationDeg();
 
         // dynaface-lib's AnalyzePosition recomputes pd/pix2mm FRESH from whatever
         // landmarks are current when this measure runs, rather than reading

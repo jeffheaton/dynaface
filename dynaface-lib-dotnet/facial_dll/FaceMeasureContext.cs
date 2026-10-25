@@ -7,7 +7,20 @@ using System.Collections.Generic;
 // bottom-left happens internally before calling FaceRenderer helpers.
 public class FaceMeasureContext
 {
-    public Rgba32[] Pixels { get; }
+    // The canvas measures draw on. Like dynaface-lib's render_img vs original_img, an
+    // undrawn copy is kept for sampling (MeasureSkinTone), so drawn overlays never leak
+    // into measured values. The copy is taken the first time Pixels is accessed, i.e.
+    // before anything can draw; a render: false pass never touches Pixels and never copies.
+    public Rgba32[] Pixels
+    {
+        get
+        {
+            _undrawn ??= (Rgba32[])_pixels.Clone();
+            return _pixels;
+        }
+    }
+    readonly Rgba32[] _pixels;
+    Rgba32[] _undrawn;
     public int Width { get; }
     public int Height { get; }
 
@@ -58,7 +71,7 @@ public class FaceMeasureContext
     {
         Width = photo.Width;
         Height = photo.Height;
-        Pixels = photo.Pixels; // caller must ensure this array is not shared
+        _pixels = photo.Pixels; // caller must ensure this array is not shared
         Landmarks = landmarks;
         Pix2mm = pix2mm;
         IsLateral = isLateral;
@@ -425,10 +438,14 @@ public class FaceMeasureContext
     {
         int left = MathHelpers.RoundToInt(topLeft.X);
         int right = MathHelpers.RoundToInt(bottomRight.X);
+        // Like dynaface-lib's sample_rectangle, accept the corners in either order:
+        // MeasureSkinTone's second cheek rectangle (contour 30 to nostril 59) runs right
+        // to left, and an unsorted span sampled nothing.
+        if (left > right) (left, right) = (right, left);
         int top = BLY(topLeft.Y);
         int bottom = BLY(bottomRight.Y);
         if (bottom > top) (bottom, top) = (top, bottom); // BLY flips vertical order
-        return FaceRenderer.SampleRectangle(Pixels, Width, Height, left, bottom, right, top + 1);
+        return FaceRenderer.SampleRectangle(_undrawn ?? _pixels, Width, Height, left, bottom, right, top + 1);
     }
 
     // -------------------------------------------------------------------------

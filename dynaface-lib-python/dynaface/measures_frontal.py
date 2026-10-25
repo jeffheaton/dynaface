@@ -479,8 +479,8 @@ class AnalyzePosition(MeasureBase):
 
         if p:
             landmarks: Any = face.landmarks
+            tilt = util.to_degrees(util.calculate_face_rotation(p))
             if render and render2_tilt:
-                tilt = util.to_degrees(util.calculate_face_rotation(p))
                 if face.face_rotation:
                     orig: float = util.to_degrees(face.face_rotation)
                     txt = f"tilt={round(orig,2)} -> {round(tilt,2)}"
@@ -561,17 +561,17 @@ class AnalyzePose(MeasureBase):
         roll = face.roll
         yaw = face.yaw
 
-        if render2_pitch:
+        if render and render2_pitch:
             txt = f"Pitch: {pitch:.2f}"
             pos = face.analyze_next_pt(txt)
             face.write_text_sq(pos, txt, mark="o", up=15)
 
-        if render2_roll:
+        if render and render2_roll:
             txt = f"Roll: {roll:.2f}"
             pos = face.analyze_next_pt(txt)
             face.write_text_sq(pos, txt, mark="o", up=15)
 
-        if render2_yaw:
+        if render and render2_yaw:
             txt = f"Yaw: {yaw:.2f}"
             pos = face.analyze_next_pt(txt)
             face.write_text_sq(pos, txt, mark="o", up=15)

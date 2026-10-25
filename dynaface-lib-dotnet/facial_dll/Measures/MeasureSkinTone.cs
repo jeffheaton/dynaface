@@ -29,9 +29,9 @@ public class MeasureSkinTone : FaceMeasureBase
 
     public override Dictionary<string, double> Calc(FaceMeasureContext ctx, bool render = true)
     {
+        // Computed whether or not it's drawn; drawing only shows the result.
         var results = new Dictionary<string, double>();
         bool anyEnabled = IsEnabled("hue") || IsEnabled("sat") || IsEnabled("brightness");
-        if (!(render && anyEnabled)) return results;
 
         var lm = ctx.Landmarks;
         foreach (int idx in RequiredLandmarks)
@@ -62,9 +62,6 @@ public class MeasureSkinTone : FaceMeasureBase
         byte cr = (byte)(sumR / n), cg = (byte)(sumG / n), cb = (byte)(sumB / n);
         var colorRgb = new Rgba32(cr, cg, cb, 255);
 
-        DrawRectTopLeft(ctx, swatchTopLeft, swatchBottomRight, colorRgb, filled: true);
-        DrawRectTopLeft(ctx, swatchTopLeft, swatchBottomRight, new Rgba32(0, 0, 0, 255), filled: false);
-
         var (h, s, v) = ColorUtils.RgbToHsv(cr / 255f, cg / 255f, cb / 255f);
         int hueDeg = (int)(h * 360f);
         int satPct = (int)(s * 100f);
@@ -73,6 +70,11 @@ public class MeasureSkinTone : FaceMeasureBase
         results["hue"] = hueDeg;
         results["sat"] = satPct;
         results["brightness"] = briPct;
+
+        if (!(render && anyEnabled)) return results;
+
+        DrawRectTopLeft(ctx, swatchTopLeft, swatchBottomRight, colorRgb, filled: true);
+        DrawRectTopLeft(ctx, swatchTopLeft, swatchBottomRight, new Rgba32(0, 0, 0, 255), filled: false);
 
         string[] lines = { $"HUE: {hueDeg}", $"SAT: {satPct}", $"BRT: {briPct}" };
         var sizes = new Vec2i[lines.Length];
