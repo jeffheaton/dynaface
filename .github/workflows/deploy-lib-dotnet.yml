@@ -1,0 +1,65 @@
+name: Deploy Library to NuGet (.NET)
+
+# Publishes the Dynaface and Dynaface.Onnx packages that a Build Library (.NET) run
+# uploaded to S3. Mirrors deploy-lib.yml (the Python wheel to PyPI).
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version to deploy (e.g., 2.0.3); deploys Dynaface.<version>.nupkg and Dynaface.Onnx.<version>.nupkg'
+        required: true
+
+permissions:
+  contents: read
+  # Required for NuGet Trusted Publishing: lets the NuGet/login action request a
+  # short-lived OIDC token from GitHub to exchange for a temporary NuGet API key.
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download packages from S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Error: '$VERSION' is not a package version (e.g., 2.0.3)."
+            exit 1
+          fi
+          mkdir -p nupkgs
+          for id in Dynaface Dynaface.Onnx; do
+            file="$id.$VERSION.nupkg"
+            echo "Downloading $file from S3..."
+            aws s3 cp "s3://data.heatonresearch.com/library/$file" nupkgs/ || {
+              echo "Error: File $file does not exist in S3. Run Build Library (.NET) at this version first."
+              exit 1
+            }
+          done
+          ls -l nupkgs
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Trusted Publishing: exchange GitHub's OIDC token for a short-lived NuGet
+      # API key (no long-lived secret stored in the repo). Requires a matching
+      # trusted-publishing policy on NuGet.org for both package IDs, bound to this
+      # workflow file — see dynaface-lib-dotnet/README.md.
+      - name: NuGet login (Trusted Publishing / OIDC)
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: jeffheaton
+
+      - name: Push to NuGet.org
+        run: |
+          dotnet nuget push "nupkgs/*.nupkg" \
+            --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate

@@ -3,12 +3,11 @@ name: Build Library (.NET)
 on:
   workflow_dispatch:
 
+# Builds, tests and uploads to S3 only. Publishing to NuGet.org is a separate,
+# manual step: the Deploy Library to NuGet (.NET) workflow (deploy-lib-dotnet.yml).
 permissions:
   contents: read
   checks: write
-  # Required for NuGet Trusted Publishing: lets the NuGet/login action request a
-  # short-lived OIDC token from GitHub to exchange for a temporary NuGet API key.
-  id-token: write
 
 env:
   # The 3 ONNX models the integration tests need (same zip dynaface-lib downloads).
@@ -193,22 +192,16 @@ jobs:
           retention-days: 7
           path: dynaface-lib-dotnet/nupkgs/*.nupkg
 
-      # Trusted Publishing: exchange GitHub's OIDC token for a short-lived NuGet
-      # API key (no long-lived secret stored in the repo). Requires a matching
-      # trusted-publishing policy on NuGet.org for both package IDs — see README.
-      - name: NuGet login (Trusted Publishing / OIDC)
-        id: nuget-login
-        uses: NuGet/login@v1
-        with:
-          user: jeffheaton
-
-      - name: Push to NuGet.org
+      - name: Upload NuGet packages to S3
         working-directory: dynaface-lib-dotnet
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: |
-          dotnet nuget push "nupkgs/*.nupkg" \
-            --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
-            --source https://api.nuget.org/v3/index.json \
-            --skip-duplicate
+          for f in nupkgs/*.nupkg; do
+            aws s3 cp "$f" s3://data.heatonresearch.com/library/ --acl public-read
+          done
 
       - name: Clean up build artifacts
         if: always()

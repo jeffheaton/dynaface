@@ -54,17 +54,26 @@ Both take `<Version>` from their own `.csproj`; keep the two in lockstep.
 
 ### Publishing to NuGet (maintainers)
 
-Releases are published by manually running the [Build Library (.NET)](../.github/workflows/build-lib-dotnet.yml)
-workflow (`workflow_dispatch`). It packs both packages and pushes them to NuGet.org
-via **Trusted Publishing** — GitHub's OIDC token is exchanged for a short-lived
-key by the `NuGet/login` action, so there is **no long-lived API key stored in the repo**.
+Releases take two manually dispatched (`workflow_dispatch`) workflows, the same way
+the Python library goes to PyPI:
+
+1. [Build Library (.NET)](../.github/workflows/build-lib-dotnet.yml) builds, runs the
+   full test suite (it downloads the ONNX models and requires the integration tests to
+   run), packs both packages, and uploads `Dynaface.<version>.nupkg` and
+   `Dynaface.Onnx.<version>.nupkg` to `s3://data.heatonresearch.com/library/`. It
+   does not publish.
+2. [Deploy Library to NuGet (.NET)](../.github/workflows/deploy-lib-dotnet.yml), given
+   that version, downloads both packages from S3 and pushes them to NuGet.org via
+   **Trusted Publishing** — GitHub's OIDC token is exchanged for a short-lived key by
+   the `NuGet/login` action, so there is **no long-lived API key stored in the repo**.
 
 One-time setup on NuGet.org (Account → **Trusted Publishing**): add a policy for
 each package ID (`Dynaface`, `Dynaface.Onnx`) bound to this repository
-(`jeffheaton/dynaface`) and the `Build Library (.NET)` workflow. To cut a release,
-bump `<Version>` in both `.csproj` files (kept in lockstep), then dispatch the
-workflow. Pushes use `--skip-duplicate`, so re-running at an already-published
-version is a no-op rather than an error.
+(`jeffheaton/dynaface`) and the workflow file `deploy-lib-dotnet.yml`. A new policy is
+provisional and expires if it isn't used within about a week. To cut a release, bump
+`<Version>` in both `.csproj` files (kept in lockstep), run the build, then run the
+deploy with that version. Pushes use `--skip-duplicate`, so deploying an
+already-published version is a no-op rather than an error.
 
 ## Test
 
@@ -79,7 +88,7 @@ export DYNAFACE_ONNX_MODELS=/path/to/models
 dotnet test DynafaceTests/DynafaceTests.csproj
 ```
 
-or place them at `~/.dynaface/models` (dynaface-lib's own default download location). Without a resolvable directory, those tests no-op (pass without exercising the pipeline) rather than fail.
+or place them at `~/.dynaface/models` (dynaface-lib's own default download location). When `DYNAFACE_ONNX_MODELS` is set it is the only place looked. Without the models, those tests are reported as Skipped; set `DYNAFACE_REQUIRE_MODELS=1` to make them fail instead (the CI build does).
 
 ## Run
 
