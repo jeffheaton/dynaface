@@ -47,7 +47,10 @@ def util_calc_pd(
     right_pupil = np.array(pupils[1])
 
     pupillary_distance = np.linalg.norm(left_pupil - right_pupil)
-    pix2mm = AnalyzeFace.pd / pupillary_distance
+    # Coincident pupils give no scale: NaN (undefined) rather than infinity.
+    pix2mm = (
+        AnalyzeFace.pd / pupillary_distance if pupillary_distance > 0 else float("nan")
+    )
 
     return float(pupillary_distance), float(pix2mm)
 

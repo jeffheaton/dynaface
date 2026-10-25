@@ -85,7 +85,7 @@ public static class FacePipeline
             : RunFrontal(working, landmarks, headPose, resolvedPose, tiltThreshold, crop);
     }
 
-    static FacePipelineResult? RunFrontal(
+    internal static FacePipelineResult? RunFrontal(
         FaceImage working, Vec2[] landmarks, float[] headPose, FacePose resolvedPose,
         float tiltThreshold, bool crop)
     {
@@ -103,9 +103,11 @@ public static class FacePipeline
         // Pix2mm is measured in the same (post-crop) pixel space as the landmarks
         // every measure multiplies it by.
         float pupillaryDistance = ComputePupillaryDistance(outLandmarks);
+        // Coincident pupils give no scale: NaN (undefined), like dynaface-lib's util_calc_pd,
+        // rather than a made-up 63mm / 256px.
         float pix2mm = pupillaryDistance > 0f
             ? DynafaceConfig.PupilDistMm / pupillaryDistance
-            : DynafaceConfig.PupilDistMm / 256f;
+            : float.NaN;
 
         return new FacePipelineResult
         {

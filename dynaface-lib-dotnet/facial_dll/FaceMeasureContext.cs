@@ -89,14 +89,15 @@ public class FaceMeasureContext
     {
     }
 
+    // NaN (undefined) without two distinct pupils, like dynaface-lib's util_calc_pd.
     static float ComputePix2mmFromLandmarks(Vec2[] lm)
     {
         if (lm != null && lm.Length > DynafaceConstants.LmLeftPupil)
         {
             float dist = Vec2.Distance(lm[DynafaceConstants.LmRightPupil], lm[DynafaceConstants.LmLeftPupil]);
-            if (dist > 1f) return DynafaceConfig.PupilDistMm / dist;
+            if (dist > 0f) return DynafaceConfig.PupilDistMm / dist;
         }
-        return DynafaceConfig.PupilDistMm / 256f;
+        return float.NaN;
     }
 
     // -------------------------------------------------------------------------

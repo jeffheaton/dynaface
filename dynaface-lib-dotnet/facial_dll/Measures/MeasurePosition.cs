@@ -40,7 +40,7 @@ public class MeasurePosition : FaceMeasureBase
             pd = Vec2.Distance(
                 ctx.Landmarks[DynafaceConstants.LmRightPupil], ctx.Landmarks[DynafaceConstants.LmLeftPupil]);
             if (!ctx.IsLateral)
-                pix2mm = DynafaceConfig.PupilDistMm / pd;
+                pix2mm = pd > 0f ? DynafaceConfig.PupilDistMm / pd : float.NaN;
         }
 
         if (render && render2Tilt)

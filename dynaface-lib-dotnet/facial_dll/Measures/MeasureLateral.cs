@@ -47,13 +47,13 @@ public class MeasureLateral : FaceMeasureBase
         float nfa = AngleAt(nasion, glabella, nasalTip);
         float nla = AngleAt(subnasal, nasalTip, pogonion);
 
-        if (render && renderNfa)
+        if (render && renderNfa && !float.IsNaN(nfa))
         {
             ctx.DrawArrow(nasion, glabella, ArrowColor, thickness: 2, arrowAtStart: false, arrowAtEnd: true);
             ctx.DrawArrow(nasion, nasalTip, ArrowColor, thickness: 2, arrowAtStart: false, arrowAtEnd: true);
             ctx.DrawImageText(new Vec2(nasion.X + 10, nasion.Y), $"NFA={nfa:F2}", new Rgba32(255, 255, 255, 255));
         }
-        if (render && renderNla)
+        if (render && renderNla && !float.IsNaN(nla))
         {
             ctx.DrawArrow(subnasal, nasalTip, ArrowColor, thickness: 2, arrowAtStart: false, arrowAtEnd: true);
             ctx.DrawArrow(subnasal, pogonion, ArrowColor, thickness: 2, arrowAtStart: false, arrowAtEnd: true);
@@ -62,11 +62,15 @@ public class MeasureLateral : FaceMeasureBase
 
         Vec2 ptA = nasalTip, ptN = nasion;
         var ptT = new Vec2(ptN.X, ptA.Y);
-        float at = Vec2.Distance(ptA, ptT);
-        float nt = Vec2.Distance(ptN, ptT);
-        float atNtRatio = nt != 0f ? at / nt : float.NaN;
+        float at = float.NaN, nt = float.NaN, atNtRatio = float.NaN;
+        if (!Missing(ptA) && !Missing(ptN))
+        {
+            at = Vec2.Distance(ptA, ptT);
+            nt = Vec2.Distance(ptN, ptT);
+            atNtRatio = nt != 0f ? at / nt : float.NaN;
+        }
 
-        if (render && IsEnabled("tip_proj"))
+        if (render && IsEnabled("tip_proj") && !float.IsNaN(at))
         {
             ctx.DrawArrow(ptA, ptT, ArrowColor, thickness: 2, arrowAtStart: false, arrowAtEnd: true);
             ctx.DrawArrow(ptN, ptT, ArrowColor, thickness: 2, arrowAtStart: false, arrowAtEnd: true);
@@ -96,11 +100,18 @@ public class MeasureLateral : FaceMeasureBase
         };
     }
 
+    // The lateral finder marks a landmark it couldn't find as (-1, -1); its X is then
+    // shifted into image space like the others (as in dynaface-lib), but Y stays -1.
+    static bool Missing(Vec2 p) => p.Y < 0f;
+
+    // Undefined (NaN) when a point is missing or a side has zero length, like
+    // dynaface-lib's calculate_angle; never a plausible-looking 0.
     static float AngleAt(Vec2 center, Vec2 p1, Vec2 p2)
     {
+        if (Missing(center) || Missing(p1) || Missing(p2)) return float.NaN;
         Vec2 v1 = p1 - center, v2 = p2 - center;
         float mag1 = v1.Magnitude, mag2 = v2.Magnitude;
-        if (mag1 <= 0f || mag2 <= 0f) return 0f;
+        if (mag1 <= 0f || mag2 <= 0f) return float.NaN;
         float cosAngle = MathHelpers.Clamp(Vec2.Dot(v1, v2) / (mag1 * mag2), -1f, 1f);
         return MathHelpers.Acos(cosAngle) * MathHelpers.Rad2Deg;
     }

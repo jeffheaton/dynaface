@@ -1,4 +1,5 @@
 import logging
+import math
 from typing import Any, Dict
 import numpy as np
 
@@ -47,17 +48,22 @@ class AnalyzeLateral(MeasureBase):
 
         landmarks: Any = face.lateral_landmarks
 
-        def calculate_angle(pt_center, pt1, pt2):
-            v1 = np.array(pt1) - np.array(pt_center)
-            v2 = np.array(pt2) - np.array(pt_center)
-            angle_rad = np.arccos(
-                np.clip(
-                    np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)),
-                    -1.0,
-                    1.0,
-                )
-            )
-            return np.degrees(angle_rad)
+        def missing(pt: Any) -> bool:
+            # The lateral finder marks a landmark it couldn't find as (-1, -1). Its x
+            # is then shifted into image space like the others, but y stays -1.
+            return bool(pt[1] < 0)
+
+        def calculate_angle(pt_center: Any, pt1: Any, pt2: Any) -> float:
+            # Undefined (NaN) when a point is missing or a side has zero length.
+            if missing(pt_center) or missing(pt1) or missing(pt2):
+                return float("nan")
+            v1 = np.array(pt1, dtype=float) - np.array(pt_center, dtype=float)
+            v2 = np.array(pt2, dtype=float) - np.array(pt_center, dtype=float)
+            n1, n2 = float(np.linalg.norm(v1)), float(np.linalg.norm(v2))
+            if n1 == 0 or n2 == 0:
+                return float("nan")
+            cos_angle = float(np.clip(np.dot(v1, v2) / (n1 * n2), -1.0, 1.0))
+            return float(np.degrees(np.arccos(cos_angle)))
 
         nfa: float = calculate_angle(
             landmarks[lateral.LATERAL_LM_SOFT_TISSUE_NASION],
@@ -71,7 +77,7 @@ class AnalyzeLateral(MeasureBase):
             landmarks[lateral.LATERAL_LM_SOFT_TISSUE_POGONION],
         )
 
-        if render and render_nfa:
+        if render and render_nfa and not math.isnan(nfa):
             face.arrow(
                 landmarks[lateral.LATERAL_LM_SOFT_TISSUE_NASION],
                 landmarks[lateral.LATERAL_LM_SOFT_TISSUE_GLABELLA],
@@ -91,7 +97,7 @@ class AnalyzeLateral(MeasureBase):
             txt_nfa: str = f"NFA={nfa:.2f}"
             face.write_text_sq(pt, txt_nfa, mark="o", up=10)
 
-        if render and render_nla:
+        if render and render_nla and not math.isnan(nla):
             face.arrow(
                 landmarks[lateral.LATERAL_LM_SUBNASAL_POINT],
                 landmarks[lateral.LATERAL_LM_NASAL_TIP],
@@ -116,11 +122,14 @@ class AnalyzeLateral(MeasureBase):
         pt_N = landmarks[lateral.LATERAL_LM_SOFT_TISSUE_NASION]
         pt_T = (pt_N[0], pt_A[1])
 
-        AT = util.euclidean_distance(pt_A, pt_T)
-        NT = util.euclidean_distance(pt_N, pt_T)
-        AT_NT_ratio = AT / NT if NT != 0 else float("nan")
+        if missing(pt_A) or missing(pt_N):
+            AT = NT = AT_NT_ratio = float("nan")
+        else:
+            AT = util.euclidean_distance(pt_A, pt_T)
+            NT = util.euclidean_distance(pt_N, pt_T)
+            AT_NT_ratio = AT / NT if NT != 0 else float("nan")
 
-        if render and self.is_enabled("tip_proj"):
+        if render and self.is_enabled("tip_proj") and not math.isnan(AT):
             face.arrow(pt_A, pt_T, thickness=2, apt1=False)
             face.arrow(pt_N, pt_T, thickness=2, apt1=False)
 
