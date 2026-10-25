@@ -1,9 +1,18 @@
+using System;
 using System.Collections.Generic;
 
-// Dental Display: area of the inner lip opening, split left/right by the face midline.
-// WFLW: landmarks 88-95 = inner lip contour.
+// Dental Display: area of the inner lip opening, split at the facial midline (the tilted
+// perpendicular bisector of the pupils, ctx.CalcBisect). WFLW: landmarks 88-95 = inner lip
+// contour. Sides are the person's, like eye.right: dental_right is the image-left half.
+// Mirrors dynaface-lib's AnalyzeDentalArea: each half is the outline clipped to one side of
+// the midline, so a closed mouth (an outline with no area) measures ~0 instead of failing,
+// and the zero fallback only covers real failures.
 public class MeasureDentalArea : FaceMeasureBase
 {
+    // Floating-point dust from a closed mouth counts as zero, so two empty halves keep a
+    // symmetry ratio of 1 (dynaface-lib's DENTAL_MIN_AREA_MM2).
+    const double MinAreaMm2 = 1e-6;
+
     public override string Label => "DENTAL";
 
     static readonly Rgba32 RightColor = new Rgba32(255, 60, 60, 255);
@@ -29,19 +38,19 @@ public class MeasureDentalArea : FaceMeasureBase
         bool renderDiff = IsEnabled("dental_diff");
 
         var poly = Slice(ctx.Landmarks, 88, 95);
+        var (p1, p2) = ctx.CalcBisect();
 
-        float midX = ctx.Landmarks.Length > 97
-            ? (ctx.Landmarks[96].X + ctx.Landmarks[97].X) * 0.5f
-            : ctx.Width * 0.5f;
-
-        float rightArea = 0f, leftArea = 0f;
+        float rightArea, leftArea;
         try
         {
-            var (leftPoly, rightPoly) = FaceMeasureContext.SplitPolygonByX(poly, midX);
-            rightArea = leftPoly.Length >= 3 ? ctx.MeasurePolygon(leftPoly, render && renderRight, RightColor) : 0f;
-            leftArea = rightPoly.Length >= 3 ? ctx.MeasurePolygon(rightPoly, render && renderLeft, LeftColor) : 0f;
+            rightArea = HalfArea(ctx, poly, p1, p2, imageLeft: true, render && renderRight, RightColor);
+            leftArea = HalfArea(ctx, poly, p1, p2, imageLeft: false, render && renderLeft, LeftColor);
         }
-        catch { /* malformed polygon — skip fill */ }
+        catch (Exception)
+        {
+            // A real failure, not a closed mouth: same zero fallback as dynaface-lib.
+            rightArea = leftArea = 0f;
+        }
 
         float total = rightArea + leftArea;
         float ratio = FaceMeasureContext.SymmetryRatio(leftArea, rightArea);
@@ -66,6 +75,16 @@ public class MeasureDentalArea : FaceMeasureBase
             ["dental_ratio"] = ratio,
             ["dental_diff"] = diff,
         };
+    }
+
+    static float HalfArea(FaceMeasureContext ctx, Vec2[] poly, Vec2 p1, Vec2 p2, bool imageLeft,
+        bool render, Rgba32 color)
+    {
+        var half = FaceMeasureContext.ClipPolygonToSide(poly, p1, p2, imageLeft);
+        if (half.Length < 3) return 0f;
+        if (render) ctx.MeasurePolygon(half, render: true, color: color);
+        double area = FaceMeasureContext.PolygonAreaPx(half) * ctx.Pix2mm * ctx.Pix2mm;
+        return area >= MinAreaMm2 ? (float)area : 0f;
     }
 
     static Vec2[] Slice(Vec2[] lm, int first, int last)

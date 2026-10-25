@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 // Transient context passed to each FaceMeasureBase.Calc() call.
@@ -120,12 +121,36 @@ public class FaceMeasureContext
     // Geometric helpers
     // -------------------------------------------------------------------------
 
-    public (Vec2 top, Vec2 bottom) CalcBisect()
+    // The facial midline: the perpendicular bisector of the pupils, as two points where it
+    // leaves a 1024px frame. Mirrors dynaface-lib's AnalyzeFace.calc_bisect and
+    // util.bisecting_line_coordinates exactly, including the pupil order (left, right),
+    // the integer truncation of pupils and end points, and the fixed 1024 frame, so that
+    // measures splitting the face at the midline (MeasureDentalArea) match Python.
+    public (Vec2 p1, Vec2 p2) CalcBisect()
     {
-        float midX = Landmarks.Length > 97
-            ? (Landmarks[96].X + Landmarks[97].X) * 0.5f
-            : Width * 0.5f;
-        return (new Vec2(midX, 0), new Vec2(midX, Height - 1));
+        if (Landmarks == null || Landmarks.Length <= DynafaceConstants.LmLeftPupil)
+            return (new Vec2(Width * 0.5f, 0), new Vec2(Width * 0.5f, Height - 1));
+        Vec2 left = Landmarks[DynafaceConstants.LmLeftPupil];
+        Vec2 right = Landmarks[DynafaceConstants.LmRightPupil];
+        return BisectingLine(1024, (int)left.X, (int)left.Y, (int)right.X, (int)right.Y);
+    }
+
+    // Port of dynaface-lib's util.bisecting_line_coordinates (double math, int results).
+    internal static (Vec2 p1, Vec2 p2) BisectingLine(int imgSize, int x1, int y1, int x2, int y2)
+    {
+        double midX = (x1 + x2) / 2.0, midY = (y1 + y2) / 2.0;
+        double angle = x1 == x2 ? Math.PI / 2 : Math.Atan2(y2 - y1, x2 - x1);
+        double slope = Math.Tan(angle + Math.PI / 2);
+        double GetY(double x) => slope * (x - midX) + midY;
+        double GetX(double y) => (y - midY) / slope + midX;
+
+        double xa = 0.0, xb = imgSize;
+        double ya = GetY(xa), yb = GetY(xb);
+        if (ya < 0) { ya = 0.0; xa = GetX(ya); }
+        else if (ya > imgSize) { ya = imgSize; xa = GetX(ya); }
+        if (yb < 0) { yb = 0.0; xb = GetX(yb); }
+        else if (yb > imgSize) { yb = imgSize; xb = GetX(yb); }
+        return (new Vec2((int)xa, (int)ya), new Vec2((int)xb, (int)yb));
     }
 
     public float CalcFaceRotationDeg()
@@ -178,6 +203,50 @@ public class FaceMeasureContext
         }
 
         return (leftPts.ToArray(), rightPts.ToArray());
+    }
+
+    // Clip a polygon to the part on one side of the infinite line through p1 and p2
+    // (Sutherland-Hodgman). imageLeft keeps the side toward smaller x, whichever order the
+    // points come in. Never throws: a polygon with no area (a closed mouth's inner-lip
+    // outline) clips to zero-area pieces. Mirrors dynaface-lib's util.clip_polygon_to_side.
+    public static Vec2[] ClipPolygonToSide(Vec2[] polygon, Vec2 p1, Vec2 p2, bool imageLeft)
+    {
+        double dx = p2.X - p1.X, dy = p2.Y - p1.Y;
+        if (dy < 0) { dx = -dx; dy = -dy; } // point the line downward
+        double Side(Vec2 p)
+        {
+            double s = dx * (p.Y - p1.Y) - dy * (p.X - p1.X); // > 0 toward image left
+            return imageLeft ? s : -s;
+        }
+
+        var result = new List<Vec2>();
+        int n = polygon.Length;
+        for (int i = 0; i < n; i++)
+        {
+            Vec2 a = polygon[i], b = polygon[(i + 1) % n];
+            double sa = Side(a), sb = Side(b);
+            if (sa >= 0) result.Add(a);
+            if ((sa >= 0) != (sb >= 0))
+            {
+                double t = sa / (sa - sb);
+                result.Add(new Vec2((float)(a.X + t * (b.X - a.X)), (float)(a.Y + t * (b.Y - a.Y))));
+            }
+        }
+        return result.ToArray();
+    }
+
+    // Shoelace area in square pixels, on the exact (unrounded) vertices, like dynaface-lib's
+    // measure_polygon. MeasurePolygon rounds vertices to whole pixels first.
+    public static double PolygonAreaPx(Vec2[] polygon)
+    {
+        double area = 0;
+        int n = polygon.Length;
+        for (int i = 0; i < n; i++)
+        {
+            Vec2 a = polygon[i], b = polygon[(i + 1) % n];
+            area += (double)a.X * b.Y - (double)b.X * a.Y;
+        }
+        return Math.Abs(area) * 0.5;
     }
 
     // min/max symmetry ratio: 1.0 = perfect symmetry, 0 = fully asymmetric.

@@ -265,6 +265,41 @@ def split_polygon(
     return np.array(poly1), np.array(poly2)
 
 
+def clip_polygon_to_side(
+    polygon: NDArray[Any],
+    line: Tuple[Tuple[int, int], Tuple[int, int]],
+    image_left: bool,
+) -> NDArray[Any]:
+    """
+    Clip a polygon to the part on one side of an infinite line (Sutherland-Hodgman).
+
+    image_left=True keeps the side toward smaller x, whichever order the line's two
+    points come in. Unlike split_polygon this never raises: a polygon with no area,
+    such as a closed mouth's inner-lip outline, clips to zero-area pieces, and one
+    that lies wholly on the other side clips to an empty (0, 2) array.
+    """
+    (x1, y1), (x2, y2) = line
+    dx, dy = float(x2 - x1), float(y2 - y1)
+    if dy < 0:  # point the line downward so the sign test always means the same side
+        dx, dy = -dx, -dy
+
+    def side(p: Tuple[float, float]) -> float:
+        s = dx * (p[1] - y1) - dy * (p[0] - x1)  # > 0 toward image left
+        return s if image_left else -s
+
+    pts = [(float(x), float(y)) for x, y in polygon]
+    out: List[Tuple[float, float]] = []
+    for i, a in enumerate(pts):
+        b = pts[(i + 1) % len(pts)]
+        sa, sb = side(a), side(b)
+        if sa >= 0:
+            out.append(a)
+        if (sa >= 0) != (sb >= 0):
+            t = sa / (sa - sb)
+            out.append((a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])))
+    return np.array(out, dtype=float).reshape(-1, 2)
+
+
 def bisecting_line_coordinates(
     img_size: int, pupils: Tuple[Tuple[int, int], Tuple[int, int]]
 ) -> Tuple[Tuple[int, int], Tuple[int, int]]:

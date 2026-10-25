@@ -184,6 +184,9 @@ class AnalyzeBrows(MeasureBase):
         return filter_measurements({"brow.d": diff}, self.items)
 
 
+DENTAL_MIN_AREA_MM2 = 1e-6
+
+
 class AnalyzeDentalArea(MeasureBase):
     """
     Analyze the dental area measurements.
@@ -245,28 +248,29 @@ class AnalyzeDentalArea(MeasureBase):
         p1, p2 = face.calc_bisect()
         contours_area = np.array(contours_area_list)
 
+        def half_area(image_left: bool, enabled: bool, color: Any) -> float:
+            # Clipping (rather than util.split_polygon) copes with a closed mouth,
+            # whose inner-lip outline has no area: the halves just measure ~0.
+            half = util.clip_polygon_to_side(contours_area, (p1, p2), image_left)
+            if len(half) < 3:
+                return 0.0
+            area = float(
+                face.measure_polygon(
+                    half,
+                    face.pix2mm,
+                    render=(render and enabled),
+                    color=color,
+                )
+            )
+            # Floating-point dust from a closed mouth counts as zero, so the
+            # symmetry ratio of two empty halves stays 1.
+            return area if area >= DENTAL_MIN_AREA_MM2 else 0.0
+
         try:
-            # Pass a tuple as the second argument.
-            contours_area_left, contours_area_right = util.split_polygon(
-                contours_area, (p1, p2)
-            )
-
-            contours_area_left = np.array(contours_area_left, dtype=int)
-            contours_area_right = np.array(contours_area_right, dtype=int)
-
-            dental_area_right: float = face.measure_polygon(
-                contours_area_right,
-                face.pix2mm,
-                render=(render and render2_right),
-                color=(255, 0, 0),
-            )
-
-            dental_area_left: float = face.measure_polygon(
-                contours_area_left,
-                face.pix2mm,
-                render=(render and render2_left),
-                color=(0, 0, 255),
-            )
+            # Sides are the person's, like eye.right and oce.r: their right is the
+            # image-left half.
+            dental_area_right: float = half_area(True, render2_right, (255, 0, 0))
+            dental_area_left: float = half_area(False, render2_left, (0, 0, 255))
 
             dental_area: float = dental_area_right + dental_area_left
 
