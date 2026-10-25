@@ -28,10 +28,10 @@ public class DeclaredOutputsTests
             lateralLandmarks: r.LateralAnalysis?.LateralLandmarks, headPose: r.HeadPose,
             pose: r.Pose, flipped: r.Flipped);
 
-    [Fact]
+    [SkippableFact]
     public void EveryMeasureReturnsExactlyItsDeclaredOutputs()
     {
-        if (!_fixture.Available) return;
+        _fixture.RequireModels();
 
         var views = new[] { Run("img1-512.jpg"), Run("img2-1024-right-lateral.jpg") };
         var problems = new List<string>();

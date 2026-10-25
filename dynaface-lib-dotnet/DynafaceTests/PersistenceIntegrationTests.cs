@@ -13,10 +13,10 @@ public class PersistenceIntegrationTests
 
     static string TestImage(string name) => Path.Combine(AppContext.BaseDirectory, "TestData", name);
 
-    [Fact]
+    [SkippableFact]
     public void CaptureThenRestore_ReproducesTheSameMeasurements()
     {
-        if (!_fixture.Available) return;
+        _fixture.RequireModels();
 
         var photo = ImageLoader.Load(TestImage("img1-512.jpg"));
         var result = FacialPipelineIntegrationTests.RunWithRotationRetry(photo);
@@ -40,10 +40,10 @@ public class PersistenceIntegrationTests
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public void Capture_ClonesPixelArray_IndependentFromLiveContext()
     {
-        if (!_fixture.Available) return;
+        _fixture.RequireModels();
 
         var photo = ImageLoader.Load(TestImage("img1-512.jpg"));
         var result = FacialPipelineIntegrationTests.RunWithRotationRetry(photo);

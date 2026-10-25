@@ -10,8 +10,56 @@ permissions:
   # short-lived OIDC token from GitHub to exchange for a temporary NuGet API key.
   id-token: write
 
+env:
+  # The 3 ONNX models the integration tests need (same zip dynaface-lib downloads).
+  MODELS_URL: https://data.heatonresearch.com/dynaface/model/2/dynaface_models.zip
+  MODELS_SHA256: 8adc1246c00e8ea5a53e81e8000717b4541eabba59639ae178a07a799b5c57de
+
 jobs:
+  # Runs the suite with no models, to prove the model-gated tests are reported as
+  # Skipped (not silently passed) and that everything else still passes without them.
+  test-without-models:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run tests without models
+        working-directory: dynaface-lib-dotnet
+        env:
+          # Authoritative when set, so pointing it at an empty folder means no models.
+          DYNAFACE_ONNX_MODELS: ${{ runner.temp }}/no-models
+        run: |
+          mkdir -p "$DYNAFACE_ONNX_MODELS"
+          dotnet test DynafaceTests/DynafaceTests.csproj -c Release \
+            --logger "trx;LogFileName=test_results.trx" \
+            --results-directory TestResults
+
+      - name: Check the model-gated tests were skipped
+        working-directory: dynaface-lib-dotnet
+        run: |
+          SKIPPED=$(grep -o 'outcome="NotExecuted"' TestResults/test_results.trx | wc -l)
+          echo "Skipped tests: $SKIPPED"
+          if [ "$SKIPPED" -eq 0 ]; then
+            echo "::error::Expected the model-gated tests to be skipped without models."
+            exit 1
+          fi
+
+      - name: Publish test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: .NET Test Results (no models)
+          path: dynaface-lib-dotnet/TestResults/*.trx
+          reporter: dotnet-trx
+
   build:
+    needs: test-without-models
     runs-on: ubuntu-latest
 
     steps:
@@ -78,15 +126,25 @@ jobs:
         working-directory: dynaface-lib-dotnet
         run: dotnet build FacialDll.sln -c Release --no-restore -p:Version=$VERSION
 
+      - name: Download ONNX models
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/dynaface_models.zip" "$MODELS_URL"
+          echo "$MODELS_SHA256  $RUNNER_TEMP/dynaface_models.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/dynaface_models.zip" -d "$RUNNER_TEMP/models"
+          ls -l "$RUNNER_TEMP/models"
+
+      # DYNAFACE_REQUIRE_MODELS makes the model-gated integration tests fail rather
+      # than skip if the models can't be loaded, so nothing is published unless they
+      # actually ran. See DynafaceTests/ModelFixture.cs.
       - name: Run tests
         working-directory: dynaface-lib-dotnet
+        env:
+          DYNAFACE_ONNX_MODELS: ${{ runner.temp }}/models
+          DYNAFACE_REQUIRE_MODELS: '1'
         run: |
           dotnet test DynafaceTests/DynafaceTests.csproj -c Release --no-build \
             --logger "trx;LogFileName=test_results.trx" \
             --results-directory TestResults
-        # Model-gated integration tests self-skip here (no local .onnx files in
-        # CI) — see DynafaceTests/ModelPathResolver.cs. Set DYNAFACE_ONNX_MODELS
-        # (and provide the 3 models via a prior step) if you want them to run.
 
       - name: Publish test results
         if: always()

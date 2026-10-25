@@ -21,12 +21,12 @@ public class RenderIndependenceTests
             lateralLandmarks: r.LateralAnalysis?.LateralLandmarks, headPose: r.HeadPose,
             pose: r.Pose, flipped: r.Flipped);
 
-    [Theory]
+    [SkippableTheory]
     [InlineData("img1-512.jpg")]
     [InlineData("img2-1024-right-lateral.jpg")]
     public void MeasuresReturnTheSameValuesWithAndWithoutRendering(string image)
     {
-        if (!_fixture.Available) return;
+        _fixture.RequireModels();
 
         var photo = ImageLoader.Load(Path.Combine(AppContext.BaseDirectory, "TestData", image));
         var result = FacialPipelineIntegrationTests.RunWithRotationRetry(photo);

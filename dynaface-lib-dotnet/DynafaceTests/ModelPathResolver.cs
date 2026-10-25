@@ -13,23 +13,27 @@ public static class ModelPathResolver
     public const string SpigaFileName = "spiga_wflw.onnx";
     public const string U2NetFileName = "u2net.onnx";
 
-    // Checked in order: DYNAFACE_ONNX_MODELS env var, dynaface-lib's own default
-    // download location, then this repo's sibling dynaface-app/data (known to have
-    // all 3 models on this dev machine).
-    public static string? FindModelDirectory()
+    public const string ModelsEnvVar = "DYNAFACE_ONNX_MODELS";
+
+    // When DYNAFACE_ONNX_MODELS is set it is the only place looked at (so CI, or a
+    // deliberate "no models" run, gets exactly what it asked for). Otherwise: dynaface-lib's
+    // own default download location, then this repo's sibling dynaface-app/data (known to
+    // have all 3 models on this dev machine).
+    public static string[] CandidateDirectories()
     {
-        var candidates = new[]
+        var fromEnv = Environment.GetEnvironmentVariable(ModelsEnvVar);
+        if (!string.IsNullOrEmpty(fromEnv)) return new[] { fromEnv };
+        return new[]
         {
-            Environment.GetEnvironmentVariable("DYNAFACE_ONNX_MODELS"),
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".dynaface", "models"),
             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "dynaface-app", "data")),
         };
+    }
 
-        foreach (var dir in candidates)
-        {
-            if (string.IsNullOrEmpty(dir)) continue;
+    public static string? FindModelDirectory()
+    {
+        foreach (var dir in CandidateDirectories())
             if (HasAllModels(dir)) return dir;
-        }
         return null;
     }
 

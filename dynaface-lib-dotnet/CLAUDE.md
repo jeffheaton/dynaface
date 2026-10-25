@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `facial_dll/` — core library (`netstandard2.1`), no Unity or ONNX dependencies; ships as a Unity package and as the NuGet package **`Dynaface`**
 - `FacialDll.Onnx/` — ONNX Runtime inference backend (`netstandard2.1`): `OnnxDynafaceInference`, depends on the core + `Microsoft.ML.OnnxRuntime`; ships as the NuGet package **`Dynaface.Onnx`**
 - `FacialDllConsole/` — standalone CLI harness / example (`net10.0`, not packaged) using both projects + `SkiaSharp`
-- `DynafaceTests/` — xUnit tests (`net10.0`); pure unit tests always run, model-gated integration tests self-skip when the 3 real `.onnx` files aren't found locally (see `DynafaceTests/ModelPathResolver.cs`)
+- `DynafaceTests/` — xUnit tests (`net10.0`); pure unit tests always run, model-gated integration tests are reported as Skipped when the 3 real `.onnx` files aren't found (`DYNAFACE_ONNX_MODELS` names the folder and, when set, is the only place looked; `DYNAFACE_REQUIRE_MODELS=1` turns the skips into failures, as CI's publishing build does — see `DynafaceTests/ModelFixture.cs`)
 - `FacialDll.sln` — solution covering all four projects
 
 `Dynaface` and `Dynaface.Onnx` are published to NuGet in lockstep at the same `<Version>`. As of 2.0.2 the assembly names match the package ids (`Dynaface.dll` / `Dynaface.Onnx.dll`); before that they were `FacialDll` / `FacialDll.Onnx`, so prebuilt-DLL and Unity consumers (the external `DynafaceRuntime` asmdef) must update their references when crossing 2.0.2.

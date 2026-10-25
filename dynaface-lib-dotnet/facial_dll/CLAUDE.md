@@ -10,7 +10,7 @@ This is a pure C# face-processing pipeline with no Unity dependencies (`noEngine
 - `facial_dll/` — the core library (`FacialDll.csproj`, `netstandard2.1`), NuGet package `Dynaface`
 - `FacialDll.Onnx/` — ONNX Runtime inference backend (`netstandard2.1`), NuGet package `Dynaface.Onnx`; holds `OnnxDynafaceInference`
 - `FacialDllConsole/` — standalone console app / example (`net10.0`), uses OnnxRuntime (via `FacialDll.Onnx`) + SkiaSharp
-- `DynafaceTests/` — xUnit tests (`net10.0`); pure unit tests always run, model-gated integration tests self-skip without local `.onnx` files (see its own files for the env var)
+- `DynafaceTests/` — xUnit tests (`net10.0`); pure unit tests always run, model-gated integration tests are reported as Skipped without the `.onnx` files, or fail under `DYNAFACE_REQUIRE_MODELS` (see `DynafaceTests/ModelFixture.cs` for the env vars)
 - `FacialDll.sln` — solution file covering all four projects
 
 ## Build & Run

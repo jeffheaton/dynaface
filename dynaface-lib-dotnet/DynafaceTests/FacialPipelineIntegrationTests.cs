@@ -4,9 +4,10 @@ using System.IO;
 namespace DynafaceTests;
 
 // Model-gated end-to-end pipeline tests, mirroring dynaface-lib's test_facial.py
-// (test_frontal/test_right_lateral/test_left_lateral). Skips (no-op pass) when the 3
-// real ONNX models aren't found locally — see ModelPathResolver — since they can't
-// be committed to the repo (~400MB, gitignored).
+// (test_frontal/test_right_lateral/test_left_lateral). Reported as Skipped when the 3
+// real ONNX models aren't found locally (failed under DYNAFACE_REQUIRE_MODELS) — see
+// ModelFixture and ModelPathResolver — since they can't be committed to the repo
+// (~400MB, gitignored).
 //
 // Unlike test_facial.py, these assert sane RANGES rather than dynaface-lib's exact
 // hardcoded values: the frontal alignment now matches dynaface-lib's crop_stylegan
@@ -23,10 +24,10 @@ public class FacialPipelineIntegrationTests
 
     static string TestImage(string name) => Path.Combine(AppContext.BaseDirectory, "TestData", name);
 
-    [Fact]
+    [SkippableFact]
     public void FrontalImage_DetectsFrontalPoseAndProducesSensibleMeasurements()
     {
-        if (!_fixture.Available) return;
+        _fixture.RequireModels();
 
         var photo = ImageLoader.Load(TestImage("img1-512.jpg"));
         var result = RunWithRotationRetry(photo);
@@ -53,10 +54,10 @@ public class FacialPipelineIntegrationTests
         Assert.True(all["ml"] > 0);
     }
 
-    [Fact]
+    [SkippableFact]
     public void RightLateralImage_ClassifiesLateralAndProducesLateralLandmarks()
     {
-        if (!_fixture.Available) return;
+        _fixture.RequireModels();
 
         var photo = ImageLoader.Load(TestImage("img2-1024-right-lateral.jpg"));
         var result = RunWithRotationRetry(photo);
@@ -70,10 +71,10 @@ public class FacialPipelineIntegrationTests
         Assert.Equal(6, lateral.Value.LateralLandmarks.Length);
     }
 
-    [Fact]
+    [SkippableFact]
     public void LeftLateralImage_ClassifiesLateralAndProducesLateralLandmarks()
     {
-        if (!_fixture.Available) return;
+        _fixture.RequireModels();
 
         var photo = ImageLoader.Load(TestImage("img3-1024-left-lateral.jpg"));
         var result = RunWithRotationRetry(photo);
