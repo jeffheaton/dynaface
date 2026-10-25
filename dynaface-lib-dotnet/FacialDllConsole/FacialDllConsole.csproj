@@ -14,5 +14,8 @@
     <ProjectReference Include="../FacialDll.Onnx/FacialDll.Onnx.csproj" />
     <ProjectReference Include="../facial_dll/FacialDll.csproj" />
     <PackageReference Include="SkiaSharp" Version="2.88.8" />
+    <!-- SkiaSharp itself only carries the Windows and macOS native libraries. This adds
+         libSkiaSharp.so for Linux (the CI runners), without needing fontconfig. -->
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.8" />
   </ItemGroup>
 </Project>
