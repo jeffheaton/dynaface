@@ -667,7 +667,15 @@ class AnalyzeMouthLength(MeasureBase):
 
 class AnalyzeNoseFrontal(MeasureBase):
     """
-    Class to analyze NW (Nasal Width), the horizontal width of the nose at its widest point.
+    Frontal nose widths, in millimeters, between landmarks on the nose's lower outline:
+
+    nose.alar: alar width, between the outer edges of the nostrils (WFLW 55 and 59).
+    nose.nostril: between the points midway along each nostril (WFLW 56 and 58).
+
+    These replace four earlier columns that held only these two widths: nostril was the
+    alar span padded by 20%, dorsal.base the alar span, and nose.tip and dorsal.bridge
+    both the 56-58 span. WFLW has no landmarks on the sides of the nose higher up, so
+    widths along the dorsum can't be measured from landmarks.
     """
 
     def __init__(self) -> None:
@@ -676,10 +684,8 @@ class AnalyzeNoseFrontal(MeasureBase):
         """
         self.enabled: bool = True
         self.items: List[MeasureItem] = [
-            MeasureItem("nostril"),
-            MeasureItem("nose.tip"),
-            MeasureItem("dorsal.base"),
-            MeasureItem("dorsal.bridge"),
+            MeasureItem("nose.alar"),
+            MeasureItem("nose.nostril"),
         ]
         self.is_frontal: bool = True
         self.is_lateral: bool = False
@@ -696,75 +702,41 @@ class AnalyzeNoseFrontal(MeasureBase):
 
     def calc(self, face: Any, render: bool = True) -> Dict[str, float]:
         """
-        Calculates the nasal width.
+        Calculates the alar and nostril widths.
 
         Parameters:
             face (Any): A face object containing landmarks.
             render (bool): Whether to render the measurement visually.
 
         Returns:
-            Dict[str, float]: A dictionary containing the nasal width measurement.
+            Dict[str, float]: nose.alar and nose.nostril in millimeters.
         """
-        render1: bool = self.is_enabled("nostril")
-        render2: bool = self.is_enabled("nose.tip")
-        render3: bool = self.is_enabled("dorsal.base")
-        render4: bool = self.is_enabled("dorsal.bridge")
+        render_alar: bool = self.is_enabled("nose.alar")
+        render_nostril: bool = self.is_enabled("nose.nostril")
 
-        x1 = face.landmarks[55][0]
-        x2 = face.landmarks[59][0]
-        w = int(0.1 * abs(x2 - x1))
-
-        # Nostril
-        d1: float = face.measure(
-            [x1 - w, face.landmarks[55][1]],
-            [x2 + w, face.landmarks[59][1]],
-            render=(render and render1),
+        alar: float = face.measure(
+            face.landmarks[55],
+            face.landmarks[59],
+            render=(render and render_alar),
             dir="s",
         )
-        if render and render1:
-            txt = f"nostril={d1:.2f}"
-            pos = face.analyze_next_pt(txt)
-            face.write_text(pos, txt)
-
-        # Nose tip
-        d2: float = face.measure(
-            [face.landmarks[56][0], face.landmarks[54][1]],
-            [face.landmarks[58][0], face.landmarks[54][1]],
-            render=(render and render2),
+        nostril: float = face.measure(
+            face.landmarks[56],
+            face.landmarks[58],
+            render=(render and render_nostril),
             dir="s",
         )
-        if render and render2:
-            txt = f"nose.tip={d2:.2f}"
-            pos = face.analyze_next_pt(txt)
-            face.write_text(pos, txt)
 
-        # Dorsal base
-        d3: float = face.measure(
-            [x1, face.landmarks[53][1]],
-            [x2, face.landmarks[53][1]],
-            render=(render and render3),
-            dir="s",
-        )
-        if render and render3:
-            txt = f"dorsal.base={d3:.2f}"
-            pos = face.analyze_next_pt(txt)
-            face.write_text(pos, txt)
-
-        # Dorsal bridge
-        d4: float = face.measure(
-            [face.landmarks[56][0], face.landmarks[52][1]],
-            [face.landmarks[58][0], face.landmarks[52][1]],
-            render=(render and render4),
-            dir="s",
-        )
-        if render and render4:
-            txt = f"dorsal.bridge={d4:.2f}"
-            pos = face.analyze_next_pt(txt)
-            face.write_text(pos, txt)
+        for enabled, txt in (
+            (render_alar, f"nose.alar={alar:.2f}"),
+            (render_nostril, f"nose.nostril={nostril:.2f}"),
+        ):
+            if render and enabled:
+                pos = face.analyze_next_pt(txt)
+                face.write_text(pos, txt)
 
         return filter_measurements(
-            {"nostril": d1, "nose.tip": d2, "dorsal.base": d3, "dorsal.bridge": d4},
-            self.items,
+            {"nose.alar": alar, "nose.nostril": nostril}, self.items
         )
 
 
