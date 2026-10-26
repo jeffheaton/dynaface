@@ -21,7 +21,7 @@ From the head pose and the landmarks, Dynaface decides whether the photo shows t
 
 ## 5. Measure
 
-Each [measure](measures.md) calculates its values from the landmarks and draws them on the image. Distances are converted from pixels to millimeters by assuming the pupils are 63 mm apart, the average for adults. If you know the person's actual pupillary distance, set it before analyzing for more accurate millimeters:
+Each [measure](../measures.md) calculates its values from the landmarks and draws them on the image. Distances are converted from pixels to millimeters by assuming the pupils are 63 mm apart, the average for adults. If you know the person's actual pupillary distance, set it before loading the image for more accurate millimeters (see [Units and scale](units.md)):
 
 ```python
 from dynaface.facial import AnalyzeFace
@@ -33,4 +33,4 @@ Frontal distances are in millimeters, areas in square millimeters and angles in 
 
 ## Videos
 
-A video is analyzed one frame at a time. Each frame's analysis can be kept with `AnalyzeFace.dump_state()` and restored with `load_state()`, so a video can be analyzed once and its measures recalculated later. The [examples](python/examples.md) include a script that measures every frame of a video.
+A video is analyzed one frame at a time. Each frame's analysis can be kept with `AnalyzeFace.dump_state()` and restored with `load_state()`, so a video can be analyzed once and its measures recalculated later. [Analyzing video](video.md) shows how, and the [examples](../python/examples.md) include a script that measures every frame of a video.

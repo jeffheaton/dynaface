@@ -11,8 +11,9 @@ Dynaface comes in three forms:
 ## Where to start
 
 - [Getting started](getting-started.md): install a library and measure your first face.
-- [How it works](how-it-works.md): the steps from a photo to its measurements.
-- [Measures](measures.md): every measurement Dynaface makes.
+- [How it works](guide/how-it-works.md): the steps from a photo to its measurements.
+- [Taking photos and videos](guide/capture.md): how to capture images that measure well.
+- [Measures](measures.md): every measurement Dynaface makes, with its clinical meaning.
 - [Tutorial](python/tutorial.ipynb): a step-by-step notebook you can run in Colab.
 
 ## Citing Dynaface

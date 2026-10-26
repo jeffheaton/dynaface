@@ -89,6 +89,8 @@ mkdocs serve
 
 CI builds the site with `mkdocs build --strict` for every change to the docs or the library, so a broken link or malformed docstring fails the build, and publishes it from `main`.
 
+The figures on the measures and landmarks pages come from `scripts/make_docs_figures.py`. If you change how a measure is drawn, rerun it from the repository root in the Python library's virtual environment, since it needs the models: `python scripts/make_docs_figures.py`.
+
 ## Making changes
 
 ### Code style

@@ -10,6 +10,11 @@ copyright: Copyright &copy; Jeff Heaton. Licensed under the Apache License 2.0.
 exclude_docs: |
   requirements.txt
 
+# Fail the strict build on a link to a heading that doesn't exist. (Links in
+# markdown-exec output, such as the measures table, aren't checked.)
+validation:
+  anchors: warn
+
 theme:
   name: material
   features:
@@ -30,6 +35,9 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
 
+extra_css:
+  - stylesheets/extra.css
+
 plugins:
   - search
   - mkdocstrings:
@@ -49,6 +57,8 @@ plugins:
       include: ["python/tutorial.ipynb"]
       execute: false
       include_source: true
+      # Name it "Tutorial" in the navigation, not after the notebook's heading.
+      ignore_h1_titles: true
   # Runs the Python on measures.md that builds its table from the library.
   - markdown-exec
 
@@ -67,7 +77,14 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting started: getting-started.md
-  - How it works: how-it-works.md
+  - User guide:
+      - How it works: guide/how-it-works.md
+      - Taking photos and videos: guide/capture.md
+      - Units and scale: guide/units.md
+      - Landmarks: guide/landmarks.md
+      - Working with results: guide/results.md
+      - Analyzing video: guide/video.md
+      - Models and devices: guide/models.md
   - Measures: measures.md
   - Python:
       - python/index.md

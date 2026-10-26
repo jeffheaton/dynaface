@@ -1,0 +1,4 @@
+/* Keep output names such as dental_area whole in narrow tables. */
+.md-typeset td code {
+  white-space: nowrap;
+}
