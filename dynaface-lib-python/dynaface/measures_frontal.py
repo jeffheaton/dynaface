@@ -17,7 +17,9 @@ class AnalyzeFAI(MeasureBase):
     corner to the same side's mouth corner differs between the two sides, in
     millimeters.
 
-    Output: fai.
+    Outputs:
+        - `fai`: The absolute difference between the two distances; 0 means the
+          sides match.
     """
 
     def __init__(self) -> None:
@@ -68,7 +70,12 @@ class AnalyzeFAI(MeasureBase):
 
 class AnalyzeOralCommissureExcursion(MeasureBase):
     """
-    Analyze the Oral Commissure Excursion measurement.
+    Oral commissure excursion (Oral CE): the distance from each corner of the
+    mouth to the middle of the lower lip, in millimeters.
+
+    Outputs:
+        - `oce.l`: From the subject's left corner.
+        - `oce.r`: From the subject's right corner.
     """
 
     def __init__(self) -> None:
@@ -120,7 +127,11 @@ class AnalyzeOralCommissureExcursion(MeasureBase):
 
 class AnalyzeBrows(MeasureBase):
     """
-    Analyze the brow distance measurement.
+    Brow height: the difference in height between the middles of the two brows,
+    in millimeters, measured along lines parallel to the line between the pupils.
+
+    Outputs:
+        - `brow.d`: The difference in height.
     """
 
     def __init__(self) -> None:
@@ -195,7 +206,15 @@ DENTAL_MIN_AREA_MM2 = 1e-6
 
 class AnalyzeDentalArea(MeasureBase):
     """
-    Analyze the dental area measurements.
+    Dental display: the area of the mouth opening inside the lips, in square
+    millimeters, split at the facial midline.
+
+    Outputs:
+        - `dental_area`: The total area.
+        - `dental_left`: The area of the subject's left half.
+        - `dental_right`: The area of the subject's right half.
+        - `dental_ratio`: The smaller half divided by the larger.
+        - `dental_diff`: The difference between the halves.
     """
 
     def __init__(self) -> None:
@@ -329,7 +348,14 @@ class AnalyzeDentalArea(MeasureBase):
 
 class AnalyzeEyeArea(MeasureBase):
     """
-    Analyze the eye area measurements.
+    Eye area: the area of each eye opening (palpebral fissure), in square
+    millimeters.
+
+    Outputs:
+        - `eye.left`: The subject's left eye.
+        - `eye.right`: The subject's right eye.
+        - `eye.diff`: The difference between them, rounded to 0.01.
+        - `eye.ratio`: The smaller area divided by the larger.
     """
 
     def __init__(self) -> None:
@@ -440,7 +466,15 @@ class AnalyzeEyeArea(MeasureBase):
 
 class AnalyzePosition(MeasureBase):
     """
-    Analyze facial position measurements including tilt, pixel-to-millimeter conversion, and pupillary distance.
+    Position: the head's tilt in the image, the distance between the pupils, and
+    the millimeters-per-pixel scale that converts every measurement.
+
+    Outputs:
+        - `tilt`: The angle of the line between the pupils, in degrees; 0 when
+          they're level.
+        - `pd`: The distance between the pupils, in pixels.
+        - `px2mm`: Millimeters per pixel: AnalyzeFace.pd divided by pd for a
+          frontal face, and 0.24 for a profile.
     """
 
     def __init__(self) -> None:
@@ -517,9 +551,12 @@ class AnalyzePosition(MeasureBase):
 
 class AnalyzePose(MeasureBase):
     """
-    Analyze facial pose, pitch, yaw and roll. Pitch is when you nod your head up and down, like saying "yes." Yaw is
-    when you turn your head left and right, like saying "no." Roll is when you tilt your head sideways toward
-    your shoulder, like trying to touch your ear to your shoulder.
+    Pose: the head's rotation, in degrees, as estimated by the landmark model.
+
+    Outputs:
+        - `pitch`: Nodding up and down, as in saying "yes."
+        - `roll`: Tilting toward a shoulder.
+        - `yaw`: Turning left and right, as in saying "no."
     """
 
     def __init__(self) -> None:
@@ -585,7 +622,11 @@ class AnalyzePose(MeasureBase):
 
 class AnalyzeIntercanthalDistance(MeasureBase):
     """
-    Class to analyze intercanthal distance (ID), which is the distance between the inner corners of the eyes.
+    Intercanthal distance: the distance between the inner corners of the eyes, in
+    millimeters.
+
+    Outputs:
+        - `id`: The distance.
     """
 
     def __init__(self) -> None:
@@ -627,7 +668,11 @@ class AnalyzeIntercanthalDistance(MeasureBase):
 
 class AnalyzeMouthLength(MeasureBase):
     """
-    Class to analyze ML (Mouth Length), the horizontal distance between the corners of the mouth.
+    Mouth length: the distance between the corners of the mouth, where the lips
+    meet, in millimeters.
+
+    Outputs:
+        - `ml`: The distance.
     """
 
     def __init__(self) -> None:
@@ -669,15 +714,19 @@ class AnalyzeMouthLength(MeasureBase):
 
 class AnalyzeNoseFrontal(MeasureBase):
     """
-    Frontal nose widths, in millimeters, between landmarks on the nose's lower outline:
+    Nose widths seen from the front, in millimeters, between landmarks on the
+    nose's lower outline.
 
-    nose.alar: alar width, between the outer edges of the nostrils (WFLW 55 and 59).
-    nose.nostril: between the points midway along each nostril (WFLW 56 and 58).
+    Outputs:
+        - `nose.alar`: The alar width, between the outer edges of the nostrils
+          (WFLW 55 and 59).
+        - `nose.nostril`: Between the points midway along each nostril (WFLW 56
+          and 58).
 
-    These replace four earlier columns that held only these two widths: nostril was the
-    alar span padded by 20%, dorsal.base the alar span, and nose.tip and dorsal.bridge
-    both the 56-58 span. WFLW has no landmarks on the sides of the nose higher up, so
-    widths along the dorsum can't be measured from landmarks.
+    These replace four earlier columns that held only these two widths: nostril was
+    the alar span padded by 20%, dorsal.base the alar span, and nose.tip and
+    dorsal.bridge both the 56-58 span. WFLW has no landmarks on the sides of the
+    nose higher up, so widths along the dorsum can't be measured from landmarks.
     """
 
     def __init__(self) -> None:
@@ -742,8 +791,11 @@ class AnalyzeNoseFrontal(MeasureBase):
 
 class AnalyzeOuterEyeCorners(MeasureBase):
     """
-    OE (Distance Between Outer Eye Corners): The horizontal distance between the outermost points of
-    the eyes (lateral canthi).
+    Outer eye corners: the distance between the outer corners of the eyes (lateral
+    canthi), in millimeters.
+
+    Outputs:
+        - `oe`: The distance.
     """
 
     def __init__(self) -> None:
@@ -784,7 +836,13 @@ class AnalyzeOuterEyeCorners(MeasureBase):
 
 
 class AnalyzeLandmarks(MeasureBase):
-    """Output all facial landmark (x, y) coordinates as named CSV columns."""
+    """
+    Landmarks: the position of each of the 98 landmarks, in pixels, for export.
+
+    Outputs:
+        - `landmark-1-x` to `landmark-98-y`: The x and y of each landmark, numbered
+          from 1, so landmark-1 is face.landmarks[0].
+    """
 
     # Number of SPIGA wflw landmarks
     NUM_LANDMARKS = 98

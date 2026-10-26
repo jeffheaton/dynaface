@@ -143,8 +143,9 @@ class VideoToVideo:
             face.load_image(image, self._crop, pupils)
 
             rec = face.analyze()
-            for stat in rec.keys():
-                self.data[stat].append(rec[stat])
+            for stat in self.stats:
+                # A frame without a face has no measures; NaN keeps the frames aligned.
+                self.data[stat].append(rec.get(stat) if rec else float("nan"))
 
             face.write_text(
                 (10, 30), f"Frame {idx}, {round((idx - 1) * self.rate * 1000)} ms"
@@ -154,7 +155,7 @@ class VideoToVideo:
                 face.draw_landmarks(numbers=True)
 
             face.save(os.path.join(p.temp_path, f"output-{out_idx}.jpg"))
-            if pupils is None:
+            if pupils is None and not face.is_no_face():
                 pupils = face.get_pupils()
             out_idx += 1
 

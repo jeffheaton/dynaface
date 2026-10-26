@@ -59,7 +59,10 @@ class AnalyzeSkinTone(MeasureBase):
     """
     Skin tone: the average color of both cheeks, as hue, saturation and brightness.
 
-    Outputs: hue, in degrees from 0 to 360, and sat and brightness, in percent.
+    Outputs:
+        - `hue`: Hue, in degrees from 0 to 360.
+        - `sat`: Saturation, in percent.
+        - `brightness`: Brightness, in percent.
     """
 
     def __init__(self) -> None:

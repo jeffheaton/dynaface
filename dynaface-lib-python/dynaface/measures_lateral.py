@@ -17,15 +17,15 @@ class AnalyzeLateral(MeasureBase):
     Measures of a side profile, from the landmarks found along its outline.
 
     Outputs:
-        nfa: Nasofrontal angle, in degrees, at the soft tissue nasion between the
-            glabella and the nasal tip.
-        nla: Nasolabial angle, in degrees, at the subnasal point between the nasal
-            tip and the soft tissue pogonion.
-        at: Tip projection: the horizontal distance, in pixels, from the nasal tip
-            (A) to point T, which is level with the tip and directly below the
-            nasion.
-        nt: The vertical distance, in pixels, from the nasion (N) to T.
-        at_nt: The ratio AT/NT.
+        - `nfa`: Nasofrontal angle, in degrees, at the soft tissue nasion between
+          the glabella and the nasal tip.
+        - `nla`: Nasolabial angle, in degrees, at the subnasal point between the
+          nasal tip and the soft tissue pogonion.
+        - `at`: Tip projection: the horizontal distance, in pixels, from the nasal
+          tip (A) to point T, which is level with the tip and directly below the
+          nasion.
+        - `nt`: The vertical distance, in pixels, from the nasion (N) to T.
+        - `at_nt`: The ratio AT/NT.
 
     The tip_proj item only switches the AT and NT drawing on and off; it has no
     value of its own.
