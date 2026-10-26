@@ -14,7 +14,7 @@ using System.Collections.Generic;
 public static class LateralLandmarkFinder
 {
     public enum SearchMode { Max, Min, Corner, Nearest }
-    enum ExtremePick { Max, Min }
+    internal enum ExtremePick { Max, Min }
 
     // Output layout: 0=Glabella, 1=Nasion, 2=NasalTip, 3=Subnasal, 4=MentoLabial, 5=Pogonion.
     public const int Glabella = 0, Nasion = 1, NasalTip = 2, Subnasal = 3, MentoLabial = 4, Pogonion = 5;
@@ -116,7 +116,7 @@ public static class LateralLandmarkFinder
         return result;
     }
 
-    static Vec2? FindLateralLandmark(
+    internal static Vec2? FindLateralLandmark(
         float[] sagittalX, float[] sagittalY,
         int[] maxIndices, int[] minIndices, int[] cornerIdxs,
         float yCoord, SearchMode mode, bool? yForward)
@@ -164,7 +164,7 @@ public static class LateralLandmarkFinder
         return new Vec2(sagittalX[idx], sagittalY[idx]);
     }
 
-    static Vec2? FindCornerLandmarkInRange(
+    internal static Vec2? FindCornerLandmarkInRange(
         float[] sagittalX, float[] sagittalY, int[] cornerIdxs,
         int? idxLow, int? idxHigh,
         Vec2[] landmarksFrontal, int? frontalLoIdx, int? frontalHiIdx, int widenIfSame = 2)
@@ -228,7 +228,7 @@ public static class LateralLandmarkFinder
         return new Vec2(sagittalX[chosen], sagittalY[chosen]);
     }
 
-    static Vec2? FindLateralLandmarkInRange(
+    internal static Vec2? FindLateralLandmarkInRange(
         float[] sagittalX, float[] sagittalY,
         int? idxLow, int? idxHigh, ExtremePick pick,
         Vec2[] landmarksFrontal, int? frontalLoIdx, int? frontalHiIdx, int widenIfSame = 2)
@@ -269,7 +269,7 @@ public static class LateralLandmarkFinder
         return PickExtremeInRange(sagittalX, sagittalY, lo, hi, pick);
     }
 
-    static Vec2? FindLateralLandmarkMinMax(float[] sagittalX, float[] sagittalY, int? idxLow, int? idxHigh, ExtremePick pick)
+    internal static Vec2? FindLateralLandmarkMinMax(float[] sagittalX, float[] sagittalY, int? idxLow, int? idxHigh, ExtremePick pick)
     {
         int n = sagittalX.Length;
         if (n == 0 || n != sagittalY.Length) return null;

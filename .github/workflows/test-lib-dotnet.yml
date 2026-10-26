@@ -8,10 +8,14 @@ on:
   push:
     paths:
       - 'dynaface-lib-dotnet/**'
+      # Shared with the Python tests; see LateralProfileTests.
+      - 'dynaface-lib-python/tests_data/lateral_profiles.json'
       - '.github/workflows/test-lib-dotnet.yml'
   pull_request:
     paths:
       - 'dynaface-lib-dotnet/**'
+      # Shared with the Python tests; see LateralProfileTests.
+      - 'dynaface-lib-python/tests_data/lateral_profiles.json'
       - '.github/workflows/test-lib-dotnet.yml'
   workflow_dispatch:
 

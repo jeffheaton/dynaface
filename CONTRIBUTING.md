@@ -119,6 +119,7 @@ A measure's `calc()` must return every output it declares, whether or not that o
 ### Tests and versions
 
 - Add or update tests for any change in behavior.
+- Both libraries test the side-profile landmark search against the same synthetic outlines, in [`dynaface-lib-python/tests_data/lateral_profiles.json`](dynaface-lib-python/tests_data/lateral_profiles.json), whose expected results come from the Python library. If you change that search on purpose, regenerate the file with `python scripts/make_lateral_profiles.py`, run from the repository root in the Python library's virtual environment, and make the .NET tests pass again.
 - Don't change version numbers. The maintainer bumps them when making a release.
 
 ## Pull requests

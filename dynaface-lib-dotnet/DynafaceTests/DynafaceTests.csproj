@@ -28,6 +28,10 @@
 
   <ItemGroup>
     <None Include="TestData\**" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Synthetic side profiles shared with dynaface-lib-python's tests, which
+         hold the one copy; see LateralProfileTests. -->
+    <None Include="..\..\dynaface-lib-python\tests_data\lateral_profiles.json"
+          Link="TestData\lateral_profiles.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

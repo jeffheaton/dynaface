@@ -485,39 +485,13 @@ def analyze_lateral(
     fig, ax2 = plt.subplots(figsize=(6, 10))  # type: ignore
     _plot_sagittal_profile(ax2, sagittal_x, sagittal_y, dx_scaled, ddx_scaled)
 
-    # Extrema
-    max_indices, min_indices = _find_local_max_min(sagittal_x)
+    max_indices, min_indices, corner_idxs, landmarks_np = _find_profile_landmarks(
+        sagittal_x, sagittal_y, int(shift_x), landmarks
+    )
     if DEBUG:
         _plot_sagittal_minmax(ax2, sagittal_x, sagittal_y, max_indices, min_indices)
-
-    # Multi-scale “corners” (turning-angle + curvature under monotonic slope)
-    extrema_set = set(map(int, np.concatenate([max_indices, min_indices])))
-    corner_idxs = _find_monotonic_corners(
-        sagittal_x,
-        scales=[9, 13, 17],  # try [11, 15, 19, 23] for broader bends
-        polyorder=2,
-        dx_tol=0.035,  # raise to ignore shallow changes
-        min_run=10,  # longer monotonic neighborhood
-        distance_px=32,  # spacing between corners
-        angle_percentile=93.0,  # stronger angle threshold
-        angle_min_deg=16.0,  # absolute angle floor
-        kappa_percentile=92.0,  # κ backup gate
-        mix_weight_angle=0.75,  # bias toward angle over κ
-        exclude_extrema=extrema_set,
-    )
-    if DEBUG:
         _plot_monotonic_corners(ax2, sagittal_x, sagittal_y, corner_idxs)
 
-    # Compute/plot lateral landmarks
-    landmarks_np = _find_lateral_landmarks(
-        sagittal_x,
-        sagittal_y,
-        max_indices,
-        min_indices,
-        corner_idxs,
-        int(shift_x),
-        landmarks,
-    )
     _plot_lateral_landmarks(ax2, landmarks_np, int(shift_x))
     logging.debug("Lateral Landmarks (x, y):")
     logging.debug(landmarks_np)
@@ -540,6 +514,61 @@ def analyze_lateral(
         sagittal_x + shift_x,
         sagittal_y,
     )
+
+
+def _find_profile_landmarks(
+    sagittal_x: NDArray[Any],
+    sagittal_y: NDArray[Any],
+    shift_x: int,
+    landmarks: Any,
+) -> Tuple[NDArray[Any], NDArray[Any], NDArray[np.int64], NDArray[Any]]:
+    """
+    Find the six profile landmarks on a traced outline.
+
+    dynaface-lib-dotnet's LateralAnalyzer.FindProfileLandmarks() is the same
+    search, and tests/test_lateral.py checks both against the synthetic outlines
+    in tests_data/lateral_profiles.json.
+
+    Args:
+        sagittal_x (NDArray[Any]): The outline's x in each row, shifted so the
+            smallest is 0.
+        sagittal_y (NDArray[Any]): The row of each x.
+        shift_x (int): How far x was shifted; it's added back to the landmarks.
+        landmarks (Any): The 98 frontal landmarks; their heights anchor the search.
+
+    Returns:
+        Tuple: The outline's local maxima and minima and its corners, as indices
+            into sagittal_x, and the six landmarks as (x, y) pixels.
+    """
+    # Extrema
+    max_indices, min_indices = _find_local_max_min(sagittal_x)
+
+    # Multi-scale “corners” (turning-angle + curvature under monotonic slope)
+    extrema_set = set(map(int, np.concatenate([max_indices, min_indices])))
+    corner_idxs = _find_monotonic_corners(
+        sagittal_x,
+        scales=[9, 13, 17],  # try [11, 15, 19, 23] for broader bends
+        polyorder=2,
+        dx_tol=0.035,  # raise to ignore shallow changes
+        min_run=10,  # longer monotonic neighborhood
+        distance_px=32,  # spacing between corners
+        angle_percentile=93.0,  # stronger angle threshold
+        angle_min_deg=16.0,  # absolute angle floor
+        kappa_percentile=92.0,  # κ backup gate
+        mix_weight_angle=0.75,  # bias toward angle over κ
+        exclude_extrema=extrema_set,
+    )
+
+    landmarks_np = _find_lateral_landmarks(
+        sagittal_x,
+        sagittal_y,
+        max_indices,
+        min_indices,
+        corner_idxs,
+        shift_x,
+        landmarks,
+    )
+    return max_indices, min_indices, corner_idxs, landmarks_np
 
 
 class LateralSearchMode(Enum):

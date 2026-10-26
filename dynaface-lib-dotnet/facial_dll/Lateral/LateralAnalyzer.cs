@@ -28,6 +28,31 @@ public static class LateralAnalyzer
 
         var (sagittalXShifted, shiftX) = SagittalProfile.ShiftSagittalProfile(sagittalXInt);
 
+        var sagittalYFloat = new float[sagittalYInt.Length];
+        for (int i = 0; i < sagittalYInt.Length; i++) sagittalYFloat[i] = sagittalYInt[i];
+
+        var (_, _, _, lateralLandmarks) = FindProfileLandmarks(
+            sagittalXShifted, sagittalYFloat, (int)shiftX, frontalLandmarksInCropSpace);
+
+        var sagittalXFull = new float[sagittalXShifted.Length];
+        for (int i = 0; i < sagittalXShifted.Length; i++) sagittalXFull[i] = sagittalXShifted[i] + shiftX;
+
+        return new Result
+        {
+            LateralLandmarks = lateralLandmarks,
+            SagittalX = sagittalXFull,
+            SagittalY = sagittalYFloat,
+        };
+    }
+
+    // Mirrors dynaface-lib's lateral.py _find_profile_landmarks(): the traced
+    // outline's extrema and corners, then the six landmarks. sagittalXShifted is
+    // shifted so its smallest value is 0, and shiftX is added back to the
+    // landmarks. LateralProfileTests checks it against the synthetic outlines in
+    // dynaface-lib-python/tests_data/lateral_profiles.json.
+    internal static (int[] maxIndices, int[] minIndices, int[] cornerIdxs, Vec2[] landmarks) FindProfileLandmarks(
+        float[] sagittalXShifted, float[] sagittalY, int shiftX, Vec2[] frontalLandmarks)
+    {
         var sagittalXDouble = new double[sagittalXShifted.Length];
         for (int i = 0; i < sagittalXShifted.Length; i++) sagittalXDouble[i] = sagittalXShifted[i];
 
@@ -49,21 +74,9 @@ public static class LateralAnalyzer
             kappaPercentile: 92.0, mixWeightAngle: 0.75,
             excludeExtrema: extremaSet);
 
-        var sagittalYFloat = new float[sagittalYInt.Length];
-        for (int i = 0; i < sagittalYInt.Length; i++) sagittalYFloat[i] = sagittalYInt[i];
-
-        Vec2[] lateralLandmarks = LateralLandmarkFinder.FindLateralLandmarks(
-            sagittalXShifted, sagittalYFloat, maxIndices, minIndices, cornerIdxs,
-            (int)shiftX, frontalLandmarksInCropSpace);
-
-        var sagittalXFull = new float[sagittalXShifted.Length];
-        for (int i = 0; i < sagittalXShifted.Length; i++) sagittalXFull[i] = sagittalXShifted[i] + shiftX;
-
-        return new Result
-        {
-            LateralLandmarks = lateralLandmarks,
-            SagittalX = sagittalXFull,
-            SagittalY = sagittalYFloat,
-        };
+        Vec2[] landmarks = LateralLandmarkFinder.FindLateralLandmarks(
+            sagittalXShifted, sagittalY, maxIndices, minIndices, cornerIdxs,
+            shiftX, frontalLandmarks);
+        return (maxIndices, minIndices, cornerIdxs, landmarks);
     }
 }
