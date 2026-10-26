@@ -85,7 +85,7 @@ dotnet test DynafaceTests/DynafaceTests.csproj
 - Formatter: Black
 - Import sorter: isort
 - Linter: flake8 (configured in `.flake8` at repo root)
-- Python: 3.10+ required, tested on 3.11
+- Python: 3.10+ required; CI tests 3.10 through 3.14 on Linux, macOS and Windows (and the .NET library on all three)
 - **Spelling: American English everywhere** — identifiers, comments, docstrings, log
   and UI strings, Markdown docs, and commit messages. Use `color`, `canceled`,
   `center`, `behavior`, `gray`, `analyze`, `normalize`, `initialize`, `modeling`,

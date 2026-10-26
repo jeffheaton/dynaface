@@ -41,7 +41,7 @@ Both libraries use three ONNX models (about 400 MB) stored in `~/.dynaface/model
 
 ### Python library
 
-Python 3.10 or newer is required, and CI tests with 3.11. Always work in a virtual environment:
+Python 3.10 or newer is required. CI tests Python 3.10 through 3.14 on Linux, macOS and Windows. Always work in a virtual environment:
 
 ```bash
 cd dynaface-lib-python
