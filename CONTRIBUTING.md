@@ -76,6 +76,19 @@ python dynaface_app.py
 
 The app's only automated tests cover its project files; run them from `dynaface-app` with `python -m unittest discover -s tests -t .`. Otherwise, check your change by running the app, and say in the pull request what you tried.
 
+### Documentation
+
+[docs.dynaface.org](https://docs.dynaface.org) is built with MkDocs from the `docs` folder and from the Python library's docstrings, which use Google style. To preview it, use Python 3.12 or newer in its own virtual environment, from the repository root:
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r docs/requirements.txt -e dynaface-lib-python
+mkdocs serve
+```
+
+CI builds the site with `mkdocs build --strict` for every change to the docs or the library, so a broken link or malformed docstring fails the build, and publishes it from `main`.
+
 ## Making changes
 
 ### Code style

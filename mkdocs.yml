@@ -1,0 +1,83 @@
+site_name: Dynaface
+site_description: Measure facial symmetry and movement in photos and videos.
+site_url: https://docs.dynaface.org/
+repo_url: https://github.com/jeffheaton/dynaface
+repo_name: jeffheaton/dynaface
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; Jeff Heaton. Licensed under the Apache License 2.0.
+
+# The build requirements live beside the pages but aren't a page.
+exclude_docs: |
+  requirements.txt
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.indexes
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [dynaface-lib-python]
+          options:
+            docstring_style: google
+            show_source: false
+            members_order: source
+            show_root_heading: true
+            merge_init_into_class: true
+            separate_signature: true
+            show_signature_annotations: true
+            heading_level: 2
+  - mkdocs-jupyter:
+      include: ["python/tutorial.ipynb"]
+      execute: false
+      include_source: true
+  # Runs the Python on measures.md that builds its table from the library.
+  - markdown-exec
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - How it works: how-it-works.md
+  - Measures: measures.md
+  - Python:
+      - python/index.md
+      - Tutorial: python/tutorial.ipynb
+      - Examples: python/examples.md
+      - API reference:
+          - Face analysis: python/api/facial.md
+          - Models: python/api/models.md
+          - Measures: python/api/measures.md
+          - Images: python/api/image.md
+          - Constants: python/api/const.md
+  - .NET: dotnet/index.md
+  - Contributing: https://github.com/jeffheaton/dynaface/blob/main/CONTRIBUTING.md

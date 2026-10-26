@@ -1,0 +1,77 @@
+name: Docs
+
+# Builds docs.dynaface.org on every push and pull request that touches the docs or
+# the Python library, and publishes it to GitHub Pages from main. The custom domain
+# is set in the repository's Pages settings, not by this workflow.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - 'dynaface-lib-python/dynaface/**'
+      - 'dynaface-lib-python/examples/dynaface_intro.ipynb'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - 'dynaface-lib-python/dynaface/**'
+      - 'dynaface-lib-python/examples/dynaface_intro.ipynb'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # mkdocs-jupyter needs Python 3.12 or newer; the library itself supports 3.10.
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            docs/requirements.txt
+            dynaface-lib-python/setup.cfg
+
+      # The library is installed because the measures page lists its measures.
+      - name: Install MkDocs and the library
+        run: pip install -r docs/requirements.txt -e dynaface-lib-python
+
+      # --strict fails the build on broken links and malformed docstrings.
+      - name: Build the site
+        run: mkdocs build --strict
+
+      - name: Upload the site
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    # One deploy at a time; a newer run waits rather than being overwritten.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

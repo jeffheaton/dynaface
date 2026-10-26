@@ -1,0 +1,10 @@
+# Builds docs.dynaface.org. Needs Python 3.12 or newer. Install the library too
+# (pip install -e dynaface-lib-python), since the measures page lists its measures.
+mkdocs==1.6.1
+mkdocs-material==9.8.0
+mkdocstrings[python]==1.0.8
+mkdocstrings-python==2.0.10
+mkdocs-jupyter==0.27.0
+markdown-exec==1.12.5
+# Lets mkdocstrings wrap long signatures in the API reference.
+black==26.10.1

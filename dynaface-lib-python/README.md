@@ -40,7 +40,7 @@ print(f"Facial Asymmetry Index: {results['fai']:.2f}")
 face.save("face_measures.jpg")
 ```
 
-For a step-by-step walkthrough, open the [tutorial notebook](https://github.com/jeffheaton/dynaface/blob/main/dynaface-lib-python/examples/dynaface_intro.ipynb) in [Colab](https://colab.research.google.com/github/jeffheaton/dynaface/blob/main/dynaface-lib-python/examples/dynaface_intro.ipynb).
+For a step-by-step walkthrough, open the [tutorial notebook](https://github.com/jeffheaton/dynaface/blob/main/dynaface-lib-python/examples/dynaface_intro.ipynb) in [Colab](https://colab.research.google.com/github/jeffheaton/dynaface/blob/main/dynaface-lib-python/examples/dynaface_intro.ipynb). The full documentation, including the API reference, is at [docs.dynaface.org](https://docs.dynaface.org).
 
 # Helpful Links
 
