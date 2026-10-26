@@ -776,16 +776,17 @@ class AnalyzeFace(ImageAnalysis):
 
     def load_state(self, obj: List[Any]) -> None:
         """
-        Restore a frame's analysis captured by dump_state().
+        Restore a frame's analysis captured by dump_state(), including its image,
+        so analyze() draws on that frame.
 
         Args:
             obj (List[Any]): The list dump_state() returned. A state saved without
                 a face rotation restores with a rotation of 0.
         """
-        if not self.is_image_loaded():
-            self.init_image(obj[0])
-        else:
-            self.original_img = obj[0][:]
+        # Always start from the saved image: every AnalyzeFace already has a
+        # placeholder image, so drawing would otherwise land on that, or on the
+        # previous frame's drawing.
+        self.init_image(obj[0])
         self.headpose = copy.copy(obj[1])
         self.landmarks = copy.copy(obj[2])
         self.pupillary_distance = obj[3]
