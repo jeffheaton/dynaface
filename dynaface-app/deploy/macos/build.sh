@@ -153,7 +153,19 @@ if [ -n "${AC_API_KEY_PATH}" ]; then
     # fails Gatekeeper for anyone offline or behind a slow network.
     echo "** Staple **"
     xcrun stapler staple "$APP"
-    xcrun stapler validate "$APP"
+
+    # stapler staple already validates the ticket it attaches. This extra check
+    # re-fetches it from Apple's CloudKit, which GitHub's macOS runners drop
+    # repeatedly (NSURLError -1005, "Error 68"), so retry it and only warn; the
+    # spctl assessment below remains the hard gate.
+    for attempt in 1 2 3; do
+        if xcrun stapler validate "$APP"; then break; fi
+        if [ "$attempt" -eq 3 ]; then
+            echo "** WARNING: stapler validate could not reach Apple; relying on spctl **"
+        else
+            sleep 20
+        fi
+    done
 
     echo "** Gatekeeper check **"
     spctl -a -vvv "$APP"
