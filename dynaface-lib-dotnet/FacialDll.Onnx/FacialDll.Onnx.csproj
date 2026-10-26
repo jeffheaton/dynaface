@@ -6,7 +6,7 @@
          prebuilt-DLL and Unity consumers must update their references. -->
     <AssemblyName>Dynaface.Onnx</AssemblyName>
     <!-- Ships in lockstep with the core Dynaface package (same version). -->
-    <Version>2.0.3</Version>
+    <Version>2.0.4</Version>
   </PropertyGroup>
 
   <!-- NuGet package metadata (package id "Dynaface.Onnx") -->

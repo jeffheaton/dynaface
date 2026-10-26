@@ -127,7 +127,7 @@ workflow publishes a zipped `netstandard2.1` build to:
 
     https://data.heatonresearch.com/library/dynaface-dotnet-<VERSION>.zip
 
-where `<VERSION>` is the `<Version>` in `facial_dll/FacialDll.csproj` (currently `2.0.3`).
+where `<VERSION>` is the `<Version>` in `facial_dll/FacialDll.csproj` (currently `2.0.4`).
 The zip contains:
 
 | File | Needed? | Purpose |
@@ -149,7 +149,7 @@ Skip this if you installed `Dynaface.Onnx` above. To build your own backend, ref
 ```xml
 <!-- In your .csproj -->
 <ItemGroup>
-  <PackageReference Include="Dynaface" Version="2.0.3" />
+  <PackageReference Include="Dynaface" Version="2.0.4" />
   <!-- Plus your inference runtime, e.g.: -->
   <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.19.2" />
 </ItemGroup>
