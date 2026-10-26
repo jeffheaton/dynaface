@@ -1,14 +1,17 @@
 """Image loading, plus the base class that holds an image and draws on it."""
 
+import logging
 import math
 import os
-from typing import List, Optional, Tuple
-from numpy.typing import NDArray
 from typing import Any, List, Optional, Tuple
 
 import cv2
 import numpy as np
+from numpy.typing import NDArray
+
 from dynaface.util import PolyArea
+
+logger = logging.getLogger(__name__)
 
 COLORS = np.array(
     [
@@ -59,6 +62,7 @@ class ImageAnalysis:
         self.text_size: float = 0.75
         self.text_color: Tuple[int, int, int] = (255, 255, 255)
         self.text_thick: int = 2
+        # The black outline around text is text_back // 2 pixels wide.
         self.text_back: int = 5
         self.stats_right: int = 750
         self.width: int = 0
@@ -144,37 +148,73 @@ class ImageAnalysis:
         if color is None:
             color = self.text_color
 
-        cv2.putText(
-            self.render_img,
-            txt,
-            pos,
-            self.text_font,
-            size,
-            (0, 0, 0),
-            thick + self.text_back,
-            cv2.LINE_AA,
-        )
-        cv2.putText(
-            self.render_img,
-            txt,
-            pos,
-            self.text_font,
-            size,
-            (0, 0, 0),
-            thick + self.text_back,
-            cv2.LINE_AA,
-        )
+        self._draw_outlined_text([(pos, txt)], size, color, thick)
 
-        cv2.putText(
-            self.render_img,
-            txt,
-            pos,
-            self.text_font,
-            size,
-            self.text_color,
-            thick,
-            cv2.LINE_AA,
+    def _draw_outlined_text(
+        self,
+        parts: List[Tuple[Tuple[int, int], str]],
+        scale: float,
+        color: Tuple[int, int, int],
+        thick: int,
+    ) -> None:
+        """
+        Draw text with a black outline, so it reads on light and dark areas alike.
+
+        OpenCV 5 draws text at the same weight for any thickness of 2 or more, so
+        drawing it thicker in black underneath no longer leaves an outline.
+        Instead, the outline is the text's own shape, grown by text_back // 2
+        pixels. Every part's outline is drawn before any of the text, so a
+        superscript's outline can't cover the text beside it.
+
+        Args:
+            parts (List[Tuple[Tuple[int, int], str]]): Each piece of text, with
+                the position of its bottom-left corner.
+            scale (float): Font scale, as for cv2.putText().
+            color (Tuple[int, int, int]): Text color.
+            thick (int): Text thickness.
+        """
+        radius = max(1, self.text_back // 2)
+        pad = radius + 2  # getTextSize() can be a pixel or two off
+
+        boxes = []
+        for (x, y), txt in parts:
+            (w, h), baseline = cv2.getTextSize(txt, self.text_font, scale, thick)
+            boxes.append((x - pad, y - h - pad, x + w + pad, y + baseline + pad))
+        x0 = min(box[0] for box in boxes)
+        y0 = min(box[1] for box in boxes)
+        x1 = max(box[2] for box in boxes)
+        y1 = max(box[3] for box in boxes)
+
+        # Draw the text into a mask covering just the text, then grow it.
+        mask = np.zeros((y1 - y0, x1 - x0), dtype=np.uint8)
+        for (x, y), txt in parts:
+            cv2.putText(
+                mask,
+                txt,
+                (x - x0, y - y0),
+                self.text_font,
+                scale,
+                255,
+                thick,
+                cv2.LINE_AA,
+            )
+        kernel = cv2.getStructuringElement(
+            cv2.MORPH_ELLIPSE, (2 * radius + 1, 2 * radius + 1)
         )
+        outline = cv2.dilate(mask, kernel)
+
+        # Blend in the part that falls on the image, outline first.
+        img = self.render_img
+        left, top = max(x0, 0), max(y0, 0)
+        right, bottom = min(x1, img.shape[1]), min(y1, img.shape[0])
+        if left >= right or top >= bottom:
+            return
+        inside = (slice(top - y0, bottom - y0), slice(left - x0, right - x0))
+        text_alpha = mask[inside][..., np.newaxis] / 255.0
+        outline_alpha = outline[inside][..., np.newaxis] / 255.0
+        region = img[top:bottom, left:right] * (1.0 - outline_alpha)
+        region = region * (1.0 - text_alpha) + np.array(color) * text_alpha
+        img[top:bottom, left:right] = np.rint(region).astype(img.dtype)
 
     def calc_text_size(
         self, txt: str, size: float = 1, thick: int = 1
@@ -219,52 +259,12 @@ class ImageAnalysis:
         if color is None:
             color = self.text_color
 
-        cv2.putText(
-            self.render_img,
-            txt,
-            pos,
-            self.text_font,
+        w1 = cv2.getTextSize(txt, self.text_font, self.text_size, self.text_thick)[0][0]
+        self._draw_outlined_text(
+            [(pos, txt), ((pos[0] + w1 - 5, pos[1] - up), mark)],
             self.text_size,
-            (0, 0, 0),
-            self.text_thick + self.text_back,
-            cv2.LINE_AA,
-        )
-        w1 = cv2.getTextSize(
-            txt, self.text_font, self.text_size, self.text_thick + self.text_back
-        )[0][0]
-
-        cv2.putText(
-            self.render_img,
-            txt,
-            pos,
-            self.text_font,
-            self.text_size,
-            self.text_color,
+            color,
             self.text_thick,
-            cv2.LINE_AA,
-        )
-        cv2.getTextSize(txt, self.text_font, self.text_size, self.text_thick)[0][0]
-
-        cv2.putText(
-            self.render_img,
-            mark,
-            (pos[0] + w1 - 5, pos[1] - up),
-            self.text_font,
-            self.text_size,
-            (0, 0, 0),
-            self.text_thick + self.text_back,
-            cv2.LINE_AA,
-        )
-
-        cv2.putText(
-            self.render_img,
-            mark,
-            (pos[0] + w1 - 5, pos[1] - up),
-            self.text_font,
-            self.text_size,
-            self.text_color,
-            self.text_thick,
-            cv2.LINE_AA,
         )
 
     def hline(

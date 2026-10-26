@@ -100,6 +100,33 @@ class TestImage(unittest.TestCase):
         analysis.load_image(test_img)
         analysis.write_text((10, 10), "")
 
+    def test_write_text_outline_shows_on_white(self):
+        # OpenCV 5 draws text at the same weight for any thickness of 2 or more,
+        # which once hid the outline: white text vanished on light backgrounds.
+        analysis = ImageAnalysis()
+        test_img = np.full((100, 300, 3), 255, dtype=np.uint8)
+        analysis.load_image(test_img)
+        analysis.write_text((10, 60), "dental=577 mm")
+        dark = analysis.render_img.max(axis=2) < 64
+        self.assertGreater(int(dark.sum()), 100)
+
+    def test_write_text_uses_color(self):
+        analysis = ImageAnalysis()
+        test_img = np.full((100, 300, 3), 128, dtype=np.uint8)
+        analysis.load_image(test_img)
+        analysis.write_text((10, 60), "Test", color=(255, 0, 0))
+        img = analysis.render_img
+        red = (img[..., 0] > 200) & (img[..., 1] < 60) & (img[..., 2] < 60)
+        self.assertTrue(red.any())
+
+    def test_write_text_off_the_edges(self):
+        analysis = ImageAnalysis()
+        test_img = np.full((100, 100, 3), 255, dtype=np.uint8)
+        analysis.load_image(test_img)
+        for pos in [(-30, 50), (80, 50), (10, 5), (10, 110), (-500, -500)]:
+            analysis.write_text(pos, "Edge")
+            analysis.write_text_sq(pos, "Edge")
+
     #
     # hline() and vline() Tests
     #
