@@ -1,0 +1,74 @@
+name: Bug report
+description: Report something in Dynaface that doesn't work as expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a problem.
+
+        **Please don't attach photos, videos or screenshots of identifiable patients**, or measurements exported from them. Issues are public. Reproduce the problem with one of the [sample images](https://github.com/jeffheaton/dynaface/tree/main/dynaface-lib-python/tests_data) or an image you have the right to share, or describe the image instead. See [Protect patient privacy](https://github.com/jeffheaton/dynaface/blob/main/CONTRIBUTING.md#protect-patient-privacy).
+  - type: dropdown
+    id: component
+    attributes:
+      label: Which part of Dynaface?
+      options:
+        - Dynaface app
+        - Python library (dynaface on PyPI)
+        - .NET library (Dynaface or Dynaface.Onnx on NuGet)
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The app version, or the library version (`pip show dynaface`, or the NuGet package version).
+      placeholder: e.g. 2.0.3
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: Your operating system or device, plus your Python or .NET version if you're using a library.
+      placeholder: e.g. Windows 11, Python 3.11
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Include any error message you saw.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: For the libraries, a short code sample is ideal.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or traceback
+      description: Paste any relevant output. It's formatted as code automatically, so there's no need for backticks.
+      render: shell
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Patient privacy
+      options:
+        - label: This report doesn't include photos, videos or data of identifiable patients.
+          required: true

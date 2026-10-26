@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Dynaface FAQ
+    url: https://github.com/jeffheaton/dynaface/blob/main/FAQ.md
+    about: Answers to common questions about Dynaface.

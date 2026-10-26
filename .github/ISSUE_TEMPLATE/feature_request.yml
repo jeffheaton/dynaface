@@ -1,0 +1,41 @@
+name: Feature request
+description: Suggest a new feature, measurement or improvement.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! Explaining the problem it solves helps the most. Please don't attach images of identifiable patients, since issues are public.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Which part of Dynaface?
+      options:
+        - Dynaface app
+        - Python library (dynaface on PyPI)
+        - .NET library (Dynaface or Dynaface.Onnx on NuGet)
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: What are you trying to do, and what gets in the way?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: measurement
+    attributes:
+      label: For a new measurement
+      description: Which landmarks it uses, how it's calculated and in what units, and a clinical reference if there is one. Leave this empty if it doesn't apply.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered

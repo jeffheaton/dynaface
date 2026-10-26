@@ -1,5 +1,8 @@
 # Dynaface.Onnx
 
+[![Tests](https://img.shields.io/github/actions/workflow/status/jeffheaton/dynaface/test-lib-dotnet.yml?branch=main&label=tests&style=flat-square)](https://github.com/jeffheaton/dynaface/actions/workflows/test-lib-dotnet.yml)
+[![Coverage](https://img.shields.io/codecov/c/github/jeffheaton/dynaface/main?flag=dotnet&label=coverage&style=flat-square)](https://app.codecov.io/gh/jeffheaton/dynaface)
+
 The **ONNX Runtime inference backend** for [Dynaface](https://www.nuget.org/packages/Dynaface) — a C# facial-analysis pipeline ported from the Python [`dynaface-lib`](https://github.com/jeffheaton/dynaface) package.
 
 The core `Dynaface` package runs no neural networks itself; it reaches all 3 models (BlazeFace, SPIGA, U²-Net) through the `IDynafaceInference` interface. This package provides `OnnxDynafaceInference`, a ready-made implementation over `Microsoft.ML.OnnxRuntime`, so you don't have to write one.

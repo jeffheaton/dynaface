@@ -1,5 +1,8 @@
 # Dynaface
 
+[![Tests](https://img.shields.io/github/actions/workflow/status/jeffheaton/dynaface/test-lib-dotnet.yml?branch=main&label=tests&style=flat-square)](https://github.com/jeffheaton/dynaface/actions/workflows/test-lib-dotnet.yml)
+[![Coverage](https://img.shields.io/codecov/c/github/jeffheaton/dynaface/main?flag=dotnet&label=coverage&style=flat-square)](https://app.codecov.io/gh/jeffheaton/dynaface)
+
 A C# facial-analysis pipeline — a contract-faithful port of the Python [`dynaface-lib`](https://github.com/jeffheaton/dynaface) package. It runs BlazeFace detection, SPIGA WFLW-98 landmark + headpose estimation, U²-Net background removal, frontal (StyleGAN-style) and lateral analysis, and the full frontal + lateral + skin-tone measurement set used to assess facial symmetry and movement.
 
 This is the **backend-agnostic core**: it runs no neural networks itself. All 3 networks are reached through a single interface, `IDynafaceInference`, kept as 3 independent methods so each can be swapped or tested on its own.

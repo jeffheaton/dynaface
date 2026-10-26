@@ -1,8 +1,5 @@
 # DynaFace .NET
 
-[![Tests](https://img.shields.io/github/actions/workflow/status/jeffheaton/dynaface/test-lib-dotnet.yml?branch=main&label=tests&style=flat-square)](https://github.com/jeffheaton/dynaface/actions/workflows/test-lib-dotnet.yml)
-[![Coverage](https://img.shields.io/codecov/c/github/jeffheaton/dynaface/main?flag=dotnet&label=coverage&style=flat-square)](https://app.codecov.io/gh/jeffheaton/dynaface)
-
 A C# face-processing pipeline — a contract-faithful port of the Python `dynaface-lib` package: BlazeFace detection, SPIGA WFLW-98 landmark + headpose estimation, U²-Net background removal, frontal (StyleGAN-style) and lateral analysis, and the full frontal + lateral + skin-tone measurement set.
 
 ## Projects
@@ -93,7 +90,7 @@ dotnet test DynafaceTests/DynafaceTests.csproj
 
 or place them at `~/.dynaface/models` (dynaface-lib's own default download location). When `DYNAFACE_ONNX_MODELS` is set it is the only place looked. Without the models, those tests are reported as Skipped; set `DYNAFACE_REQUIRE_MODELS=1` to make them fail instead (CI does).
 
-Every push or pull request that touches `dynaface-lib-dotnet/` runs the [Test Library (.NET)](../.github/workflows/test-lib-dotnet.yml) workflow: the full suite with the models required, with coverage (excluding the `FacialDllConsole` example) uploaded to [Codecov](https://app.codecov.io/gh/jeffheaton/dynaface) for the badges at the top of this page.
+Every push or pull request that touches `dynaface-lib-dotnet/` runs the [Test Library (.NET)](../.github/workflows/test-lib-dotnet.yml) workflow: the full suite with the models required, with coverage (excluding the `FacialDllConsole` example) uploaded to [Codecov](https://app.codecov.io/gh/jeffheaton/dynaface) for the coverage badges.
 
 ## Run
 
