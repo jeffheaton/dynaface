@@ -2,7 +2,7 @@ import os
 import sys
 import unittest
 
-from dynaface import facial, lateral, measures, models
+from dynaface import facial, measures, models
 from dynaface.image import load_image
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -22,7 +22,6 @@ class TestFaceAnalysis(unittest.TestCase):
     def test_frontal(self):
         img = load_image("./tests_data/img1-512.jpg")
 
-        lateral.DEBUG = True
         # Initialize models
         device = models.detect_device()
         path = models.download_models()
@@ -80,7 +79,6 @@ class TestFaceAnalysis(unittest.TestCase):
                 delta=_tolerance(expected),
                 msg=f"{key}: expected {expected}, got {actual}",
             )
-        lateral.DEBUG = False
 
     def test_right_lateral(self):
         img = load_image("./tests_data/img2-1024-right-lateral.jpg")
