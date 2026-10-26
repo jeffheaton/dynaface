@@ -2,6 +2,8 @@
 
 Thanks for helping improve Dynaface! It measures facial symmetry and movement, mainly to assess people with facial paralysis. Bug reports, feature ideas, documentation fixes and code are all welcome.
 
+Everyone who takes part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Protect patient privacy
 
 Dynaface is used with patient photos and videos, and everything posted here is public, so please be careful about what you share.
@@ -14,6 +16,8 @@ Dynaface is used with patient photos and videos, and everything posted here is p
 ## Reporting bugs and suggesting features
 
 Search the [existing issues](https://github.com/jeffheaton/dynaface/issues) first. Then open a new issue with the **Bug report** or **Feature request** form, which asks for the details needed to act on it.
+
+Report security vulnerabilities privately instead, as the [security policy](SECURITY.md) describes. Accessibility problems are bugs too, and the [accessibility statement](ACCESSIBILITY.md) says what to include.
 
 For a new measurement, explain which landmarks it uses and how it's calculated, and link a clinical reference if there is one.
 

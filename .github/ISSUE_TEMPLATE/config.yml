@@ -3,3 +3,6 @@ contact_links:
   - name: Dynaface FAQ
     url: https://github.com/jeffheaton/dynaface/blob/main/FAQ.md
     about: Answers to common questions about Dynaface.
+  - name: Report a security vulnerability
+    url: https://github.com/jeffheaton/dynaface/security/policy
+    about: Please report security problems privately, as the security policy describes, not in a public issue.
