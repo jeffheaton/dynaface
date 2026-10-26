@@ -34,25 +34,6 @@ internal static class ImageUtils
         return dst;
     }
 
-    // Creates a new image where one half is original and the other half is a
-    // horizontal mirror of the kept half. Used by MirroredLandmarkDetector.
-    //   mirrorLeft = true  → right half replaced with mirror of left half
-    //   mirrorLeft = false → left half replaced with mirror of right half
-    internal static FaceImage CreateHalfMirror(FaceImage src, bool mirrorLeft)
-    {
-        int w = src.Width, h = src.Height, mid = w / 2;
-        var dst = new Rgba32[w * h];
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-            {
-                int srcX = mirrorLeft
-                    ? (x < mid ? x : w - 1 - x)   // right mirrors left
-                    : (x >= mid ? x : w - 1 - x);  // left mirrors right
-                dst[y * w + x] = src.Pixels[y * w + srcX];
-            }
-        return new FaceImage(dst, w, h);
-    }
-
     // Bilinear resize of a row-major Rgba32 pixel array.
     // Pixels are in Unity bottom-left order (y=0 at bottom).
     // Uses center-pixel mapping: each destination pixel center maps to the
