@@ -144,7 +144,7 @@ class AnalyzeFace(ImageAnalysis):
         self.headpose: List[int] = [0, 0, 0]
         self.landmarks: List[Tuple[int, int]] = []
         self.lateral: bool = False
-        self.lateral_landmarks: NDArray[Any] = NDArray[Any]([])
+        self.lateral_landmarks: NDArray[Any] = np.empty((0, 2), dtype=int)
         self.pupillary_distance: float = 0.0
         self.tilt_threshold: float = tilt_threshold
         self.pix2mm: float = 1.0
