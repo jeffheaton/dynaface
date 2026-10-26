@@ -298,61 +298,6 @@ public class FaceMeasureContext
         return dist;
     }
 
-    // Mirrors dynaface-lib's AnalyzeFace.measure_curve(): measures the curved
-    // distance along the sagittal polyline between the points on it closest to
-    // pt1 and pt2, optionally rendering the curve segment plus a mm label offset
-    // from its midpoint (dir "r" = right of midpoint, anything else = left).
-    public float MeasureCurve(Vec2 pt1, Vec2 pt2, float[] sagittalX, float[] sagittalY,
-        Rgba32 color = default, int thickness = 3, bool render = true, string dir = "r")
-    {
-        if (sagittalX == null || sagittalY == null || sagittalX.Length == 0) return 0f;
-        int n = MathHelpers.Min(sagittalX.Length, sagittalY.Length);
-
-        int idx1 = FindClosestIndex(pt1, sagittalX, sagittalY, n);
-        int idx2 = FindClosestIndex(pt2, sagittalX, sagittalY, n);
-        if (idx1 > idx2) (idx1, idx2) = (idx2, idx1);
-
-        var segment = new Vec2[idx2 - idx1 + 1];
-        for (int i = 0; i < segment.Length; i++)
-            segment[i] = new Vec2(sagittalX[idx1 + i], sagittalY[idx1 + i]);
-
-        float dist = 0f;
-        for (int i = 0; i + 1 < segment.Length; i++)
-            dist += Vec2.Distance(segment[i], segment[i + 1]);
-        dist *= Pix2mm;
-
-        if (render)
-        {
-            Rgba32 c = color.A == 0 ? MeasureColor : color;
-            DrawCurve(segment, c, thickness);
-
-            Vec2 mid = segment[segment.Length / 2];
-            float labelX = dir == "r" ? mid.X + 15 : mid.X - 15;
-            DrawImageText(new Vec2(labelX, mid.Y), $"{dist:F2}mm", new Rgba32(255, 255, 255, 255));
-        }
-        return dist;
-    }
-
-    static int FindClosestIndex(Vec2 point, float[] xs, float[] ys, int n)
-    {
-        int best = 0;
-        float bestDist = float.MaxValue;
-        for (int i = 0; i < n; i++)
-        {
-            float dx = xs[i] - point.X, dy = ys[i] - point.Y;
-            float d = dx * dx + dy * dy;
-            if (d < bestDist) { bestDist = d; best = i; }
-        }
-        return best;
-    }
-
-    // Mirrors dynaface-lib's AnalyzeFace.draw_curve(): polyline through the points.
-    public void DrawCurve(Vec2[] segment, Rgba32 color, int thickness = 3)
-    {
-        for (int i = 0; i + 1 < segment.Length; i++)
-            DrawLine(segment[i], segment[i + 1], color, thickness);
-    }
-
     // Mirrors dynaface-lib's AnalyzeFace.draw_static(): stamps the resolved pose
     // caption near the bottom-left corner of the image.
     public void DrawStatic()
