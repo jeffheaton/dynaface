@@ -10,25 +10,37 @@
 
 Dynaface is an AI-driven facial tracking Python Library utilizing computer vision techniques that integrate Convolutional Neural Networks (CNNs) with cascaded Graph Attention Network (GAT) regressors to enhance facial landmark detection by capturing both local appearance and global structural relationships ([Prados-Torreblanca1, A & Buenaposada, J](https://bmvc2022.mpi-inf.mpg.de/0155.pdf)). This approach encodes both the appearance and spatial positioning of facial landmarks while employing an attention mechanism to prioritize reliable information. Such a method is particularly advantageous for assessing facial asymmetry in patients with facial paralysis, where conventional landmarking algorithms are often biased toward symmetric faces. By leveraging a global representation of facial structure, Dynaface enables precise detection of key landmarks despite asymmetries, facilitating the objective quantification of facial movement and asymmetry. These measurements, including the Facial Asymmetry Index (FAI) and Oral Commissure Excursion (OCE), serve as critical indicators of facial function and can be correlated with patient-reported outcomes to evaluate recovery and patient satisfaction.
 
-# Sample Code
+# Quick Start
 
-Install from [pypi](https://pypi.org/project/dynaface/).
+Install from [PyPI](https://pypi.org/project/dynaface/):
 
-```
+```bash
 pip install dynaface
 ```
 
-Calculate measures on a face.
+Measure a face in a photo. The first run downloads Dynaface's AI models (about 400 MB) to `~/.dynaface/models`.
 
-```
-import cv2
+```python
 from dynaface import facial, measures, models
 
-all_measures = measures.all_measures()
-face = facial.AnalyzeFace(measures = all_measures)
-face.load_image(image_rgb,crop=True)
-face.analyze()
+# Load the AI models, using a GPU or Apple silicon when one is available.
+models.init_models(models.download_models(), models.detect_device())
+
+# Find the face, crop it to a standard size and run every measure.
+face = facial.load_face_image(
+    "https://data.heatonresearch.com/dynaface/sample/img4-1024-frontal.jpg",
+    measures=measures.all_measures(),
+)
+results = face.analyze()
+
+# results maps each measure to its value, such as results["oce.l"] in millimeters.
+print(f"Facial Asymmetry Index: {results['fai']:.2f}")
+
+# Save the cropped face with every measure drawn on it.
+face.save("face_measures.jpg")
 ```
+
+For a step-by-step walkthrough, open the [tutorial notebook](https://github.com/jeffheaton/dynaface/blob/main/dynaface-lib-python/examples/dynaface_intro.ipynb) in [Colab](https://colab.research.google.com/github/jeffheaton/dynaface/blob/main/dynaface-lib-python/examples/dynaface_intro.ipynb).
 
 # Helpful Links
 
@@ -82,16 +94,19 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 # Running Examples
 
-- [Dynaface Examples]()
+The [examples folder](https://github.com/jeffheaton/dynaface/tree/main/dynaface-lib-python/examples) has scripts that measure images and videos. From `dynaface-lib-python` in a clone of this repository, run them on the bundled sample files:
 
-```
-python ./examples/process_media.py /Users/jeff/data/facial/samples/tracy-ref-blink.mp4
+```bash
+# Measure a frontal photo and save it with the measures drawn on it.
+python examples/process_image.py tests_data/img4-1024-frontal.jpg frontal.jpg
 
-python ./examples/process_media.py --crop /Users/jeff/data/facial/samples/2021-8-19.png
+# Measure a side profile.
+python examples/process_media.py --crop tests_data/img2-1024-right-lateral.jpg lateral.jpg
 
-python ./examples/process_media.py --crop /Users/jeff/data/facial/samples/tracy_frame.png
-
-python ./examples/process_media.py --crop /Users/jeff/data/facial/samples/tracy-blink-single.mp4
+# Measure every frame of a video. This writes the annotated video-analyze.mp4,
+# a chart of each measure over time (video-graph.png) and the values for every
+# frame (video-data.csv).
+python examples/process_media.py tests_data/video1-512.mp4 video.mp4
 ```
 
 # To Cite Dynaface

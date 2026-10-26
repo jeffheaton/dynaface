@@ -13,8 +13,9 @@ from dynaface.measures import (
 from video import VideoToVideo
 from dynaface import models
 
-# Sample usage:
-# python process_media.py /Users/jeff/data/facial/samples/tracy-blink-single.mp4
+# Sample usage, from dynaface-lib-python:
+# python examples/process_media.py --crop tests_data/img2-1024-right-lateral.jpg lateral.jpg
+# python examples/process_media.py tests_data/video1-512.mp4 video.mp4
 
 
 def process_image(input_file, output_file, points, crop):
@@ -53,7 +54,7 @@ def process_video(input_file, output_base, points, crop):
         print("Video analysis failed")
 
 
-parser = argparse.ArgumentParser(description="Process an image.")
+parser = argparse.ArgumentParser(description="Process an image or an .mp4 video.")
 parser.add_argument(
     "--points",
     default=False,
@@ -63,7 +64,7 @@ parser.add_argument(
 parser.add_argument(
     "--crop", default=False, action="store_true", help="Crop/zoom to face."
 )
-parser.add_argument("input_file", type=str, help="Path to the input image file.")
+parser.add_argument("input_file", type=str, help="Path to the input image or video.")
 parser.add_argument(
     "--device", type=str, default="detect", help="The GPU/CPU device to use."
 )
@@ -72,24 +73,25 @@ parser.add_argument(
     type=str,
     nargs="?",
     default=None,
-    help="Path to the output image file.",
+    help="Path to the output image, or the base name for video outputs.",
 )
-
-
-# Detect device and download models
-device = models.detect_device()
-print(f"Detected device: {device}")
-path = models.download_models()
-models.init_models(path, device)
 
 # process arguments
 args = parser.parse_args()
 
+# Detect device and download models
+device = models.detect_device() if args.device == "detect" else args.device
+print(f"Detected device: {device}")
+path = models.download_models()
+models.init_models(path, device)
+
 input_file = args.input_file
+media_ext = os.path.splitext(input_file)[1]
 if args.output_file:
-    print("You gave me an output file")
+    output_file = args.output_file
+    output_base = os.path.splitext(output_file)[0]
 else:
-    output_base, media_ext = os.path.splitext(input_file)
+    output_base = os.path.splitext(input_file)[0]
     output_file = output_base + "_output" + media_ext
 
 print(f"Input file: {input_file}")

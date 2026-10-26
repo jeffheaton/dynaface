@@ -1,12 +1,11 @@
 import csv
 import logging
 import os
-import re
 import shutil
-import subprocess
 import tempfile
 
 import cv2
+import matplotlib.pyplot as plt
 from dynaface.facial import AnalyzeFace
 
 logger = logging.getLogger(__name__)
@@ -111,8 +110,9 @@ class VideoToVideo:
         # p = ProcessVideoFFMPEG()
         p = ProcessVideoOpenCV()
         if not p.extract(input_video):
-            logger.error("Failed to execute ffmpeg")
+            logger.error(f"Couldn't read the video {input_video}")
             return False
+        self.rate = 1 / p.frame_rate
 
         # sample 1st
         filename = os.path.join(p.temp_path, "input-1.jpg")
@@ -146,7 +146,9 @@ class VideoToVideo:
             for stat in rec.keys():
                 self.data[stat].append(rec[stat])
 
-            face.write_text((10, 30), f"Frame {idx+1}, {round(idx*self.rate*1000)} ms")
+            face.write_text(
+                (10, 30), f"Frame {idx}, {round((idx - 1) * self.rate * 1000)} ms"
+            )
 
             if self._points:
                 face.draw_landmarks(numbers=True)
@@ -162,7 +164,19 @@ class VideoToVideo:
         return True
 
     def plot_chart(self, filename, plot_stats=None):
-        pass
+        """Plots each measure over time, one panel per measure."""
+        stats = plot_stats or self.stats
+        times = [i * self.rate for i in range(len(self.data[stats[0]]))]
+        fig, axes = plt.subplots(
+            len(stats), 1, sharex=True, squeeze=False, figsize=(8, 1.5 * len(stats))
+        )
+        for ax, stat in zip(axes[:, 0], stats):
+            ax.plot(times, self.data[stat])
+            ax.set_ylabel(stat)
+        axes[-1, 0].set_xlabel("Time (seconds)")
+        fig.tight_layout()
+        fig.savefig(filename)
+        plt.close(fig)
 
     def dump_data(self, filename):
         with open(filename, "w") as f:
