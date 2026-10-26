@@ -6,8 +6,18 @@ namespace DynafaceTests;
 // IDynafaceInference rather than by asserting on FacePipeline's global static state
 // "before" initialization, since that would be test-order-dependent (other tests in
 // the same run may already have called FacePipeline.Initialize()).
+//
+// Installing the fake replaces the inference FacePipeline shares with the model-gated
+// tests, so this class runs in their collection, never at the same time as one of
+// them, and puts the real inference back afterward. Run alongside them, it made every
+// model-gated test after it fail on Windows CI.
+[Collection("ModelTests")]
 public class PipelineReadinessTests
 {
+    readonly ModelFixture _fixture;
+
+    public PipelineReadinessTests(ModelFixture fixture) => _fixture = fixture;
+
     class NotReadyInference : IDynafaceInference
     {
         public bool IsReady => false;
@@ -38,11 +48,18 @@ public class PipelineReadinessTests
     [Fact]
     public void FacePipeline_Initialize_WithNotReadyInference_StaysNotReady()
     {
-        FacePipeline.Initialize(new NotReadyInference());
-        Assert.False(FacePipeline.IsReady);
+        try
+        {
+            FacePipeline.Initialize(new NotReadyInference());
+            Assert.False(FacePipeline.IsReady);
 
-        var photo = new FaceImage(new Rgba32[100 * 100], 100, 100);
-        var result = FacePipeline.Run(photo, 0, flipHorizontal: false);
-        Assert.Null(result);
+            var photo = new FaceImage(new Rgba32[100 * 100], 100, 100);
+            var result = FacePipeline.Run(photo, 0, flipHorizontal: false);
+            Assert.Null(result);
+        }
+        finally
+        {
+            if (_fixture.Available) FacePipeline.Initialize(_fixture.Inference);
+        }
     }
 }
