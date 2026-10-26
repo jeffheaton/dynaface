@@ -53,8 +53,12 @@ def assert_standard_python(
     if isinstance(obj, _ALLOWED_PRIMITIVES):
         return
 
-    # 2) numpy.ndarray → convert to nested lists and re-check
+    # 2) numpy.ndarray: only object arrays can hold non-standard values, so only
+    #    their elements are checked. Walking every element of numeric arrays, such
+    #    as each frame's image, used to take most of the time spent saving.
     if isinstance(obj, np.ndarray):
+        if not obj.dtype.hasobject:
+            return
         try:
             nested = obj.tolist()
         except Exception:
@@ -86,6 +90,5 @@ def assert_standard_python(
         f"    – Primitives: "
         + ", ".join(_full_typename(t) for t in _ALLOWED_PRIMITIVES)
         + "\n"
-        f"    – Containers: "
-        + ", ".join(_full_typename(t) for t in _ALLOWED_CONTAINERS)
+        "    – Containers: " + ", ".join(_full_typename(t) for t in _ALLOWED_CONTAINERS)
     )
