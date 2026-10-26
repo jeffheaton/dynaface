@@ -1,0 +1,24 @@
+# Codecov settings for the coverage badges in the READMEs. Each library's test
+# workflow (test-lib.yml, test-lib-dotnet.yml) uploads its report under its own
+# flag. Those workflows only run when their library changes, so carryforward keeps
+# a flag's last coverage on commits that don't touch that library.
+flag_management:
+  default_rules:
+    carryforward: true
+  individual_flags:
+    - name: python
+      paths:
+        - dynaface-lib-python/
+    - name: dotnet
+      paths:
+        - dynaface-lib-dotnet/
+
+coverage:
+  status:
+    # Report coverage on each commit, but never mark a commit as failing over it.
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true

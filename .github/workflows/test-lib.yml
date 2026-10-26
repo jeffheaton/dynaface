@@ -1,0 +1,86 @@
+name: Test Library
+
+# Runs the Python library's test suite with coverage on every push and pull request
+# that touches it, and uploads the coverage to Codecov for the README badges.
+# Releases are still built by the manual Build Library workflow (build-lib.yml).
+on:
+  push:
+    paths:
+      - 'dynaface-lib-python/**'
+      - '.github/workflows/test-lib.yml'
+  pull_request:
+    paths:
+      - 'dynaface-lib-python/**'
+      - '.github/workflows/test-lib.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # Lets the Codecov upload authenticate with GitHub's OIDC token, so no Codecov
+  # token is stored in the repo.
+  id-token: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The 3 ONNX models the tests need (the same zip models.download_models() fetches).
+  MODELS_URL: https://data.heatonresearch.com/dynaface/model/2/dynaface_models.zip
+  MODELS_SHA256: 8adc1246c00e8ea5a53e81e8000717b4541eabba59639ae178a07a799b5c57de
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: dynaface-lib-python/setup.cfg
+
+      - name: Install dependencies
+        working-directory: dynaface-lib-python
+        run: pip install -e ".[test]"
+
+      # The cache key is shared with test-lib-dotnet.yml, so the ~400MB of models are
+      # downloaded once rather than on every push. Having them in place before the
+      # tests also keeps models.download_models()'s download path from running, so
+      # coverage doesn't change with whether the cache hit.
+      - name: Restore ONNX models
+        id: models
+        uses: actions/cache@v6
+        with:
+          path: ~/.dynaface/models
+          key: dynaface-models-${{ env.MODELS_SHA256 }}
+
+      - name: Download ONNX models
+        if: steps.models.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/dynaface_models.zip" "$MODELS_URL"
+          echo "$MODELS_SHA256  $RUNNER_TEMP/dynaface_models.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/dynaface_models.zip" -d ~/.dynaface/models
+          ls -l ~/.dynaface/models
+
+      - name: Run tests
+        working-directory: dynaface-lib-python
+        run: |
+          python -m pytest tests \
+            --cov=dynaface --cov-branch \
+            --cov-report=xml:coverage.xml \
+            --cov-report=term
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          use_oidc: true
+          files: dynaface-lib-python/coverage.xml
+          disable_search: true
+          flags: python
+          # A Codecov outage shouldn't turn the tests badge red.
+          fail_ci_if_error: false

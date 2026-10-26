@@ -3,6 +3,8 @@
 # Dynaface Python Library
 
 [![PyPI version](https://img.shields.io/pypi/v/dynaface?style=flat-square)](https://pypi.org/project/dynaface/)
+[![Tests](https://img.shields.io/github/actions/workflow/status/jeffheaton/dynaface/test-lib.yml?branch=main&label=tests&style=flat-square)](https://github.com/jeffheaton/dynaface/actions/workflows/test-lib.yml)
+[![Coverage](https://img.shields.io/codecov/c/github/jeffheaton/dynaface/main?flag=python&label=coverage&style=flat-square)](https://app.codecov.io/gh/jeffheaton/dynaface)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE)
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/jeffheaton/dynaface/blob/main/dynaface-lib-python/examples/dynaface_intro.ipynb)
 
