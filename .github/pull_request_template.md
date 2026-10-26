@@ -7,7 +7,7 @@ https://github.com/jeffheaton/dynaface/blob/main/CONTRIBUTING.md -->
 
 ## How it was tested
 
-<!-- The tests you added or ran. The desktop app has no automated tests, so for app changes describe what you tried. -->
+<!-- The tests you added or ran. The desktop app has few automated tests, so for app changes describe what you tried. -->
 
 ## Checklist
 

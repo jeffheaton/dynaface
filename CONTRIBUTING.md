@@ -74,7 +74,7 @@ pip install -e ../dynaface-lib-python   # your local library; or `pip install dy
 python dynaface_app.py
 ```
 
-The app has no automated tests, so check your change by running it, and say in the pull request what you tried.
+The app's only automated tests cover its project files; run them from `dynaface-app` with `python -m unittest discover -s tests -t .`. Otherwise, check your change by running the app, and say in the pull request what you tried.
 
 ## Making changes
 

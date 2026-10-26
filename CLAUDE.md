@@ -63,7 +63,7 @@ pip install -r requirements.txt && pip install dynaface
 python dynaface_app.py
 ```
 
-(The app has no automated test suite; verify changes by running the app.)
+(The app's only automated tests cover `.dyfc` project files: `python -m unittest discover -s tests -t .` from `dynaface-app`, in its venv. Otherwise, verify changes by running the app.)
 
 ### dynaface-lib-dotnet (C#/.NET Library)
 
@@ -121,7 +121,7 @@ The library has two main analysis paths: **frontal** (face-on) and **lateral** (
 
 - `dynaface_app.py` — Entry point; `AppDynaface` extends `AppJTH` (Jeff Heaton's UI framework)
 - `dynaface_window.py` — `DynafaceWindow`: main window, menu, file handling, tab management
-- `dynaface_document.py` — Project file management (`.dyfc` format)
+- `dynaface_document.py` — Project file management (`.dyfc` format: a zip of JSON plus `.npy` arrays, never pickle; older gzip-pickle files load through an allowlisted unpickler, and measures are created only from `all_measures()` classes)
 - `tab_analyze_video.py` — Primary analysis tab: landmark visualization, data export (largest file at ~51KB)
 - `tab_settings.py` — Preferences (pupillary distance, accelerator, smoothing)
 - `tab_eval.py` — Evaluation/testing tab
