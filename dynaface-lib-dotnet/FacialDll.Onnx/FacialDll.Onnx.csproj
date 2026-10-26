@@ -17,7 +17,7 @@
     <Description>ONNX Runtime inference backend for Dynaface. Provides OnnxDynafaceInference, a ready-made IDynafaceInference implementation over Microsoft.ML.OnnxRuntime for the BlazeFace, SPIGA, and U²-Net models. Install this instead of implementing IDynafaceInference yourself; it pulls in the core Dynaface package.</Description>
     <PackageTags>facial-analysis;dynaface;onnx;onnxruntime;inference;computer-vision</PackageTags>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/jeffheaton/dynaface</PackageProjectUrl>
+    <PackageProjectUrl>https://docs.dynaface.org/dotnet/</PackageProjectUrl>
     <RepositoryUrl>https://github.com/jeffheaton/dynaface</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>

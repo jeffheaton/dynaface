@@ -3,6 +3,8 @@
 [![Tests](https://img.shields.io/github/actions/workflow/status/jeffheaton/dynaface/test-lib-dotnet.yml?branch=main&label=tests&style=flat-square)](https://github.com/jeffheaton/dynaface/actions/workflows/test-lib-dotnet.yml)
 [![Coverage](https://img.shields.io/codecov/c/github/jeffheaton/dynaface/main?flag=dotnet&label=coverage&style=flat-square)](https://app.codecov.io/gh/jeffheaton/dynaface)
 
+**Documentation:** [docs.dynaface.org](https://docs.dynaface.org/dotnet/)
+
 The **ONNX Runtime inference backend** for [Dynaface](https://www.nuget.org/packages/Dynaface) — a C# facial-analysis pipeline ported from the Python [`dynaface-lib`](https://github.com/jeffheaton/dynaface) package.
 
 The core `Dynaface` package runs no neural networks itself; it reaches all 3 models (BlazeFace, SPIGA, U²-Net) through the `IDynafaceInference` interface. This package provides `OnnxDynafaceInference`, a ready-made implementation over `Microsoft.ML.OnnxRuntime`, so you don't have to write one.
@@ -30,6 +32,6 @@ FacePipeline.Initialize(inference);
 
 `OnnxDynafaceInference` auto-detects each model's input/output tensor names from its metadata; pass explicit overrides to the constructor if a custom export uses unexpected names.
 
-The 3 `.onnx` model files are distributed separately (they're large) — see the [project repository](https://github.com/jeffheaton/dynaface) for where to obtain them.
+The 3 `.onnx` model files are distributed separately (they're large) — see [Getting started](https://docs.dynaface.org/getting-started/#net) for where to get them.
 
 Licensed under Apache-2.0.

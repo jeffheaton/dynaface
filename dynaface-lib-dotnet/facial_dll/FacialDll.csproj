@@ -19,7 +19,7 @@
     <Description>Contract-faithful C# port of the Python dynaface-lib facial-analysis pipeline: BlazeFace detection, SPIGA WFLW-98 landmarks + headpose, U²-Net background removal, frontal and lateral analysis, and the full measurement set. Backend-agnostic — supply neural-network inference by implementing IDynafaceInference (see the Dynaface.Onnx package for a ready-made ONNX Runtime backend).</Description>
     <PackageTags>facial-analysis;face-landmarks;dynaface;spiga;blazeface;computer-vision</PackageTags>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/jeffheaton/dynaface</PackageProjectUrl>
+    <PackageProjectUrl>https://docs.dynaface.org/dotnet/</PackageProjectUrl>
     <RepositoryUrl>https://github.com/jeffheaton/dynaface</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
