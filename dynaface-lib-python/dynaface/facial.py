@@ -1,3 +1,11 @@
+"""
+Face analysis: find a face, place its landmarks, crop it and run the measures.
+
+load_face_image() loads a photo from a file or URL. For images you already hold as
+RGB NumPy arrays, such as video frames, create an AnalyzeFace and call its
+load_image().
+"""
+
 import copy
 import logging
 import math
@@ -43,6 +51,19 @@ LATERAL_LEFT_MARGIN_RATIO = 0.20
 def util_calc_pd(
     pupils: Tuple[Tuple[float, float], Tuple[float, float]],
 ) -> Tuple[float, float]:
+    """
+    Measure the distance between the pupils and the millimeters per pixel.
+
+    The scale assumes the pupils are AnalyzeFace.pd millimeters apart.
+
+    Args:
+        pupils (Tuple[Tuple[float, float], Tuple[float, float]]): The two pupil
+            positions, in pixels.
+
+    Returns:
+        Tuple[float, float]: The pupillary distance in pixels, and the millimeters
+            per pixel, which is NaN when the pupils coincide.
+    """
     left_pupil = np.array(pupils[0])
     right_pupil = np.array(pupils[1])
 
@@ -58,6 +79,16 @@ def util_calc_pd(
 def util_get_pupils(
     landmarks: List[Tuple[int, int]],
 ) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+    """
+    Return the two pupil landmarks, left first.
+
+    Args:
+        landmarks (List[Tuple[int, int]]): The 98 WFLW landmarks.
+
+    Returns:
+        Tuple[Tuple[int, int], Tuple[int, int]]: The left pupil (landmark 97) and
+            the right pupil (landmark 96).
+    """
     # Returns (left_pupil, right_pupil) -- LEFT first, RIGHT second. Callers that
     # feed this straight into calculate_face_rotation() depend on this exact
     # order for the sign of the resulting tilt angle; don't reorder casually.
@@ -65,6 +96,25 @@ def util_get_pupils(
 
 
 class AnalyzeFace(ImageAnalysis):
+    """
+    Analyzes a face: finds it in an image, places its 98 landmarks, crops it to a
+    standard size and runs the measures on it.
+
+    Load the models with dynaface.models.init_models() first. Then call
+    load_image() with an RGB image and analyze() for the measurements. The image
+    with the measures drawn on it is in render_img, and save() writes it to a file.
+
+    Attributes:
+        pd (float): The assumed distance between the pupils, in millimeters (63 by
+            default), used to convert pixels to millimeters. Set it on the class,
+            as AnalyzeFace.pd, to calibrate.
+        measures (List[MeasureBase]): The measures that analyze() runs.
+        landmarks (List[Tuple[int, int]]): The 98 WFLW landmark positions, in
+            pixels of the current image.
+        pose (Pose): The pose that load_image() detected or was told to use.
+        render_img (NDArray[np.uint8]): The image the measures draw on.
+    """
+
     pd = STD_PUPIL_DIST
 
     def __init__(
@@ -105,6 +155,16 @@ class AnalyzeFace(ImageAnalysis):
         self.pose = Pose.FRONTAL
 
     def get_all_items(self) -> List[str]:
+        """
+        List the outputs to show or export: the enabled items of the enabled
+        measures, without display-only items.
+
+        analyze() returns every output whether or not its item is enabled, so use
+        this list to choose which ones to show.
+
+        Returns:
+            List[str]: Output names, such as "fai" and "oce.l".
+        """
         return [
             stat.name
             for obj in self.measures
@@ -279,14 +339,20 @@ class AnalyzeFace(ImageAnalysis):
         force_pose: Optional[Pose] = Pose.DETECT,
     ) -> bool:
         """
-        Load an image and process facial landmarks.
+        Load an RGB image, find the face, place its landmarks and crop it.
 
         Args:
-            img (NDArray[Any]): The image to load.
-            crop (bool): Whether to crop the face.
-            pupils (Optional[Tuple[Tuple[int, int], Tuple[int, int]]]): Optional pupils coordinates.
+            img (NDArray[Any]): The image, as an RGB array.
+            crop (bool): Whether to crop the face to the standard 1024 by 1024 size.
+                Lateral faces are always cropped.
+            pupils (Optional[Tuple[Tuple[int, int], Tuple[int, int]]]): Currently
+                unused; the crop is always placed using the pupils found in this
+                image.
+            force_pose (Optional[Pose]): Pose.DETECT to classify the pose as
+                frontal or lateral, or a Pose to use instead.
+
         Returns:
-            bool: True if the image was processed, False otherwise.
+            bool: True once the image is loaded.
         """
         super().load_image(img)
         logger.debug("Low level-image loaded")
@@ -536,7 +602,12 @@ class AnalyzeFace(ImageAnalysis):
 
     def analyze(self) -> Optional[Dict[str, Any]]:
         """
-        Performs analysis on the face using enabled measures.
+        Run the enabled measures on the face, drawing them on render_img.
+
+        Returns:
+            Optional[Dict[str, Any]]: Each output's name mapped to its value, such
+                as {"fai": 0.70, "oce.l": 30.12, ...}, or None if the image has no
+                landmarks. A value that couldn't be determined is NaN.
         """
         if not self.landmarks:  # Changed check since landmarks is never None.
             return None
@@ -735,12 +806,29 @@ class AnalyzeFace(ImageAnalysis):
         super().load_image(img2)
 
     def calc_pd(self) -> None:
+        """Measure the pupils on the current landmarks; update pupillary_distance
+        and pix2mm (millimeters per pixel)."""
         self.pupillary_distance, self.pix2mm = util_calc_pd(self.get_pupils())
 
     def get_pupils(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
+        """
+        Return the two pupil positions, left first.
+
+        Returns:
+            Tuple[Tuple[float, float], Tuple[float, float]]: The left and right
+                pupil landmarks, in pixels.
+        """
         return util_get_pupils(self.landmarks)
 
     def dump_state(self) -> List[Any]:
+        """
+        Capture this frame's analysis, so a video's frames can be kept and
+        restored with load_state() without detecting the face again.
+
+        Returns:
+            List[Any]: The original image, head pose, landmarks, pupillary
+                distance, millimeters per pixel and face rotation.
+        """
         result: List[Any] = [
             self.original_img,
             self.headpose,
@@ -752,6 +840,13 @@ class AnalyzeFace(ImageAnalysis):
         return copy.copy(result)
 
     def load_state(self, obj: List[Any]) -> None:
+        """
+        Restore a frame's analysis captured by dump_state().
+
+        Args:
+            obj (List[Any]): The list dump_state() returned. A state saved without
+                a face rotation restores with a rotation of 0.
+        """
         if not self.is_image_loaded():
             self.init_image(obj[0])
         else:
@@ -766,9 +861,23 @@ class AnalyzeFace(ImageAnalysis):
             self.face_rotation = 0
 
     def find_pupils(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
+        """
+        Return the two pupil positions, left first. The same as get_pupils().
+
+        Returns:
+            Tuple[Tuple[float, float], Tuple[float, float]]: The left and right
+                pupil landmarks, in pixels.
+        """
         return util_get_pupils(self.landmarks)
 
     def calc_bisect(self) -> Any:
+        """
+        Return the line that bisects the face: perpendicular to the line between
+        the pupils, through its midpoint.
+
+        Returns:
+            Any: The line's two end points on a 1024 by 1024 image.
+        """
         # Convert pupil coordinates to ints to match the expected type.
         pupils: Tuple[Tuple[int, int], Tuple[int, int]] = (
             (int(self.find_pupils()[0][0]), int(self.find_pupils()[0][1])),
@@ -777,6 +886,8 @@ class AnalyzeFace(ImageAnalysis):
         return util.bisecting_line_coordinates(img_size=1024, pupils=pupils)
 
     def draw_static(self) -> None:
+        """Write the pose, such as "Frontal" or "Lateral (left)", at the bottom left
+        of render_img."""
         if self.pose == Pose.FRONTAL:
             text = "Frontal"
         elif self.pose == Pose.QUARTER:
@@ -794,7 +905,20 @@ def load_face_image(
     tilt_threshold: float = DEFAULT_TILT_THRESHOLD,
 ) -> AnalyzeFace:
     """
-    Load and analyze a face image from a local file or URL.
+    Load a face image from a file or URL and get it ready to analyze.
+
+    Load the models with dynaface.models.init_models() first.
+
+    Args:
+        filename (str): A path to an image file, or an http or https URL.
+        crop (bool): Whether to crop the face to the standard 1024 by 1024 size.
+        measures (Optional[List[MeasureBase]]): The measures to run. Defaults to
+            all_measures().
+        tilt_threshold (float): Straighten faces tilted more than this many
+            degrees. A negative value, the default, never straightens.
+
+    Returns:
+        AnalyzeFace: The face, ready for analyze().
     """
     if measures is None:
         measures = dynaface.measures.all_measures()

@@ -1,3 +1,5 @@
+"""Download Dynaface's three AI models, load them and choose a device to run on."""
+
 import gc
 import hashlib
 import logging
@@ -44,6 +46,24 @@ def _init_onnx() -> None:
 def download_models(
     path: Optional[Union[str, Path]] = None, verify_hash: bool = True
 ) -> str:
+    """
+    Download Dynaface's AI models, unless they're already there.
+
+    The three ONNX models (about 400 MB) come as one zip file, which is checked
+    against a SHA-256 hash and then unpacked.
+
+    Args:
+        path (Optional[Union[str, Path]]): The folder for the models. Defaults to
+            ~/.dynaface/models.
+        verify_hash (bool): Whether to check the download's SHA-256 hash before
+            unpacking it.
+
+    Returns:
+        str: The folder that holds the models, to pass to init_models().
+
+    Raises:
+        ValueError: If the download doesn't match the expected hash.
+    """
     # Accept either a string or Path; if None, use the default directory.
     if path is None:
         path = Path.home() / ".dynaface" / "models"
@@ -113,6 +133,15 @@ def download_models(
 
 
 def init_models(model_path: str, device: str) -> None:
+    """
+    Load the AI models. Call this once before analyzing any face.
+
+    Args:
+        model_path (str): The folder that holds the models, as download_models()
+            returns it.
+        device (str): "cpu", "cuda" for an NVIDIA GPU, or "mps" for Core ML on a
+            Mac. detect_device() picks the best one available.
+    """
     global _model_path, _device
     _model_path = model_path
     _device = device
@@ -120,6 +149,7 @@ def init_models(model_path: str, device: str) -> None:
 
 
 def unload_models() -> None:
+    """Release the loaded models. Call init_models() again before analyzing more."""
     global _model_path, _device, onnx_model
     _model_path = None
     _device = "cpu"
@@ -127,10 +157,24 @@ def unload_models() -> None:
 
 
 def are_models_init() -> bool:
+    """
+    Report whether init_models() has been called.
+
+    Returns:
+        bool: True once init_models() has been called. It stays True after
+            unload_models().
+    """
     return _device != "?"
 
 
 def detect_device() -> str:
+    """
+    Pick the fastest device ONNX Runtime can use on this computer.
+
+    Returns:
+        str: "cuda" when an NVIDIA GPU is available, "mps" (Core ML) on a Mac that
+            supports it, and "cpu" otherwise.
+    """
     available = ort.get_available_providers()
     if "CUDAExecutionProvider" in available:
         return "cuda"

@@ -1,3 +1,5 @@
+"""Image loading, plus the base class that holds an image and draws on it."""
+
 import math
 import os
 from typing import List, Optional, Tuple
@@ -45,6 +47,12 @@ def load_image(filename: str) -> NDArray[Any]:
 
 
 class ImageAnalysis:
+    """
+    Holds an RGB image and draws on it: text, lines, arrows and shapes.
+
+    AnalyzeFace builds on this class. Measures draw their results on render_img,
+    and save() writes it to a file.
+    """
 
     def __init__(self) -> None:
         self.text_font: int = cv2.FONT_HERSHEY_SIMPLEX

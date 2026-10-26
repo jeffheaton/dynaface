@@ -1,3 +1,5 @@
+"""Measures of a lateral (side-profile) view."""
+
 import logging
 import math
 from typing import Any, Dict
@@ -12,13 +14,21 @@ from dynaface.measures_base import MeasureBase, MeasureItem, select_outputs
 
 class AnalyzeLateral(MeasureBase):
     """
-    Analyze several measurements in lateral view.
-    NN: Distance from soft tissue nasion to subnasal point.
-    NM: Distance from subnasal point to mentolabial point.
-    NP: Distance from subnasal point to soft tissue pogonion.
-    NFA: Nasofrontal Angle at Soft Tissue Nasion formed by Glabella and Nasal Tip.
-    NLA: Nasolabial Angle at Subnasal Point formed by Nasal Tip and Soft Tissue Pogonion.
-    Tip Projection: (AT, NT, AT/NT)
+    Measures of a side profile, from the landmarks found along its outline.
+
+    Outputs:
+        nfa: Nasofrontal angle, in degrees, at the soft tissue nasion between the
+            glabella and the nasal tip.
+        nla: Nasolabial angle, in degrees, at the subnasal point between the nasal
+            tip and the soft tissue pogonion.
+        at: Tip projection: the horizontal distance, in pixels, from the nasal tip
+            (A) to point T, which is level with the tip and directly below the
+            nasion.
+        nt: The vertical distance, in pixels, from the nasion (N) to T.
+        at_nt: The ratio AT/NT.
+
+    The tip_proj item only switches the AT and NT drawing on and off; it has no
+    value of its own.
     """
 
     def __init__(self) -> None:
@@ -37,9 +47,27 @@ class AnalyzeLateral(MeasureBase):
         self.sync_items()
 
     def abbrev(self) -> str:
+        """
+        Return the abbreviation for the lateral measures.
+
+        Returns:
+            str: Abbreviation string.
+        """
         return "Lateral Measures"
 
     def calc(self, face: Any, render: bool = True) -> Dict[str, float]:
+        """
+        Calculate the lateral measures, drawing the enabled ones when render is
+        True.
+
+        Args:
+            face (Any): Face object with its lateral_landmarks set.
+            render (bool): Whether to render the measurements visually.
+
+        Returns:
+            Dict[str, float]: nfa, nla, at, nt and at_nt, with NaN where a landmark
+                wasn't found, or an empty dict for a face that isn't lateral.
+        """
         render_nfa: bool = self.is_enabled("nfa")
         render_nla: bool = self.is_enabled("nla")
 

@@ -1,3 +1,5 @@
+"""The registry of Dynaface's measures."""
+
 import logging
 import math
 from typing import Any, List
@@ -27,10 +29,10 @@ logger = logging.getLogger(__name__)
 
 def all_measures() -> List["MeasureBase"]:
     """
-    Return a list of all measurement analysis objects.
+    Return a new instance of every Dynaface measure, in the order they run.
 
     Returns:
-        List[MeasureBase]: List of measurement analysis objects.
+        List[MeasureBase]: One instance of each measure, all enabled.
     """
     return [
         AnalyzeFAI(),

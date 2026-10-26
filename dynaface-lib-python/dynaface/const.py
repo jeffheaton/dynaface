@@ -1,3 +1,5 @@
+"""Constants shared across Dynaface: crop geometry, landmark indices and poses."""
+
 from enum import Enum
 
 STYLEGAN_WIDTH = 1024
@@ -16,6 +18,13 @@ FILL_COLOR = (255, 255, 255)
 
 
 class Pose(Enum):
+    """
+    The pose of a face: which way it faces the camera.
+
+    Pass DETECT to AnalyzeFace.load_image() to have the pose classified as frontal
+    or lateral, or one of the others to force it.
+    """
+
     FRONTAL = "frontal"
     LATERAL = "lateral"
     QUARTER = "quarter"

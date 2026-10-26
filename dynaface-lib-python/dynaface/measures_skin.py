@@ -1,3 +1,5 @@
+"""The skin tone measure."""
+
 import logging
 from typing import Any, Dict
 
@@ -55,7 +57,9 @@ VON_LUSCHAN_RGB = {
 
 class AnalyzeSkinTone(MeasureBase):
     """
-    Analyze the skin toke using the Fitzpatrick and Von Luschan skin tone measurement.
+    Skin tone: the average color of both cheeks, as hue, saturation and brightness.
+
+    Outputs: hue, in degrees from 0 to 360, and sat and brightness, in percent.
     """
 
     def __init__(self) -> None:
@@ -66,6 +70,12 @@ class AnalyzeSkinTone(MeasureBase):
         self.sync_items()
 
     def abbrev(self) -> str:
+        """
+        Return the abbreviation for the skin tone measure.
+
+        Returns:
+            str: Abbreviation string.
+        """
         return "Skin Tone"
 
     def draw_swatch(
@@ -102,6 +112,17 @@ class AnalyzeSkinTone(MeasureBase):
             current_y += text_h + 5
 
     def calc(self, face: Any, render: bool = True) -> Dict[str, Any]:
+        """
+        Calculate the skin tone, drawing a swatch of it when render is True.
+
+        Args:
+            face (Any): Face object containing landmarks and measurement methods.
+            render (bool): Whether to render the swatch visually.
+
+        Returns:
+            Dict[str, Any]: hue, sat and brightness, or an empty dict when the
+                landmarks it samples are missing.
+        """
         results: Dict[str, Any] = {}
 
         try:

@@ -1,3 +1,5 @@
+"""Measures of a frontal (face-on) view."""
+
 import logging
 from typing import Any, Dict, List
 
@@ -11,7 +13,11 @@ logger = logging.getLogger(__name__)
 
 class AnalyzeFAI(MeasureBase):
     """
-    Analyze the Facial Angle of Incisor (FAI) measurement.
+    Facial Asymmetry Index (FAI): how much the distance from each eye's inner
+    corner to the same side's mouth corner differs between the two sides, in
+    millimeters.
+
+    Output: fai.
     """
 
     def __init__(self) -> None:
@@ -35,14 +41,14 @@ class AnalyzeFAI(MeasureBase):
 
     def calc(self, face: Any, render: bool = True) -> Dict[str, Any]:
         """
-        Calculate the Facial Angle of Incisor (FAI) measurement.
+        Calculate the Facial Asymmetry Index (FAI).
 
         Args:
             face (Any): Face object containing landmarks and measurement methods.
             render (bool): Whether to render the measurement visually.
 
         Returns:
-            Dict[str, Any]: Filtered measurement results.
+            Dict[str, Any]: fai, in millimeters.
         """
         render2: bool = self.is_enabled("fai")
         d1: float = face.measure(
@@ -798,9 +804,26 @@ class AnalyzeLandmarks(MeasureBase):
         self.sync_items()
 
     def abbrev(self) -> str:
+        """
+        Return the abbreviation for the landmarks measure.
+
+        Returns:
+            str: Abbreviation string.
+        """
         return "Landmarks"
 
     def calc(self, face: Any, render: bool = True) -> Dict[str, Any]:
+        """
+        Return the position of all 98 landmarks, drawing them when render is True.
+
+        Args:
+            face (Any): Face object containing landmarks and measurement methods.
+            render (bool): Whether to render the landmarks visually.
+
+        Returns:
+            Dict[str, Any]: landmark-1-x, landmark-1-y and so on through
+                landmark-98-y, in pixels, numbered from 1.
+        """
         if render:
             # Draw black outline (radius 3) then white fill (radius 2) so dots
             # are visible against any background color.
