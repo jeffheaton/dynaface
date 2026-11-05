@@ -21,11 +21,6 @@ WIDTH, HEIGHT = 1280, 720
 HEADPOSE = np.array([8.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 RIGHT_PUPIL, LEFT_PUPIL = (530, 320), (760, 330)
 
-# dump_state() keeps self.headpose, which load_image() never fills in, so a restored
-# face reports a level head. That's a separate gap from the scale, so the restored
-# comparisons leave these out.
-POSE_OUTPUTS = ("yaw", "pitch", "roll")
-
 
 def made_up_landmarks():
     """98 landmarks scattered around pupils 230 pixels apart, in a video-sized frame."""
@@ -60,11 +55,9 @@ def _is_nan(value):
         return False
 
 
-def assert_same_outputs(test, expected, actual, ignore=()):
+def assert_same_outputs(test, expected, actual):
     test.assertEqual(sorted(expected), sorted(actual))
     for key, value in expected.items():
-        if key in ignore:
-            continue
         if _is_nan(value):
             test.assertTrue(_is_nan(actual[key]), f"{key}: expected NaN")
         else:
@@ -86,8 +79,7 @@ class TestScale(unittest.TestCase):
         assert_same_outputs(self, expected, later.analyze())
 
         # Saved, then restored.
-        restored = restore(face.dump_state())
-        assert_same_outputs(self, expected, restored.analyze(), ignore=POSE_OUTPUTS)
+        assert_same_outputs(self, expected, restore(face.dump_state()).analyze())
 
     def test_state_saved_with_the_old_rule_is_corrected(self):
         # Before October 2026 the scale was measured on the uncropped pupils, and
@@ -99,9 +91,7 @@ class TestScale(unittest.TestCase):
 
         state = face.dump_state()
         state[3], state[4] = uncropped_pd, uncropped_pix2mm
-        assert_same_outputs(
-            self, expected, restore(state).analyze(), ignore=POSE_OUTPUTS
-        )
+        assert_same_outputs(self, expected, restore(state).analyze())
 
     def test_each_face_keeps_its_pupillary_distance(self):
         face = load(crop=True)
@@ -115,7 +105,7 @@ class TestScale(unittest.TestCase):
             assert_same_outputs(self, expected, face.analyze())
             restored = restore(state)
             self.assertAlmostEqual(restored.pd, default_pd)
-            assert_same_outputs(self, expected, restored.analyze(), ignore=POSE_OUTPUTS)
+            assert_same_outputs(self, expected, restored.analyze())
             # A face loaded now uses the new one.
             self.assertAlmostEqual(
                 load(crop=True).analyze()["ml"], expected["ml"] * 58 / default_pd
@@ -152,8 +142,7 @@ class TestScaleOnAPhoto(unittest.TestCase):
         later.crop_stylegan()
         assert_same_outputs(self, expected, later.analyze())
 
-        restored = restore(face.dump_state())
-        assert_same_outputs(self, expected, restored.analyze(), ignore=POSE_OUTPUTS)
+        assert_same_outputs(self, expected, restore(face.dump_state()).analyze())
 
 
 if __name__ == "__main__":

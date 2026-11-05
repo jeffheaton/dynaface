@@ -96,6 +96,20 @@ def _saved_pupil_distance(pupillary_distance: Any, pix2mm: Any) -> Optional[floa
     return pd_mm if math.isfinite(pd_mm) and pd_mm > 0 else None
 
 
+def _saved_head_pose(saved: Any) -> List[float]:
+    """
+    The head pose a saved state holds, as floats, with at least yaw, pitch and roll.
+
+    States saved by Dynaface 2.0.4 and earlier hold [0, 0, 0] (dump_state() saved a
+    placeholder), so they restore a level head, as they always did.
+    """
+    try:
+        pose = [float(v) for v in saved]
+    except (TypeError, ValueError):
+        pose = []
+    return pose + [0.0] * (3 - len(pose))
+
+
 def util_get_pupils(
     landmarks: List[Tuple[int, int]],
 ) -> Tuple[Tuple[int, int], Tuple[int, int]]:
@@ -137,6 +151,9 @@ class AnalyzeFace(ImageAnalysis):
         measures (List[MeasureBase]): The measures that analyze() runs.
         landmarks (List[Tuple[int, int]]): The 98 WFLW landmark positions, in
             pixels of the current image.
+        headpose (List[float]): The head pose the landmark model found in the
+            image as loaded: yaw, pitch and roll in degrees (also in yaw, pitch
+            and roll), then its translation. dump_state() saves it.
         pose (Pose): The pose that load_image() detected or was told to use.
         render_img (NDArray[np.uint8]): The image the measures draw on.
     """
@@ -167,7 +184,7 @@ class AnalyzeFace(ImageAnalysis):
             self.measures: List[MeasureBase] = dynaface.measures.all_measures()
         else:
             self.measures = measures
-        self.headpose: List[int] = [0, 0, 0]
+        self.headpose: List[float] = [0.0, 0.0, 0.0]
         self.landmarks: List[Tuple[int, int]] = []
         self.lateral: bool = False
         self.lateral_landmarks: NDArray[Any] = np.empty((0, 2), dtype=int)
@@ -392,6 +409,10 @@ class AnalyzeFace(ImageAnalysis):
         self._scale_from_landmarks = False
         landmarks, self._headpose = self._find_landmarks(img)
         self.yaw, self.pitch, self.roll = self._headpose[:3]
+        # The pose this face reports, as plain floats so any saved state can hold it.
+        # Like yaw, pitch and roll, it stays the image's own, even when a profile is
+        # flipped and found again below.
+        self.headpose = [float(v) for v in self._headpose]
         self.landmarks = [(int(x), int(y)) for x, y in landmarks]
 
         if force_pose is None or force_pose == Pose.DETECT:
@@ -813,7 +834,7 @@ class AnalyzeFace(ImageAnalysis):
         """
         result: List[Any] = [
             self.original_img,
-            self.headpose,
+            list(self.headpose),
             self.landmarks,
             self.pupillary_distance,
             self.pix2mm,
@@ -830,6 +851,8 @@ class AnalyzeFace(ImageAnalysis):
         today's AnalyzeFace.pd, and its scale is measured again on the restored
         landmarks, which also corrects states saved when the scale was measured
         before the crop. A state with a fixed scale (a profile) keeps its saved one.
+        It also reports the head pose the face was analyzed with; states saved by
+        Dynaface 2.0.4 and earlier hold none, and restore a level head.
 
         Args:
             obj (List[Any]): The list dump_state() returned. A state saved without
@@ -839,7 +862,9 @@ class AnalyzeFace(ImageAnalysis):
         # placeholder image, so drawing would otherwise land on that, or on the
         # previous frame's drawing.
         self.init_image(obj[0])
-        self.headpose = copy.copy(obj[1])
+        self.headpose = _saved_head_pose(obj[1])
+        self._headpose = np.array(self.headpose, dtype=np.float64)
+        self.yaw, self.pitch, self.roll = self.headpose[:3]
         self.landmarks = copy.copy(obj[2])
         self.pupillary_distance = obj[3]
         self.pix2mm = obj[4]

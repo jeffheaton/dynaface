@@ -1,8 +1,12 @@
 import os
 import sys
 import unittest
+from unittest import mock
+
+import numpy as np
 
 from dynaface import facial, measures, models
+from dynaface.const import Pose
 from dynaface.image import load_image
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -123,4 +127,58 @@ class TestFaceSave(unittest.TestCase):
                 expected,
                 delta=_tolerance(expected),
                 msg=f"{key}: expected {expected}, got {actual}",
+            )
+
+
+class TestSavedHeadPose(unittest.TestCase):
+    """A restored state reports the head pose its face was analyzed with."""
+
+    # yaw, pitch and roll in degrees, then the translation, as the landmark model gives
+    POSE = np.array([12.5, -4.25, 3.0, 10.0, 20.0, 30.0])
+
+    def load(self):
+        """A gray image loaded with made-up landmarks and pose instead of the models."""
+        face = facial.AnalyzeFace(measures=[measures.AnalyzePose()])
+        img = np.full((1024, 1024, 3), 128, dtype=np.uint8)
+        landmarks = [(512, 512)] * 96 + [(400, 500), (600, 500)]
+        with mock.patch.object(
+            facial.AnalyzeFace, "_find_landmarks", return_value=(landmarks, self.POSE)
+        ):
+            face.load_image(img, crop=True, force_pose=Pose.FRONTAL)
+        return face
+
+    def restore(self, state):
+        face = facial.AnalyzeFace(measures=[measures.AnalyzePose()])
+        face.load_state(state)
+        return face
+
+    def test_pose_survives_saving(self):
+        face = self.load()
+        expected = face.analyze()
+        restored = self.restore(face.dump_state())
+        self.assertEqual(restored.analyze(), expected)
+        self.assertEqual(restored.headpose, list(self.POSE))
+
+    def test_state_saved_before_the_pose_was_kept(self):
+        # Dynaface 2.0.4 and earlier saved [0, 0, 0] in its place, and such a state
+        # restores a level head, as it always did.
+        state = self.load().dump_state()
+        state[1] = [0, 0, 0]
+        restored = self.restore(state)
+        self.assertEqual((restored.yaw, restored.pitch, restored.roll), (0.0, 0.0, 0.0))
+
+    def test_flipped_profile(self):
+        # A profile facing right is flipped and found again, but it reports, and
+        # saves, the pose found in the photo as loaded.
+        models.init_models(models.download_models(), models.detect_device())
+        img = load_image("./tests_data/img2-1024-right-lateral.jpg")
+        face = facial.AnalyzeFace(measures=measures.all_measures())
+        face.load_image(img, crop=True)
+        self.assertTrue(face.flipped)
+
+        restored = facial.AnalyzeFace(measures=measures.all_measures())
+        restored.load_state(face.dump_state())
+        for name in ("yaw", "pitch", "roll"):
+            self.assertAlmostEqual(
+                getattr(restored, name), getattr(face, name), msg=name
             )
