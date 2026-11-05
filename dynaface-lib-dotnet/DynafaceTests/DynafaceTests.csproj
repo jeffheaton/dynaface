@@ -32,6 +32,12 @@
          hold the one copy; see LateralProfileTests. -->
     <None Include="..\..\dynaface-lib-python\tests_data\lateral_profiles.json"
           Link="TestData\lateral_profiles.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The Python library's own copies of values the .NET port also keeps, which
+         SharedConstantsTests checks the .NET copies against. -->
+    <None Include="..\..\dynaface-lib-python\dynaface\dynaface_onnx.py"
+          Link="TestData\python\dynaface_onnx.py" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\dynaface-lib-python\dynaface\lateral.py"
+          Link="TestData\python\lateral.py" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

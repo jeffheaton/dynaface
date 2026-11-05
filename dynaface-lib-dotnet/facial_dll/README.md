@@ -48,6 +48,6 @@ Dictionary<string, double> measurements = ctx.Analyze();
 | ONNX | `Microsoft.ML.OnnxRuntime` | `Dynaface.Onnx` |
 | Unity Inference Engine | Unity Sentis | external `DynafaceRuntime` assembly |
 
-To add your own backend, implement `IDynafaceInference`'s 3 methods (`RunBlazeFace` / `RunSpiga` / `RunU2Net`).
+To add your own backend, implement `IDynafaceInference`'s 3 methods (`RunBlazeFace` / `RunSpiga` / `RunU2Net`). SPIGA also takes two fixed inputs alongside the image; feed them from `SpigaModelInputs`.
 
 The [documentation](https://docs.dynaface.org/dotnet/) shows how to use the library, and its [measures catalog](https://docs.dynaface.org/measures/) explains every measurement and how it's calculated. The source is in the [project repository](https://github.com/jeffheaton/dynaface). Licensed under Apache-2.0.

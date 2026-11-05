@@ -19,6 +19,20 @@ public static class LateralLandmarkFinder
     // Output layout: 0=Glabella, 1=Nasion, 2=NasalTip, 3=Subnasal, 4=MentoLabial, 5=Pogonion.
     public const int Glabella = 0, Nasion = 1, NasalTip = 2, Subnasal = 3, MentoLabial = 4, Pogonion = 5;
 
+    // Display names for that layout, index for index: dynaface-lib's
+    // lateral.LATERAL_LANDMARK_NAMES. The lateral chart labels its points with them,
+    // and apps use them to name the points too (in a lateral CSV, for one). Read-only,
+    // so no consumer can rename a point for everyone else.
+    public static readonly IReadOnlyList<string> LandmarkNames = Array.AsReadOnly(new[]
+    {
+        "Soft Tissue Glabella",
+        "Soft Tissue Nasion",
+        "Nasal Tip",
+        "Subnasal Point",
+        "Mento Labial Point",
+        "Soft Tissue Pogonion",
+    });
+
     public static Vec2[] FindLateralLandmarks(
         float[] sagittalX, float[] sagittalY,
         int[] maxIndices, int[] minIndices, int[] cornerIdxs,

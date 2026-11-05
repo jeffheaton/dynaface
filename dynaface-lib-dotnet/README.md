@@ -171,6 +171,8 @@ public class MyDynafaceInference : IDynafaceInference
 
     // SPIGA WFLW-98
     //   in:  NCHW float[1×3×256×256], values in [0, 1], y=0 at top
+    //        (the model's two fixed inputs, model3d [1×98×3] and cam_matrix [1×3×3],
+    //        come from SpigaModelInputs.Model3d() and SpigaModelInputs.CameraMatrix())
     //   out: (landmarks flat float[98×2] normalized to [0,1],
     //         pose float[6] raw [yaw, pitch, roll, tx, ty, tz]), or null on failure
     public (float[] landmarks, float[] pose)? RunSpiga(float[] imageTensor) { ... }

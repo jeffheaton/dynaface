@@ -14,16 +14,6 @@ using System;
 // place a height-1024-normalized matplotlib render would.
 public static class LateralChartRenderer
 {
-    static readonly string[] LandmarkNames =
-    {
-        "Soft Tissue Glabella",
-        "Soft Tissue Nasion",
-        "Nasal Tip",
-        "Subnasal Point",
-        "Mento Labial Point",
-        "Soft Tissue Pogonion",
-    };
-
     static readonly Rgba32 White = new Rgba32(255, 255, 255, 255);
     static readonly Rgba32 Black = new Rgba32(0, 0, 0, 255);
     static readonly Rgba32 LandmarkDot = new Rgba32(20, 160, 20, 255);
@@ -80,7 +70,8 @@ public static class LateralChartRenderer
             prevY = y;
         }
 
-        for (int i = 0; i < result.LateralLandmarks.Length && i < LandmarkNames.Length; i++)
+        var names = LateralLandmarkFinder.LandmarkNames;
+        for (int i = 0; i < result.LateralLandmarks.Length && i < names.Count; i++)
         {
             Vec2 lm = result.LateralLandmarks[i];
             if (lm.X < 0 || lm.Y < 0) continue;
@@ -92,7 +83,7 @@ public static class LateralChartRenderer
             FaceRenderer.DrawText(
                 image.Pixels, image.Width, image.Height,
                 x + DotRadius + LabelGap, y - FaceRenderer.GlyphHeight * LabelTextScale / 2,
-                LandmarkNames[i], Black, LabelTextScale, outlined: false);
+                names[i], Black, LabelTextScale, outlined: false);
         }
 
         DrawLegend(image, xOffset);

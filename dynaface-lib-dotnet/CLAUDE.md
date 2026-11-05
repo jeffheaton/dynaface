@@ -40,7 +40,7 @@ dotnet run --project FacialDllConsole -- photo.jpg blaze_face_short_range.onnx s
 |---|---|
 | `IDynafaceInference` (`RunBlazeFace`/`RunSpiga`/`RunU2Net`) | `OnnxDynafaceInference` |
 
-The interface lives in `facial_dll/IDynafaceInference.cs`; `OnnxDynafaceInference` lives in `FacialDll.Onnx/`. It auto-detects tensor names from model metadata; pass explicit overrides to the constructor or use `--list-tensors` to inspect a model before running inference.
+The interface lives in `facial_dll/IDynafaceInference.cs`; `OnnxDynafaceInference` lives in `FacialDll.Onnx/`. It auto-detects tensor names from model metadata; pass explicit overrides to the constructor or use `--list-tensors` to inspect a model before running inference. SPIGA's two fixed inputs (`model3d`, `cam_matrix`) live in the core as `SpigaModelInputs`, so every backend feeds the same values instead of carrying its own copy.
 
 The Unity runtime adapter layer (`DynafaceRuntime` assembly) implements the same interface for Unity Inference Engine — it lives outside this repo, and (unlike `Dynaface.Onnx`) is not a NuGet package.
 

@@ -20,6 +20,71 @@ public static class StyleGanCropper
         float tiltThreshold = DynafaceConstants.DefaultTiltThreshold,
         Vec2? pupilLeftOverride = null, Vec2? pupilRightOverride = null)
     {
+        int width = photo.Width, height = photo.Height;
+        CropPlan plan = Plan(width, height, landmarks, yaw, tiltThreshold, pupilLeftOverride, pupilRightOverride);
+
+        Rgba32[] topLeftPixels = ImageUtils.FlipVertical(photo.Pixels, width, height);
+
+        if (plan.FaceRotationRad.HasValue)
+            topLeftPixels = ImageUtils.Straighten(topLeftPixels, width, height, plan.FaceRotationRad.Value);
+
+        Rgba32[] resized = ImageUtils.ResizeBilinear(
+            topLeftPixels, width, height, plan.ResizedWidth, plan.ResizedHeight);
+        var (clipped, _, _) = ImageUtils.SafeClip(
+            resized, plan.ResizedWidth, plan.ResizedHeight,
+            plan.CropX, plan.CropY, DynafaceConstants.StyleganWidth, DynafaceConstants.StyleganWidth,
+            DynafaceConstants.FillColorWhite);
+
+        Rgba32[] bottomLeftPixels = ImageUtils.FlipVertical(
+            clipped, DynafaceConstants.StyleganWidth, DynafaceConstants.StyleganWidth);
+
+        var cropImage = new FaceImage(bottomLeftPixels, DynafaceConstants.StyleganWidth, DynafaceConstants.StyleganWidth);
+        return (cropImage, plan.Landmarks, plan.FaceRotationRad);
+    }
+
+    // The landmarks Crop would return, without building the image. For the same
+    // landmarks, yaw, options and image size the result equals Crop(...).landmarks
+    // exactly, integer truncation included, because both use the same layout math
+    // (Plan). It suits a consumer that stores a frame's uncropped landmarks (e.g. from
+    // FacePipeline.Run(crop: false)) and needs the cropped ones without decoding the
+    // frame, like a video's per-frame measures. imageWidth/imageHeight: the size of the
+    // image the landmarks were found in. Throws like Crop when the pupils coincide.
+    //
+    // Pix2mm doesn't carry over: a crop: false run measures it in the uncropped image's
+    // pixels. With these landmarks, use DynafaceConfig.PupilDistMm over their own pupil
+    // distance, as FacePipeline does after its crop (or rescale the stored value by the
+    // ratio of the two pupil distances, to keep the PD it was analyzed with).
+    //
+    // .NET-only: dynaface-lib's crop_stylegan always builds the image.
+    public static Vec2[] CropLandmarks(
+        int imageWidth, int imageHeight, Vec2[] landmarks, float yaw,
+        float tiltThreshold = DynafaceConstants.DefaultTiltThreshold,
+        Vec2? pupilLeftOverride = null, Vec2? pupilRightOverride = null)
+    {
+        if (imageWidth <= 0)
+            throw new ArgumentOutOfRangeException(nameof(imageWidth), imageWidth, "The image width must be positive.");
+        if (imageHeight <= 0)
+            throw new ArgumentOutOfRangeException(nameof(imageHeight), imageHeight, "The image height must be positive.");
+
+        return Plan(imageWidth, imageHeight, landmarks, yaw, tiltThreshold, pupilLeftOverride, pupilRightOverride)
+            .Landmarks;
+    }
+
+    // Everything the crop works out from the landmarks before it touches a pixel.
+    struct CropPlan
+    {
+        public Vec2[] Landmarks;        // the final landmarks, in the crop's top-left pixels
+        public float? FaceRotationRad;  // set only when the tilt is straightened
+        public int ResizedWidth;
+        public int ResizedHeight;
+        public int CropX;               // the crop window's top-left corner, in the
+        public int CropY;               // resized image's top-left pixels
+    }
+
+    static CropPlan Plan(
+        int width, int height, Vec2[] landmarks, float yaw, float tiltThreshold,
+        Vec2? pupilLeftOverride, Vec2? pupilRightOverride)
+    {
         Vec2 pupilLeft = pupilLeftOverride ?? landmarks[DynafaceConstants.LmLeftPupil];
         Vec2 pupilRight = pupilRightOverride ?? landmarks[DynafaceConstants.LmRightPupil];
 
@@ -34,7 +99,7 @@ public static class StyleGanCropper
         if (tiltThreshold >= 0f && MathHelpers.Abs(tiltDeg) > tiltThreshold)
         {
             faceRotationRad = rotRad;
-            var center = new Vec2(photo.Width / 2, photo.Height / 2);
+            var center = new Vec2(width / 2, height / 2);
             workingLandmarks = ImageUtils.RotateCropPoints(workingLandmarks, center, tiltDeg);
         }
 
@@ -49,12 +114,6 @@ public static class StyleGanCropper
         if (yaw > 5f)
             d = CorrectDistance2DForYaw(d, yaw) * 1.3f;
 
-        int width = photo.Width, height = photo.Height;
-        Rgba32[] topLeftPixels = ImageUtils.FlipVertical(photo.Pixels, width, height);
-
-        if (faceRotationRad.HasValue)
-            topLeftPixels = ImageUtils.Straighten(topLeftPixels, width, height, faceRotationRad.Value);
-
         float ar = (float)width / height;
         int newWidth = (int)(width * (DynafaceConstants.StyleganPupilDist / d));
         int newHeight = (int)(newWidth / ar);
@@ -63,19 +122,15 @@ public static class StyleGanCropper
         int cropX = (int)(workingLandmarks[DynafaceConstants.LmRightPupil].X * scale - DynafaceConstants.StyleganRightPupilX);
         int cropY = (int)(workingLandmarks[DynafaceConstants.LmRightPupil].Y * scale - DynafaceConstants.StyleganRightPupilY);
 
-        Rgba32[] resized = ImageUtils.ResizeBilinear(topLeftPixels, width, height, newWidth, newHeight);
-        var (clipped, _, _) = ImageUtils.SafeClip(
-            resized, newWidth, newHeight,
-            cropX, cropY, DynafaceConstants.StyleganWidth, DynafaceConstants.StyleganWidth,
-            DynafaceConstants.FillColorWhite);
-
-        Vec2[] finalLandmarks = ImageUtils.ScaleCropPoints(workingLandmarks, cropX, cropY, scale);
-
-        Rgba32[] bottomLeftPixels = ImageUtils.FlipVertical(
-            clipped, DynafaceConstants.StyleganWidth, DynafaceConstants.StyleganWidth);
-
-        var cropImage = new FaceImage(bottomLeftPixels, DynafaceConstants.StyleganWidth, DynafaceConstants.StyleganWidth);
-        return (cropImage, finalLandmarks, faceRotationRad);
+        return new CropPlan
+        {
+            Landmarks = ImageUtils.ScaleCropPoints(workingLandmarks, cropX, cropY, scale),
+            FaceRotationRad = faceRotationRad,
+            ResizedWidth = newWidth,
+            ResizedHeight = newHeight,
+            CropX = cropX,
+            CropY = cropY,
+        };
     }
 
     static float ToDegrees(float radians)

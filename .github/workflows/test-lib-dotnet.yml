@@ -10,12 +10,20 @@ on:
       - 'dynaface-lib-dotnet/**'
       # Shared with the Python tests; see LateralProfileTests.
       - 'dynaface-lib-python/tests_data/lateral_profiles.json'
+      # The .NET copies of their constants are checked against them; see
+      # SharedConstantsTests.
+      - 'dynaface-lib-python/dynaface/dynaface_onnx.py'
+      - 'dynaface-lib-python/dynaface/lateral.py'
       - '.github/workflows/test-lib-dotnet.yml'
   pull_request:
     paths:
       - 'dynaface-lib-dotnet/**'
       # Shared with the Python tests; see LateralProfileTests.
       - 'dynaface-lib-python/tests_data/lateral_profiles.json'
+      # The .NET copies of their constants are checked against them; see
+      # SharedConstantsTests.
+      - 'dynaface-lib-python/dynaface/dynaface_onnx.py'
+      - 'dynaface-lib-python/dynaface/lateral.py'
       - '.github/workflows/test-lib-dotnet.yml'
   workflow_dispatch:
 
