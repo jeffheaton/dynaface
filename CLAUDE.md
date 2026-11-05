@@ -111,6 +111,7 @@ The library has two main analysis paths: **frontal** (face-on) and **lateral** (
 - `measures_lateral.py` — Lateral measurements
 - `measures_skin.py` — Skin tone analysis
 - `measures.py` — `all_measures()` returns the full list of active measurement plugins
+- `video.py` — `FrameSeries`: a video's outputs frame by frame (from `analyze()` results or saved states), its CSV, peak frames, and the numbers behind the apps' Evaluation report. The desktop app's chart, CSV, jump-to-max and Evaluation use it, and the Unity app should too once it takes the 2.1 library (the .NET port has `FrameSeries` as well); keep that logic here, not in the apps
 
 **Other:**
 - `const.py` — Landmark indices and thresholds

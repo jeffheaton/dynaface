@@ -16,6 +16,7 @@ from dynaface.const import Pose
 from dynaface.facial import AnalyzeFace
 from dynaface.lateral import LATERAL_LANDMARK_NAMES
 from dynaface.measures import AnalyzeDentalArea, AnalyzeEyeArea, all_measures
+from dynaface.video import FrameSeries
 from jth_ui import app_jth, utl_etc
 from jth_ui.tab_graphic import TabGraphic
 from matplotlib.figure import Figure
@@ -821,50 +822,20 @@ gesture you wish to analyze."""
             self._window.display_message_box("Unable to save file.")
 
     def collect_data(self, step_size=1):
-        app = QApplication.instance()
-
-        tilt_threshold = app.tilt_threshold
-        face = AnalyzeFace(self._face.measures, tilt_threshold=tilt_threshold)
-        stats = face.get_all_items()
-        data = {stat: [] for stat in stats}
-
-        cols = list(data.keys())
-        cols = ["frame", "time"] + cols
-
-        frames = range(self._frame_begin, self._frame_end, step_size)
-
-        for i in frames:
-            frame = self._frames[i]
-            face.load_state(frame)
-            rec = face.analyze()
-            for stat in rec.keys():
-                if stat in data:
-                    data[stat].append(rec[stat])
-        frame_count = self._frame_end - self._frame_begin
-        data["frame"] = list(range(0, frame_count, step_size))
-        return data
+        """The enabled measures' outputs for every step_size-th kept frame. Frames
+        keep their numbers in the whole video, so a trimmed clip's start at its
+        first kept frame."""
+        return FrameSeries.from_states(
+            self._frames,
+            self._face.measures,
+            start=self._frame_begin,
+            stop=self._frame_end,
+            step=step_size,
+            fps=self.frame_rate,
+        )
 
     def save_csv_frontal(self, filename):
-        data = self.collect_data()
-
-        with open(filename, "w") as f:
-            writer = csv.writer(f)
-            cols = list(data.keys())
-            if "frame" in cols:
-                cols.remove("frame")
-            if "time" in cols:
-                cols.remove("time")
-            writer.writerow(["frame", "time"] + cols)
-            all_stats = self._face.get_all_items()
-            l = len(data[all_stats[0]])
-            rt = 1.0 / self.frame_rate
-            lst_time = [round(x * rt, 2) for x in range(l)]
-
-            for i in range(l):
-                row = [str(i), lst_time[i]]
-                for col in cols:
-                    row.append(data[col][i])
-                writer.writerow(row)
+        self.collect_data().write_csv(filename)
 
     def save_csv_lateral(self, filename):
         landmarks = self._face.lateral_landmarks  # shape: (N, 2), format (x, y)
@@ -905,13 +876,12 @@ gesture you wish to analyze."""
         ax = self.chart_fig.add_subplot(111)
         self.chart_fig.subplots_adjust(right=0.75)  # Adjust this value as needed
 
-        data = self.collect_data(self._frame_step)
-        plot_stats = data.keys()
-        lst_time = data["frame"]  # list(range(l))
-
-        for stat in data.keys():
-            if stat in plot_stats and stat != "frame":
-                ax.plot(lst_time, data[stat], label=stat)
+        series = self.collect_data(self._frame_step)
+        # The chart counts frames from the start of the kept range, like the red
+        # current-frame bar below.
+        x = [frame - self._frame_begin for frame in series.frames]
+        for name in series.names:
+            ax.plot(x, series.values[name], label=name)
 
         ax.set_xlabel("Frame")
         ax.set_ylabel("Value")
@@ -1273,56 +1243,37 @@ gesture you wish to analyze."""
             self._chk_graph.setChecked(True)
         return True
 
+    def _kept_frames(self, measures):
+        """These measures' outputs for every kept frame."""
+        return FrameSeries.from_states(
+            self._frames,
+            measures,
+            start=self._frame_begin,
+            stop=self._frame_end,
+            fps=self.frame_rate,
+        )
+
     def find_max_dental(self):
-        app = QApplication.instance()
-
-        measures = [AnalyzeDentalArea()]
-        tilt_threshold = app.tilt_threshold
-        face = AnalyzeFace(measures, tilt_threshold=tilt_threshold)
-        frames = range(self._frame_begin, self._frame_end, 1)
-
-        max_smile_idx = max_smile = -1
-        for i in frames:
-            frame = self._frames[i]
-            face.load_state(frame)
-            rec = face.analyze()
-            da = rec["dental_area"]
-            if max_smile == -1 or da > max_smile:
-                max_smile_idx = i
-                max_smile = da
-
-        return max_smile_idx
+        """The kept frame with the widest smile, or -1 if none has a value."""
+        frame = self._kept_frames([AnalyzeDentalArea()]).peak("dental_area")
+        return -1 if frame is None else frame
 
     def find_max_ocular(self):
-        app = QApplication.instance()
-
-        measures = [AnalyzeEyeArea()]
-        tilt_threshold = app.tilt_threshold
-        face = AnalyzeFace(measures, tilt_threshold=tilt_threshold)
-        frames = range(self._frame_begin, self._frame_end, 1)
-
-        max_eye_idx = max_eye = -1
-        for i in frames:
-            frame = self._frames[i]
-            face.load_state(frame)
-            rec = face.analyze()
-            if "eye.left" not in rec or "eye.right" not in rec:
-                logger.info("Jump to max ocular, can't find ocular information")
-                return -1
-            ea = rec["eye.left"] + rec["eye.right"]
-            if max_eye == -1 or ea > max_eye:
-                max_eye_idx = i
-                max_eye = ea
-
-        return max_eye_idx
+        """The kept frame with the widest eye opening, or -1 if none has a value."""
+        frame = self._kept_frames([AnalyzeEyeArea()]).peak("eye.left", "eye.right")
+        if frame is None:
+            logger.info("Jump to max ocular, can't find ocular information")
+            return -1
+        return frame
 
     def exec_max_dental(self):
         idx = self.find_max_dental()
-        self._video_slider.setValue(idx)
+        if idx >= 0:
+            self._video_slider.setValue(idx)
 
     def exec_max_ocular(self):
         idx = self.find_max_ocular()
-        if idx > 0:
+        if idx >= 0:  # frame 0 can be the widest, too
             self._video_slider.setValue(idx)
 
     def jump_max_dental(self):

@@ -1,13 +1,48 @@
 import logging
+import math
 
 import dlg_modal
-from dynaface.facial import AnalyzeFace
-from dynaface.measures import AnalyzeDentalArea, AnalyzeEyeArea, all_measures
-from jth_ui.app_jth import get_library_version
+from dynaface.measures import AnalyzeDentalArea, AnalyzeEyeArea
+from dynaface.video import FrameSeries
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QPushButton, QTextEdit, QVBoxLayout, QWidget
 
 logger = logging.getLogger(__name__)
+
+
+def _number(value, places):
+    return "n/a" if math.isnan(value) else f"{value:.{places}f}"
+
+
+def evaluation_html(evaluation):
+    """The Evaluation report: the eyes at the widest smile and the mouth at the
+    widest eye opening, or a note when no frame has the measures to compare."""
+    if evaluation is None:
+        return "No frame has the eye and dental measures to compare."
+
+    def heading(title, moment):
+        return f"<b>{title}</b> (frame {moment.frame}, {_number(moment.time, 2)} s)"
+
+    def eyes(moment):
+        return [
+            f"Eye area: left {_number(moment.eye_left, 1)}, "
+            f"right {_number(moment.eye_right, 1)}, "
+            f"total {_number(moment.eye_total, 1)} mm²",
+            f"Left/right: {_number(moment.eye_left_over_right, 3)}, "
+            f"right/left: {_number(moment.eye_right_over_left, 3)}",
+        ]
+
+    smile, opening = evaluation.widest_smile, evaluation.widest_eyes
+    lines = [
+        heading("Max dental display", smile),
+        f"Dental area: {_number(smile.dental_area, 1)} mm²",
+        *eyes(smile),
+        "",
+        heading("Max eye opening", opening),
+        *eyes(opening),
+        f"Dental area: {_number(opening.dental_area, 1)} mm²",
+    ]
+    return "<br>".join(lines)
 
 
 class TabEval(QWidget):
@@ -42,43 +77,15 @@ class TabEval(QWidget):
         pass
 
     def exec_eval(self, analyze):
-        import dynaface_app
-
-        measures = [AnalyzeEyeArea(), AnalyzeDentalArea()]
-        tilt_threshold = app.tilt_threshold
-        face = AnalyzeFace(measures, tilt_threshold=tilt_threshold)
-        frames = range(analyze._frame_begin, analyze._frame_end, 1)
-
-        max_eye_idx = max_eye = -1
-        max_eye_data = ""
-        max_smile_idx = max_smile = -1
-        max_smile_data = ""
-
-        for i in frames:
-            frame = analyze._frames[i]
-            face.load_state(frame)
-            rec = face.analyze()
-            el = rec["eye.l"]
-            er = rec["eye.r"]
-            ea = el + er
-            da = rec["dental_area"]
-
-            if max_eye == -1 or ea > max_eye:
-                # max_eye_idx = i
-                max_eye = ea
-                max_eye_data = f"Max Dental (frame:{i}: Dental area: {round(da,1)})"
-
-            if max_smile == -1 or da > max_smile:
-                # max_smile_idx = i
-                max_smile = da
-
-                ratio_lr = round(el / er, 3)
-                ratio_rl = round(er / el, 3)
-                max_smile_data = f"Max ocular (frame:{i}): left={round(el,1)}, right={round(er,1)}, lr={ratio_lr}, rl={ratio_rl}, total={round(ea,1)}"
-
-        self._window._background_queue.append(
-            lambda: self.text_edit.setHtml(f"{max_eye_data}<br>{max_smile_data}")
+        series = FrameSeries.from_states(
+            analyze._frames,
+            [AnalyzeEyeArea(), AnalyzeDentalArea()],
+            start=analyze._frame_begin,
+            stop=analyze._frame_end,
+            fps=analyze.frame_rate,
         )
+        html = evaluation_html(series.evaluate())
+        self._window._background_queue.append(lambda: self.text_edit.setHtml(html))
 
     def generate(self, analyze):
         logger.info("Evaluate video")
