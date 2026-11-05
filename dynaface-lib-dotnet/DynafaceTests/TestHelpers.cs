@@ -12,12 +12,25 @@ internal static class TestHelpers
         return lm;
     }
 
+    // A context with a pinned scale, so a measure's formulas can be checked with
+    // round numbers (a real one measures its scale on its landmarks).
     public static FaceMeasureContext BuildContext(
         int width = 1024, int height = 1024, Vec2[]? landmarks = null,
         bool isLateral = false, Vec2[]? lateralLandmarks = null, float pix2mm = 0.25f)
     {
         landmarks ??= MakeLandmarks();
         var photo = new FaceImage(new Rgba32[width * height], width, height);
-        return new FaceMeasureContext(photo, landmarks, pix2mm, isLateral, lateralLandmarks);
+        return FaceMeasureContext.WithFixedScale(photo, landmarks, pix2mm, isLateral, lateralLandmarks);
     }
+
+    // The context an app builds from a pipeline result: its scale measured on the
+    // result's landmarks, with the pupillary distance the run assumed.
+    public static FaceMeasureContext ContextFor(FacePipelineResult r, bool clonePixels = true, bool withLateralLandmarks = true) =>
+        new FaceMeasureContext(
+            clonePixels
+                ? new FaceImage((Rgba32[])r.AlignedCrop.Pixels.Clone(), r.AlignedCrop.Width, r.AlignedCrop.Height)
+                : r.AlignedCrop,
+            r.Wflw98, isLateral: r.IsLateral,
+            lateralLandmarks: withLateralLandmarks ? r.LateralAnalysis?.LateralLandmarks : null,
+            headPose: r.HeadPose, pose: r.Pose, flipped: r.Flipped, pupilDistMm: r.PupilDistMm);
 }

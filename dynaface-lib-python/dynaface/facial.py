@@ -50,15 +50,20 @@ LATERAL_LEFT_MARGIN_RATIO = 0.20
 
 def util_calc_pd(
     pupils: Tuple[Tuple[float, float], Tuple[float, float]],
+    pd: Optional[float] = None,
 ) -> Tuple[float, float]:
     """
     Measure the distance between the pupils and the millimeters per pixel.
 
-    The scale assumes the pupils are AnalyzeFace.pd millimeters apart.
+    This is the one rule for a frontal face's scale. Measure it on the pupils of the
+    landmarks you are about to measure: a scale taken from other landmarks, such as
+    those from before a crop, converts every distance wrongly.
 
     Args:
         pupils (Tuple[Tuple[float, float], Tuple[float, float]]): The two pupil
             positions, in pixels.
+        pd (Optional[float]): The pupillary distance to assume, in millimeters.
+            Defaults to AnalyzeFace.pd.
 
     Returns:
         Tuple[float, float]: The pupillary distance in pixels, and the millimeters
@@ -68,12 +73,27 @@ def util_calc_pd(
     right_pupil = np.array(pupils[1])
 
     pupillary_distance = np.linalg.norm(left_pupil - right_pupil)
+    pd_mm = AnalyzeFace.pd if pd is None else pd
     # Coincident pupils give no scale: NaN (undefined) rather than infinity.
-    pix2mm = (
-        AnalyzeFace.pd / pupillary_distance if pupillary_distance > 0 else float("nan")
-    )
+    pix2mm = pd_mm / pupillary_distance if pupillary_distance > 0 else float("nan")
 
     return float(pupillary_distance), float(pix2mm)
+
+
+def _saved_pupil_distance(pupillary_distance: Any, pix2mm: Any) -> Optional[float]:
+    """
+    The pupillary distance, in millimeters, that a saved state was analyzed with.
+
+    pix2mm has always been computed as the millimeters over the distance between the
+    pupils in pixels saved beside it, so their product gives the millimeters back,
+    even for states saved when the scale was measured before the crop. None when the
+    pair holds no pupillary distance: a profile's fixed scale, or pupils in one place.
+    """
+    try:
+        pd_mm = float(pupillary_distance) * float(pix2mm)
+    except (TypeError, ValueError):
+        return None
+    return pd_mm if math.isfinite(pd_mm) and pd_mm > 0 else None
 
 
 def util_get_pupils(
@@ -107,7 +127,13 @@ class AnalyzeFace(ImageAnalysis):
     Attributes:
         pd (float): The assumed distance between the pupils, in millimeters (63 by
             default), used to convert pixels to millimeters. Set it on the class,
-            as AnalyzeFace.pd, to calibrate.
+            as AnalyzeFace.pd, to calibrate the faces loaded afterward. Each face
+            keeps the one it was loaded with, and a face restored with load_state()
+            keeps the one it was analyzed with. Set it on a face, then call
+            analyze(), to measure that face with another.
+        pix2mm (float): Millimeters per pixel. For a frontal face, analyze()
+            measures it again on the current landmarks before every run, so it
+            always matches them; a profile uses a fixed 0.24.
         measures (List[MeasureBase]): The measures that analyze() runs.
         landmarks (List[Tuple[int, int]]): The 98 WFLW landmark positions, in
             pixels of the current image.
@@ -115,7 +141,7 @@ class AnalyzeFace(ImageAnalysis):
         render_img (NDArray[np.uint8]): The image the measures draw on.
     """
 
-    pd = STD_PUPIL_DIST
+    pd: float = STD_PUPIL_DIST
 
     def __init__(
         self,
@@ -148,6 +174,10 @@ class AnalyzeFace(ImageAnalysis):
         self.pupillary_distance: float = 0.0
         self.tilt_threshold: float = tilt_threshold
         self.pix2mm: float = 1.0
+        # True once pix2mm comes from the pupils (calc_pd), so analyze() measures it
+        # again on whatever the landmarks are by then; False while it's fixed (a
+        # profile, or a saved state that records no pupillary distance).
+        self._scale_from_landmarks: bool = False
         # Changed face_rotation to Optional[float] to allow assigning None.
         self.face_rotation: Optional[float] = 0.0
         self.orig_pupils: Tuple[Tuple[int, int], Tuple[int, int]] = ((0, 0), (0, 0))
@@ -356,6 +386,10 @@ class AnalyzeFace(ImageAnalysis):
         """
         super().load_image(img)
         logger.debug("Low level-image loaded")
+        # Measure this face with today's AnalyzeFace.pd, kept on the face so that a
+        # later change to the class doesn't rescale it.
+        self.pd = type(self).pd
+        self._scale_from_landmarks = False
         landmarks, self._headpose = self._find_landmarks(img)
         self.yaw, self.pitch, self.roll = self._headpose[:3]
         self.landmarks = [(int(x), int(y)) for x, y in landmarks]
@@ -381,6 +415,9 @@ class AnalyzeFace(ImageAnalysis):
         if lateral_pos and self.landmarks:
             self.lateral = True
             self.pix2mm = 0.24
+            # A profile's scale is fixed; its pupils give none, so keep no distance
+            # (a stale one would pair with 0.24 in a saved state).
+            self.pupillary_distance = 0.0
             if not facing_left:
                 self.flipped = True
                 flipped = cv2.flip(self.original_img, 1)
@@ -546,6 +583,14 @@ class AnalyzeFace(ImageAnalysis):
         """
         if not self.landmarks:  # Changed check since landmarks is never None.
             return None
+        if (
+            self._scale_from_landmarks
+            and not self.lateral
+            and len(self.landmarks) > LM_LEFT_PUPIL
+        ):
+            # Measure the scale on the landmarks about to be measured, so it can't
+            # be one left over from before a crop, or from a saved state.
+            self.calc_pd()
         self.width = self.render_img.shape[1]
         self.height = self.render_img.shape[0]
         m = self.calc_text_size("W")
@@ -742,8 +787,10 @@ class AnalyzeFace(ImageAnalysis):
 
     def calc_pd(self) -> None:
         """Measure the pupils on the current landmarks; update pupillary_distance
-        and pix2mm (millimeters per pixel)."""
-        self.pupillary_distance, self.pix2mm = util_calc_pd(self.get_pupils())
+        and pix2mm (millimeters per pixel), assuming this face's pd. From then on,
+        analyze() measures them again on the landmarks it finds."""
+        self.pupillary_distance, self.pix2mm = util_calc_pd(self.get_pupils(), self.pd)
+        self._scale_from_landmarks = True
 
     def get_pupils(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
         """
@@ -779,6 +826,11 @@ class AnalyzeFace(ImageAnalysis):
         Restore a frame's analysis captured by dump_state(), including its image,
         so analyze() draws on that frame.
 
+        The restored face keeps the pupillary distance it was analyzed with, not
+        today's AnalyzeFace.pd, and its scale is measured again on the restored
+        landmarks, which also corrects states saved when the scale was measured
+        before the crop. A state with a fixed scale (a profile) keeps its saved one.
+
         Args:
             obj (List[Any]): The list dump_state() returned. A state saved without
                 a face rotation restores with a rotation of 0.
@@ -795,6 +847,15 @@ class AnalyzeFace(ImageAnalysis):
             self.face_rotation = obj[5]
         except (IndexError, TypeError):
             self.face_rotation = 0
+        self._scale_from_landmarks = False
+        saved_pd = _saved_pupil_distance(obj[3], obj[4])
+        if (
+            saved_pd is not None
+            and not self.lateral
+            and len(self.landmarks) > LM_LEFT_PUPIL
+        ):
+            self.pd = saved_pd
+            self.calc_pd()
 
     def find_pupils(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
         """

@@ -50,10 +50,9 @@ public static class StyleGanCropper
     // frame, like a video's per-frame measures. imageWidth/imageHeight: the size of the
     // image the landmarks were found in. Throws like Crop when the pupils coincide.
     //
-    // Pix2mm doesn't carry over: a crop: false run measures it in the uncropped image's
-    // pixels. With these landmarks, use DynafaceConfig.PupilDistMm over their own pupil
-    // distance, as FacePipeline does after its crop (or rescale the stored value by the
-    // ratio of the two pupil distances, to keep the PD it was analyzed with).
+    // A crop: false run's Pix2mm was measured on the uncropped pupils, so it doesn't
+    // fit these landmarks. Build the FaceMeasureContext from them with the run's
+    // PupilDistMm, and it measures the matching scale itself.
     //
     // .NET-only: dynaface-lib's crop_stylegan always builds the image.
     public static Vec2[] CropLandmarks(

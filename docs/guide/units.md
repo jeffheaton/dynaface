@@ -16,6 +16,8 @@ px2mm = pupillary distance (mm) / distance between the pupils (pixels)
 
 In the standard image the pupils are 260 pixels apart, so a pixel is about 0.24 mm. Distances are multiplied by `px2mm`, and areas by its square. The [position measure](../measures.md#position) reports the values used, as `pd` and `px2mm`.
 
+Dynaface measures `px2mm` on the same landmarks it's about to measure, every time it measures. A scale taken from other landmarks, such as the face before it was cropped, would convert every distance wrongly, so it's never carried over from one set of landmarks to another.
+
 Because the scale comes from the pupils, every millimeter value is in effect a fraction of the pupillary distance. The assumed 63 mm doesn't affect comparisons of the same person over time, as long as it stays the same, but it does affect absolute sizes and comparisons between people.
 
 ### Using the subject's pupillary distance
@@ -30,7 +32,7 @@ face = facial.load_face_image("subject.jpg")
 results = face.analyze()
 ```
 
-The scale is fixed when the image is loaded, so set `pd` first. It's a class attribute, so it applies to every face loaded afterward: set it again for each subject. Ratios and angles don't depend on it.
+The pupillary distance is fixed when the image is loaded, so set `pd` first. It's a class attribute, so it applies to every face loaded afterward: set it again for each subject. Each face keeps the one it was loaded with, and a face saved with `dump_state()` and restored with `load_state()` keeps the one it was analyzed with. To measure a face again with another, set it on that face (`face.pd = 58`) and call `analyze()`. Ratios and angles don't depend on it.
 
 ## Turned heads
 

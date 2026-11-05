@@ -106,10 +106,7 @@ public class FacialPipelineIntegrationTests
     }
 
     internal static FaceMeasureContext BuildContext(FacePipelineResult result) =>
-        new FaceMeasureContext(
-            result.AlignedCrop, result.Wflw98, result.Pix2mm,
-            isLateral: result.IsLateral, lateralLandmarks: null, headPose: result.HeadPose,
-            pose: result.Pose, flipped: result.Flipped);
+        TestHelpers.ContextFor(result, clonePixels: false, withLateralLandmarks: false);
 
     // Runs the library's own registry + runner (DynafaceMeasures.AllMeasures via
     // ctx.Analyze), the same path dynaface-lib's AnalyzeFace.analyze() takes.

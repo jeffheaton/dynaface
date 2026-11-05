@@ -78,12 +78,12 @@ public class CropLandmarksTests
             frame.Width, frame.Height, uncropped.Wflw98, uncropped.HeadPose[0]);
         Assert.Equal(cropped.Wflw98, realigned);
 
-        // But the uncropped run's Pix2mm doesn't carry over: it was measured on the
-        // frame's own pupils, which the crop moves closer together or farther apart.
-        float realignedPd = Vec2.Distance(
-            realigned[DynafaceConstants.LmRightPupil], realigned[DynafaceConstants.LmLeftPupil]);
-        Assert.Equal(cropped.PupillaryDistance, realignedPd);
-        Assert.NotEqual(uncropped.PupillaryDistance, realignedPd);
+        // The uncropped run's Pix2mm doesn't fit them: it was measured on the frame's
+        // own pupils, which the crop moves closer together or farther apart. A context
+        // built on them with the run's pupillary distance measures the right one.
+        Assert.NotEqual(uncropped.Pix2mm, cropped.Pix2mm);
+        var ctx = new FaceMeasureContext(cropped.AlignedCrop, realigned, pupilDistMm: uncropped.PupilDistMm);
+        Assert.Equal(cropped.Pix2mm, ctx.Pix2mm);
     }
 
     [Fact]

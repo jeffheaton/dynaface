@@ -131,6 +131,7 @@ The library has two main analysis paths: **frontal** (face-on) and **lateral** (
 
 - **Plugin architecture** for measurements: add a new `MeasureBase` subclass and register it in `measures.py`
 - **Measure output contract** (both ports): `calc()` returns every declared output whether or not its item is enabled or rendering is on; item flags only gate drawing, and callers pick what to show or export (`get_all_items()` / `GetAllItems`). Drawing-only switches are declared `display_only` and are never returned (see the `measures_base.py` docstring)
+- **Scale contract** (both ports): a frontal face's `pix2mm` is always measured on the landmarks about to be measured, from a pupillary distance in mm that belongs to the analysis (`face.pd` / `FacePipelineResult.PupilDistMm`). Never pair a saved or pre-crop scale with other landmarks: `analyze()` re-measures it and `FaceMeasureContext` measures it itself, and `tests/test_scale.py` / `ScaleConsistencyTests` guard it (see the units note in `dynaface-lib-dotnet/facial_dll/CLAUDE.md`)
 - **Lazy model loading**: models are downloaded on first use and cached
 - **Dual-view analysis**: frontal and lateral are separate code paths that share base infrastructure
 - **MVC separation**: `dynaface-lib-python` handles all computation; `dynaface-app` handles presentation

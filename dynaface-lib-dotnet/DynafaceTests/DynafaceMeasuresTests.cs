@@ -38,7 +38,7 @@ public class DynafaceMeasuresTests
     public void Analyze_ReturnsNullWithoutLandmarks()
     {
         var photo = new FaceImage(new Rgba32[16 * 16], 16, 16);
-        var ctx = new FaceMeasureContext(photo, new Vec2[0], 0.24f);
+        var ctx = new FaceMeasureContext(photo, new Vec2[0]);
         Assert.Null(ctx.Analyze());
     }
 }

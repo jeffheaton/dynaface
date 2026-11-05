@@ -101,13 +101,9 @@ public static class FacePipeline
 
         // Matches dynaface-lib's call order: calc_pd() runs after crop_stylegan(), so
         // Pix2mm is measured in the same (post-crop) pixel space as the landmarks
-        // every measure multiplies it by.
-        float pupillaryDistance = ComputePupillaryDistance(outLandmarks);
-        // Coincident pupils give no scale: NaN (undefined), like dynaface-lib's util_calc_pd,
-        // rather than a made-up 63mm / 256px.
-        float pix2mm = pupillaryDistance > 0f
-            ? DynafaceConfig.PupilDistMm / pupillaryDistance
-            : float.NaN;
+        // every measure multiplies it by. Coincident pupils give no scale: NaN.
+        float pupilDistMm = DynafaceConfig.PupilDistMm;
+        var (pupillaryDistance, pix2mm) = FaceMeasureContext.CalcPd(outLandmarks, pupilDistMm);
 
         return new FacePipelineResult
         {
@@ -119,6 +115,7 @@ public static class FacePipeline
             Flipped = false,
             Pix2mm = pix2mm,
             PupillaryDistance = pupillaryDistance,
+            PupilDistMm = pupilDistMm,
             FaceRotationRad = faceRotationRad,
         };
     }
@@ -167,6 +164,7 @@ public static class FacePipeline
             Flipped = flipped,
             Pix2mm = DynafaceConstants.LateralPix2mm,
             PupillaryDistance = 0f, // dynaface-lib never calls calc_pd() in the lateral branch
+            PupilDistMm = DynafaceConfig.PupilDistMm,
             FaceRotationRad = null,
             LateralAnalysis = lateralAnalysis,
         };
@@ -217,17 +215,6 @@ public static class FacePipeline
 
         return (new FaceImage(padded, newW, h), newLandmarks);
     }
-
-    // Pixel distance between the two pupil landmarks (dynaface-lib's util_calc_pd's
-    // first return value). 0 if landmarks are missing/too short (shouldn't happen in
-    // practice — SPIGA always returns 98 points).
-    static float ComputePupillaryDistance(Vec2[] landmarks)
-    {
-        if (landmarks != null && landmarks.Length > DynafaceConstants.LmLeftPupil)
-            return Vec2.Distance(
-                landmarks[DynafaceConstants.LmRightPupil], landmarks[DynafaceConstants.LmLeftPupil]);
-        return 0f;
-    }
 }
 
 public struct FacePipelineResult
@@ -238,8 +225,11 @@ public struct FacePipelineResult
     public FacePose Pose;
     public bool IsLateral;
     public bool Flipped;           // true if lateral and originally facing right
-    public float Pix2mm;
+    public float Pix2mm;            // measured on Wflw98; build a FaceMeasureContext from Wflw98 and
+                                    // PupilDistMm rather than reusing it with other landmarks
     public float PupillaryDistance; // pupil pixel distance in AlignedCrop's space; 0 in lateral mode
+    public float PupilDistMm;       // the pupillary distance (mm) the run assumed: DynafaceConfig.PupilDistMm
+                                    // at the time. Save it with the landmarks to measure them the same way later.
     public float? FaceRotationRad;   // null unless tilt correction triggered (frontal only)
     public LateralAnalyzer.Result? LateralAnalysis; // lateral only; null if IsLateral is false
                                                     // or if analysis failed (no sagittal profile)

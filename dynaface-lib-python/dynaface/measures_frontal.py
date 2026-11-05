@@ -473,8 +473,9 @@ class AnalyzePosition(MeasureBase):
         - `tilt`: The angle of the line between the pupils, in degrees; 0 when
           they're level.
         - `pd`: The distance between the pupils, in pixels.
-        - `px2mm`: Millimeters per pixel: AnalyzeFace.pd divided by pd for a
-          frontal face, and 0.24 for a profile.
+        - `px2mm`: Millimeters per pixel: the face's pd (its pupillary distance in
+          millimeters) divided by this pd for a frontal face, and 0.24 for a
+          profile.
     """
 
     def __init__(self) -> None:
@@ -532,7 +533,9 @@ class AnalyzePosition(MeasureBase):
                 face.line(p1, p2)
 
             if not face.lateral:
-                pd, pix2mm = facial.util_calc_pd(facial.util_get_pupils(landmarks))
+                pd, pix2mm = facial.util_calc_pd(
+                    facial.util_get_pupils(landmarks), getattr(face, "pd", None)
+                )
             else:
                 pd, _ = facial.util_calc_pd(facial.util_get_pupils(landmarks))
 

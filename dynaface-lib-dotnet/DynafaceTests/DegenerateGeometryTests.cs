@@ -23,7 +23,7 @@ public class DegenerateGeometryTests
     static System.Collections.Generic.Dictionary<string, double> Lateral(Vec2[] points, bool render = false)
     {
         var photo = new FaceImage(new Rgba32[1024 * 1024], 1024, 1024);
-        var ctx = new FaceMeasureContext(photo, TestHelpers.MakeLandmarks(), 0.24f,
+        var ctx = new FaceMeasureContext(photo, TestHelpers.MakeLandmarks(),
             isLateral: true, lateralLandmarks: points);
         return new MeasureLateral().Calc(ctx, render);
     }

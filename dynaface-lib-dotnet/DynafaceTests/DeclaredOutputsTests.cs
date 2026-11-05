@@ -21,12 +21,7 @@ public class DeclaredOutputsTests
         return result.Value;
     }
 
-    static FaceMeasureContext Context(FacePipelineResult r) =>
-        new FaceMeasureContext(
-            new FaceImage((Rgba32[])r.AlignedCrop.Pixels.Clone(), r.AlignedCrop.Width, r.AlignedCrop.Height),
-            r.Wflw98, r.Pix2mm, isLateral: r.IsLateral,
-            lateralLandmarks: r.LateralAnalysis?.LateralLandmarks, headPose: r.HeadPose,
-            pose: r.Pose, flipped: r.Flipped);
+    static FaceMeasureContext Context(FacePipelineResult r) => TestHelpers.ContextFor(r);
 
     [SkippableFact]
     public void EveryMeasureReturnsExactlyItsDeclaredOutputs()

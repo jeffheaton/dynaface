@@ -41,11 +41,21 @@ public static class FaceAnalysisPersistence
     }
 
     // Rebuilds a FaceMeasureContext from saved state, ready for measures to run
-    // again and reproduce the same numbers.
+    // again and reproduce the same numbers. Like dynaface-lib's load_state(), it
+    // keeps the pupillary distance the analysis assumed, not today's
+    // DynafaceConfig.PupilDistMm: Pix2mm has always been computed as it over the
+    // PupillaryDistance saved beside it, so their product gives it back. With it, the
+    // context measures its scale on the saved landmarks, which also corrects states
+    // saved when the scale was measured before the crop. A pair that holds no
+    // pupillary distance (a profile's fixed scale, or no pupils) keeps its saved scale.
     public static FaceMeasureContext Restore(FaceAnalysisState state)
     {
-        return new FaceMeasureContext(
-            state.PostCropImage, state.Landmarks, state.Pix2mm,
-            isLateral: false, lateralLandmarks: null, headPose: state.HeadPose);
+        float savedPupilDistMm = state.PupillaryDistance * state.Pix2mm;
+        bool havePupils = state.Landmarks != null && state.Landmarks.Length > DynafaceConstants.LmLeftPupil;
+        if (havePupils && savedPupilDistMm > 0f && !float.IsInfinity(savedPupilDistMm))
+            return new FaceMeasureContext(
+                state.PostCropImage, state.Landmarks, headPose: state.HeadPose, pupilDistMm: savedPupilDistMm);
+        return FaceMeasureContext.WithFixedScale(
+            state.PostCropImage, state.Landmarks, state.Pix2mm, headPose: state.HeadPose);
     }
 }

@@ -223,11 +223,14 @@ Vec2[] lateralLandmarks = result?.LateralAnalysis?.LateralLandmarks;
 // Mirrors dynaface-lib's settable AnalyzeFace.pd; defaults to the 63mm average.
 DynafaceConfig.PupilDistMm = 63f;
 
+// The context measures its millimeters-per-pixel scale on the landmarks it's given,
+// assuming the pupillary distance the run did.
 var ctx = new FaceMeasureContext(
-    result.Value.AlignedCrop, result.Value.Wflw98, result.Value.Pix2mm,
+    result.Value.AlignedCrop, result.Value.Wflw98,
     isLateral: result.Value.IsLateral, lateralLandmarks: lateralLandmarks,
     headPose: result.Value.HeadPose,
-    pose: result.Value.Pose, flipped: result.Value.Flipped);
+    pose: result.Value.Pose, flipped: result.Value.Flipped,
+    pupilDistMm: result.Value.PupilDistMm);
 
 // Runs the full library measure registry (DynafaceMeasures.AllMeasures()) and
 // merges every measure's results — mirrors dynaface-lib's AnalyzeFace.analyze().
@@ -255,8 +258,15 @@ foreach (var kv in ctx.Values)
 // live FaceMeasureContext can't retroactively mutate the snapshot)
 FaceAnalysisState state = FaceAnalysisPersistence.Capture(result.Value);
 
-// ...later, rebuild a context and re-run measurements against it
+// ...later, rebuild a context and re-run measurements against it. It keeps the
+// pupillary distance the analysis assumed, even if DynafaceConfig.PupilDistMm has
+// changed since, and measures its scale on the saved landmarks.
 FaceMeasureContext restored = FaceAnalysisPersistence.Restore(state);
+
+// Saving landmarks your own way (e.g. a video's frames, cropped later with
+// StyleGanCropper.CropLandmarks)? Save result.PupilDistMm with them and pass it back
+// as pupilDistMm, never a saved Pix2mm: a scale only fits the landmarks it was
+// measured on.
 ```
 
 ### Options

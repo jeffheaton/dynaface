@@ -27,11 +27,19 @@ public class FaceMeasureContext
     // WFLW landmarks in top-left pixel coordinates.
     public Vec2[] Landmarks { get; }
 
-    // Millimeters per pixel. For frontal faces this must be computed from the
-    // ORIGINAL (pre-StyleGAN-crop) pupil distance — see FacePipeline.RunFrontal —
-    // not re-derived from these (post-crop) landmarks, so it's always supplied
-    // explicitly rather than computed internally from Landmarks.
+    // Millimeters per pixel, measured on Landmarks themselves, so every measure
+    // converts with the scale of the landmarks it measures, whatever crop or
+    // save/restore they came through. For a frontal face it's PupilDistMm over the
+    // distance between the pupils (CalcPd, dynaface-lib's util_calc_pd; NaN when the
+    // pupils coincide or are missing); a profile uses the fixed
+    // DynafaceConstants.LateralPix2mm. Only the obsolete explicit-scale constructor
+    // sets it directly.
     public float Pix2mm { get; }
+
+    // The pupillary distance, in millimeters, a frontal face is measured with: the
+    // one its analysis assumed (FacePipelineResult.PupilDistMm, or the copy saved with
+    // it), or DynafaceConfig.PupilDistMm when none was given.
+    public float PupilDistMm { get; }
 
     // True for a lateral-view analysis. When true, LateralLandmarks holds the 6
     // points from LateralAnalyzer (Glabella/Nasion/NasalTip/Subnasal/MentoLabial/
@@ -64,16 +72,54 @@ public class FaceMeasureContext
     const int ImageLabelX = 20;
     int _imageLabelY = 20;
 
+    // Builds the context for one analysis pass, measuring Pix2mm on these landmarks.
+    // pupilDistMm: the pupillary distance the analysis assumed — pass
+    // FacePipelineResult.PupilDistMm, or the copy saved with the landmarks — and
+    // DynafaceConfig.PupilDistMm when omitted.
+    public FaceMeasureContext(
+        FaceImage photo, Vec2[] landmarks,
+        bool isLateral = false, Vec2[] lateralLandmarks = null, float[] headPose = null,
+        FacePose pose = FacePose.Frontal, bool flipped = false, float? pupilDistMm = null)
+        : this(photo, landmarks,
+            ContextScale.Measure(landmarks, isLateral, pupilDistMm ?? DynafaceConfig.PupilDistMm),
+            isLateral, lateralLandmarks, headPose, pose, flipped)
+    {
+    }
+
+    // The old way to build a context: with a scale measured somewhere else. It only
+    // fits these landmarks if it was measured on them, and when it wasn't (a scale
+    // from before a crop, or from a saved analysis), every millimeter value came out
+    // wrong. DynafaceConfig.PupilDistMm stands in for the pupillary distance.
+    [Obsolete("Pass pupilDistMm instead of pix2mm, so the scale is measured on these landmarks: "
+        + "a scale measured on other landmarks (before a crop, or in a saved analysis) gives wrong millimeters.")]
     public FaceMeasureContext(
         FaceImage photo, Vec2[] landmarks, float pix2mm,
         bool isLateral = false, Vec2[] lateralLandmarks = null, float[] headPose = null,
         FacePose pose = FacePose.Frontal, bool flipped = false)
+        : this(photo, landmarks, new ContextScale(pix2mm, DynafaceConfig.PupilDistMm),
+            isLateral, lateralLandmarks, headPose, pose, flipped)
+    {
+    }
+
+    // A context with a fixed scale: for unit tests that pin one, and for saved
+    // analyses that record no pupillary distance (FaceAnalysisPersistence.Restore).
+    internal static FaceMeasureContext WithFixedScale(
+        FaceImage photo, Vec2[] landmarks, float pix2mm,
+        bool isLateral = false, Vec2[] lateralLandmarks = null, float[] headPose = null,
+        FacePose pose = FacePose.Frontal, bool flipped = false) =>
+        new FaceMeasureContext(photo, landmarks, new ContextScale(pix2mm, DynafaceConfig.PupilDistMm),
+            isLateral, lateralLandmarks, headPose, pose, flipped);
+
+    FaceMeasureContext(
+        FaceImage photo, Vec2[] landmarks, ContextScale scale,
+        bool isLateral, Vec2[] lateralLandmarks, float[] headPose, FacePose pose, bool flipped)
     {
         Width = photo.Width;
         Height = photo.Height;
         _pixels = photo.Pixels; // caller must ensure this array is not shared
         Landmarks = landmarks;
-        Pix2mm = pix2mm;
+        Pix2mm = scale.Pix2mm;
+        PupilDistMm = scale.PupilDistMm;
         IsLateral = isLateral;
         LateralLandmarks = lateralLandmarks;
         HeadPose = headPose;
@@ -81,23 +127,36 @@ public class FaceMeasureContext
         Flipped = flipped;
     }
 
-    // Convenience overload for simple/test scenarios that don't have a
-    // FacePipelineResult on hand: auto-computes Pix2mm from the landmarks' own
-    // pupil distance (frontal-only assumption), matching FacePipeline.ComputePix2mm.
-    public FaceMeasureContext(FaceImage photo, Vec2[] landmarks)
-        : this(photo, landmarks, ComputePix2mmFromLandmarks(landmarks))
+    // A context's scale: millimeters per pixel, and the pupillary distance behind it.
+    readonly struct ContextScale
     {
+        public readonly float Pix2mm;
+        public readonly float PupilDistMm;
+
+        public ContextScale(float pix2mm, float pupilDistMm)
+        {
+            Pix2mm = pix2mm;
+            PupilDistMm = pupilDistMm;
+        }
+
+        // Measured on the landmarks themselves; a profile's scale is fixed.
+        public static ContextScale Measure(Vec2[] landmarks, bool isLateral, float pupilDistMm) =>
+            new ContextScale(
+                isLateral ? DynafaceConstants.LateralPix2mm : CalcPd(landmarks, pupilDistMm).pix2mm,
+                pupilDistMm);
     }
 
-    // NaN (undefined) without two distinct pupils, like dynaface-lib's util_calc_pd.
-    static float ComputePix2mmFromLandmarks(Vec2[] lm)
+    // The frontal scale rule, dynaface-lib's util_calc_pd, kept in this one place: the
+    // distance between the pupils (WFLW 96 and 97) in pixels, and millimeters per
+    // pixel assuming they're pupilDistMm apart. Measure it on the landmarks you're
+    // about to measure. (0, NaN) without two distinct pupils: no scale.
+    public static (float pupillaryDistance, float pix2mm) CalcPd(Vec2[] landmarks, float pupilDistMm)
     {
-        if (lm != null && lm.Length > DynafaceConstants.LmLeftPupil)
-        {
-            float dist = Vec2.Distance(lm[DynafaceConstants.LmRightPupil], lm[DynafaceConstants.LmLeftPupil]);
-            if (dist > 0f) return DynafaceConfig.PupilDistMm / dist;
-        }
-        return float.NaN;
+        if (landmarks == null || landmarks.Length <= DynafaceConstants.LmLeftPupil)
+            return (0f, float.NaN);
+        float distance = Vec2.Distance(
+            landmarks[DynafaceConstants.LmRightPupil], landmarks[DynafaceConstants.LmLeftPupil]);
+        return (distance, distance > 0f ? pupilDistMm / distance : float.NaN);
     }
 
     // -------------------------------------------------------------------------

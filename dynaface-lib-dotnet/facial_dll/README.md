@@ -31,12 +31,14 @@ FacePipeline.Initialize(inference);
 var image  = new FaceImage(pixels, width, height); // flat Rgba32[], y=0 at bottom
 var result = FacePipeline.Run(image, rotationAngle: 0, flipHorizontal: false);
 
+// The context measures its millimeters-per-pixel scale on these landmarks.
 var ctx = new FaceMeasureContext(
-    result.Value.AlignedCrop, result.Value.Wflw98, result.Value.Pix2mm,
+    result.Value.AlignedCrop, result.Value.Wflw98,
     isLateral: result.Value.IsLateral,
     lateralLandmarks: result.Value.LateralAnalysis?.LateralLandmarks,
     headPose: result.Value.HeadPose,
-    pose: result.Value.Pose, flipped: result.Value.Flipped);
+    pose: result.Value.Pose, flipped: result.Value.Flipped,
+    pupilDistMm: result.Value.PupilDistMm);
 
 Dictionary<string, double> measurements = ctx.Analyze();
 ```

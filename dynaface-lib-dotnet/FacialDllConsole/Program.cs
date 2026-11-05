@@ -77,10 +77,11 @@ class Program
 
         Console.WriteLine("Running measurements...");
         var ctx = new FaceMeasureContext(
-            crop, result.Value.Wflw98, result.Value.Pix2mm,
+            crop, result.Value.Wflw98,
             isLateral: result.Value.IsLateral, lateralLandmarks: lateralLandmarks,
             headPose: result.Value.HeadPose,
-            pose: result.Value.Pose, flipped: result.Value.Flipped);
+            pose: result.Value.Pose, flipped: result.Value.Flipped,
+            pupilDistMm: result.Value.PupilDistMm);
 
         // Library-owned measure registry + loop, mirroring dynaface-lib's
         // AnalyzeFace.analyze() over measures.all_measures().

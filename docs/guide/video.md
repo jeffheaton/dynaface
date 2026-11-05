@@ -56,7 +56,11 @@ for state in states:
     results = face.analyze()
 ```
 
-`load_state()` restores the frame's image too, so `analyze()` draws on that frame. In Dynaface 2.0.3 and earlier it didn't, so call `face.render_reset()` after `load_state()` to draw on the restored frame. Each state holds its frame's 1024 by 1024 image, about 3 MB, so the states of a long video take a lot of memory. The desktop app keeps them in its `.dyfc` project files.
+`load_state()` restores the frame's image too, so `analyze()` draws on that frame. In Dynaface 2.0.3 and earlier it didn't, so call `face.render_reset()` after `load_state()` to draw on the restored frame.
+
+A restored frame is measured with the pupillary distance it was analyzed with, and its scale is measured again on its landmarks, so states saved by versions up to 2.0.2, which measured the scale before the crop, come out right.
+
+Each state holds its frame's 1024 by 1024 image, about 3 MB, so the states of a long video take a lot of memory. The desktop app keeps them in its `.dyfc` project files.
 
 ## Speed
 

@@ -28,15 +28,18 @@ var image  = new FaceImage(pixels, width, height); // flat Rgba32[], y=0 at bott
 var result = FacePipeline.Run(image, rotationAngle: 0, flipHorizontal: false);
 
 var ctx = new FaceMeasureContext(
-    result.Value.AlignedCrop, result.Value.Wflw98, result.Value.Pix2mm,
+    result.Value.AlignedCrop, result.Value.Wflw98,
     isLateral: result.Value.IsLateral,
     lateralLandmarks: result.Value.LateralAnalysis?.LateralLandmarks,
     headPose: result.Value.HeadPose,
-    pose: result.Value.Pose, flipped: result.Value.Flipped);
+    pose: result.Value.Pose, flipped: result.Value.Flipped,
+    pupilDistMm: result.Value.PupilDistMm);
 
 Dictionary<string, double> measurements = ctx.Analyze();
 ```
 
 `Analyze()` returns the same outputs, by the same names, as the Python library's `analyze()`; see [Measures](../measures.md).
+
+The context measures its own millimeters-per-pixel scale on the landmarks you give it, from a pupillary distance in millimeters. If you save landmarks to measure later, save `PupilDistMm` with them and pass it back, rather than a saved `Pix2mm`: a scale is only right for the landmarks it was measured on. See [Units and scale](../guide/units.md).
 
 For the full walkthrough, including supplying your own inference backend, see the [.NET README](https://github.com/jeffheaton/dynaface/tree/main/dynaface-lib-dotnet#using-the-library-from-another-app).
