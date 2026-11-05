@@ -40,6 +40,8 @@ Dictionary<string, double> measurements = ctx.Analyze();
 
 `Analyze()` returns the same outputs, by the same names, as the Python library's `analyze()`; see [Measures](../measures.md).
 
+For a video, `FrameSeries` measures every frame's saved analysis and gives the same CSV, peak frames and evaluation as the Python library's [`FrameSeries`](../guide/video.md).
+
 The context measures its own millimeters-per-pixel scale on the landmarks you give it, from a pupillary distance in millimeters. If you save landmarks to measure later, save `PupilDistMm` with them and pass it back, rather than a saved `Pix2mm`: a scale is only right for the landmarks it was measured on. See [Units and scale](../guide/units.md).
 
 For the full walkthrough, including supplying your own inference backend, see the [.NET README](https://github.com/jeffheaton/dynaface/tree/main/dynaface-lib-dotnet#using-the-library-from-another-app).

@@ -41,6 +41,11 @@ public abstract class FaceMeasureBase
 
     public abstract string Label { get; }
 
+    // True for a measure that samples the image's pixels (MeasureSkinTone), rather than
+    // measuring the landmarks alone. FrameSeries.FromStates leaves these out for frames
+    // saved without their image. .NET-only: dynaface-lib's saved states always hold it.
+    public virtual bool NeedsImage => false;
+
     public abstract Dictionary<string, double> Calc(FaceMeasureContext ctx, bool render = true);
 
     // Sets every item's Enabled to this measure's own IsLateral/IsFrontal flag

@@ -16,6 +16,9 @@ public class MeasureSkinTone : FaceMeasureBase
 {
     public override string Label => "SKIN TONE";
 
+    // It samples the cheeks' pixels, so a frame saved without its image can't have it.
+    public override bool NeedsImage => true;
+
     static readonly int[] RequiredLandmarks = { 2, 3, 30, 55, 59 };
 
     public MeasureSkinTone()

@@ -50,3 +50,24 @@ def all_measures() -> List["MeasureBase"]:
         AnalyzeSkinTone(),
         AnalyzeLandmarks(),
     ]
+
+
+def get_all_items(measures: List["MeasureBase"]) -> List[str]:
+    """
+    List the outputs to show or export from these measures: the enabled items of
+    the enabled measures, without display-only items. AnalyzeFace.get_all_items()
+    gives the same list for a face's own measures.
+
+    Args:
+        measures (List[MeasureBase]): The measures, such as all_measures().
+
+    Returns:
+        List[str]: Output names, such as "fai" and "oce.l".
+    """
+    return [
+        item.name
+        for measure in measures
+        if measure.enabled
+        for item in measure.items
+        if item.enabled and not item.display_only
+    ]

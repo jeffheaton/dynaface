@@ -212,13 +212,7 @@ class AnalyzeFace(ImageAnalysis):
         Returns:
             List[str]: Output names, such as "fai" and "oce.l".
         """
-        return [
-            stat.name
-            for obj in self.measures
-            if obj.enabled
-            for stat in obj.items
-            if stat.enabled and not stat.display_only
-        ]
+        return dynaface.measures.get_all_items(self.measures)
 
     def is_no_face(self) -> bool:
         """
@@ -593,9 +587,13 @@ class AnalyzeFace(ImageAnalysis):
         self.analyze_y += int(m[0][1] * 2)
         return result
 
-    def analyze(self) -> Optional[Dict[str, Any]]:
+    def analyze(self, render: bool = True) -> Optional[Dict[str, Any]]:
         """
         Run the enabled measures on the face, drawing them on render_img.
+
+        Args:
+            render (bool): Whether to draw the measures. The values are the same
+                either way, so turn it off when you only need the numbers.
 
         Returns:
             Optional[Dict[str, Any]]: Each output's name mapped to its value, such
@@ -621,7 +619,7 @@ class AnalyzeFace(ImageAnalysis):
         for calc in self.measures:
             if calc.enabled:
                 # Use type-ignore to bypass missing attribute error on 'calc'
-                result.update(calc.calc(self))  # type: ignore[attr-defined]
+                result.update(calc.calc(self, render=render))  # type: ignore[attr-defined]
         return result
 
     def calculate_face_rotation(self) -> float:

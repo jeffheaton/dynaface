@@ -1,11 +1,12 @@
 # Analyzing video
 
-Dynaface analyzes a video one frame at a time, each frame just like a photo. Read the frames with OpenCV, convert each one from BGR to RGB, and give it to [`load_image()`][dynaface.facial.AnalyzeFace.load_image]:
+Dynaface analyzes a video one frame at a time, each frame just like a photo. Read the frames with OpenCV, convert each one from BGR to RGB, and give it to [`load_image()`][dynaface.facial.AnalyzeFace.load_image]. A [`FrameSeries`][dynaface.video.FrameSeries] keeps each frame's measurements:
 
 ```python
 import cv2
 from dynaface import facial, measures, models
 from dynaface.measures_frontal import AnalyzeLandmarks
+from dynaface.video import FrameSeries
 
 models.init_models(models.download_models(), models.detect_device())
 chosen = [
@@ -15,45 +16,54 @@ chosen = [
 ]
 
 video = cv2.VideoCapture("smile.mp4")
-fps = video.get(cv2.CAP_PROP_FPS)
-rows = []
+series = FrameSeries(chosen, fps=video.get(cv2.CAP_PROP_FPS))
 while True:
     ok, frame = video.read()
     if not ok:
         break
     face = facial.AnalyzeFace(measures=chosen)
     face.load_image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), crop=True)
-    row = {"frame": len(rows), "time": len(rows) / fps}
-    results = face.analyze()
-    if results is not None:  # None for a frame without a face
-        row.update({name: results.get(name) for name in face.get_all_items()})
-    rows.append(row)
+    series.add(len(series), face.analyze(render=False))  # None for a frame without a face
 video.release()
+
+series.write_csv("smile.csv")
 ```
 
-A frame without a face, such as one where the subject turns away, gets a row with only its frame number and time. Write the rows to a CSV file as in [Measuring a folder of photos](results.md#measuring-a-folder-of-photos), or load them into pandas with `pandas.DataFrame(rows)`.
+The series has a row for every frame and a column for every output. A frame without a face, such as one where the subject turns away, gets a row whose values are NaN, and the CSV file leaves them empty. `series.values` holds each output's values in frame order, and `pandas.DataFrame(series.rows())` loads them into pandas. `render=False` skips drawing the measures, which a series doesn't need.
 
 ## Finding a moment
 
-The rows make it easy to find a moment in the video, such as the peak of a smile, where the dental display is largest, and to look at the other measures at that moment:
+The series makes it easy to find a moment in the video, such as the peak of a smile, where the dental display is largest, and to look at the other measures at that moment:
 
 ```python
-with_face = [row for row in rows if "dental_area" in row]
-smile = max(with_face, key=lambda row: row["dental_area"])
-print(f"Widest smile at {smile['time']:.2f} s, eye.ratio = {smile['eye.ratio']:.2f}")
+smile = series.peak("dental_area")
+row = series.rows()[smile]  # the frames are numbered from 0, so this is its row too
+print(f"Widest smile at {row['time']:.2f} s, eye.ratio = {row['eye.ratio']:.2f}")
 ```
 
-Comparing the eyes at the widest smile with the mouth at the widest eye opening is the kind of comparison used in studies of oral-ocular synkinesis. The Evaluation report in the Dynaface apps makes it for you.
+`peak()` adds up the outputs you name, so `series.peak("eye.left", "eye.right")` finds the widest eye opening. Comparing the eyes at the widest smile with the mouth at the widest eye opening is the kind of comparison used in studies of oral-ocular synkinesis. [`evaluate()`][dynaface.video.FrameSeries.evaluate] makes it, and the Evaluation report in the Dynaface apps shows it:
+
+```python
+evaluation = series.evaluate()
+smile, eyes = evaluation.widest_smile, evaluation.widest_eyes
+print(f"Widest smile: eyes {smile.eye_left:.1f} and {smile.eye_right:.1f} mm²")
+print(f"Widest eye opening: dental display {eyes.dental_area:.1f} mm²")
+```
 
 ## Keeping the analysis
 
-Finding the face and its landmarks is the slow part. [`dump_state()`][dynaface.facial.AnalyzeFace.dump_state] captures a frame's analysis, including its standard image, landmarks, head pose and scale, and [`load_state()`][dynaface.facial.AnalyzeFace.load_state] restores it without running the models again. To keep every frame's state, create a list before the loop, `states = []`, and add `states.append(face.dump_state())` after `load_image()`. You can then calculate other measures later:
+Finding the face and its landmarks is the slow part. [`dump_state()`][dynaface.facial.AnalyzeFace.dump_state] captures a frame's analysis, including its standard image, landmarks, head pose and scale, and [`load_state()`][dynaface.facial.AnalyzeFace.load_state] restores it without running the models again. To keep every frame's state, create a list before the loop, `states = []`, and add `states.append(face.dump_state())` after `load_image()`. You can then calculate other measures later, for every frame at once or for a range of them:
+
+```python
+series = FrameSeries.from_states(states, [measures.AnalyzeEyeArea()], fps=30)
+```
+
+Each row keeps its state's position in the list as its frame number, so measuring a range, such as `start=100, stop=200`, numbers its frames as they are in the whole video. To work with one frame, restore it yourself:
 
 ```python
 face = facial.AnalyzeFace(measures=[measures.AnalyzeEyeArea()])
-for state in states:
-    face.load_state(state)
-    results = face.analyze()
+face.load_state(states[0])
+results = face.analyze()
 ```
 
 `load_state()` restores the frame's image too, so `analyze()` draws on that frame. In Dynaface 2.0.3 and earlier it didn't, so call `face.render_reset()` after `load_state()` to draw on the restored frame.

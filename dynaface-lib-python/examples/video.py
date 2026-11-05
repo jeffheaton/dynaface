@@ -1,4 +1,3 @@
-import csv
 import logging
 import os
 import shutil
@@ -7,6 +6,7 @@ import tempfile
 import cv2
 import matplotlib.pyplot as plt
 from dynaface.facial import AnalyzeFace
+from dynaface.video import FrameSeries
 
 logger = logging.getLogger(__name__)
 
@@ -97,12 +97,7 @@ class ProcessVideoOpenCV:
 
 class VideoToVideo:
     def __init__(self, points, crop):
-        self.stats = []
-        self.left_area = []
-        self.right_area = []
-        self.rate = 1 / 240  # 240
-        self.data = {}
-        self.auto_sync = True
+        self.series = None
         self._points = points
         self._crop = crop
 
@@ -112,18 +107,9 @@ class VideoToVideo:
         if not p.extract(input_video):
             logger.error(f"Couldn't read the video {input_video}")
             return False
-        self.rate = 1 / p.frame_rate
 
-        # sample 1st
-        filename = os.path.join(p.temp_path, "input-1.jpg")
-        logger.debug(filename)
-        image = cv2.imread(filename)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        face = AnalyzeFace(stats)
-        face.load_image(image, self._crop)
-
-        self.stats = face.get_all_items()
-        self.data = {stat: [] for stat in self.stats}
+        # One row per frame, one column per output of the chosen measures.
+        self.series = FrameSeries(stats, fps=p.frame_rate)
 
         out_idx = 1
         pupils = None
@@ -142,13 +128,12 @@ class VideoToVideo:
             face = AnalyzeFace(stats)
             face.load_image(image, self._crop, pupils)
 
-            rec = face.analyze()
-            for stat in self.stats:
-                # A frame without a face has no measures; NaN keeps the frames aligned.
-                self.data[stat].append(rec.get(stat) if rec else float("nan"))
+            # Drawn, for the annotated video. A frame without a face adds a row of
+            # NaN, which keeps the frames aligned.
+            self.series.add(idx - 1, face.analyze())
 
             face.write_text(
-                (10, 30), f"Frame {idx}, {round((idx - 1) * self.rate * 1000)} ms"
+                (10, 30), f"Frame {idx}, {round(self.series.time(idx - 1) * 1000)} ms"
             )
 
             if self._points:
@@ -166,29 +151,18 @@ class VideoToVideo:
 
     def plot_chart(self, filename, plot_stats=None):
         """Plots each measure over time, one panel per measure."""
-        stats = plot_stats or self.stats
-        times = [i * self.rate for i in range(len(self.data[stats[0]]))]
+        names = plot_stats or self.series.names
+        times = [self.series.time(frame) for frame in self.series.frames]
         fig, axes = plt.subplots(
-            len(stats), 1, sharex=True, squeeze=False, figsize=(8, 1.5 * len(stats))
+            len(names), 1, sharex=True, squeeze=False, figsize=(8, 1.5 * len(names))
         )
-        for ax, stat in zip(axes[:, 0], stats):
-            ax.plot(times, self.data[stat])
-            ax.set_ylabel(stat)
+        for ax, name in zip(axes[:, 0], names):
+            ax.plot(times, self.series.values[name])
+            ax.set_ylabel(name)
         axes[-1, 0].set_xlabel("Time (seconds)")
         fig.tight_layout()
         fig.savefig(filename)
         plt.close(fig)
 
     def dump_data(self, filename):
-        with open(filename, "w") as f:
-            writer = csv.writer(f)
-            cols = list(self.data.keys())
-            writer.writerow(["frame", "time"] + cols)
-            data_length = len(self.data[self.stats[0]])
-            lst_time = [x * self.rate for x in range(data_length)]
-
-            for i in range(data_length):
-                row = [str(i), lst_time[i]]
-                for col in cols:
-                    row.append(self.data[col][i])
-                writer.writerow(row)
+        self.series.write_csv(filename)

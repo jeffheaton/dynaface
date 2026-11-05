@@ -269,6 +269,25 @@ FaceMeasureContext restored = FaceAnalysisPersistence.Restore(state);
 // measured on.
 ```
 
+### 6. Video: measuring frame by frame
+
+```csharp
+// One saved state per frame (FaceAnalysisPersistence.Capture), measured again without
+// drawing: a row per frame, a column per output. A state saved without its image is
+// measured on its landmarks alone, leaving out skin tone, which needs the pixels.
+FrameSeries series = FrameSeries.FromStates(states, fps: 30f);
+File.WriteAllText("video.csv", series.ToCsv());     // frame,time,<outputs...>
+
+int? widestSmile = series.Peak("dental_area");
+int? widestEyes = series.Peak("eye.left", "eye.right");
+
+// The eyes at the widest smile and the mouth at the widest eye opening, as the apps'
+// Evaluation report shows them (null without the dental and eye outputs).
+FrameSeries.Evaluation evaluation = FrameSeries
+    .FromStates(states, new FaceMeasureBase[] { new MeasureDentalArea(), new MeasureEyeArea() })
+    .Evaluate();
+```
+
 ### Options
 
 | Flag | Description |
