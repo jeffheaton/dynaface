@@ -16,11 +16,14 @@ class TestDynaface(unittest.TestCase):
         self.assertNotEqual(dynaface.__version__, "unknown")
 
     def test_version_fallback(self):
-        # Remove dynaface from sys.modules to force __init__.py to re-run
-        sys.modules.pop("dynaface", None)
+        # Run __init__.py again in a fresh package object, then put the original back.
+        # Left in sys.modules, the fresh one would lack the submodule attributes
+        # (dynaface.lateral and the rest) that Python 3.10's mock.patch resolves a
+        # target such as "dynaface.lateral.analyze_lateral" through.
+        original = sys.modules.pop("dynaface")
+        self.addCleanup(sys.modules.__setitem__, "dynaface", original)
 
         with patch("importlib.metadata.version", side_effect=Exception("fail")):
-            import dynaface  # Triggers re-import with patched version()
-
-            importlib.reload(dynaface)
-            self.assertEqual(dynaface.__version__, "unknown")
+            fresh = importlib.import_module("dynaface")
+            self.assertEqual(fresh.__version__, "unknown")
+        self.assertIsNot(fresh, original)
