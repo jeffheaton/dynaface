@@ -272,7 +272,15 @@ FaceMeasureContext restored = FaceAnalysisPersistence.Restore(state);
 ### 6. Video: measuring frame by frame
 
 ```csharp
-// One saved state per frame (FaceAnalysisPersistence.Capture), measured again without
+// Import a video the way the apps do: frames without a face are skipped but counted,
+// landmarks can be averaged over the last frames, and only the first 5000 frames are
+// analyzed. keepImages: false keeps each frame's landmarks but not its 1024x1024 crop.
+var analyzer = new VideoAnalyzer(smoothing: 2, keepImages: false);
+foreach (FaceImage frame in frames)   // upright, in order; analyzer.Skip() for one you can't read
+    if (!analyzer.IsFull) analyzer.Add(frame);
+FrameSeries fromVideo = analyzer.Series(fps: 30f);   // rows numbered as in the video
+
+// Or any saved states (FaceAnalysisPersistence.Capture), measured again without
 // drawing: a row per frame, a column per output. A state saved without its image is
 // measured on its landmarks alone, leaving out skin tone, which needs the pixels.
 FrameSeries series = FrameSeries.FromStates(states, fps: 30f);

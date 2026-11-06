@@ -1,21 +1,42 @@
 """
-Measure a video frame by frame: the values behind its chart, a CSV file of them,
-the frame where an output peaks, and the evaluation the Dynaface apps report.
+Analyze and measure a video frame by frame: the values behind its chart, a CSV
+file of them, the frame where an output peaks, and the evaluation the Dynaface
+apps report.
 
-Build a FrameSeries while analyzing the frames, adding each frame's analyze()
-results, or from saved states (AnalyzeFace.dump_state()) with
-FrameSeries.from_states().
+VideoAnalyzer imports a video the way the apps do: it analyzes each frame, skips
+frames without a face, and can smooth the landmarks over the last few frames.
+FrameSeries measures the frames: build one while analyzing them, adding each
+frame's analyze() results, or from saved states (AnalyzeFace.dump_state()) with
+FrameSeries.from_states() or VideoAnalyzer.series().
 """
 
 import csv
 import math
 import os
+from collections import deque
 from dataclasses import dataclass
-from typing import IO, Any, Dict, Iterable, List, Optional, Sequence, Union
+from typing import (
+    IO,
+    Any,
+    Deque,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
+
+from numpy.typing import NDArray
 
 from dynaface import measures as dynaface_measures
+from dynaface.const import DEFAULT_TILT_THRESHOLD, Pose
 from dynaface.facial import AnalyzeFace
 from dynaface.measures_base import MeasureBase
+
+#: The most frames the Dynaface apps import from one video.
+MAX_FRAMES = 5000
 
 
 def _number(value: Any) -> float:
@@ -133,12 +154,15 @@ class FrameSeries:
         stop: Optional[int] = None,
         step: int = 1,
         fps: float = 0.0,
+        frame_numbers: Optional[Sequence[int]] = None,
     ) -> "FrameSeries":
         """
         Measure saved states again, frame by frame, without drawing.
 
         Each row is numbered by its state's position in states, so the frames of a
-        trimmed range keep the numbers they have in the whole video.
+        trimmed range keep the numbers they have in the whole video. When frames
+        without a face were skipped, as VideoAnalyzer skips them, pass the kept
+        frames' numbers in the video as frame_numbers, so each row's time is right.
 
         Args:
             states (Sequence[List[Any]]): States from AnalyzeFace.dump_state().
@@ -149,20 +173,26 @@ class FrameSeries:
             step (int): Measure every step-th state, such as every 10th for a
                 quick chart of a long video.
             fps (float): Frames per second, for the time of each frame.
+            frame_numbers (Optional[Sequence[int]]): Each state's frame number in
+                the video, such as VideoAnalyzer.frames; their positions if None.
 
         Returns:
             FrameSeries: One row per measured state.
 
         Raises:
-            ValueError: If step is less than 1.
+            ValueError: If step is less than 1, or frame_numbers doesn't have one
+                number per state.
         """
         if step < 1:
             raise ValueError("The step must be at least 1.")
+        if frame_numbers is not None and len(frame_numbers) != len(states):
+            raise ValueError("frame_numbers needs one number per state.")
         face = AnalyzeFace(measures)
         series = cls(face.measures, fps)
         end = len(states) if stop is None else stop
-        for frame in range(start, end, step):
-            face.load_state(states[frame])
+        for index in range(start, end, step):
+            face.load_state(states[index])
+            frame = index if frame_numbers is None else frame_numbers[index]
             series.add(frame, face.analyze(render=False))
         return series
 
@@ -293,4 +323,159 @@ class FrameSeries:
             dental_area=self.values["dental_area"][row],
             eye_left=self.values["eye.left"][row],
             eye_right=self.values["eye.right"][row],
+        )
+
+
+class LandmarkSmoother:
+    """
+    A moving average of the last few frames' landmarks, which steadies their jitter
+    from frame to frame, as the Dynaface apps' data-smoothing setting does.
+
+    Give it the landmarks of the cropped face (the standard image), where the head
+    moving within the frame doesn't blur them. Each average is truncated to whole
+    pixels, like the landmarks themselves.
+    """
+
+    def __init__(self, size: int) -> None:
+        """
+        Args:
+            size (int): How many frames to average, this one included; 1 turns
+                smoothing off.
+
+        Raises:
+            ValueError: If size is less than 1.
+        """
+        if size < 1:
+            raise ValueError("The size must be at least 1.")
+        self.size = size
+        self._window: Deque[List[Tuple[float, float]]] = deque(maxlen=size)
+
+    def add(self, landmarks: Sequence[Tuple[float, float]]) -> List[Tuple[int, int]]:
+        """
+        Add a frame's landmarks.
+
+        Returns:
+            List[Tuple[int, int]]: The average of the last size frames' landmarks,
+                this frame's included, in whole pixels. With a size of 1, the
+                landmarks themselves (AnalyzeFace keeps them in whole pixels).
+        """
+        if self.size == 1:
+            return [(int(x), int(y)) for x, y in landmarks]
+        self._window.append([(x, y) for x, y in landmarks])
+        n = len(self._window)
+        return [
+            (
+                int(sum(frame[i][0] for frame in self._window) / n),
+                int(sum(frame[i][1] for frame in self._window) / n),
+            )
+            for i in range(len(landmarks))
+        ]
+
+    def reset(self) -> None:
+        """Forget the earlier frames, so the next one starts a new average."""
+        self._window.clear()
+
+
+class VideoAnalyzer:
+    """
+    Analyze a video's frames one at a time, as the Dynaface apps import a video.
+
+    Give it every frame in order, upright and as an RGB image. A frame with a face
+    is analyzed and kept as a saved state (AnalyzeFace.dump_state()); a frame
+    without one is skipped but still counted, so the kept frames keep their numbers
+    in the video. With a smoothing above 1, each frame's landmarks are averaged
+    with those of the frames before it (see LandmarkSmoother), and the scale is
+    measured again on the averaged landmarks. Only the first max_frames frames are
+    analyzed.
+
+    Attributes:
+        states (List[List[Any]]): The kept frames' states, in order.
+        frames (List[int]): Each kept frame's number in the video, counting from 0.
+    """
+
+    def __init__(
+        self,
+        smoothing: int = 1,
+        max_frames: int = MAX_FRAMES,
+        force_pose: Pose = Pose.DETECT,
+        tilt_threshold: float = DEFAULT_TILT_THRESHOLD,
+    ) -> None:
+        """
+        Args:
+            smoothing (int): How many frames' landmarks to average; 1, the
+                default, turns smoothing off.
+            max_frames (int): How many frames to analyze at most.
+            force_pose (Pose): Pose.DETECT to classify each frame as frontal or
+                lateral, or the pose to use for all of them.
+            tilt_threshold (float): As for AnalyzeFace.
+        """
+        self.states: List[List[Any]] = []
+        self.frames: List[int] = []
+        self.max_frames = max_frames
+        self.force_pose = force_pose
+        self.tilt_threshold = tilt_threshold
+        self._smoother = LandmarkSmoother(smoothing)
+        self._seen = 0
+        self._lateral: Optional[bool] = None
+
+    @property
+    def full(self) -> bool:
+        """True once max_frames frames have been given; add() analyzes no more."""
+        return self._seen >= self.max_frames
+
+    @property
+    def thumbnail(self) -> Optional[NDArray[Any]]:
+        """The first kept frame's standard image, or None before one is kept."""
+        return self.states[0][0] if self.states else None
+
+    def add(self, image: NDArray[Any]) -> bool:
+        """
+        Analyze the next frame.
+
+        Args:
+            image (NDArray[Any]): The frame, upright and as an RGB image.
+
+        Returns:
+            bool: True if it had a face and was kept; False if it had none, or the
+                analyzer was already full.
+        """
+        if self.full:
+            return False
+        frame = self._seen
+        self._seen += 1
+        face = AnalyzeFace([], tilt_threshold=self.tilt_threshold)
+        face.load_image(image, crop=True, force_pose=self.force_pose)
+        if not face.landmarks:
+            return False
+        if face.lateral != self._lateral:
+            # A profile's landmarks don't average with a frontal face's.
+            self._smoother.reset()
+            self._lateral = face.lateral
+        if self._smoother.size > 1:
+            face.landmarks = self._smoother.add(face.landmarks)
+            if not face.lateral:
+                face.calc_pd()  # saved with the averaged landmarks it fits
+        self.states.append(face.dump_state())
+        self.frames.append(frame)
+        return True
+
+    def skip(self) -> None:
+        """Count a frame that couldn't be read, so the frames after it keep their
+        numbers in the video."""
+        if not self.full:
+            self._seen += 1
+
+    def series(
+        self, measures: Optional[List[MeasureBase]] = None, fps: float = 0.0
+    ) -> FrameSeries:
+        """
+        Measure the kept frames: one row per frame, numbered as in the video.
+
+        Args:
+            measures (Optional[List[MeasureBase]]): The measures to run; all of
+                them if None.
+            fps (float): Frames per second, for the time of each frame.
+        """
+        return FrameSeries.from_states(
+            self.states, measures, fps=fps, frame_numbers=self.frames
         )

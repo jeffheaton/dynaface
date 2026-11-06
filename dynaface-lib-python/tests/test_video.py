@@ -1,6 +1,7 @@
 """
 FrameSeries: a video's outputs frame by frame, and the CSV, peaks and evaluation
-built from them. The .NET port's FrameSeriesTests checks the same.
+built from them; and VideoAnalyzer and LandmarkSmoother, which import a video.
+The .NET port's FrameSeriesTests and VideoAnalyzerTests check the same.
 """
 
 import io
@@ -12,9 +13,23 @@ import numpy as np
 
 from dynaface import facial, measures
 from dynaface.const import Pose
-from dynaface.video import FrameSeries, Moment
+from dynaface.video import FrameSeries, LandmarkSmoother, Moment, VideoAnalyzer
 
 NAN = float("nan")
+FRAME = np.full((720, 1280, 3), 128, dtype=np.uint8)
+NO_FACE = ([], np.array([0, 0, 0]))
+
+
+def detected(spread):
+    """What the models would find in a made-up frame: 98 landmarks and a head pose.
+    The pupils are 230 + spread pixels apart, so each spread measures differently."""
+    right, left = (530, 320), (760 + spread, 330)
+    landmarks = [
+        (right[0] - 80 + (i * 37) % 380, right[1] - 120 + (i * 53) % 400)
+        for i in range(98)
+    ]
+    landmarks[96], landmarks[97] = right, left
+    return landmarks, np.array([8.0, 1.0, -2.0, 0.0, 0.0, 0.0])
 
 
 def series_of(rows, measure_list, fps=0.0):
@@ -32,20 +47,23 @@ def same(a, b):
 
 
 def load_face(spread):
-    """A gray frame with made-up landmarks in place of the models; the pupils are
-    230 + spread pixels apart, so each spread measures differently."""
-    right, left = (530, 320), (760 + spread, 330)
-    landmarks = [
-        (right[0] - 80 + (i * 37) % 380, right[1] - 120 + (i * 53) % 400)
-        for i in range(98)
-    ]
-    landmarks[96], landmarks[97] = right, left
+    """A gray frame analyzed with made-up detections in place of the models."""
     face = facial.AnalyzeFace(measures=measures.all_measures())
-    frame = np.full((720, 1280, 3), 128, dtype=np.uint8)
-    found = (landmarks, np.array([8.0, 1.0, -2.0, 0.0, 0.0, 0.0]))
+    found = detected(spread)
     with mock.patch.object(facial.AnalyzeFace, "_find_landmarks", return_value=found):
-        face.load_image(frame, crop=True, force_pose=Pose.FRONTAL)
+        face.load_image(FRAME, crop=True, force_pose=Pose.FRONTAL)
     return face
+
+
+def import_video(detections, **options):
+    """Run a VideoAnalyzer over gray frames, one per detection (NO_FACE for none)."""
+    analyzer = VideoAnalyzer(force_pose=Pose.FRONTAL, **options)
+    with mock.patch.object(
+        facial.AnalyzeFace, "_find_landmarks", side_effect=detections
+    ):
+        for _ in detections:
+            analyzer.add(FRAME)
+    return analyzer
 
 
 class TestFrameSeries(unittest.TestCase):
@@ -191,6 +209,81 @@ class TestFromStates(unittest.TestCase):
                 self.live[evaluation.widest_eyes.frame]["dental_area"],
             )
         )
+
+
+class TestLandmarkSmoother(unittest.TestCase):
+    def test_averages_the_last_frames(self):
+        smoother = LandmarkSmoother(2)
+        self.assertEqual(smoother.add([(10, 20), (30, 41)]), [(10, 20), (30, 41)])
+        # Averages are truncated to whole pixels: 11.5 is 11, 40.5 is 40.
+        self.assertEqual(smoother.add([(13, 25), (31, 40)]), [(11, 22), (30, 40)])
+        # Only the last 2 frames count.
+        self.assertEqual(smoother.add([(20, 30), (30, 40)]), [(16, 27), (30, 40)])
+        smoother.reset()
+        self.assertEqual(smoother.add([(0, 0), (1, 1)]), [(0, 0), (1, 1)])
+
+    def test_size_one_is_off(self):
+        smoother = LandmarkSmoother(1)
+        smoother.add([(10, 20)])
+        self.assertEqual(smoother.add([(13, 25)]), [(13, 25)])
+        with self.assertRaises(ValueError):
+            LandmarkSmoother(0)
+
+
+class TestVideoAnalyzer(unittest.TestCase):
+    """Importing a video, with made-up detections in place of the models."""
+
+    def test_frames_without_a_face_are_skipped_but_counted(self):
+        analyzer = import_video([detected(0), NO_FACE, detected(40)])
+        self.assertEqual(analyzer.frames, [0, 2])
+        self.assertEqual(len(analyzer.states), 2)
+        self.assertIs(analyzer.thumbnail, analyzer.states[0][0])
+        # The series keeps the frames' numbers, so their times are right too.
+        series = analyzer.series([measures.AnalyzeFAI()], fps=30)
+        self.assertEqual(series.frames, [0, 2])
+        self.assertAlmostEqual(series.time(2), 2 / 30)
+
+    def test_frames_that_couldnt_be_read(self):
+        analyzer = VideoAnalyzer(force_pose=Pose.FRONTAL)
+        with mock.patch.object(
+            facial.AnalyzeFace, "_find_landmarks", side_effect=[detected(0)] * 2
+        ):
+            analyzer.add(FRAME)
+            analyzer.skip()
+            analyzer.add(FRAME)
+        self.assertEqual(analyzer.frames, [0, 2])
+
+    def test_only_the_first_frames(self):
+        analyzer = import_video([detected(0)] * 3, max_frames=2)
+        self.assertEqual(analyzer.frames, [0, 1])
+        self.assertTrue(analyzer.full)
+        self.assertFalse(analyzer.add(FRAME))
+        self.assertIsNone(VideoAnalyzer().thumbnail)
+
+    def test_without_smoothing_each_frame_is_as_analyzed(self):
+        analyzer = import_video([detected(0), detected(80)])
+        for state, spread in zip(analyzer.states, (0, 80)):
+            face = load_face(spread)
+            self.assertEqual(state[2], face.landmarks)
+            self.assertEqual(state[4], face.pix2mm)
+
+    def test_smoothing(self):
+        analyzer = import_video([detected(0), detected(80)], smoothing=2)
+        first, second = load_face(0), load_face(80)
+        smoother = LandmarkSmoother(2)
+        smoother.add(first.landmarks)
+        averaged = smoother.add(second.landmarks)
+        self.assertEqual(analyzer.states[0][2], first.landmarks)
+        self.assertEqual(analyzer.states[1][2], averaged)
+        self.assertNotEqual(averaged, second.landmarks)
+        # The saved scale is the averaged landmarks' own.
+        pd, pix2mm = facial.util_calc_pd(facial.util_get_pupils(averaged))
+        self.assertEqual(analyzer.states[1][3:5], [pd, pix2mm])
+
+    def test_frame_numbers_must_match_the_states(self):
+        analyzer = import_video([detected(0), detected(40)])
+        with self.assertRaises(ValueError):
+            FrameSeries.from_states(analyzer.states, frame_numbers=[0])
 
 
 if __name__ == "__main__":

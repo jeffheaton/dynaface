@@ -47,7 +47,9 @@ public sealed class FrameSeries
     // by its state's position in states, so the frames of a trimmed range keep the numbers
     // they have in the whole video. measures: the ones to run, all of them
     // (DynafaceMeasures.AllMeasures()) if null. step: measure every step-th state, such as
-    // every 10th for a quick chart of a long video.
+    // every 10th for a quick chart of a long video. When frames without a face were
+    // skipped, as VideoAnalyzer skips them, pass the kept frames' numbers in the video as
+    // frameNumbers (VideoAnalyzer.Frames), so each row's time is right.
     //
     // A state saved without its image (PostCropImage not valid) is measured on its
     // landmarks alone: the measures that need the image (FaceMeasureBase.NeedsImage) are
@@ -55,10 +57,13 @@ public sealed class FrameSeries
     // landmarks, such as the Unity app's video frames.
     public static FrameSeries FromStates(
         IReadOnlyList<FaceAnalysisState> states, IEnumerable<FaceMeasureBase> measures = null,
-        int start = 0, int? stop = null, int step = 1, float fps = 0f)
+        int start = 0, int? stop = null, int step = 1, float fps = 0f,
+        IReadOnlyList<int> frameNumbers = null)
     {
         if (step < 1)
             throw new ArgumentOutOfRangeException(nameof(step), step, "The step must be at least 1.");
+        if (frameNumbers != null && frameNumbers.Count != states.Count)
+            throw new ArgumentException("frameNumbers needs one number per state.", nameof(frameNumbers));
 
         var all = new List<FaceMeasureBase>(measures ?? DynafaceMeasures.AllMeasures());
         var series = new FrameSeries(all, fps);
@@ -66,9 +71,10 @@ public sealed class FrameSeries
         FaceImage blank = default;
 
         int end = stop ?? states.Count;
-        for (int frame = start; frame < end; frame += step)
+        for (int index = start; index < end; index += step)
         {
-            FaceAnalysisState state = states[frame];
+            FaceAnalysisState state = states[index];
+            int frame = frameNumbers == null ? index : frameNumbers[index];
             if (state.PostCropImage.IsValid)
             {
                 series.Add(frame, FaceAnalysisPersistence.Restore(state).Analyze(all, render: false));

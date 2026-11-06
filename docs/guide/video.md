@@ -52,7 +52,28 @@ print(f"Widest eye opening: dental display {eyes.dental_area:.1f} mm²")
 
 ## Keeping the analysis
 
-Finding the face and its landmarks is the slow part. [`dump_state()`][dynaface.facial.AnalyzeFace.dump_state] captures a frame's analysis, including its standard image, landmarks, head pose and scale, and [`load_state()`][dynaface.facial.AnalyzeFace.load_state] restores it without running the models again. To keep every frame's state, create a list before the loop, `states = []`, and add `states.append(face.dump_state())` after `load_image()`. You can then calculate other measures later, for every frame at once or for a range of them:
+Finding the face and its landmarks is the slow part. [`dump_state()`][dynaface.facial.AnalyzeFace.dump_state] captures a frame's analysis, including its standard image, landmarks, head pose and scale, and [`load_state()`][dynaface.facial.AnalyzeFace.load_state] restores it without running the models again.
+
+A [`VideoAnalyzer`][dynaface.video.VideoAnalyzer] keeps every frame's state as it analyzes the video, the way the Dynaface apps import one:
+
+```python
+from dynaface.video import VideoAnalyzer
+
+analyzer = VideoAnalyzer(smoothing=2)
+video = cv2.VideoCapture("smile.mp4")
+while not analyzer.full:  # the first 5000 frames, as in the apps
+    ok, frame = video.read()
+    if not ok:
+        break
+    analyzer.add(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+video.release()
+
+series = analyzer.series([measures.AnalyzeEyeArea()], fps=30)
+```
+
+It skips a frame without a face but still counts it, so `analyzer.frames` holds each kept frame's number in the video, and the series keeps those numbers, so each frame's time is right. `smoothing=2` averages each frame's landmarks with the frame before's, which steadies their jitter; the desktop app's data-smoothing setting does the same, and its default is 2. The averaging uses the landmarks of the cropped face, so the head moving within the frame doesn't blur them. Give the analyzer upright frames: unlike the desktop app, it doesn't try turning a sideways frame.
+
+You can calculate other measures later, for every frame at once or for a range of them, from the states (`analyzer.states`, or any list of `dump_state()` results):
 
 ```python
 series = FrameSeries.from_states(states, [measures.AnalyzeEyeArea()], fps=30)
