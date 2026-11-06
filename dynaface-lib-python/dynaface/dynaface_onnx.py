@@ -14,11 +14,15 @@ Usage:
     box, score = dynaface.detect_face(image_bgr)          # (x, y, w, h), float
     landmarks, pose = dynaface.find_landmarks(image_bgr, box)  # [98, 2], [6]
     rgba = dynaface.remove_background(image_bgr)          # BGRA, alpha = mask
+
+Each call checks its model's output and raises ModelOutputError for output that no
+working model gives, so a device that computes the models wrongly isn't mistaken for
+an image without a face.
 """
 
 import math
 import os
-from typing import List, Optional, Tuple, cast
+from typing import Any, List, Optional, Tuple, cast
 
 import cv2
 import numpy as np
@@ -163,6 +167,31 @@ def _resolve_providers(device: str) -> List[str]:
     return _DEVICE_PROVIDERS.get(device.lower(), ["CPUExecutionProvider"])
 
 
+class ModelOutputError(RuntimeError):
+    """
+    A model gave output that no working model gives: values that aren't numbers (NaN
+    or infinity), the same value everywhere, or landmarks all at one point.
+
+    The device the models run on isn't computing them correctly, as some GPUs and
+    their drivers don't. Without this check, the face detector's broken output looks
+    like an image without a face. Load the models on another device, such as the CPU:
+    dynaface.models.init_models(path, "cpu"). Also available as
+    dynaface.models.ModelOutputError.
+    """
+
+
+def _broken(model: str, problem: str) -> ModelOutputError:
+    return ModelOutputError(
+        f"The {model} gave {problem}, which a working model never does, so the "
+        "device it runs on isn't computing it correctly. Load the models on "
+        'another device, such as the CPU: models.init_models(path, "cpu").'
+    )
+
+
+def _all_finite(*outputs: Any) -> bool:
+    return all(bool(np.all(np.isfinite(output))) for output in outputs)
+
+
 # ---------------------------------------------------------------------------
 # BlazeFace (short-range) anchor generation — SSD-style anchors matching the
 # model's fixed config: 4 layers, strides 8/16/16/16, 128x128 input,
@@ -273,6 +302,14 @@ class DynafaceOnnxInference:
         regressors, scores = self._face_session.run(
             self._face_output_names, {self._face_input_name: tensor}
         )
+        if not _all_finite(regressors, scores):
+            raise _broken("face detector (BlazeFace)", "values that aren't numbers")
+        if np.ptp(scores) == 0:
+            # Even a blank image gets scores that differ across its parts.
+            raise _broken(
+                "face detector (BlazeFace)",
+                "the same score for every part of the image",
+            )
         regressors = regressors[0]  # [896, 16]: 4 box params + 6 keypoints * 2
         scores = scores[0, :, 0]  # [896] raw confidence logits
 
@@ -400,7 +437,12 @@ class DynafaceOnnxInference:
                 "cam_matrix": self._cam_matrix,
             },
         )
+        if not _all_finite(landmarks_norm, pose):
+            raise _broken("landmark model (SPIGA)", "values that aren't numbers")
         landmarks_crop_px = landmarks_norm[0] * float(_SPIGA_CROP_SIZE)  # [98, 2]
+        if float(np.ptp(landmarks_crop_px, axis=0).max()) < 1.0:
+            # Even a crop without a face gets landmarks spread over 100 pixels.
+            raise _broken("landmark model (SPIGA)", "all its landmarks at one point")
 
         # Map landmarks from the crop's pixel space back to image_bgr's.
         inv_affine = resample.invert_affine(crop_affine)
@@ -474,6 +516,10 @@ class DynafaceOnnxInference:
         )[0][
             0, 0
         ]  # [320, 320], sigmoid saliency map
+        if not _all_finite(mask):
+            raise _broken("background model (U2-Net)", "values that aren't numbers")
+        if np.ptp(mask) == 0:
+            raise _broken("background model (U2-Net)", "the same value for every pixel")
 
         mask = resample.resize_mask_bilinear(mask, w, h)
         alpha = (np.clip(mask, 0.0, 1.0) * 255).astype(np.uint8)

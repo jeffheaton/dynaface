@@ -115,16 +115,21 @@ public class BlazeFaceDetector
                 inputData[dest + 2] = color.B / 255f * 2f - 1f;
             }
 
+        // A ready backend gives output a working model would; anything else is an error,
+        // not "no face" (see ModelOutputException).
+        const string model = ModelOutputCheck.FaceDetector;
         var runResult = _runner.RunBlazeFace(inputData);
-        if (runResult == null) return false;
+        if (runResult == null) throw new ModelOutputException(model, "no output");
 
         var (regsArr, scoresArr) = runResult.Value;
+        ModelOutputCheck.Require(model, regsArr, AnchorCount * 4);
+        ModelOutputCheck.Require(model, scoresArr, AnchorCount);
         int totalRegs = regsArr.Length;
-        int totalScores = scoresArr.Length;
-        if (totalRegs % AnchorCount != 0 || totalScores < AnchorCount) return false;
+        if (totalRegs % AnchorCount != 0) throw new ModelOutputException(model, "output of the wrong size");
+        if (ModelOutputCheck.AllSame(scoresArr, AnchorCount))
+            throw new ModelOutputException(model, "the same score for every part of the image");
 
         int regStride = totalRegs / AnchorCount;
-        if (regStride < 4) return false;
 
         // Decode every anchor scoring above threshold (needed for NMS — the single
         // best-scoring anchor doesn't always survive NMS as the best surviving box

@@ -3,6 +3,9 @@ using System;
 // Low-level inference contract for the Dynaface pipeline: 3 separate model calls,
 // kept independent so each can be swapped/tested on its own.
 // One implementation wraps the ONNX runtime; another wraps Unity Inference Engine (in DynafaceRuntime).
+// The detectors check each call's output: null ("failure") from a ready backend, output
+// of the wrong size, NaN or infinite values, a constant output, or collapsed landmarks
+// throw a ModelOutputException rather than passing for a photo without a face.
 public interface IDynafaceInference : IDisposable
 {
     bool IsReady { get; }

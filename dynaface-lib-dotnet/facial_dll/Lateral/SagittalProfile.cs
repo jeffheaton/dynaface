@@ -91,7 +91,11 @@ public static class SagittalProfile
             tensor[2 * plane + i] = (c.B / 255f - ImageNetMean[2]) / ImageNetStd[2];
         }
 
-        return inference.RunU2Net(tensor); // flat [320*320] raw sigmoid saliency map
+        float[] mask = inference.RunU2Net(tensor); // flat [320*320] raw sigmoid saliency map
+        ModelOutputCheck.Require(ModelOutputCheck.BackgroundModel, mask, plane);
+        if (ModelOutputCheck.AllSame(mask, plane))
+            throw new ModelOutputException(ModelOutputCheck.BackgroundModel, "the same value for every pixel");
+        return mask;
     }
 
     static float[] ResizeMaskBilinear(float[] src, int srcW, int srcH, int dstW, int dstH)

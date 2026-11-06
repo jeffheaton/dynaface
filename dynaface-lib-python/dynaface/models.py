@@ -11,7 +11,10 @@ from typing import Optional, Union
 import onnxruntime as ort
 import requests
 
-from dynaface.dynaface_onnx import DynafaceOnnxInference
+from dynaface.dynaface_onnx import (  # noqa: F401 (ModelOutputError for callers)
+    DynafaceOnnxInference,
+    ModelOutputError,
+)
 from dynaface.util import VERIFY_CERTS
 
 # Download Constants

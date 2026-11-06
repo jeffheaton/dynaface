@@ -31,6 +31,8 @@ Some corporate networks intercept HTTPS traffic with their own certificate, whic
 
 [`detect_device()`][dynaface.models.detect_device] picks the fastest device ONNX Runtime can use: `"cuda"` when an NVIDIA GPU is available, `"mps"` (Core ML) on a Mac that supports it, and `"cpu"` otherwise. To choose for yourself, pass one of these to [`init_models()`][dynaface.models.init_models]. A GPU matters most for video. Using `"cuda"` needs ONNX Runtime's CUDA build, the `onnxruntime-gpu` package, and NVIDIA's CUDA libraries.
 
+Some GPUs and their drivers run the models but compute them wrongly, giving values that aren't numbers or the same value everywhere. Dynaface checks each model's output, and raises [`ModelOutputError`][dynaface.dynaface_onnx.ModelOutputError] for output that no working model gives, so the problem isn't mistaken for an image without a face. If you see it, load the models on the CPU with `init_models(path, "cpu")`.
+
 [`unload_models()`][dynaface.models.unload_models] releases the models. Call `init_models()` again before analyzing more faces.
 
 ## Citing the models

@@ -211,6 +211,12 @@ if (result == null)
     result = FacePipeline.Run(image, rotationAngle: 90, flipHorizontal: false);
 }
 
+// A backend that runs the models but computes them wrongly (as GPU compute on some
+// virtual and software graphics adapters does) gives output no working model gives:
+// none, NaN values, the same value everywhere, or landmarks all at one point. Run()
+// throws a ModelOutputException for it, rather than reporting no face; run the models
+// on the CPU instead.
+
 // Run() already performed lateral background-removal analysis internally when the
 // pose came back lateral (mirroring dynaface-lib's load_image) — just read it back.
 Vec2[] lateralLandmarks = result?.LateralAnalysis?.LateralLandmarks;

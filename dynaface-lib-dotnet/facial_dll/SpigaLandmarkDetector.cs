@@ -76,11 +76,18 @@ public class SpigaLandmarkDetector
                 tensor[2 * n * n + idx] = color.B / 255f;
             }
 
+        // A ready backend gives output a working model would; anything else is an error
+        // (see ModelOutputException).
+        const string model = ModelOutputCheck.LandmarkModel;
         var result = _runner.RunSpiga(tensor);
-        if (result == null) return null;
+        if (result == null) throw new ModelOutputException(model, "no output");
 
         var (landmarksNorm, pose) = result.Value;
-        if (landmarksNorm == null || landmarksNorm.Length < NumWflwLandmarks * 2) return null;
+        ModelOutputCheck.Require(model, landmarksNorm, NumWflwLandmarks * 2);
+        if (pose != null) ModelOutputCheck.Require(model, pose, 0);
+        if (Spread(landmarksNorm) * SpigaCropSize < 1f)
+            // Even a crop without a face gets landmarks spread over 100 pixels.
+            throw new ModelOutputException(model, "all its landmarks at one point");
 
         var (i00, i01, i02, i10, i11, i12) = ImageUtils.InvertAffine(m00, m01, m02, m10, m11, m12);
 
@@ -104,5 +111,20 @@ public class SpigaLandmarkDetector
         }
 
         return (landmarks, pose);
+    }
+
+    // The larger of the landmarks' spans across and down, in the crop's normalized units.
+    static float Spread(float[] landmarksNorm)
+    {
+        float minX = float.MaxValue, maxX = float.MinValue, minY = float.MaxValue, maxY = float.MinValue;
+        for (int i = 0; i < NumWflwLandmarks; i++)
+        {
+            float x = landmarksNorm[i * 2], y = landmarksNorm[i * 2 + 1];
+            minX = System.Math.Min(minX, x);
+            maxX = System.Math.Max(maxX, x);
+            minY = System.Math.Min(minY, y);
+            maxY = System.Math.Max(maxY, y);
+        }
+        return System.Math.Max(maxX - minX, maxY - minY);
     }
 }
