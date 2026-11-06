@@ -46,7 +46,12 @@ for _msg in _migration_actions:
     logger.info(_msg)
 
 import jth_ui.utl_settings as utl_settings
-from dynaface.const import DEFAULT_TILT_THRESHOLD, STD_PUPIL_DIST
+from dynaface.const import (
+    DEFAULT_TILT_THRESHOLD,
+    MAX_PUPIL_DIST,
+    MIN_PUPIL_DIST,
+    STD_PUPIL_DIST,
+)
 from dynaface_window import DynafaceWindow
 from jth_ui import app_const, utl_log
 from jth_ui.app_jth import AppJTH, get_library_version
@@ -159,10 +164,19 @@ class AppDynaface(AppJTH):
         logging_level = getattr(logging, level)
         utl_log.change_log_level(logging_level)
 
-        # Set pupillary distance (PD)
-        dynaface.facial.AnalyzeFace.pd = utl_settings.get_int(
-            self.settings, key=SETTING_PD, default=STD_PUPIL_DIST
-        )
+        # Set pupillary distance (PD). The library refuses one outside its range
+        # when it loads an image, so a stored value outside it, as versions before
+        # 2.1 allowed, is reset rather than failing every image and video.
+        pd = utl_settings.get_int(self.settings, key=SETTING_PD, default=STD_PUPIL_DIST)
+        try:
+            dynaface.facial.check_pupil_distance(pd)
+        except ValueError:
+            logger.warning(f"Stored pupillary distance {pd} mm is out of range; reset")
+            self.settings[SETTING_PD] = STD_PUPIL_DIST
+            self.save_settings()
+            QTimer.singleShot(0, lambda bad=pd: self._report_pd_reset(bad))
+            pd = STD_PUPIL_DIST
+        dynaface.facial.AnalyzeFace.pd = pd
 
         # Set the tilt threshold
         self.tilt_threshold = utl_settings.get_int(
@@ -204,6 +218,14 @@ class AppDynaface(AppJTH):
         # users mistook for a crash. models_ready is flipped in the completion
         # slot on the main thread.
         self._start_model_loader(self.device)
+
+    def _report_pd_reset(self, pd):
+        if self.main_window is not None:
+            self.main_window.display_message_box(
+                f"Your pupillary distance setting, {pd} mm, is outside the "
+                f"{MIN_PUPIL_DIST} to {MAX_PUPIL_DIST} mm that Dynaface accepts, so it "
+                f"has been reset to {STD_PUPIL_DIST} mm. You can change it in Settings."
+            )
 
     def _start_model_loader(self, device: str):
         self._model_thread = QThread()

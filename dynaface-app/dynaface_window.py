@@ -3,6 +3,7 @@ import os
 import webbrowser
 
 import tab_splash
+import utl_general
 from jth_ui import app_jth
 from jth_ui.window_jth import MainWindowJTH
 from PyQt6.QtCore import QTimer
@@ -240,7 +241,9 @@ class DynafaceWindow(MainWindowJTH):
             self.add_tab(tab, tab_name)
         except Exception as e:
             logger.error("Error during video open", exc_info=True)
-            self.display_message_box(f"Unable to open file. {e}")
+            self.display_message_box(
+                f"Unable to open file. {utl_general.describe_analysis_error(e)}"
+            )
 
     def close_analyze_tabs(self):
         try:

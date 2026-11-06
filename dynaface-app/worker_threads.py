@@ -123,8 +123,10 @@ class WorkerLoad(QThread):
         if color:
             frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
-        success = self._face.load_image(img=frame, crop=True, pupils=pupils)
-        if not success:
+        self._face.load_image(img=frame, crop=True, pupils=pupils)
+        if not self._face.landmarks:
+            # No face. load_image() returns True either way, so this used to go on
+            # to fail on the missing landmarks, which stopped the whole import.
             return None
 
         return frame
@@ -223,6 +225,8 @@ class WorkerLoad(QThread):
 
         except Exception as e:
             logger.error("Error loading video", exc_info=True)
+            # Reported when loading ends, rather than as no faces found.
+            self._target.load_failure = e
         finally:
             self._update_signal.emit("*")
             self._target.loading = False

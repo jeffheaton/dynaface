@@ -15,8 +15,9 @@ import unittest
 import zipfile
 
 import numpy as np
-from dynaface import facial, measures  # noqa: F401 (facial first avoids a cycle)
+from dynaface import facial, measures
 from dynaface.const import Pose
+from dynaface.measures_lateral import AnalyzeLateral
 
 from dynaface_document import DOC_BODY, DOC_BODY_FRAMES, DOC_HEADER, DynafaceDocument
 
@@ -129,6 +130,42 @@ class DynafaceDocumentTest(unittest.TestCase):
         for s, l in zip(saved.measures, loaded.measures):
             self.assertEqual(l.enabled, s.enabled)
             self.assertEqual([i.enabled for i in l.items], [i.enabled for i in s.items])
+
+    def test_profile_saved_before_2_1(self):
+        # Its frames end with the face rotation and hold no view; the document keeps
+        # the profile's lateral data, which the app sets before restoring a frame.
+        _sample_document().save(self.path)
+        loaded = self.load()
+        face = facial.AnalyzeFace(measures=[AnalyzeLateral()])
+        face.lateral = loaded.lateral
+        face.lateral_landmarks = loaded.lateral_landmarks
+        face.load_state(loaded.frames[0])
+        self.assertTrue(face.lateral)
+        results = AnalyzeLateral().calc(face, render=False)
+        self.assertEqual(set(results), {"nfa", "nla", "at", "nt", "at_nt"})
+
+    def test_frames_keep_their_view(self):
+        # From 2.1 each frame's state ends with its view, including a profile's
+        # lateral landmarks and outline as arrays.
+        doc = _sample_document()
+        image = np.zeros((4, 4, 3), dtype=np.uint8)
+        view = {
+            "pose": "lateral",
+            "flipped": True,
+            "lateral": True,
+            "lateral_landmarks": np.arange(12).reshape(6, 2),
+            "sagittal_x": np.arange(5, dtype=np.int32),
+            "sagittal_y": np.arange(5, 10, dtype=np.int32),
+        }
+        doc.frames = [[image, [10.0, -2.0, 1.0], [(10, 20)], 0.0, 0.24, None, view]]
+        doc.save(self.path)
+        loaded = self.load()
+        self.assert_same(doc.frames, loaded.frames)
+
+        face = facial.AnalyzeFace(measures=[AnalyzeLateral()])
+        face.load_state(loaded.frames[0])
+        self.assertTrue(face.lateral and face.flipped)
+        self.assertEqual(face.pose, Pose.LATERAL)
 
     def test_file_holds_only_json_and_npy(self):
         _sample_document().save(self.path)

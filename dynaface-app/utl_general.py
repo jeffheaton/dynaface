@@ -92,3 +92,22 @@ def assert_standard_python(
         + "\n"
         "    – Containers: " + ", ".join(_full_typename(t) for t in _ALLOWED_CONTAINERS)
     )
+
+
+def describe_analysis_error(error: Exception) -> str:
+    """
+    A message for the user about an error from analyzing an image or video.
+
+    The library's ModelOutputError means the models computed garbage on the
+    accelerator; its own advice is for programmers, so give the app's instead.
+    """
+    from dynaface.models import ModelOutputError
+
+    if isinstance(error, ModelOutputError):
+        return (
+            "Dynaface's AI models aren't working on this computer's accelerator "
+            "(GPU): they gave results that working models never give. Turn off "
+            '"Use Accelerator (GPU)" in Settings, restart Dynaface, and try again.'
+            f"\n\nDetails: {error}"
+        )
+    return str(error)

@@ -1,5 +1,6 @@
 import logging
 
+from dynaface.const import MAX_PUPIL_DIST, MIN_PUPIL_DIST
 from dynaface.facial import DEFAULT_TILT_THRESHOLD, STD_PUPIL_DIST
 from jth_ui import utl_settings, utl_log
 from PyQt6.QtGui import QIntValidator
@@ -31,9 +32,12 @@ class SettingsTab(QWidget):
         self._window = window
 
         # Create widgets
-        lbl_pd = QLabel("Pupillary Distance (PD, mm):", self)
+        lbl_pd = QLabel(
+            f"Pupillary Distance (PD, {MIN_PUPIL_DIST} to {MAX_PUPIL_DIST} mm):", self
+        )
         self._text_pd = QLineEdit(self)
-        self._text_pd.setValidator(QIntValidator())
+        # The library refuses a distance outside this range when it loads an image.
+        self._text_pd.setValidator(QIntValidator(MIN_PUPIL_DIST, MAX_PUPIL_DIST, self))
 
         lbl_tilt = QLabel("Correct tilt greater than (deg, -1 to disable):", self)
         self._text_tilt = QLineEdit(self)
@@ -45,7 +49,7 @@ class SettingsTab(QWidget):
 
         lbl_data_smooth = QLabel("Data smoothing (1 to disable):", self)
         self._text_data_smooth = QLineEdit(self)
-        self._text_dynamic_adjust.setValidator(QIntValidator())
+        self._text_data_smooth.setValidator(QIntValidator())
 
         log_level_label = QLabel("Log Level:", self)
         self._log_combo_box = QComboBox()
@@ -107,8 +111,24 @@ class SettingsTab(QWidget):
         # self._window.close_simulator_tabs()
 
     def action_save(self):
+        if not self.check_values():
+            return
         self.save_values()
         self._window.close_current_tab()
+
+    def check_values(self):
+        """Tell the user about a value that can't be saved, and return False."""
+        pd = utl_settings.parse_int(self._text_pd.text(), default=STD_PUPIL_DIST)
+        try:
+            dynaface.facial.check_pupil_distance(pd)
+        except ValueError:
+            self._window.display_message_box(
+                f"The pupillary distance must be from {MIN_PUPIL_DIST} to "
+                f"{MAX_PUPIL_DIST} mm."
+            )
+            self._text_pd.setFocus()
+            return False
+        return True
 
     def action_reset(self):
         import dynaface_app

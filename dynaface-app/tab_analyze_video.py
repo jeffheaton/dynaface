@@ -9,6 +9,7 @@ import cv2
 import dlg_modal
 import dynaface_document
 import numpy as np
+import utl_general
 import utl_gfx
 import utl_print
 import worker_threads
@@ -61,6 +62,8 @@ class AnalyzeVideoTab(TabGraphic):
         super().__init__(window)
         self.unsaved_changes = False
         self.load_error = False
+        # An error that stopped the video import, set by WorkerLoad.
+        self.load_failure = None
         self._auto_update = False
         self._path = path
 
@@ -558,7 +561,17 @@ gesture you wish to analyze."""
 
     def update_load_progress(self, status):
         if len(status) > 0 and status[0] == "*":
-            if len(self._frames) < 1:
+            if self.load_failure is not None:
+                message = utl_general.describe_analysis_error(self.load_failure)
+                if len(self._frames) > 0:
+                    message += (
+                        f"\n\nLoading stopped after {len(self._frames):,} frames, "
+                        "which are kept."
+                    )
+                self._window.display_message_box(f"Unable to load the video. {message}")
+                if len(self._frames) < 1:
+                    self._window.close_action()
+            elif len(self._frames) < 1:
                 self._window.display_message_box("No faces found in that video")
                 logger.info("No faces found in video")
                 self._window.close_action()
