@@ -49,6 +49,8 @@ Mirrors dynaface-lib's `AnalyzeFace.load_image` order exactly (not the pipeline'
 
 `FacePipeline` is the single stateless entry point for the whole pipeline, steps 1–5. Call `Initialize(inference)` once at startup before calling `Run` — this also stashes `inference` for step 5's own use. `Run()` decides internally whether to call `LateralAnalyzer.Analyze` + chart overlay (populating `FacePipelineResult.LateralAnalysis`) exactly like dynaface-lib's `AnalyzeFace.load_image()` decides internally whether to call `analyze_lateral()` — the pose-gated branch lives inside the library in both ports, not in the caller. `Run(crop: false)` mirrors `load_image(crop=False)`: it skips the frontal StyleGAN crop (returning original-space landmarks; the lateral branch always crops, same quirk as Python). Do not reintroduce caller-side `if (result.IsLateral) ...` analysis/overlay branches or hand-built measure lists in `FacialDllConsole` or any other consumer; those were past architectural mismatches (library decisions leaking outside the DLL) that have since been fixed.
 
+`FaceImage` has the image helpers apps need at the boundary: `FromRgba`/`ToRgba` (RGBA bytes, rows from the bottom or, with `topDown: true`, from the top, copied in bulk), `Rotate(quarterTurns)` (clockwise as seen) and `FlipHorizontal`/`FlipVertical`, each returning a copy.
+
 ## Coordinate System Contract
 
 | Location | Convention |

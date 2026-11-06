@@ -201,6 +201,13 @@ FacePipeline.Initialize(new OnnxDynafaceInference(blazeFacePath, spigaPath, u2ne
 // Pixels must be a flat Rgba32[] in bottom-left row-major order (y=0 at bottom)
 var image = new FaceImage(pixels, width, height);
 
+// ...or from 8-bit RGBA bytes: rows from the bottom by default (Unity's
+// Texture2D.GetRawTextureData for RGBA32), or from the top, as most decoders give them.
+// image.ToRgba(topDown: true) gives the bytes back. Rotate(quarterTurns) turns a copy
+// clockwise as the image is seen, and FlipHorizontal/FlipVertical mirror a copy.
+image = FaceImage.FromRgba(rgbaBytes, width, height, topDown: true);
+FaceImage upright = image.Rotate(1);
+
 // Run detection + pose classification + crop
 FacePipelineResult? result = FacePipeline.Run(image, rotationAngle: 0, flipHorizontal: false);
 // flipHorizontal: true for live camera frames on iOS; false for file/gallery images
