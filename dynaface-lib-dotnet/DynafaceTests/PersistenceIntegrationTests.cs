@@ -40,6 +40,30 @@ public class PersistenceIntegrationTests
         }
     }
 
+    // A profile is restored as a profile, flipped or not, so MeasureLateral measures it
+    // as it measured the original. Mirrors test_persist_left_lateral and
+    // test_flipped_profile; up to 2.0.4 a restored profile lost its lateral landmarks.
+    [SkippableTheory]
+    [InlineData("img3-1024-left-lateral.jpg", false)]
+    [InlineData("img2-1024-right-lateral.jpg", true)]
+    public void CaptureThenRestore_AProfileMeasuresTheSame(string image, bool flipped)
+    {
+        _fixture.RequireModels();
+
+        var result = FacialPipelineIntegrationTests.RunWithRotationRetry(ImageLoader.Load(TestImage(image)));
+        Assert.NotNull(result);
+        Assert.True(result.Value.IsLateral);
+        Assert.Equal(flipped, result.Value.Flipped);
+        var measures = new FaceMeasureBase[] { new MeasureLateral(), new MeasurePose(), new MeasurePosition() };
+        var expected = TestHelpers.ContextFor(result.Value).Analyze(measures, render: false);
+        Assert.Contains("nfa", expected.Keys);
+
+        var restored = FaceAnalysisPersistence.Restore(FaceAnalysisPersistence.Capture(result.Value));
+        Assert.True(restored.IsLateral);
+        Assert.Equal(flipped, restored.Flipped);
+        Assert.Equal(expected, restored.Analyze(measures, render: false));
+    }
+
     [SkippableFact]
     public void Capture_ClonesPixelArray_IndependentFromLiveContext()
     {

@@ -77,7 +77,9 @@ public sealed class FrameSeries
             int frame = frameNumbers == null ? index : frameNumbers[index];
             if (state.PostCropImage.IsValid)
             {
-                series.Add(frame, FaceAnalysisPersistence.Restore(state).Analyze(all, render: false));
+                // With render: false nothing is drawn, so the state's image needs no copy.
+                series.Add(frame, FaceAnalysisPersistence.Restore(state, copyImage: false)
+                    .Analyze(all, render: false));
                 continue;
             }
 
@@ -89,16 +91,8 @@ public sealed class FrameSeries
             }
             // The measures left run on landmarks alone, and with render: false nothing is
             // drawn, so one blank image stands in for every frame.
-            var landmarkState = new FaceAnalysisState
-            {
-                PostCropImage = blank,
-                HeadPose = state.HeadPose,
-                Landmarks = state.Landmarks,
-                PupillaryDistance = state.PupillaryDistance,
-                Pix2mm = state.Pix2mm,
-                FaceRotationRad = state.FaceRotationRad,
-            };
-            series.Add(frame, FaceAnalysisPersistence.Restore(landmarkState).Analyze(landmarksOnly, render: false));
+            series.Add(frame, FaceAnalysisPersistence.Restore(state.WithImage(blank), copyImage: false)
+                .Analyze(landmarksOnly, render: false));
         }
         return series;
     }

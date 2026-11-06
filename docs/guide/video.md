@@ -52,7 +52,7 @@ print(f"Widest eye opening: dental display {eyes.dental_area:.1f} mm²")
 
 ## Keeping the analysis
 
-Finding the face and its landmarks is the slow part. [`dump_state()`][dynaface.facial.AnalyzeFace.dump_state] captures a frame's analysis, including its standard image, landmarks, head pose and scale, and [`load_state()`][dynaface.facial.AnalyzeFace.load_state] restores it without running the models again.
+Finding the face and its landmarks is the slow part. [`dump_state()`][dynaface.facial.AnalyzeFace.dump_state] captures a frame's analysis, including its standard image, landmarks, head pose and scale, and for a profile its lateral landmarks and outline, and [`load_state()`][dynaface.facial.AnalyzeFace.load_state] restores it without running the models again.
 
 A [`VideoAnalyzer`][dynaface.video.VideoAnalyzer] keeps every frame's state as it analyzes the video, the way the Dynaface apps import one:
 
@@ -89,7 +89,7 @@ results = face.analyze()
 
 `load_state()` restores the frame's image too, so `analyze()` draws on that frame. In Dynaface 2.0.3 and earlier it didn't, so call `face.render_reset()` after `load_state()` to draw on the restored frame.
 
-A restored frame is measured with the pupillary distance it was analyzed with, and its scale is measured again on its landmarks, so states saved by versions up to 2.0.2, which measured the scale before the crop, come out right. States saved by Dynaface 2.0.4 and earlier didn't keep the head pose, though: they restore with a yaw, pitch and roll of 0.
+A restored frame is measured with the pupillary distance it was analyzed with, and its scale is measured again on its landmarks, so states saved by versions up to 2.0.2, which measured the scale before the crop, come out right. States saved by Dynaface 2.0.4 and earlier didn't keep the head pose, though: they restore with a yaw, pitch and roll of 0. Nor did they keep the view, so they restore a profile as a frontal face, and its lateral measures are missing, unless you set `face.lateral` and `face.lateral_landmarks` before restoring them, as the desktop app does from its project file.
 
 Each state holds its frame's 1024 by 1024 image, about 3 MB, so the states of a long video take a lot of memory. The desktop app keeps them in its `.dyfc` project files.
 

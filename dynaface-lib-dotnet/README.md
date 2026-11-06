@@ -270,7 +270,10 @@ FaceAnalysisState state = FaceAnalysisPersistence.Capture(result.Value);
 
 // ...later, rebuild a context and re-run measurements against it. It keeps the
 // pupillary distance the analysis assumed, even if DynafaceConfig.PupilDistMm has
-// changed since, and measures its scale on the saved landmarks.
+// changed since, and measures its scale on the saved landmarks. The state keeps the
+// view too (pose, flip, and a profile's lateral landmarks and sagittal outline), so a
+// restored profile measures as the original did, and the context draws on a copy of
+// the saved image, leaving the state as it was.
 FaceMeasureContext restored = FaceAnalysisPersistence.Restore(state);
 
 // Saving landmarks your own way (e.g. a video's frames, cropped later with

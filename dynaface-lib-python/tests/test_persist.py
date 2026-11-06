@@ -8,8 +8,17 @@ import numpy as np
 from dynaface import facial, measures, models
 from dynaface.const import Pose
 from dynaface.image import load_image
+from dynaface.measures_lateral import AnalyzeLateral
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+
+LATERAL_OUTPUTS = ("nfa", "nla", "at", "nt", "at_nt")
+
+
+def _same(a, b):
+    """Equal values, where NaN equals NaN."""
+    return a == b or (a != a and b != b)
 
 
 def _tolerance(expected: float) -> float:
@@ -91,12 +100,24 @@ class TestFaceSave(unittest.TestCase):
         face.load_image(img, crop=True)
         face.analyze()
 
+        original = face.analyze()
         data = face.dump_state()
 
         face2 = facial.AnalyzeFace(measures=measures.all_measures())
         face2.load_state(data)
         stats = face2.analyze()
 
+        # The profile is restored as a profile, so AnalyzeLateral measures it as
+        # it measured the original. Up to Dynaface 2.0.4 it was restored as a
+        # frontal face, and AnalyzeLateral returned nothing.
+        self.assertTrue(face2.lateral)
+        self.assertEqual(face2.pose, Pose.LATERAL)
+        for key in LATERAL_OUTPUTS:
+            self.assertIn(key, stats)
+            self.assertTrue(_same(stats[key], original[key]), key)
+
+        # The frontal measures still run on a profile, as on the original, since
+        # every measure given to AnalyzeFace runs.
         # Expected values (rounded to 2 decimals)
         # Calibrated with the first-principles resamplers (dynaface.resample,
         # replacing cv2.resize/warpAffine) under the CPU execution provider; other
@@ -182,3 +203,110 @@ class TestSavedHeadPose(unittest.TestCase):
             self.assertAlmostEqual(
                 getattr(restored, name), getattr(face, name), msg=name
             )
+        self.assertTrue(restored.flipped)
+
+
+class TestSavedView(unittest.TestCase):
+    """
+    A restored state keeps its view: the pose, whether a profile was flipped, and a
+    profile's lateral landmarks and sagittal outline.
+    """
+
+    # A profile facing right (yaw > 0), so it is flipped to face left.
+    POSE = np.array([60.0, -4.0, 2.0, 0.0, 0.0, 0.0])
+    LATERAL_LANDMARKS = np.array(
+        [[300, 200], [290, 300], [200, 450], [260, 520], [280, 640], [270, 760]]
+    )
+    SAGITTAL_Y = np.arange(1024, dtype=np.int32)
+    SAGITTAL_X = (300 + SAGITTAL_Y % 50).astype(np.int32)
+
+    def load(self, pose):
+        """A face loaded with made-up landmarks and lateral data instead of the models."""
+        face = facial.AnalyzeFace(measures=[AnalyzeLateral(), measures.AnalyzePose()])
+        img = np.full((1024, 1024, 3), 128, dtype=np.uint8)
+        landmarks = [(400 + i, 300 + 4 * i) for i in range(96)]
+        landmarks += [(450, 400), (550, 400)]  # the pupils
+        chart = np.full((1024, 600, 3), 255, dtype=np.uint8)
+        chart[:, 100:500] = 0
+        lateral = (chart, self.LATERAL_LANDMARKS, self.SAGITTAL_X, self.SAGITTAL_Y)
+        with mock.patch.object(
+            facial.AnalyzeFace, "_find_landmarks", return_value=(landmarks, self.POSE)
+        ), mock.patch("dynaface.lateral.analyze_lateral", return_value=lateral):
+            face.load_image(img, crop=True, force_pose=pose)
+        return face
+
+    def restore(self, state, face=None):
+        face = face or facial.AnalyzeFace(
+            measures=[AnalyzeLateral(), measures.AnalyzePose()]
+        )
+        face.load_state(state)
+        return face
+
+    def test_profile_survives_saving(self):
+        face = self.load(Pose.LATERAL)
+        self.assertTrue(face.lateral and face.flipped)
+        expected = face.analyze(render=False)
+        self.assertTrue(set(LATERAL_OUTPUTS) <= set(expected))
+
+        restored = self.restore(face.dump_state())
+        self.assertTrue(restored.lateral)
+        self.assertTrue(restored.flipped)
+        self.assertEqual(restored.pose, Pose.LATERAL)
+        np.testing.assert_array_equal(
+            restored.lateral_landmarks, self.LATERAL_LANDMARKS
+        )
+        np.testing.assert_array_equal(restored.sagittal_x, self.SAGITTAL_X)
+        np.testing.assert_array_equal(restored.sagittal_y, self.SAGITTAL_Y)
+        self.assertEqual(restored.pix2mm, face.pix2mm)
+        actual = restored.analyze(render=False)
+        self.assertEqual(set(actual), set(expected))
+        for key, value in expected.items():
+            self.assertTrue(_same(actual[key], value), key)
+
+    def test_restoring_does_not_share_the_arrays(self):
+        face = self.load(Pose.LATERAL)
+        state = face.dump_state()
+        restored = self.restore(state)
+        restored.lateral_landmarks[0, 0] += 1
+        restored.sagittal_x[0] += 1
+        np.testing.assert_array_equal(
+            state[6]["lateral_landmarks"], face.lateral_landmarks
+        )
+        np.testing.assert_array_equal(state[6]["sagittal_x"], face.sagittal_x)
+
+    def test_frontal_view(self):
+        state = self.load(Pose.FRONTAL).dump_state()
+        self.assertEqual(
+            state[6], {"pose": "frontal", "flipped": False, "lateral": False}
+        )
+        # Restored onto a face that holds a profile, it leaves no lateral data.
+        face = self.restore(state, self.load(Pose.LATERAL))
+        self.assertFalse(face.lateral or face.flipped)
+        self.assertEqual(face.pose, Pose.FRONTAL)
+        self.assertEqual(face.lateral_landmarks.shape, (0, 2))
+        self.assertIsNone(face.sagittal_x)
+        self.assertNotIn("nfa", face.analyze(render=False))
+
+    def test_view_needs_no_pickle(self):
+        # Plain values and arrays of numbers, which the desktop app's .dyfc files
+        # store as JSON and .npy files.
+        view = self.load(Pose.LATERAL).dump_state()[6]
+        for key, value in view.items():
+            if isinstance(value, np.ndarray):
+                self.assertFalse(value.dtype.hasobject, key)
+            else:
+                self.assertIn(type(value), (str, bool), key)
+
+    def test_state_saved_before_the_view_was_kept(self):
+        # States saved by Dynaface 2.0.4 and earlier end with the face rotation. They
+        # leave the face's view as it is: the desktop app sets a profile's lateral
+        # data from its own document before restoring its frames.
+        state = self.load(Pose.LATERAL).dump_state()[:6]
+        face = facial.AnalyzeFace(measures=[AnalyzeLateral()])
+        face.lateral = True
+        face.lateral_landmarks = self.LATERAL_LANDMARKS
+        self.restore(state, face)
+        self.assertTrue(face.lateral)
+        self.assertIn("nfa", face.analyze(render=False))
+
+        self.assertFalse(self.restore(state).lateral)

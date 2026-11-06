@@ -110,6 +110,11 @@ def _saved_head_pose(saved: Any) -> List[float]:
     return pose + [0.0] * (3 - len(pose))
 
 
+def _copy_array(values: Any) -> Optional[NDArray[Any]]:
+    """A copy of a saved array, so the state and the face don't share it; None stays."""
+    return None if values is None else np.array(values)
+
+
 def util_get_pupils(
     landmarks: List[Tuple[int, int]],
 ) -> Tuple[Tuple[int, int], Tuple[int, int]]:
@@ -188,6 +193,9 @@ class AnalyzeFace(ImageAnalysis):
         self.landmarks: List[Tuple[int, int]] = []
         self.lateral: bool = False
         self.lateral_landmarks: NDArray[Any] = np.empty((0, 2), dtype=int)
+        # A profile's outline: the x of its edge in each row y, from analyze_lateral().
+        self.sagittal_x: Optional[NDArray[Any]] = None
+        self.sagittal_y: Optional[NDArray[Any]] = None
         self.pupillary_distance: float = 0.0
         self.tilt_threshold: float = tilt_threshold
         self.pix2mm: float = 1.0
@@ -828,8 +836,22 @@ class AnalyzeFace(ImageAnalysis):
 
         Returns:
             List[Any]: The original image, head pose, landmarks, pupillary
-                distance, millimeters per pixel and face rotation.
+                distance, millimeters per pixel and face rotation, then the view: a
+                dict of the pose's value (such as "frontal"), whether a profile was
+                flipped, whether the face is lateral and, for a profile, its lateral
+                landmarks and sagittal outline (sagittal_x and sagittal_y). The
+                values are plain Python values and NumPy arrays, so the state can be
+                saved without pickle.
         """
+        view: Dict[str, Any] = {
+            "pose": self.pose.value if isinstance(self.pose, Pose) else str(self.pose),
+            "flipped": bool(self.flipped),
+            "lateral": bool(self.lateral),
+        }
+        if self.lateral:
+            view["lateral_landmarks"] = np.array(self.lateral_landmarks)
+            view["sagittal_x"] = _copy_array(self.sagittal_x)
+            view["sagittal_y"] = _copy_array(self.sagittal_y)
         result: List[Any] = [
             self.original_img,
             list(self.headpose),
@@ -837,6 +859,7 @@ class AnalyzeFace(ImageAnalysis):
             self.pupillary_distance,
             self.pix2mm,
             self.face_rotation,
+            view,
         ]
         return copy.copy(result)
 
@@ -851,6 +874,12 @@ class AnalyzeFace(ImageAnalysis):
         before the crop. A state with a fixed scale (a profile) keeps its saved one.
         It also reports the head pose the face was analyzed with; states saved by
         Dynaface 2.0.4 and earlier hold none, and restore a level head.
+
+        It restores the view too: the pose, whether a profile was flipped, and a
+        profile's lateral landmarks and sagittal outline, so AnalyzeLateral measures
+        it as it did the original. States saved by Dynaface 2.0.4 and earlier hold
+        no view, and leave the face's own as it is, which a caller that kept a
+        profile's lateral data apart from its states can set before restoring them.
 
         Args:
             obj (List[Any]): The list dump_state() returned. A state saved without
@@ -870,6 +899,8 @@ class AnalyzeFace(ImageAnalysis):
             self.face_rotation = obj[5]
         except (IndexError, TypeError):
             self.face_rotation = 0
+        if len(obj) > 6 and isinstance(obj[6], dict):
+            self._load_view(obj[6])
         self._scale_from_landmarks = False
         saved_pd = _saved_pupil_distance(obj[3], obj[4])
         if (
@@ -879,6 +910,20 @@ class AnalyzeFace(ImageAnalysis):
         ):
             self.pd = saved_pd
             self.calc_pd()
+
+    def _load_view(self, view: Dict[str, Any]) -> None:
+        """Restore the view that dump_state() saved: pose, flip and lateral data."""
+        self.pose = Pose(view.get("pose", Pose.FRONTAL.value))
+        self.flipped = bool(view.get("flipped", False))
+        self.lateral = bool(view.get("lateral", False))
+        if self.lateral:
+            self.lateral_landmarks = np.array(view["lateral_landmarks"])
+            self.sagittal_x = _copy_array(view.get("sagittal_x"))
+            self.sagittal_y = _copy_array(view.get("sagittal_y"))
+        else:
+            self.lateral_landmarks = np.empty((0, 2), dtype=int)
+            self.sagittal_x = None
+            self.sagittal_y = None
 
     def find_pupils(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
         """

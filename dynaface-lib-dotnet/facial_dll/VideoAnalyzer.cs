@@ -107,7 +107,7 @@ public sealed class VideoAnalyzer
         if (!result.IsLateral && (_smoother.Size > 1 || cropLater))
             (pupillaryDistance, pix2mm) = FaceMeasureContext.CalcPd(landmarks, result.PupilDistMm);
 
-        _states.Add(new FaceAnalysisState
+        var state = new FaceAnalysisState
         {
             PostCropImage = KeepImages ? crop : default,
             HeadPose = result.HeadPose,
@@ -115,7 +115,9 @@ public sealed class VideoAnalyzer
             PupillaryDistance = pupillaryDistance,
             Pix2mm = pix2mm,
             FaceRotationRad = result.FaceRotationRad,
-        });
+        };
+        FaceAnalysisPersistence.CaptureView(result, state);
+        _states.Add(state);
         _frames.Add(number);
         if (Thumbnail == null) Thumbnail = crop;
         return true;
