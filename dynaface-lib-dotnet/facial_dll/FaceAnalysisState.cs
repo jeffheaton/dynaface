@@ -76,7 +76,8 @@ public static class FaceAnalysisPersistence
     // PupillaryDistance saved beside it, so their product gives it back. With it, the
     // context measures its scale on the saved landmarks, which also corrects states
     // saved when the scale was measured before the crop. A pair that holds no
-    // pupillary distance (a profile's fixed scale, or no pupils) keeps its saved scale.
+    // pupillary distance (a profile's fixed scale, or no pupils), or one outside the
+    // 40–85 mm that DynafaceConfig.CheckPupilDistMm accepts, keeps its saved scale.
     //
     // The context draws on a copy of the state's image, so measuring a restored state
     // with render on leaves the state as it was, as load_state() does.
@@ -90,9 +91,12 @@ public static class FaceAnalysisPersistence
             ? new FaceImage((Rgba32[])state.PostCropImage.Pixels.Clone(),
                 state.PostCropImage.Width, state.PostCropImage.Height)
             : state.PostCropImage;
-        float savedPupilDistMm = state.PupillaryDistance * state.Pix2mm;
+        // Rounded, so the float error in the product doesn't change the distance.
+        float savedPupilDistMm = (float)System.Math.Round((double)state.PupillaryDistance * state.Pix2mm, 4);
         bool havePupils = state.Landmarks != null && state.Landmarks.Length > DynafaceConstants.LmLeftPupil;
-        if (!state.IsLateral && havePupils && savedPupilDistMm > 0f && !float.IsInfinity(savedPupilDistMm))
+        bool accepted = savedPupilDistMm >= DynafaceConstants.MinPupilDistMm
+            && savedPupilDistMm <= DynafaceConstants.MaxPupilDistMm;
+        if (!state.IsLateral && havePupils && accepted)
             return new FaceMeasureContext(
                 image, state.Landmarks, headPose: state.HeadPose,
                 pose: state.Pose, flipped: state.Flipped, pupilDistMm: savedPupilDistMm);

@@ -226,8 +226,16 @@ Vec2[] lateralLandmarks = result?.LateralAnalysis?.LateralLandmarks;
 
 ```csharp
 // Optional: calibrate the pupillary distance (mm) used for px→mm conversion.
-// Mirrors dynaface-lib's settable AnalyzeFace.pd; defaults to the 63mm average.
+// Mirrors dynaface-lib's settable AnalyzeFace.pd; defaults to the 63mm average. It must
+// be from 40 to 85 mm (DynafaceConstants.MinPupilDistMm/MaxPupilDistMm): no person's
+// pupils are closer or farther apart, so another value throws
+// ArgumentOutOfRangeException. DynafaceConfig.CheckPupilDistMm checks a value first.
 DynafaceConfig.PupilDistMm = 63f;
+
+// Optional: the size of the text the measures draw, as dynaface-lib's
+// AnalyzeFace.text_size: 0.75 by default, and 1.5 draws it twice as large. It sets
+// FaceRenderer's glyph scales for the measures' labels and the landmark numbers.
+DynafaceConfig.TextSize = 0.75f;
 
 // The context measures its millimeters-per-pixel scale on the landmarks it's given,
 // assuming the pupillary distance the run did.

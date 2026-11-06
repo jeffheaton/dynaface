@@ -34,6 +34,8 @@ results = face.analyze()
 
 The pupillary distance is fixed when the image is loaded, so set `pd` first. It's a class attribute, so it applies to every face loaded afterward: set it again for each subject. Each face keeps the one it was loaded with, and a face saved with `dump_state()` and restored with `load_state()` keeps the one it was analyzed with. To measure a face again with another, set it on that face (`face.pd = 58`) and call `analyze()`. Ratios and angles don't depend on it.
 
+The pupillary distance must be from 40 to 85 mm (`const.MIN_PUPIL_DIST` and `const.MAX_PUPIL_DIST`). No person's pupils are closer or farther apart, so a value outside the range is a mistake, such as 6.3, in centimeters, for 63 mm: loading an image or analyzing a face with one raises `ValueError`. [`check_pupil_distance()`][dynaface.facial.check_pupil_distance] checks a value first, such as one a user typed.
+
 ## Turned heads
 
 The scale assumes the face is turned toward the camera. When the head turns, the pupils look closer together than they are, which distorts the scale. Keep the head facing the camera, and check the yaw from the [pose measure](../measures.md#pose).

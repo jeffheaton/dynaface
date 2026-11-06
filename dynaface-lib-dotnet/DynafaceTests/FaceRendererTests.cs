@@ -119,6 +119,35 @@ public class FaceRendererTests
         Assert.NotEmpty(Where(pixels, White));
     }
 
+    // DynafaceConfig.TextSize is the one text-size setting, like dynaface-lib's
+    // AnalyzeFace.text_size: it sets both glyph scales.
+    [Fact]
+    public void TextSizeSetsBothScales()
+    {
+        float size = DynafaceConfig.TextSize;
+        int labels = FaceRenderer.TEXT_SIZE_MEASURE, numbers = FaceRenderer.NumberScale;
+        try
+        {
+            Assert.Equal((0.75f, 3, 2), (size, labels, numbers));   // the defaults agree
+            foreach (var (textSize, expectedLabels, expectedNumbers) in new[] { (1f, 4, 3), (1.75f, 7, 6), (0.1f, 1, 1) })
+            {
+                DynafaceConfig.TextSize = textSize;
+                Assert.Equal(textSize, DynafaceConfig.TextSize);
+                Assert.Equal(expectedLabels, FaceRenderer.TEXT_SIZE_MEASURE);
+                Assert.Equal(expectedNumbers, FaceRenderer.NumberScale);
+            }
+            Assert.Throws<ArgumentOutOfRangeException>(() => DynafaceConfig.TextSize = 0f);
+            Assert.Throws<ArgumentOutOfRangeException>(() => DynafaceConfig.TextSize = float.NaN);
+            Assert.Equal(0.1f, DynafaceConfig.TextSize);
+        }
+        finally
+        {
+            DynafaceConfig.TextSize = size;
+            FaceRenderer.TEXT_SIZE_MEASURE = labels;
+            FaceRenderer.NumberScale = numbers;
+        }
+    }
+
     [Fact]
     public void NumberScaleSizesTheLabels()
     {

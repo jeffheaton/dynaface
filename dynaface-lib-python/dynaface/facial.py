@@ -27,6 +27,8 @@ from dynaface.const import (
     FILL_COLOR,
     LM_LEFT_PUPIL,
     LM_RIGHT_PUPIL,
+    MAX_PUPIL_DIST,
+    MIN_PUPIL_DIST,
     STD_PUPIL_DIST,
     STYLEGAN_PUPIL_DIST,
     STYLEGAN_RIGHT_PUPIL,
@@ -46,6 +48,36 @@ LATERAL_PAD_BOTTOM_RATIO = 0.10
 # Fraction of the 1024 crop width kept clear left of the profile's leading edge
 # (nose tip); must clear the analysis text column drawn at the left.
 LATERAL_LEFT_MARGIN_RATIO = 0.20
+
+
+def check_pupil_distance(pd: Any) -> float:
+    """
+    Check a pupillary distance, such as one to set as AnalyzeFace.pd.
+
+    Args:
+        pd (Any): The distance between the pupils, in millimeters.
+
+    Returns:
+        float: The distance, as a float.
+
+    Raises:
+        ValueError: If it isn't a number from const.MIN_PUPIL_DIST to
+            const.MAX_PUPIL_DIST (40 to 85 mm). No person's pupils are closer or
+            farther apart, so a value outside the range is a mistake, such as
+            centimeters for millimeters.
+    """
+    try:
+        value = float(pd)
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"The pupillary distance must be a number of millimeters, not {pd!r}."
+        ) from None
+    if not MIN_PUPIL_DIST <= value <= MAX_PUPIL_DIST:  # NaN fails this too
+        raise ValueError(
+            f"The pupillary distance must be from {MIN_PUPIL_DIST} to "
+            f"{MAX_PUPIL_DIST} mm, not {pd!r}. Is it in millimeters?"
+        )
+    return value
 
 
 def util_calc_pd(
@@ -68,12 +100,16 @@ def util_calc_pd(
     Returns:
         Tuple[float, float]: The pupillary distance in pixels, and the millimeters
             per pixel, which is NaN when the pupils coincide.
+
+    Raises:
+        ValueError: If the pupillary distance is outside the range that
+            check_pupil_distance() accepts.
     """
     left_pupil = np.array(pupils[0])
     right_pupil = np.array(pupils[1])
 
     pupillary_distance = np.linalg.norm(left_pupil - right_pupil)
-    pd_mm = AnalyzeFace.pd if pd is None else pd
+    pd_mm = check_pupil_distance(AnalyzeFace.pd if pd is None else pd)
     # Coincident pupils give no scale: NaN (undefined) rather than infinity.
     pix2mm = pd_mm / pupillary_distance if pupillary_distance > 0 else float("nan")
 
@@ -87,13 +123,16 @@ def _saved_pupil_distance(pupillary_distance: Any, pix2mm: Any) -> Optional[floa
     pix2mm has always been computed as the millimeters over the distance between the
     pupils in pixels saved beside it, so their product gives the millimeters back,
     even for states saved when the scale was measured before the crop. None when the
-    pair holds no pupillary distance: a profile's fixed scale, or pupils in one place.
+    pair holds no pupillary distance Dynaface accepts: a profile's fixed scale, pupils
+    in one place, or a distance outside MIN_PUPIL_DIST to MAX_PUPIL_DIST, which a
+    state saved before 2.1 could hold; such a state keeps the scale it was saved with.
     """
     try:
-        pd_mm = float(pupillary_distance) * float(pix2mm)
-    except (TypeError, ValueError):
+        # Rounded, so the float error in the product doesn't change the distance.
+        pd_mm = round(float(pupillary_distance) * float(pix2mm), 6)
+    except (TypeError, ValueError, OverflowError):
         return None
-    return pd_mm if math.isfinite(pd_mm) and pd_mm > 0 else None
+    return pd_mm if MIN_PUPIL_DIST <= pd_mm <= MAX_PUPIL_DIST else None
 
 
 def _saved_head_pose(saved: Any) -> List[float]:
@@ -145,8 +184,9 @@ class AnalyzeFace(ImageAnalysis):
 
     Attributes:
         pd (float): The assumed distance between the pupils, in millimeters (63 by
-            default), used to convert pixels to millimeters. Set it on the class,
-            as AnalyzeFace.pd, to calibrate the faces loaded afterward. Each face
+            default), used to convert pixels to millimeters. It must be from 40 to
+            85 (see check_pupil_distance()). Set it on the class, as
+            AnalyzeFace.pd, to calibrate the faces loaded afterward. Each face
             keeps the one it was loaded with, and a face restored with load_state()
             keeps the one it was analyzed with. Set it on a face, then call
             analyze(), to measure that face with another.
@@ -406,8 +446,9 @@ class AnalyzeFace(ImageAnalysis):
         super().load_image(img)
         logger.debug("Low level-image loaded")
         # Measure this face with today's AnalyzeFace.pd, kept on the face so that a
-        # later change to the class doesn't rescale it.
-        self.pd = type(self).pd
+        # later change to the class doesn't rescale it. Checked before the models
+        # run, so a mistaken setting fails at once.
+        self.pd = check_pupil_distance(type(self).pd)
         self._scale_from_landmarks = False
         landmarks, self._headpose = self._find_landmarks(img)
         self.yaw, self.pitch, self.roll = self._headpose[:3]

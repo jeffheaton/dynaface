@@ -76,7 +76,7 @@ face.load_image(image, crop=True, force_pose=Pose.LATERAL)
 
 ## The image
 
-`face.render_img` is the standard image with the measures drawn on it, as an RGB NumPy array, and `face.save("measured.jpg")` writes it to a file. `face.original_img` is the same image without the drawings.
+`face.render_img` is the standard image with the measures drawn on it, as an RGB NumPy array, and `face.save("measured.jpg")` writes it to a file. `face.original_img` is the same image without the drawings. `face.text_size` sets the size of the text the measures draw: 0.75 by default, and 1.5 draws it twice as large.
 
 ## Measuring a folder of photos
 

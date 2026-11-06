@@ -12,6 +12,13 @@ public static class DynafaceConstants
 
     public const float StdPupilDistMm = 63f;
 
+    // The pupillary distances (mm) Dynaface accepts. No person's pupils are closer or
+    // farther apart, so a value outside the range is a mistake, such as centimeters for
+    // millimeters. See DynafaceConfig.CheckPupilDistMm; mirrors const.py's
+    // MIN_PUPIL_DIST and MAX_PUPIL_DIST.
+    public const float MinPupilDistMm = 40f;
+    public const float MaxPupilDistMm = 85f;
+
     // Tilt correction is off by default; crop_stylegan only rotates when a caller
     // explicitly passes a threshold >= 0.
     public const float DefaultTiltThreshold = -1f;
