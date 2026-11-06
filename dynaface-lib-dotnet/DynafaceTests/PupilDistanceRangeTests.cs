@@ -1,8 +1,8 @@
 namespace DynafaceTests;
 
-// A pupillary distance outside 40–85 mm is a mistake, such as centimeters for
-// millimeters, so it is refused where a scale is measured from it. Mirrors
-// dynaface-lib's TestPupilDistanceRange in tests/test_scale.py.
+// A pupillary distance setting outside 40–85 mm is a mistake, such as centimeters for
+// millimeters, so DynafaceConfig refuses it. A saved state keeps the distance it was
+// analyzed with. Mirrors dynaface-lib's TestPupilDistanceRange in tests/test_scale.py.
 public class PupilDistanceRangeTests
 {
     // Landmarks with pupils 230 pixels apart.
@@ -35,18 +35,16 @@ public class PupilDistanceRangeTests
     public void Refuses(float pd)
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => DynafaceConfig.CheckPupilDistMm(pd));
-        Assert.Throws<ArgumentOutOfRangeException>(() => FaceMeasureContext.CalcPd(Face(), pd));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new FaceMeasureContext(Gray(), Face(), pupilDistMm: pd));
 
         float before = DynafaceConfig.PupilDistMm;
         Assert.Throws<ArgumentOutOfRangeException>(() => DynafaceConfig.PupilDistMm = pd);
         Assert.Equal(before, DynafaceConfig.PupilDistMm);
     }
 
-    // A state saved before 2.1 could hold any distance. It restores with the scale it
-    // was saved with, rather than failing.
+    // A state saved before 2.1 could hold any distance. It restores with that distance,
+    // as it always did, and its scale and outputs agree.
     [Fact]
-    public void AStateWithADistanceOutsideKeepsItsScale()
+    public void AStateWithADistanceOutsideRestoresIt()
     {
         var landmarks = Face();
         var (pupils, _) = FaceMeasureContext.CalcPd(landmarks, 63f);
@@ -54,7 +52,10 @@ public class PupilDistanceRangeTests
         {
             PostCropImage = Gray(), Landmarks = landmarks, PupillaryDistance = pupils, Pix2mm = 30f / pupils,
         };
-        Assert.Equal(state.Pix2mm, FaceAnalysisPersistence.Restore(state).Pix2mm);
+        var restored = FaceAnalysisPersistence.Restore(state);
+        Assert.Equal(30f, restored.PupilDistMm);
+        Assert.Equal(state.Pix2mm, restored.Pix2mm, 5);
+        Assert.Equal(restored.Pix2mm, restored.Analyze(new[] { new MeasurePosition() }, render: false)["px2mm"], 4);
     }
 
     // The product of the saved pair has float error; the context gets 63 back.

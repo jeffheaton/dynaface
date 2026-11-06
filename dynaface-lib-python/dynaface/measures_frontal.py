@@ -513,10 +513,10 @@ class AnalyzePosition(MeasureBase):
         Returns:
             Dict[str, Any]: Filtered measurement results.
         """
-        render2_tilt: bool = self.is_enabled("tilt")
-        render2_px2mm: bool = self.is_enabled("px2mm")
         from dynaface import facial  # not at the top; see AnalyzeBrows.calc()
 
+        render2_tilt: bool = self.is_enabled("tilt")
+        render2_px2mm: bool = self.is_enabled("px2mm")
         render2_pd: bool = self.is_enabled("pd")
 
         p: Any = facial.util_get_pupils(face.landmarks)

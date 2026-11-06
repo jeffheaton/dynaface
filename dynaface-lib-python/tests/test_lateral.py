@@ -8,9 +8,12 @@ from unittest import mock
 
 import matplotlib.pyplot as plt
 import numpy as np
+from PIL import Image
 
 from dynaface import facial, lateral, models
+from dynaface.image import load_image
 from dynaface.lateral import LateralSearchMode
+from dynaface.measures_lateral import AnalyzeLateral
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -39,6 +42,46 @@ class TestLateral(unittest.TestCase):
         with mock.patch.object(models, "onnx_model", None):
             with self.assertRaises(ValueError):
                 lateral._process_image(np.zeros((8, 8, 3), dtype=np.uint8))
+
+
+class TestNoOutline(unittest.TestCase):
+    """
+    A profile the background model finds nothing in gives no outline and no lateral
+    landmarks, as in the .NET port, rather than an error.
+    """
+
+    def test_nothing_to_trace(self):
+        background = np.full((1024, 1024), 255, dtype=np.uint8)  # all background
+        image = Image.new("RGB", (1024, 1024), "white")
+        found = (image, background, 1024, 1024)
+        with mock.patch.object(lateral, "_process_image", return_value=found):
+            chart, landmarks, sagittal_x, _ = lateral.analyze_lateral(
+                image, [(500, 500)] * 98
+            )
+        self.assertIsNone(chart)
+        self.assertEqual(landmarks.shape, (0, 2))
+        self.assertEqual(sagittal_x.size, 0)
+
+    def test_lateral_measures_cannot_run(self):
+        face = facial.AnalyzeFace(measures=[])
+        face.lateral = True  # a profile, but with no lateral landmarks
+        results = AnalyzeLateral().calc(face, render=False)
+        self.assertEqual(set(results), {"nfa", "nla", "at", "nt", "at_nt"})
+        self.assertTrue(all(value is None for value in results.values()))
+
+
+class TestChartIsClosed(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        models.init_models(models.download_models(), models.detect_device())
+
+    def test_profile_leaves_no_figure_open(self):
+        # pyplot keeps a figure until it's closed: one per profile, until 2.1.
+        face = facial.AnalyzeFace(measures=[])
+        before = len(plt.get_fignums())
+        face.load_image(load_image("./tests_data/img3-1024-left-lateral.jpg"))
+        self.assertTrue(face.lateral)
+        self.assertEqual(len(plt.get_fignums()), before)
 
 
 class TestSharedProfiles(unittest.TestCase):

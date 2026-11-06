@@ -66,7 +66,8 @@ class AnalyzeLateral(MeasureBase):
 
         Returns:
             Dict[str, float]: nfa, nla, at, nt and at_nt, with NaN where a landmark
-                wasn't found, or an empty dict for a face that isn't lateral.
+                wasn't found, None for each when no outline could be traced, or an
+                empty dict for a face that isn't lateral.
         """
         render_nfa: bool = self.is_enabled("nfa")
         render_nla: bool = self.is_enabled("nla")
@@ -75,6 +76,9 @@ class AnalyzeLateral(MeasureBase):
             return {}
 
         landmarks: Any = face.lateral_landmarks
+        if len(landmarks) < len(lateral.LATERAL_LANDMARK_NAMES):
+            # No outline could be traced, so the measure can't run at all.
+            return select_outputs({}, self.items)
 
         def missing(pt: Any) -> bool:
             # The lateral finder marks a landmark it couldn't find as (-1, -1). Its x

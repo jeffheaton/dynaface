@@ -79,7 +79,15 @@ public class ModelOutputTests
         var error = Assert.Throws<ModelOutputException>(
             () => new BlazeFaceDetector(inference).TryDetectBbox(Photo, 0, out _, out _));
         Assert.Equal(ModelOutputCheck.FaceDetector, error.Model);
-        Assert.Contains("CPU", error.Message);
+        // Output computed wrongly suggests another backend; no output or the wrong size
+        // says what happened instead.
+        string expected = fault switch
+        {
+            "no output" => "no output",
+            "wrong size" => "wrong size",
+            _ => "CPU",
+        };
+        Assert.Contains(expected, error.Message);
     }
 
     [Theory]

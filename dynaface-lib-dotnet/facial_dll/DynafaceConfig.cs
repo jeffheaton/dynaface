@@ -23,8 +23,9 @@ public static class DynafaceConfig
     // Returns pupilDistMm if it's a pupillary distance Dynaface accepts, from
     // DynafaceConstants.MinPupilDistMm to MaxPupilDistMm, and throws
     // ArgumentOutOfRangeException otherwise (NaN included). Mirrors dynaface-lib's
-    // facial.check_pupil_distance(); FaceMeasureContext.CalcPd checks every distance a
-    // frontal scale is measured from with it.
+    // facial.check_pupil_distance(). Setting PupilDistMm checks it; a distance passed
+    // straight to FaceMeasureContext, or restored with a saved state, isn't checked, so
+    // check one a user typed first.
     public static float CheckPupilDistMm(float pupilDistMm, string paramName = "pupilDistMm")
     {
         if (!(pupilDistMm >= DynafaceConstants.MinPupilDistMm && pupilDistMm <= DynafaceConstants.MaxPupilDistMm))

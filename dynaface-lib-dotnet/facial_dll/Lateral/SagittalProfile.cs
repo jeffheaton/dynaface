@@ -94,7 +94,7 @@ public static class SagittalProfile
         float[] mask = inference.RunU2Net(tensor); // flat [320*320] raw sigmoid saliency map
         ModelOutputCheck.Require(ModelOutputCheck.BackgroundModel, mask, plane);
         if (ModelOutputCheck.AllSame(mask, plane))
-            throw new ModelOutputException(ModelOutputCheck.BackgroundModel, "the same value for every pixel");
+            throw ModelOutputCheck.Broken(ModelOutputCheck.BackgroundModel, "the same value for every pixel");
         return mask;
     }
 

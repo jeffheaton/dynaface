@@ -119,15 +119,15 @@ public class BlazeFaceDetector
         // not "no face" (see ModelOutputException).
         const string model = ModelOutputCheck.FaceDetector;
         var runResult = _runner.RunBlazeFace(inputData);
-        if (runResult == null) throw new ModelOutputException(model, "no output");
+        if (runResult == null) throw ModelOutputCheck.NoOutput(model);
 
         var (regsArr, scoresArr) = runResult.Value;
         ModelOutputCheck.Require(model, regsArr, AnchorCount * 4);
         ModelOutputCheck.Require(model, scoresArr, AnchorCount);
         int totalRegs = regsArr.Length;
-        if (totalRegs % AnchorCount != 0) throw new ModelOutputException(model, "output of the wrong size");
+        if (totalRegs % AnchorCount != 0) throw ModelOutputCheck.WrongSize(model);
         if (ModelOutputCheck.AllSame(scoresArr, AnchorCount))
-            throw new ModelOutputException(model, "the same score for every part of the image");
+            throw ModelOutputCheck.Broken(model, "the same score for every part of the image");
 
         int regStride = totalRegs / AnchorCount;
 

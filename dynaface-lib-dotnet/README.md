@@ -236,7 +236,8 @@ Vec2[] lateralLandmarks = result?.LateralAnalysis?.LateralLandmarks;
 // Mirrors dynaface-lib's settable AnalyzeFace.pd; defaults to the 63mm average. It must
 // be from 40 to 85 mm (DynafaceConstants.MinPupilDistMm/MaxPupilDistMm): no person's
 // pupils are closer or farther apart, so another value throws
-// ArgumentOutOfRangeException. DynafaceConfig.CheckPupilDistMm checks a value first.
+// ArgumentOutOfRangeException. A distance passed straight to FaceMeasureContext, or
+// restored with a saved state, isn't checked: DynafaceConfig.CheckPupilDistMm checks one.
 DynafaceConfig.PupilDistMm = 63f;
 
 // Optional: the size of the text the measures draw, as dynaface-lib's
@@ -313,6 +314,9 @@ var analyzer = new VideoAnalyzer(smoothing: 2, keepImages: false);
 foreach (FaceImage frame in frames)   // upright, in order; analyzer.Skip() for one you can't read
     if (!analyzer.IsFull) analyzer.Add(frame);
 FrameSeries fromVideo = analyzer.Series(fps: 30f);   // rows numbered as in the video
+// Peak and Evaluate report frames by those numbers; StateIndex finds a frame's state
+// (once a frame is skipped, the numbers and the positions in analyzer.States differ).
+FaceAnalysisState smile = analyzer.States[analyzer.StateIndex(fromVideo.Peak("dental_area").Value)];
 
 // Or any saved states (FaceAnalysisPersistence.Capture), measured again without
 // drawing: a row per frame, a column per output. A state saved without its image is

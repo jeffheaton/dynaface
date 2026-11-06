@@ -65,6 +65,9 @@ def check_pupil_distance(pd: Any) -> float:
             const.MAX_PUPIL_DIST (40 to 85 mm). No person's pupils are closer or
             farther apart, so a value outside the range is a mistake, such as
             centimeters for millimeters.
+
+    load_image() checks AnalyzeFace.pd with it. A pupillary distance set on one face,
+    or restored with a saved state, isn't checked, so check one a user typed first.
     """
     try:
         value = float(pd)
@@ -100,16 +103,12 @@ def util_calc_pd(
     Returns:
         Tuple[float, float]: The pupillary distance in pixels, and the millimeters
             per pixel, which is NaN when the pupils coincide.
-
-    Raises:
-        ValueError: If the pupillary distance is outside the range that
-            check_pupil_distance() accepts.
     """
     left_pupil = np.array(pupils[0])
     right_pupil = np.array(pupils[1])
 
     pupillary_distance = np.linalg.norm(left_pupil - right_pupil)
-    pd_mm = check_pupil_distance(AnalyzeFace.pd if pd is None else pd)
+    pd_mm = AnalyzeFace.pd if pd is None else pd
     # Coincident pupils give no scale: NaN (undefined) rather than infinity.
     pix2mm = pd_mm / pupillary_distance if pupillary_distance > 0 else float("nan")
 
@@ -123,16 +122,17 @@ def _saved_pupil_distance(pupillary_distance: Any, pix2mm: Any) -> Optional[floa
     pix2mm has always been computed as the millimeters over the distance between the
     pupils in pixels saved beside it, so their product gives the millimeters back,
     even for states saved when the scale was measured before the crop. None when the
-    pair holds no pupillary distance Dynaface accepts: a profile's fixed scale, pupils
-    in one place, or a distance outside MIN_PUPIL_DIST to MAX_PUPIL_DIST, which a
-    state saved before 2.1 could hold; such a state keeps the scale it was saved with.
+    pair holds no pupillary distance: a profile's fixed scale, or pupils in one place.
+    It isn't checked against the range check_pupil_distance() accepts: a state
+    restores the distance it was analyzed with.
     """
     try:
-        # Rounded, so the float error in the product doesn't change the distance.
-        pd_mm = round(float(pupillary_distance) * float(pix2mm), 6)
+        # Rounded, so the float error in the product doesn't change the distance:
+        # 63 mm comes back as 63. The .NET port rounds the same way.
+        pd_mm = round(float(pupillary_distance) * float(pix2mm), 4)
     except (TypeError, ValueError, OverflowError):
         return None
-    return pd_mm if MIN_PUPIL_DIST <= pd_mm <= MAX_PUPIL_DIST else None
+    return pd_mm if math.isfinite(pd_mm) and pd_mm > 0 else None
 
 
 def _saved_head_pose(saved: Any) -> List[float]:
@@ -184,9 +184,10 @@ class AnalyzeFace(ImageAnalysis):
 
     Attributes:
         pd (float): The assumed distance between the pupils, in millimeters (63 by
-            default), used to convert pixels to millimeters. It must be from 40 to
-            85 (see check_pupil_distance()). Set it on the class, as
-            AnalyzeFace.pd, to calibrate the faces loaded afterward. Each face
+            default), used to convert pixels to millimeters. Set it on the class,
+            as AnalyzeFace.pd, to calibrate the faces loaded afterward; it must be
+            from 40 to 85, which load_image() checks (see
+            check_pupil_distance()). Each face
             keeps the one it was loaded with, and a face restored with load_state()
             keeps the one it was analyzed with. Set it on a face, then call
             analyze(), to measure that face with another.
@@ -445,6 +446,13 @@ class AnalyzeFace(ImageAnalysis):
         """
         super().load_image(img)
         logger.debug("Low level-image loaded")
+        # The view belongs to this image: nothing carries over from the last image a
+        # face loaded, as one face loads every frame of a video.
+        self.lateral = False
+        self.flipped = False
+        self.lateral_landmarks = np.empty((0, 2), dtype=int)
+        self.sagittal_x = None
+        self.sagittal_y = None
         # Measure this face with today's AnalyzeFace.pd, kept on the face so that a
         # later change to the class doesn't rescale it. Checked before the models
         # run, so a mistaken setting fails at once.
@@ -531,7 +539,7 @@ class AnalyzeFace(ImageAnalysis):
             # every measure multiplies it by.
             self.calc_pd()
 
-        if lateral_pos:
+        if self.lateral:  # a profile with a face; without one there's nothing to trace
             from dynaface.lateral import analyze_lateral
 
             # self.render_img is RGB (dynaface's convention); cv2_to_pil expects
@@ -541,9 +549,8 @@ class AnalyzeFace(ImageAnalysis):
             c, self.lateral_landmarks, self.sagittal_x, self.sagittal_y = (
                 analyze_lateral(p, self.landmarks)
             )
-            c = util.trim_sides(c)
-            # cv2.imwrite("debug_overlay.png", c)
-            self._overlay_lateral_analysis(c)
+            if c is not None:  # None when no outline could be traced
+                self._overlay_lateral_analysis(util.trim_sides(c))
 
         return True
 

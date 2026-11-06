@@ -223,9 +223,11 @@ class TestSavedView(unittest.TestCase):
     SAGITTAL_Y = np.arange(1024, dtype=np.int32)
     SAGITTAL_X = (300 + SAGITTAL_Y % 50).astype(np.int32)
 
-    def load(self, pose):
+    def load(self, pose, face=None):
         """A face loaded with made-up landmarks and lateral data instead of the models."""
-        face = facial.AnalyzeFace(measures=[AnalyzeLateral(), measures.AnalyzePose()])
+        face = face or facial.AnalyzeFace(
+            measures=[AnalyzeLateral(), measures.AnalyzePose()]
+        )
         img = np.full((1024, 1024, 3), 128, dtype=np.uint8)
         landmarks = [(400 + i, 300 + 4 * i) for i in range(96)]
         landmarks += [(450, 400), (550, 400)]  # the pupils
@@ -289,6 +291,19 @@ class TestSavedView(unittest.TestCase):
         self.assertEqual(face.lateral_landmarks.shape, (0, 2))
         self.assertIsNone(face.sagittal_x)
         self.assertNotIn("nfa", face.analyze(render=False))
+
+    def test_a_reused_face_saves_each_images_own_view(self):
+        # One face loads every frame of a video. A frontal frame after a flipped
+        # profile saves no flip and no lateral data.
+        face = self.load(Pose.LATERAL)
+        self.assertTrue(face.flipped)
+        self.load(Pose.FRONTAL, face)
+        self.assertEqual(
+            face.dump_state()[6],
+            {"pose": "frontal", "flipped": False, "lateral": False},
+        )
+        self.assertEqual(face.lateral_landmarks.shape, (0, 2))
+        self.assertIsNone(face.sagittal_x)
 
     def test_view_needs_no_pickle(self):
         # Plain values and arrays of numbers, which the desktop app's .dyfc files

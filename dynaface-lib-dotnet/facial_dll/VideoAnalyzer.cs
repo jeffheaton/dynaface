@@ -59,6 +59,16 @@ public sealed class VideoAnalyzer
     // Each kept frame's number in the video, counting from 0.
     public IReadOnlyList<int> Frames => _frames;
 
+    // The position in States of the frame with this number in the video, or -1 if that
+    // frame was skipped. The series' Peak and Evaluate report frames by their numbers in
+    // the video, which stop matching positions in States once a frame is skipped.
+    // dynaface-lib's equivalent is analyzer.frames.index(frame).
+    public int StateIndex(int frame)
+    {
+        int index = _frames.BinarySearch(frame);   // the numbers only increase
+        return index >= 0 ? index : -1;
+    }
+
     public int MaxFrames { get; }
     public bool KeepImages { get; }
 

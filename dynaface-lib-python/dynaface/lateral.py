@@ -471,13 +471,18 @@ def _plot_lateral_landmarks(ax: Axes, landmarks: NDArray[Any], shift_x: int) -> 
 def analyze_lateral(
     input_image: Image.Image,
     landmarks: List[Tuple[int, int]],
-) -> Tuple[NDArray[Any], NDArray[Any], Any, NDArray[Any]]:
+) -> Tuple[Optional[NDArray[Any]], NDArray[Any], Any, NDArray[Any]]:
     """
     Render sagittal plot image and return it with landmarks and arrays.
+
+    When the background model finds nothing to trace, there is no chart (None) and
+    no lateral landmarks (an empty array), as in the .NET port, rather than an error.
     """
     _, binary_np, _, _ = _process_image(input_image)
 
     sagittal_x, sagittal_y = _extract_sagittal_profile(binary_np)
+    if sagittal_x.size == 0:
+        return None, np.empty((0, 2), dtype=int), sagittal_x, sagittal_y
     sagittal_x, shift_x = _shift_sagittal_profile(sagittal_x)
 
     dx, ddx, dx_scaled, ddx_scaled = _compute_derivatives(sagittal_x)
@@ -508,12 +513,9 @@ def analyze_lateral(
     legend = ax2.legend(frameon=True, loc="upper left", bbox_to_anchor=(0.0, 1.0))  # type: ignore
     legend.get_frame().set_alpha(0.8)
 
-    return (
-        util.convert_matplotlib_to_opencv(ax2),
-        landmarks_np,
-        sagittal_x + shift_x,
-        sagittal_y,
-    )
+    chart = util.convert_matplotlib_to_opencv(ax2)
+    plt.close(fig)  # pyplot keeps every figure until it's closed: one per profile
+    return (chart, landmarks_np, sagittal_x + shift_x, sagittal_y)
 
 
 def _find_profile_landmarks(

@@ -71,7 +71,7 @@ video.release()
 series = analyzer.series([measures.AnalyzeEyeArea()], fps=30)
 ```
 
-It skips a frame without a face but still counts it, so `analyzer.frames` holds each kept frame's number in the video, and the series keeps those numbers, so each frame's time is right. `smoothing=2` averages each frame's landmarks with the frame before's, which steadies their jitter; the desktop app's data-smoothing setting does the same, and its default is 2. The averaging uses the landmarks of the cropped face, so the head moving within the frame doesn't blur them. Give the analyzer upright frames: unlike the desktop app, it doesn't try turning a sideways frame.
+It skips a frame without a face but still counts it, so `analyzer.frames` holds each kept frame's number in the video, and the series keeps those numbers, so each frame's time is right. `peak()` and `evaluate()` report frames by those numbers too, and once a frame is skipped they no longer match positions in `analyzer.states`: `analyzer.frames.index(frame)` finds a frame's state. `smoothing=2` averages each frame's landmarks with the frame before's, which steadies their jitter; the desktop app's data-smoothing setting does the same, and its default is 2. The averaging uses the landmarks of the cropped face, so the head moving within the frame doesn't blur them. Give the analyzer upright frames: unlike the desktop app, it doesn't try turning a sideways frame.
 
 You can calculate other measures later, for every frame at once or for a range of them, from the states (`analyzer.states`, or any list of `dump_state()` results):
 

@@ -125,9 +125,10 @@ class TestScale(unittest.TestCase):
 
 class TestPupilDistanceRange(unittest.TestCase):
     """
-    A pupillary distance outside 40 to 85 mm is a mistake, such as centimeters for
-    millimeters, so it is refused where a scale is measured from it. The .NET port's
-    PupilDistanceRangeTests checks the same.
+    A pupillary distance setting outside 40 to 85 mm is a mistake, such as
+    centimeters for millimeters, so loading an image refuses it. A saved state keeps
+    the distance it was analyzed with. The .NET port's PupilDistanceRangeTests
+    checks the same.
     """
 
     def test_check(self):
@@ -137,36 +138,33 @@ class TestPupilDistanceRange(unittest.TestCase):
             with self.subTest(pd=pd), self.assertRaises(ValueError):
                 facial.check_pupil_distance(pd)
 
-    def test_scale_rule_refuses_it(self):
-        with self.assertRaisesRegex(ValueError, "40 to 85 mm"):
-            facial.util_calc_pd((LEFT_PUPIL, RIGHT_PUPIL), 6.3)
-
-    def test_loading_refuses_a_class_setting(self):
+    def test_loading_refuses_a_setting_outside(self):
         default_pd = facial.AnalyzeFace.pd
         try:
             facial.AnalyzeFace.pd = 6.3  # centimeters
             face = facial.AnalyzeFace(measures=[])
             with mock.patch.object(facial.AnalyzeFace, "_find_landmarks") as found:
-                with self.assertRaises(ValueError):
+                with self.assertRaisesRegex(ValueError, "40 to 85 mm"):
                     face.load_image(np.full((100, 100, 3), 128, dtype=np.uint8))
             found.assert_not_called()  # before the models run
         finally:
             facial.AnalyzeFace.pd = default_pd
 
-    def test_analyzing_refuses_a_face_setting(self):
-        face = load(crop=True)
-        face.pd = 630
-        with self.assertRaises(ValueError):
-            face.analyze()
-
-    def test_state_with_a_distance_outside_keeps_its_scale(self):
-        # A state saved before 2.1 could hold any distance. It restores with the
-        # scale it was saved with, rather than failing.
+    def test_state_with_a_distance_outside_restores_it(self):
+        # A state saved before 2.1 could hold any distance. It restores with that
+        # distance, as it always did, and its scale and outputs agree.
         state = load(crop=True).dump_state()
         state[4] = 30.0 / state[3]  # analyzed as if the pupils were 30 mm apart
         face = restore(state)
-        self.assertEqual(face.pix2mm, state[4])
-        self.assertIn("fai", face.analyze())
+        self.assertEqual(face.pd, 30.0)
+        self.assertAlmostEqual(face.pix2mm, state[4])
+        results = face.analyze()
+        self.assertAlmostEqual(results["px2mm"], face.pix2mm, places=4)
+
+        # Measuring it again with another distance still works.
+        face.pd = 63
+        again = face.analyze()
+        self.assertAlmostEqual(again["ml"] / results["ml"], 63 / 30, places=4)
 
     def test_restored_distance_is_exact(self):
         # The product of the saved pair has float error; the face gets 63 back.

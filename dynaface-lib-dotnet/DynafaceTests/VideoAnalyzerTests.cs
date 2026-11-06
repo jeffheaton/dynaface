@@ -78,6 +78,19 @@ public class VideoAnalyzerTests
     }
 
     [Fact]
+    public void StateIndexFindsAFramesState()
+    {
+        // Peak and Evaluate give frame numbers; after a skipped frame they aren't the
+        // positions in States.
+        var analyzer = Import(new float?[] { 0f, null, 10f });
+        Assert.Equal(new[] { 0, 2 }, analyzer.Frames);
+        Assert.Equal(0, analyzer.StateIndex(0));
+        Assert.Equal(1, analyzer.StateIndex(2));
+        Assert.Equal(-1, analyzer.StateIndex(1));   // skipped
+        Assert.Equal(-1, analyzer.StateIndex(7));
+    }
+
+    [Fact]
     public void FramesWithoutAFaceAreSkippedButCounted()
     {
         var analyzer = Import(new float?[] { 0f, null, 40f });

@@ -66,6 +66,19 @@ def import_video(detections, **options):
     return analyzer
 
 
+class TestForcedProfile(unittest.TestCase):
+    def test_frame_without_a_face_is_skipped(self):
+        # Treated as a profile, a frame without a face used to be traced anyway,
+        # which failed and stopped the import.
+        analyzer = VideoAnalyzer(force_pose=Pose.LATERAL)
+        with mock.patch.object(
+            facial.AnalyzeFace, "_find_landmarks", return_value=NO_FACE
+        ), mock.patch("dynaface.lateral.analyze_lateral") as traced:
+            self.assertFalse(analyzer.add(FRAME))
+        traced.assert_not_called()
+        self.assertEqual(analyzer.states, [])
+
+
 class TestFrameSeries(unittest.TestCase):
     def test_columns_are_the_enabled_outputs(self):
         eyes = measures.AnalyzeEyeArea()

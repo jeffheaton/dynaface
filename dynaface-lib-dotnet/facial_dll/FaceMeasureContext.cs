@@ -149,12 +149,9 @@ public class FaceMeasureContext
     // The frontal scale rule, dynaface-lib's util_calc_pd, kept in this one place: the
     // distance between the pupils (WFLW 96 and 97) in pixels, and millimeters per
     // pixel assuming they're pupilDistMm apart. Measure it on the landmarks you're
-    // about to measure. (0, NaN) without two distinct pupils: no scale. Throws
-    // ArgumentOutOfRangeException for a pupillary distance outside 40–85 mm (see
-    // DynafaceConfig.CheckPupilDistMm).
+    // about to measure. (0, NaN) without two distinct pupils: no scale.
     public static (float pupillaryDistance, float pix2mm) CalcPd(Vec2[] landmarks, float pupilDistMm)
     {
-        DynafaceConfig.CheckPupilDistMm(pupilDistMm);
         if (landmarks == null || landmarks.Length <= DynafaceConstants.LmLeftPupil)
             return (0f, float.NaN);
         float distance = Vec2.Distance(

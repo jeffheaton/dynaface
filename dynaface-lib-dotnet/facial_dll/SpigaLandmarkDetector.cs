@@ -80,14 +80,14 @@ public class SpigaLandmarkDetector
         // (see ModelOutputException).
         const string model = ModelOutputCheck.LandmarkModel;
         var result = _runner.RunSpiga(tensor);
-        if (result == null) throw new ModelOutputException(model, "no output");
+        if (result == null) throw ModelOutputCheck.NoOutput(model);
 
         var (landmarksNorm, pose) = result.Value;
         ModelOutputCheck.Require(model, landmarksNorm, NumWflwLandmarks * 2);
         if (pose != null) ModelOutputCheck.Require(model, pose, 0);
         if (Spread(landmarksNorm) * SpigaCropSize < 1f)
             // Even a crop without a face gets landmarks spread over 100 pixels.
-            throw new ModelOutputException(model, "all its landmarks at one point");
+            throw ModelOutputCheck.Broken(model, "all its landmarks at one point");
 
         var (i00, i01, i02, i10, i11, i12) = ImageUtils.InvertAffine(m00, m01, m02, m10, m11, m12);
 
