@@ -5,7 +5,7 @@ from typing import Any, Dict, List
 
 import numpy as np
 
-from dynaface import facial, util
+from dynaface import util
 from dynaface.measures_base import MeasureBase, MeasureItem, select_outputs
 
 logger = logging.getLogger(__name__)
@@ -164,6 +164,10 @@ class AnalyzeBrows(MeasureBase):
         Returns:
             Dict[str, Any]: Filtered measurement results.
         """
+        # Imported here, not at the top: facial imports the measures, so this
+        # module can then be imported first.
+        from dynaface import facial
+
         render2: bool = self.is_enabled("brow.d")
 
         p: Any = facial.util_get_pupils(face.landmarks)
@@ -511,6 +515,8 @@ class AnalyzePosition(MeasureBase):
         """
         render2_tilt: bool = self.is_enabled("tilt")
         render2_px2mm: bool = self.is_enabled("px2mm")
+        from dynaface import facial  # not at the top; see AnalyzeBrows.calc()
+
         render2_pd: bool = self.is_enabled("pd")
 
         p: Any = facial.util_get_pupils(face.landmarks)

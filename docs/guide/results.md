@@ -48,16 +48,20 @@ print(face.get_all_items())  # ['eye.left', 'eye.right', 'eye.ratio']
 
 ## Frontal photos and profiles
 
-When it loads an image, Dynaface decides whether it shows the face from the front or in profile, and sets `face.lateral` to True for a profile. `analyze()` runs every measure you gave it either way, and frontal measures don't mean anything on a profile. To keep only the outputs that fit the view, switch the others off before analyzing:
+When it loads an image, Dynaface decides whether it shows the face from the front or in profile, and sets `face.lateral` to True for a profile. `analyze()` runs every measure you gave it either way, and frontal measures don't mean anything on a profile. To run only the measures that fit the view, apply a [`MeasureSelection`][dynaface.measures.MeasureSelection] before analyzing:
 
 ```python
 face = facial.load_face_image("photo.jpg")
-for measure in face.measures:
-    measure.update_for_type(face.lateral)
+selection = measures.MeasureSelection.of(face.measures)  # as you set them
+selection.apply(face.measures, lateral=face.lateral)
 
-results = face.analyze()
+results = face.analyze()  # only the measures that fit the view
 row = {name: results.get(name) for name in face.get_all_items()}
 ```
+
+The selection holds your choice of measures and items apart from the measures themselves. `apply()` switches off what doesn't fit the face without forgetting it, so you can apply the same selection to frontal photos and profiles in turn, and an item you switched off, such as `eye.diff`, stays off. Take the selection with `of()` before applying it, since afterwards the measures hold only what fits the last face. `choose()` and `choose_item()` change it, and `to_dict()` gives it as a dictionary of the measures' and items' names, ready for `json.dump()`, which `MeasureSelection.from_dict()` turns back into a selection.
+
+Each measure also has `update_for_type()`, which switches its items on or off to fit a view, but it switches every item of a measure that fits back on, so it loses the items you switched off.
 
 If Dynaface gets the view wrong, give it the view yourself when you load the image:
 
@@ -87,6 +91,7 @@ from dynaface.measures_frontal import AnalyzeLandmarks
 
 models.init_models(models.download_models(), models.detect_device())
 chosen = [m for m in measures.all_measures() if not isinstance(m, AnalyzeLandmarks)]
+selection = measures.MeasureSelection.of(chosen)
 
 rows = []
 for path in sorted(Path("photos").glob("*.jpg")):
@@ -94,8 +99,7 @@ for path in sorted(Path("photos").glob("*.jpg")):
     if face.is_no_face():
         print(f"No face found in {path.name}")
         continue
-    for measure in face.measures:
-        measure.update_for_type(face.lateral)
+    selection.apply(face.measures, lateral=face.lateral)
     results = face.analyze()
     rows.append({"file": path.name, **{n: results.get(n) for n in face.get_all_items()}})
 

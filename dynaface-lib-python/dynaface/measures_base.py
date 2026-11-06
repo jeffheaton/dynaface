@@ -87,9 +87,23 @@ class MeasureBase:
         self.is_lateral: bool = False
         self.is_frontal: bool = False
 
+    def abbrev(self) -> str:
+        """
+        Return the measure's short name, as shown in lists and saved selections.
+
+        Each Dynaface measure has its own; the default is the class name.
+
+        Returns:
+            str: The short name, such as "FAI".
+        """
+        return type(self).__name__
+
     def update_for_type(self, lateral: bool) -> None:
         """
         Update the enabled state of each measurement item based on view type.
+
+        This overwrites every item's enabled flag, so a user's choice of items is
+        lost. To keep the choices, use dynaface.measures.MeasureSelection.apply().
 
         Args:
             lateral (bool): True if the measurement is lateral, False if frontal.

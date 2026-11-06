@@ -7,8 +7,6 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# facial must be imported first to break the circular import chain (see
-# test_measures_landmarks.py).
 from dynaface import facial  # noqa: E402
 from dynaface.measures_frontal import AnalyzeNoseFrontal  # noqa: E402
 

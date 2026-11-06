@@ -34,7 +34,7 @@ from dynaface.const import (
     Pose,
 )
 from dynaface.image import ImageAnalysis
-from dynaface.measures import MeasureBase
+from dynaface.measures_base import MeasureBase
 from dynaface.models import are_models_init
 from dynaface.util import VERIFY_CERTS
 

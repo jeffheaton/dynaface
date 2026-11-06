@@ -18,7 +18,6 @@ Each measure is a plugin class. [`all_measures()`][dynaface.measures.all_measure
 import inspect
 import re
 
-from dynaface import facial  # noqa: F401 (must be imported before dynaface.measures)
 from dynaface.measures import all_measures
 
 print("| Measure | View | Outputs | Description |")

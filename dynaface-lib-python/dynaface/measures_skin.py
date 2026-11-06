@@ -7,7 +7,6 @@ import numpy as np
 from scipy.stats import mode
 import math
 
-from dynaface import facial, util
 from dynaface.measures_base import MeasureBase, MeasureItem, select_outputs
 import colorsys
 

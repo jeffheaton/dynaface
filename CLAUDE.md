@@ -110,7 +110,7 @@ The library has two main analysis paths: **frontal** (face-on) and **lateral** (
 - `measures_frontal.py` — Frontal measurements: `AnalyzeFAI` (Facial Asymmetry Index), `AnalyzeOralCommissureExcursion`, brows, eyes, dental area, etc.
 - `measures_lateral.py` — Lateral measurements
 - `measures_skin.py` — Skin tone analysis
-- `measures.py` — `all_measures()` returns the full list of active measurement plugins
+- `measures.py` — `all_measures()` returns the full list of active measurement plugins; `MeasureSelection` keeps a user's choice of measures and items
 - `video.py` — `VideoAnalyzer`: the import loop (skips frames without a face but keeps the others' numbers, smooths landmarks with `LandmarkSmoother`, caps at 5000 frames); `FrameSeries`: a video's outputs frame by frame (from `analyze()` results or saved states), its CSV, peak frames, and the numbers behind the apps' Evaluation report. The desktop app's chart, CSV, jump-to-max and Evaluation use it, and the Unity app should too once it takes the 2.1 library (the .NET port has `FrameSeries` as well); keep that logic here, not in the apps
 
 **Other:**
@@ -133,6 +133,7 @@ The library has two main analysis paths: **frontal** (face-on) and **lateral** (
 - **Plugin architecture** for measurements: add a new `MeasureBase` subclass and register it in `measures.py`
 - **Measure output contract** (both ports): `calc()` returns every declared output whether or not its item is enabled or rendering is on; item flags only gate drawing, and callers pick what to show or export (`get_all_items()` / `GetAllItems`). Drawing-only switches are declared `display_only` and are never returned (see the `measures_base.py` docstring)
 - **Scale contract** (both ports): a frontal face's `pix2mm` is always measured on the landmarks about to be measured, from a pupillary distance in mm that belongs to the analysis (`face.pd` / `FacePipelineResult.PupilDistMm`). Never pair a saved or pre-crop scale with other landmarks: `analyze()` re-measures it and `FaceMeasureContext` measures it itself, and `tests/test_scale.py` / `ScaleConsistencyTests` guard it (see the units note in `dynaface-lib-dotnet/facial_dll/CLAUDE.md`)
+- **Measure choices** (both ports): keep a user's choice of measures and items in a `MeasureSelection` and `apply()` it to each face. `update_for_type()` / `UpdateForType` overwrites the item flags, so it loses the choices
 - **Lazy model loading**: models are downloaded on first use and cached
 - **Dual-view analysis**: frontal and lateral are separate code paths that share base infrastructure
 - **MVC separation**: `dynaface-lib-python` handles all computation; `dynaface-app` handles presentation

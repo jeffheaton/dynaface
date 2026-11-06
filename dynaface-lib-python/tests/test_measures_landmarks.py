@@ -4,11 +4,6 @@ import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# facial must be imported first to break the circular import chain:
-# facial → measures → measures_skin → facial (returns partial) → ok
-# Importing measures first causes facial to be partially initialized when
-# measures_skin needs it, making MeasureBase unavailable.
-from dynaface import facial  # noqa: F401 (side-effect import)
 from dynaface.measures_frontal import AnalyzeLandmarks
 from dynaface.measures_base import MeasureItem
 

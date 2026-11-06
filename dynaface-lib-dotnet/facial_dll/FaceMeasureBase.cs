@@ -50,7 +50,9 @@ public abstract class FaceMeasureBase
 
     // Sets every item's Enabled to this measure's own IsLateral/IsFrontal flag
     // (not the item's own IsLateral/IsFrontal) — matches dynaface-lib's
-    // update_for_type exactly, including that apparent asymmetry.
+    // update_for_type exactly, including that apparent asymmetry. This overwrites
+    // every item's Enabled flag, so a user's choice of items is lost; to keep the
+    // choices, use MeasureSelection.Apply.
     public void UpdateForType(bool lateral)
     {
         bool value = lateral ? IsLateral : IsFrontal;

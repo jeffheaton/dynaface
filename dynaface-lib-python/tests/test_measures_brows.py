@@ -5,9 +5,6 @@ import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# facial must be imported first to break the circular import chain (see
-# test_measures_landmarks.py).
-from dynaface import facial  # noqa: F401 (side-effect import)
 from dynaface.measures_frontal import AnalyzeBrows
 
 PIX2MM = 0.25
