@@ -196,6 +196,9 @@ class TestSavedHeadPose(unittest.TestCase):
         face = facial.AnalyzeFace(measures=measures.all_measures())
         face.load_image(img, crop=True)
         self.assertTrue(face.flipped)
+        # The photo's own pose, facing right; the mirror image's yaw is below 0. The
+        # .NET port's AFlippedProfileReportsThePhotosOwnPose checks the same.
+        self.assertGreater(face.yaw, 0)
 
         restored = facial.AnalyzeFace(measures=measures.all_measures())
         restored.load_state(face.dump_state())

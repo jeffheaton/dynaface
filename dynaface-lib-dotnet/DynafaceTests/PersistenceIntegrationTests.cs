@@ -64,6 +64,27 @@ public class PersistenceIntegrationTests
         Assert.Equal(expected, restored.Analyze(measures, render: false));
     }
 
+    // A profile facing right is flipped and found again, but it reports the head pose
+    // found in the photo as given, as dynaface-lib's load_image() does: up to 2.0.4 the
+    // .NET pipeline reported the mirror image's.
+    [SkippableFact]
+    public void AFlippedProfileReportsThePhotosOwnPose()
+    {
+        _fixture.RequireModels();
+
+        var photo = ImageLoader.Load(TestImage("img2-1024-right-lateral.jpg"));
+        var result = FacialPipelineIntegrationTests.RunWithRotationRetry(photo);
+        Assert.NotNull(result);
+        Assert.True(result.Value.IsLateral);
+        Assert.True(result.Value.Flipped);
+        Assert.True(result.Value.HeadPose[0] > 0f, $"yaw {result.Value.HeadPose[0]}: facing right");
+
+        // The same photo, kept frontal, isn't flipped: its pose is the photo's own.
+        var unflipped = FacePipeline.Run(photo, 0, flipHorizontal: false, forcePose: FacePose.Frontal);
+        Assert.NotNull(unflipped);
+        Assert.Equal(unflipped.Value.HeadPose, result.Value.HeadPose);
+    }
+
     [SkippableFact]
     public void Capture_ClonesPixelArray_IndependentFromLiveContext()
     {

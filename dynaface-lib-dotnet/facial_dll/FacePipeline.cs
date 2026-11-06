@@ -126,7 +126,6 @@ public static class FacePipeline
         bool flipped = !facingLeft;
         FaceImage source = working;
         Vec2[] srcLandmarks = landmarks;
-        float[] srcHeadPose = headPose;
 
         if (flipped)
         {
@@ -135,10 +134,12 @@ public static class FacePipeline
             source = new FaceImage(mirroredPixels, working.Width, working.Height);
 
             // dynaface-lib re-runs full detection (bbox + landmarks) on the flipped
-            // image rather than just remapping coordinates — do the same.
+            // image rather than just remapping coordinates — do the same. Its head pose
+            // is the mirror image's, so it's dropped: like load_image(), the result
+            // reports the pose found in the photo as given (yaw > 0, facing right).
             var redetected = DetectBboxAndLandmarks(source, 0);
             if (redetected == null) return null;
-            (srcLandmarks, srcHeadPose) = redetected.Value;
+            srcLandmarks = redetected.Value.landmarks;
         }
 
         var (padded, paddedLandmarks) = PadCanvasWidth(source, srcLandmarks, 1.5f);
@@ -158,7 +159,7 @@ public static class FacePipeline
         {
             AlignedCrop = crop,
             Wflw98 = cropLandmarks,
-            HeadPose = srcHeadPose,
+            HeadPose = headPose,
             Pose = resolvedPose,
             IsLateral = true,
             Flipped = flipped,
