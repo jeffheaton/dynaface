@@ -68,6 +68,7 @@ SETTING_TILT_THRESHOLD = "tilt"
 SETTING_DYNAMIC_ADJUST = "dynamic"
 SETTING_SMOOTH = "smooth"
 SETTING_LATERAL = "lateral"
+SETTING_QUARTER = "quarter"
 
 DEFAULT_DYNAMIC_ADJUST = 2
 DEFAULT_SMOOTH = 2
@@ -192,11 +193,18 @@ class AppDynaface(AppJTH):
             self.settings, key=SETTING_SMOOTH, default=DEFAULT_SMOOTH
         )
 
-        # Set the lateral
+        # Pose detection: a profile face is detected unless switched off; a
+        # three-quarter (turned) face only when the preference is on, since it
+        # slows video import and the library ships the detection off.
         lateral = utl_settings.get_bool(
             self.settings, key=SETTING_LATERAL, default=True
         )
         dynaface.config.AUTO_LATERAL = lateral
+        dynaface.config.AUTO_QUARTER = utl_settings.get_bool(
+            self.settings, key=SETTING_QUARTER, default=False
+        )
+        logger.info(f"Detect lateral view: {dynaface.config.AUTO_LATERAL}")
+        logger.info(f"Detect three-quarter view: {dynaface.config.AUTO_QUARTER}")
 
         # accelerator device
         acc = utl_settings.get_bool(self.settings, key=SETTING_ACC, default=True)
@@ -293,6 +301,7 @@ class AppDynaface(AppJTH):
             SETTING_DYNAMIC_ADJUST: DEFAULT_DYNAMIC_ADJUST,
             SETTING_SMOOTH: DEFAULT_SMOOTH,
             SETTING_LATERAL: True,
+            SETTING_QUARTER: False,
         }
 
 

@@ -55,8 +55,14 @@ class SettingsTab(QWidget):
         self._log_combo_box = QComboBox()
         self._log_combo_box.addItems(["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"])
 
-        lbl_lateral = QLabel("Use lateral view:")
+        lbl_lateral = QLabel("Detect lateral (profile) view:")
         self._chk_lateral = QCheckBox()
+
+        # Three-quarter detection needs lateral detection in the library, and a
+        # turned frame takes about three times as long to analyze.
+        lbl_quarter = QLabel("Detect three-quarter view (slows video import):")
+        self._chk_quarter = QCheckBox()
+        self._chk_lateral.toggled.connect(self._on_lateral_toggled)
 
         lbl_acc = QLabel("Use Accelerator (GPU)")
         self._chk_accelerator = QCheckBox()
@@ -81,6 +87,7 @@ class SettingsTab(QWidget):
         form_layout.addRow(lbl_data_smooth, self._text_data_smooth)
         form_layout.addRow(log_level_label, self._log_combo_box)
         form_layout.addRow(lbl_lateral, self._chk_lateral)
+        form_layout.addRow(lbl_quarter, self._chk_quarter)
         form_layout.addRow(lbl_acc, self._chk_accelerator)
 
         # Main layout
@@ -105,6 +112,29 @@ class SettingsTab(QWidget):
         )
         self._chk_accelerator.setChecked(settings.get(dynaface_app.SETTING_ACC, True))
         self._chk_lateral.setChecked(settings.get(dynaface_app.SETTING_LATERAL, True))
+        self._chk_quarter.setChecked(settings.get(dynaface_app.SETTING_QUARTER, False))
+        self._on_lateral_toggled(self._chk_lateral.isChecked())
+
+    def _on_lateral_toggled(self, checked: bool):
+        """Allow three-quarter detection only while lateral detection is on."""
+        self._chk_quarter.setEnabled(checked)
+        self._chk_quarter.setToolTip("" if checked else "Needs lateral view detection")
+
+    def detection_changed(self) -> bool:
+        """Return True if either pose detection switch differs from the saved one."""
+        import dynaface_app
+
+        settings = self._window.app.settings
+        lateral = utl_settings.get_bool(
+            settings, key=dynaface_app.SETTING_LATERAL, default=True
+        )
+        quarter = utl_settings.get_bool(
+            settings, key=dynaface_app.SETTING_QUARTER, default=False
+        )
+        return (
+            lateral != self._chk_lateral.isChecked()
+            or quarter != self._chk_quarter.isChecked()
+        )
 
     def on_close(self):
         pass
@@ -113,8 +143,29 @@ class SettingsTab(QWidget):
     def action_save(self):
         if not self.check_values():
             return
+        detection_changed = self.detection_changed()
+        if detection_changed and self._video_importing():
+            # The library reads the detection switches on every frame, so a
+            # change now would reclassify the rest of a video still importing.
+            self._window.display_message_box(
+                "Wait for the video import to finish before changing pose " "detection."
+            )
+            return
         self.save_values()
+        if detection_changed:
+            # Pose detection is read by each load, so open tabs keep their view.
+            self._window.display_message_box(
+                "Pose detection changes apply to photos and videos opened from now on."
+            )
         self._window.close_current_tab()
+
+    def _video_importing(self) -> bool:
+        """Whether any open analysis tab is still importing a video."""
+        tabs = self._window._tab_widget
+        return any(
+            getattr(tabs.widget(index), "loading", False)
+            for index in range(tabs.count())
+        )
 
     def check_values(self):
         """Tell the user about a value that can't be saved, and return False."""
@@ -138,6 +189,8 @@ class SettingsTab(QWidget):
         self._text_dynamic_adjust.setText(str(dynaface_app.DEFAULT_DYNAMIC_ADJUST))
         self._text_data_smooth.setText(str(dynaface_app.DEFAULT_SMOOTH))
         self._chk_accelerator.setChecked(True)
+        self._chk_lateral.setChecked(True)
+        self._chk_quarter.setChecked(False)
         utl_settings.set_combo(self._log_combo_box, "INFO")
 
     def action_cancel(self):
@@ -157,6 +210,7 @@ class SettingsTab(QWidget):
         settings[dynaface_app.SETTING_LOG_LEVEL] = self._log_combo_box.currentText()
         settings[dynaface_app.SETTING_ACC] = self._chk_accelerator.isChecked()
         settings[dynaface_app.SETTING_LATERAL] = self._chk_lateral.isChecked()
+        settings[dynaface_app.SETTING_QUARTER] = self._chk_quarter.isChecked()
         settings[dynaface_app.SETTING_TILT_THRESHOLD] = utl_settings.parse_int(
             self._text_tilt.text(), default=DEFAULT_TILT_THRESHOLD
         )

@@ -17,6 +17,7 @@ import zipfile
 import numpy as np
 from dynaface import facial, measures
 from dynaface.const import Pose
+from dynaface.measures_cheek import AnalyzeCheekMeasures
 from dynaface.measures_lateral import AnalyzeLateral
 
 from dynaface_document import DOC_BODY, DOC_BODY_FRAMES, DOC_HEADER, DynafaceDocument
@@ -166,6 +167,124 @@ class DynafaceDocumentTest(unittest.TestCase):
         face.load_state(loaded.frames[0])
         self.assertTrue(face.lateral and face.flipped)
         self.assertEqual(face.pose, Pose.LATERAL)
+
+    def test_quarter_frames_keep_their_far_cheek(self):
+        # A three-quarter frame's view holds which cheek is the far one and that
+        # cheek's traced outline as three numeric arrays, which restore with their
+        # dtypes so the cheek measure reads them as it did the original.
+        doc = _sample_document()
+        doc.pose = Pose.QUARTER
+        doc.lateral = False
+        doc.lateral_landmarks = None
+        doc.sagittal_x = None
+        doc.sagittal_y = None
+        image = np.zeros((4, 4, 3), dtype=np.uint8)
+        view = {
+            "pose": "quarter",
+            "flipped": False,
+            "lateral": False,
+            "far_left": True,
+            "cheek_outline_x": np.array([12.5, 13.0, 13.5], dtype=np.float32),
+            "cheek_outline_y": np.array([20, 21, 22], dtype=np.int32),
+            "cheek_outline_src": np.array([0, 1, 2], dtype=np.uint8),
+        }
+        doc.frames = [[image, [45.0, -2.0, 1.0], [(10, 20)], 0.0, 0.24, None, view]]
+        doc.save(self.path)
+        loaded = self.load()
+        self.assertEqual(loaded.pose, Pose.QUARTER)
+        self.assertFalse(loaded.lateral)
+        self.assert_same(doc.frames, loaded.frames)
+
+        face = facial.AnalyzeFace(measures=[AnalyzeCheekMeasures()])
+        face.load_state(loaded.frames[0])
+        self.assertEqual(face.pose, Pose.QUARTER)
+        self.assertTrue(face.quarter and face.far_left)
+        self.assertFalse(face.lateral or face.flipped)
+        for name in ("cheek_outline_x", "cheek_outline_y", "cheek_outline_src"):
+            self.assert_same(view[name], getattr(face, name))
+
+    def test_documents_without_a_lateral_key_save_again(self):
+        # A file without a lateral or pose key (saved before 1.2.0) is loaded as
+        # frontal and saves as a version 2 file that opens as one. (A numpy
+        # scalar in such a frame comes back as a Python float from the version 2
+        # file, so the frames hold none.)
+        image = np.arange(48, dtype=np.uint8).reshape(4, 4, 3)
+        frames = [[image, np.array([1.5, -2.0]), [(10, 20)], 63.0, 0.25]]
+        self.write_gzip(pickle.dumps(_version_1(frames)))
+        loaded = self.load()
+        self.assertEqual(loaded.pose, Pose.FRONTAL)
+        loaded.save(self.path)
+        with zipfile.ZipFile(self.path) as zf:
+            header = json.loads(zf.read("document.json"))[DOC_HEADER]
+        self.assertEqual(header["pose"], "frontal")
+        self.assertFalse(header["lateral"])
+        saved_again = self.load()
+        self.assertEqual(saved_again.pose, Pose.FRONTAL)
+        self.assertFalse(saved_again.lateral)
+        self.assert_same(frames, saved_again.frames)
+
+    def test_a_lateral_document_without_a_pose_key_is_lateral(self):
+        # Dynaface 1.2.0 wrote the lateral key but not the pose: the lateral flag
+        # says which view the document had, so its labels and a re-save are right.
+        image = np.arange(48, dtype=np.uint8).reshape(4, 4, 3)
+        frames = [[image, np.array([1.5, -2.0]), [(10, 20)], 63.0, 0.25]]
+        doc = _version_1(frames, lateral=True)
+        doc[DOC_BODY]["lateral_landmarks"] = np.arange(4, dtype=np.int32).reshape(2, 2)
+        doc[DOC_BODY]["sagittal_x"] = np.arange(3, dtype=np.int32)
+        doc[DOC_BODY]["sagittal_y"] = np.arange(3, 6, dtype=np.int32)
+        self.write_gzip(pickle.dumps(doc))
+        loaded = self.load()
+        self.assertTrue(loaded.lateral)
+        self.assertEqual(loaded.pose, Pose.LATERAL)
+        doc = _version_1(frames, lateral=False)
+        doc[DOC_BODY]["lateral_landmarks"] = None
+        doc[DOC_BODY]["sagittal_x"] = None
+        doc[DOC_BODY]["sagittal_y"] = None
+        self.write_gzip(pickle.dumps(doc))
+        self.assertEqual(self.load().pose, Pose.FRONTAL)
+
+    def test_add_missing_views_gives_a_profile_document_frames_its_view(self):
+        # A profile document saved by 2.0.4 or earlier holds its lateral data in
+        # the header alone; with the view on each frame, a face that restores
+        # the frame on its own (the series, the Evaluation, the video export)
+        # measures it as the profile, and a re-save keeps the view.
+        saved = _sample_document()
+        saved.frames.append(saved.frames[0] + [{"pose": "lateral", "lateral": True}])
+        saved.save(self.path)
+        loaded = self.load()
+        loaded.add_missing_views()
+        self.assertEqual([len(frame) for frame in loaded.frames], [7, 7])
+        view = loaded.frames[0][6]
+        self.assertEqual(view["pose"], "lateral")
+        self.assertTrue(view["lateral"])
+        self.assertFalse(view["flipped"])
+        self.assert_same(saved.lateral_landmarks, view["lateral_landmarks"])
+        self.assert_same(saved.sagittal_x, view["sagittal_x"])
+        self.assert_same(saved.sagittal_y, view["sagittal_y"])
+        # the frame that had a view keeps it
+        self.assertEqual(loaded.frames[1][6], {"pose": "lateral", "lateral": True})
+        face = facial.AnalyzeFace(measures=[AnalyzeLateral()])
+        face.load_state(loaded.frames[0])
+        self.assertTrue(face.lateral)
+        self.assertEqual(face.pose, Pose.LATERAL)
+        self.assert_same(saved.lateral_landmarks, face.lateral_landmarks)
+        loaded.save(self.path)
+        self.assertEqual([len(frame) for frame in self.load().frames], [7, 7])
+        # a frontal document's frames restore as frontal already; left alone
+        frontal = _sample_document()
+        frontal.pose, frontal.lateral = Pose.FRONTAL, False
+        frontal.lateral_landmarks = frontal.sagittal_x = frontal.sagittal_y = None
+        frontal.save(self.path)
+        loaded = self.load()
+        loaded.add_missing_views()
+        self.assertEqual([len(frame) for frame in loaded.frames], [6])
+
+    def test_new_documents_save_as_frontal(self):
+        # A document whose pose was never set saves as frontal rather than failing.
+        doc = _sample_document()
+        doc.pose = None
+        doc.save(self.path)
+        self.assertEqual(self.load().pose, Pose.FRONTAL)
 
     def test_file_holds_only_json_and_npy(self):
         _sample_document().save(self.path)

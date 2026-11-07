@@ -16,9 +16,11 @@ def _number(value, places):
 
 def evaluation_html(evaluation):
     """The Evaluation report: the eyes at the widest smile and the mouth at the
-    widest eye opening, or a note when no frame has the measures to compare."""
+    widest eye opening, or a note when no frontal frame has the measures to
+    compare (a turned or profile frame never carries them: FrameSeries reports
+    a measure as NaN on a frame whose view it doesn't suit)."""
     if evaluation is None:
-        return "No frame has the eye and dental measures to compare."
+        return "No frontal frame has the eye and dental measures to compare."
 
     def heading(title, moment):
         return f"<b>{title}</b> (frame {moment.frame}, {_number(moment.time, 2)} s)"

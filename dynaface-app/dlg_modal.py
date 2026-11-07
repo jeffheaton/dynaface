@@ -6,7 +6,6 @@ from dynaface.const import Pose
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
-    QApplication,
     QButtonGroup,
     QDialog,
     QFileDialog,
@@ -18,7 +17,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from dynaface import facial
+# The pose names the dialogs' callers read beside them; they live with the
+# other view helpers, for the code and tests that run without Qt.
+from utl_general import POSE_LABELS  # noqa: F401
 
 
 class SaveVideoDialog(QDialog):
@@ -133,19 +134,6 @@ class VideoExportDialog(QDialog):
             self._cancel_button.setText("Ok")
         else:
             self._update_status.setText(status)
-
-    def obtain_data(self):
-        app = QApplication.instance()
-
-        tilt_threshold = app.tilt_threshold
-        face = facial.AnalyzeFace(
-            self._calcs, data_path=None, tilt_threshold=tilt_threshold
-        )
-        c = len(self._dialog._window._frames)
-        for i, frame in enumerate(self._dialog._window._frames):
-            self._update_signal.emit(f"Exporting frame {i:,}/{c:,}...")
-            face.load_state(frame)
-            face.analyze()
 
 
 class WaitLoadingDialog(QDialog):
@@ -275,12 +263,16 @@ def save_as_document(
 
 class SelectPoseDialog(QDialog):
     """
-    Modal dialog for choosing a face pose. Shows three images (Frontal, Profile, 3/4),
-    one of which is selected by default.  Call get_choice() after exec() to retrieve
-    a Pose enum member, or None if canceled.
+    Modal dialog for choosing a face pose. Shows three images (Frontal, Lateral,
+    Three-quarter), one of which is selected by default: the face's current pose,
+    so the choice starts from what is shown. A caption under them says what the
+    three-quarter view measures and that millimeter measures are off on a
+    turned head; for a video it adds that the video will be analyzed again with
+    the chosen pose. Call get_choice() after exec() to retrieve a Pose enum
+    member, or None if canceled.
     """
 
-    def __init__(self, window, default_pose: Pose = Pose.FRONTAL):
+    def __init__(self, window, default_pose: Pose = Pose.FRONTAL, video: bool = False):
         super().__init__()
         self._window = window
         self.setWindowTitle("Select Pose")
@@ -299,8 +291,8 @@ class SelectPoseDialog(QDialog):
         # Define poses: (enum member, label text, image filename)
         poses = [
             (Pose.FRONTAL, "Frontal", "pose-frontal.png"),
-            (Pose.LATERAL, "Lateral", "pose-profile.png"),
-            (Pose.QUARTER, "3/4", "pose-quarter.png"),
+            (Pose.LATERAL, "Lateral (profile)", "pose-profile.png"),
+            (Pose.QUARTER, "Three-quarter (3/4)", "pose-quarter.png"),
         ]
 
         # Create each button manually
@@ -336,6 +328,17 @@ class SelectPoseDialog(QDialog):
             if pose == default_pose:
                 btn.setChecked(True)
                 self.user_choice = pose
+
+        # What the three-quarter choice means, under the row
+        caption_text = (
+            "Three-quarter: the far cheek's outline, malar apex and submalar "
+            "point are measured; millimeter measures are off on a turned head."
+        )
+        if video:
+            caption_text += "\nThe video will be analyzed again with the chosen pose."
+        caption = QLabel(caption_text)
+        caption.setWordWrap(True)
+        main_layout.addWidget(caption)
 
         # OK and Cancel buttons
         ctrl_layout = QHBoxLayout()

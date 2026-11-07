@@ -1,6 +1,9 @@
+import math
 import numpy as np
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Dict, List, Optional
+
+from dynaface.const import Pose
 
 # ————————————————————————————————————————————————————————————————
 # Allowed built-in types
@@ -111,3 +114,47 @@ def describe_analysis_error(error: Exception) -> str:
             f"\n\nDetails: {error}"
         )
     return str(error)
+
+
+# How the app names each pose wherever a person reads it: dialogs, messages,
+# tooltips and the status line. The enum's own values ("frontal", "lateral",
+# "quarter") are for saved documents and logs.
+POSE_LABELS: Dict[Pose, str] = {
+    Pose.FRONTAL: "frontal",
+    Pose.LATERAL: "lateral",
+    Pose.QUARTER: "three-quarter",
+}
+
+
+def view_label(pose: Optional[Pose], far_left: bool = False) -> str:
+    """
+    The name of a face's view for the user: "frontal", "lateral" or
+    "three-quarter, far cheek left" / "three-quarter, far cheek right".
+
+    A pose that isn't lateral or quarter (frontal, detect, or None from a
+    document saved before poses were stored) is frontal.
+    """
+    if pose == Pose.QUARTER:
+        side = "left" if far_left else "right"
+        return f"{POSE_LABELS[pose]}, far cheek {side}"
+    return POSE_LABELS.get(pose, POSE_LABELS[Pose.FRONTAL])
+
+
+def named_series(series: Any) -> List[str]:
+    """
+    The names of a FrameSeries' outputs that hold at least one finite number, in
+    the series' order, so a chart plots only the outputs the kept frames have
+    (a measure's outputs are NaN on every frame whose view it doesn't suit).
+    """
+    return [
+        name
+        for name in series.names
+        if any(_is_finite(value) for value in series.values[name])
+    ]
+
+
+def _is_finite(value: Any) -> bool:
+    try:
+        return math.isfinite(float(value))
+    except (TypeError, ValueError):
+        return False

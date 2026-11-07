@@ -1,4 +1,5 @@
 import base64
+import copy
 import gzip
 import io
 import itertools
@@ -12,7 +13,7 @@ from dynaface.const import Pose
 from jth_ui import utl_classes
 from utl_general import assert_standard_python
 
-import dynaface
+import dynaface.measures
 
 DOC_HEADER = "header"
 DOC_HEADER_VERSION = "version"
@@ -206,13 +207,16 @@ class DynafaceDocument:
 
     def save(self, filename: str):
         measures = self._save_measures(self.measures)
+        # A document whose pose was never set (one loaded from a version 1 file,
+        # or a new one) is frontal, so a re-save never fails on a missing pose.
+        pose = Pose.FRONTAL if self.pose is None else self.pose
 
         doc = {
             DOC_HEADER: {
                 DOC_HEADER_VERSION: self._version,
                 DOC_HEADER_FPS: self.fps,
                 DOC_HEADER_LATERAL: self.lateral,
-                DOC_HEADER_POSE: self.pose.value,
+                DOC_HEADER_POSE: pose.value,
             },
             DOC_BODY: {
                 DOC_BODY_MEASURES: measures,
@@ -246,11 +250,13 @@ class DynafaceDocument:
         self.frames = doc[DOC_BODY][DOC_BODY_FRAMES]
         self.measures = measures
         if DOC_HEADER_LATERAL not in doc[DOC_HEADER]:
-            # If the lateral key is not present, set it to False
+            # A document without a lateral key was saved before 1.2.0, when every
+            # document was frontal; setting the pose keeps it ready to save again.
             self.lateral = False
             self.lateral_landmarks = None
             self.sagittal_x = None
             self.sagittal_y = None
+            self.pose = Pose.FRONTAL
         else:
             # If the key is present, set it to the value in the document
             # This allows for backward compatibility with older documents
@@ -259,11 +265,38 @@ class DynafaceDocument:
             self.lateral_landmarks = doc[DOC_BODY][DOC_BODY_LATERAL_LANDMARKS]
             self.sagittal_x = doc[DOC_BODY][DOC_BODY_SAGITTAL_X]
             self.sagittal_y = doc[DOC_BODY][DOC_BODY_SAGITTAL_Y]
-            self.pose = (
-                Pose(doc[DOC_HEADER][DOC_HEADER_POSE])
-                if DOC_HEADER_POSE in doc[DOC_HEADER]
-                else Pose.FRONTAL
-            )
+            if DOC_HEADER_POSE in doc[DOC_HEADER]:
+                self.pose = Pose(doc[DOC_HEADER][DOC_HEADER_POSE])
+            else:
+                # Saved by 1.2.0, before the pose was stored: the lateral flag
+                # says which of the two views it had.
+                self.pose = Pose.LATERAL if self.lateral else Pose.FRONTAL
+
+    def add_missing_views(self) -> None:
+        """
+        Give every frame state that holds no view (saved by Dynaface 2.0.4 or
+        earlier, six entries) this document's view, as AnalyzeFace.dump_state()
+        writes it, so whatever restores the frame with load_state() measures it in
+        the document's view. A profile document kept its lateral landmarks and
+        sagittal outline in the header alone, which only the face that is told
+        about them restored; a frontal document's frames restore as frontal either
+        way, so they are left as they are.
+        """
+        if not self.lateral:
+            return
+        view: Dict[str, Any] = {
+            "pose": (self.pose or Pose.LATERAL).value,
+            "flipped": False,
+            "lateral": True,
+            "lateral_landmarks": np.array(self.lateral_landmarks),
+        }
+        for name in ("sagittal_x", "sagittal_y"):
+            value = getattr(self, name)
+            view[name] = None if value is None else np.array(value)
+        self.frames = [
+            list(frame) + [copy.deepcopy(view)] if len(frame) <= 6 else frame
+            for frame in self.frames
+        ]
 
     def _load_measures(self, measures):
         # Only Dynaface's own measure classes can be created. The class names come

@@ -1,3 +1,4 @@
+import copy
 import csv
 import io
 import logging
@@ -16,7 +17,12 @@ import worker_threads
 from dynaface.const import Pose
 from dynaface.facial import AnalyzeFace
 from dynaface.lateral import LATERAL_LANDMARK_NAMES
-from dynaface.measures import AnalyzeDentalArea, AnalyzeEyeArea, all_measures
+from dynaface.measures import (
+    AnalyzeDentalArea,
+    AnalyzeEyeArea,
+    MeasureSelection,
+    all_measures,
+)
 from dynaface.video import FrameSeries
 from jth_ui import app_jth, utl_etc
 from jth_ui.tab_graphic import TabGraphic
@@ -33,6 +39,7 @@ from PyQt6.QtWidgets import (
     QGraphicsScene,
     QGraphicsView,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QPinchGesture,
     QPushButton,
@@ -66,6 +73,19 @@ class AnalyzeVideoTab(TabGraphic):
         self.load_failure = None
         self._auto_update = False
         self._path = path
+        # The pose the whole file is analyzed as; Pose.DETECT classifies each
+        # frame. WorkerLoad reads it for a video.
+        self.force_pose = force_pose
+        # True once the tab's frames came from a video file (not a photo or a
+        # document), even before the import has kept more than one of them.
+        self._video_source = False
+        # The user's choice of measures and items, kept apart from the measures'
+        # flags, which _apply_view() sets for the frame's view (a millimeter
+        # measure is off on a turned or profile head). A new tab chooses nothing;
+        # a document's stored flags are its choices.
+        self._selection = MeasureSelection()
+        # The view the measure tree's rows were last enabled for.
+        self._tree_view = None
 
         # Load the face
         self._frames = []
@@ -74,10 +94,7 @@ class AnalyzeVideoTab(TabGraphic):
         self.frame_rate = 30
         self._frame_step = 1  # The scale of the video graph
 
-        if (
-            path.lower().endswith((".jpg", ".jpeg", ".png", ".tiff", ".heic"))
-            or force_pose == Pose.LATERAL
-        ):
+        if path.lower().endswith((".jpg", ".jpeg", ".png", ".tiff", ".heic")):
             self.load_image(path, force_pose=force_pose)
         elif path.lower().endswith(".dyfc"):
             self.filename = path
@@ -85,7 +102,7 @@ class AnalyzeVideoTab(TabGraphic):
                 self.load_error = True
                 return
         else:
-            self.begin_load_video(path, force_pose=Pose.DETECT)
+            self.begin_load_video(path, force_pose=force_pose)
             self.filename = None
         self._chart_view = None
 
@@ -132,6 +149,10 @@ class AnalyzeVideoTab(TabGraphic):
         if self.filename is None and len(self._frames) == 0:
             self.thread = worker_threads.WorkerLoad(self)
             self.thread._update_signal.connect(self.update_load_progress)
+            # Set here, on the main thread, so update_enabled() below (and the
+            # window's, on the tab change) sees the import as running before
+            # the worker has kept a frame; the worker clears it when it ends.
+            self.loading = True
             self.thread.start()
         else:
             self.thread = None
@@ -144,6 +165,10 @@ class AnalyzeVideoTab(TabGraphic):
 
     def begin_load_video(self, path, force_pose=Pose.DETECT):
         app = QApplication.instance()
+
+        # WorkerLoad analyzes every frame as this pose; set before it starts.
+        self.force_pose = force_pose
+        self._video_source = True
 
         # Open the video file
         self.base_rotation = None
@@ -341,11 +366,21 @@ gesture you wish to analyze."""
         # Store checkboxes in a list for easy access
         self._tree = QTreeWidget()
         self._tree.header().hide()
+        # The column as wide as its longest shown name, with a horizontal scroll
+        # bar (the tree's default, as needed) when that is wider than the
+        # toolbar, so a long item name is never cut off.
+        self._tree.header().setStretchLastSection(False)
+        self._tree.header().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.ResizeToContents
+        )
         # self._tree.itemChanged.connect(on_item_changed)
 
         for measure in self._face.measures:
             parent = QTreeWidgetItem(self._tree)
             parent.setText(0, measure.abbrev())
+            # Checkable but not user tristate: a click on a partly ticked row
+            # ticks it (and so all its items); the partial state is set here
+            # alone, from the items' rows (_measure_state()).
             parent.setFlags(parent.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             parent.setCheckState(
                 0, Qt.CheckState.Checked if measure.enabled else Qt.CheckState.Unchecked
@@ -355,7 +390,10 @@ gesture you wish to analyze."""
             for item in measure.items:
                 child = QTreeWidgetItem(parent)
                 child.setFlags(child.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-                child.setText(0, item.name)
+                # A display-only item is a drawing switch with no value of its
+                # own (never exported), so it reads as one.
+                name = f"{item.name} (drawing)" if item.display_only else item.name
+                child.setText(0, name)
                 child.setCheckState(
                     0,
                     (
@@ -365,6 +403,10 @@ gesture you wish to analyze."""
                     ),
                 )
                 child.setData(0, Qt.ItemDataRole.UserRole, item)
+            # A measure with some of its items off (a reopened document's, say)
+            # shows a partly ticked row.
+            if parent.childCount() > 0:
+                parent.setCheckState(0, self._measure_state(parent))
 
         self._tree.itemChanged.connect(self.on_tree_item_changed)
         self.left_toolbar.addWidget(self._tree)
@@ -372,49 +414,37 @@ gesture you wish to analyze."""
         self.all_button.clicked.connect(self.check_all)
         self.none_button.clicked.connect(self.uncheck_all)
 
-    def check_measure(self, item):
-        measure = item.data(0, Qt.ItemDataRole.UserRole)
-        if self._face.lateral and not measure.is_lateral:
-            self._window.display_message_box("Measure requires frontal view of face.")
-            return False
-        if not self._face.lateral and not measure.is_frontal:
-            self._window.display_message_box("Measure requires lateral view of face.")
-            return False
-        return True
-
     def on_tree_item_changed(self, item, column):
-        """Handle changes to the checkboxes on the measures."""
+        """Handle changes to the checkboxes on the measures.
+
+        A measure that doesn't suit the frame's view has a disabled row, which
+        can't be toggled, so no choice needs refusing here. Ticking or unticking
+        a measure's row ticks or unticks all of its items (a click on a partly
+        ticked row ticks it). A measure's row follows its items' rows: ticked
+        when all are, partly ticked when some are, unticked when none are,
+        counting the disabled rows of items for another view (such as Cheek
+        Measures' quarter items on a frontal frame), whose check states are
+        choices too; so unticking every item a view reaches leaves the measure
+        partly ticked, and on, when another view's items are still chosen.
+        """
         try:
             self._tree.blockSignals(True)
-            if not self.check_measure(item):
-                item.setCheckState(0, Qt.CheckState.Unchecked)
-                QApplication.processEvents()
+            # Check if the item is a parent
+            if item.childCount() > 0 and column == 0:
+                # Parent item: tick or untick all its children. A partly
+                # ticked state comes from the children alone, so it changes
+                # none of them.
+                if item.checkState(0) == Qt.CheckState.PartiallyChecked:
+                    return
+                for i in range(item.childCount()):
+                    child = item.child(i)
+                    child.setCheckState(0, item.checkState(0))
             else:
-                # Check if the item is a parent
-                if item.childCount() > 0 and column == 0:
-                    # Parent item
-                    # Update all children based on the parent's state
-                    for i in range(item.childCount()):
-                        child = item.child(i)
-                        child.setCheckState(0, item.checkState(0))
-                else:
-                    # Child item
-                    # Update parent based on children's state
-                    parent = item.parent()
-                    if parent is not None:
-                        all_unchecked = all(
-                            parent.child(i).checkState(0) == Qt.CheckState.Unchecked
-                            for i in range(parent.childCount())
-                        )
-                        all_checked = all(
-                            parent.child(i).checkState(0) == Qt.CheckState.Checked
-                            for i in range(parent.childCount())
-                        )
-
-                        if all_unchecked:
-                            parent.setCheckState(0, Qt.CheckState.Unchecked)
-                        else:
-                            parent.setCheckState(0, Qt.CheckState.Checked)
+                # Child item
+                # Update parent based on children's state
+                parent = item.parent()
+                if parent is not None:
+                    parent.setCheckState(0, self._measure_state(parent))
         except Exception as e:
             logger.error("Error updating measures", exc_info=True)
         finally:
@@ -429,7 +459,8 @@ gesture you wish to analyze."""
                 self.render_chart()
 
     def update_items(self):
-        """Sync the tree of measures/sub-measures with the face analysis."""
+        """Take the tree's check states as the user's choices, then set the
+        measures' flags for the current frame's view."""
         root = self._tree.invisibleRootItem()
         child_count = root.childCount()
 
@@ -438,10 +469,93 @@ gesture you wish to analyze."""
             self._update_item(parent_item)
             self._update_children(parent_item)
 
+        # The tree holds the choices, a disabled (unsuited) row's included; the
+        # flags hold only what the view allows.
+        self._selection = MeasureSelection.of(self._face.measures)
+        self._apply_view()
+
+    def _apply_view(self):
+        """Enable the chosen measures that suit the current frame's view, and
+        disable the tree rows of the others, keeping every check state: a choice
+        made on a frontal frame comes back when a frontal frame shows again."""
+        self._selection.apply(
+            self._face.measures, self._face.lateral, quarter=self._face.quarter
+        )
+        self._refresh_tree_views()
+
+    def _chosen_measures(self):
+        """A copy of the face's measures with their flags set to the user's
+        choices, whatever the view, the way a document stores them: what a
+        document and the series are built from. The face's own measures keep the
+        view's flags, so playback or a frame kept by an import, which apply the
+        view while a save runs, never change what is being written."""
+        measures = copy.deepcopy(self._face.measures)
+        for measure in measures:
+            measure.enabled = self._selection.is_chosen(measure)
+            for item in measure.items:
+                item.enabled = measure.enabled and self._selection.is_item_chosen(
+                    measure, item.name
+                )
+        return measures
+
+    def _refresh_tree_views(self):
+        """Disable the rows of the measures that don't suit the current view,
+        and the rows of the items that don't (MeasureItem.suits(), e.g. Cheek
+        Measures' frontal items on a quarter face), with a tooltip saying so,
+        and enable the rest; check states stay."""
+        view = (self._face.lateral, self._face.quarter)
+        if view == self._tree_view:
+            return
+        self._tree_view = view
+        # The view's name alone, the view suits() reads: which cheek is the far
+        # one has no bearing on which measures suit it.
+        if self._face.lateral:
+            pose = Pose.LATERAL
+        elif self._face.quarter:
+            pose = Pose.QUARTER
+        else:
+            pose = Pose.FRONTAL
+        tip = f"Not defined on a {utl_general.POSE_LABELS[pose]} view"
+        # Disabling a row and changing its tooltip both emit itemChanged.
+        self._tree.blockSignals(True)
+        try:
+            for i in range(self._tree.topLevelItemCount()):
+                parent = self._tree.topLevelItem(i)
+                measure = parent.data(0, Qt.ItemDataRole.UserRole)
+                suited = measure.suits(self._face.lateral, self._face.quarter)
+                parent.setDisabled(not suited)
+                parent.setToolTip(0, "" if suited else tip)
+                for j in range(parent.childCount()):
+                    row = parent.child(j)
+                    item = row.data(0, Qt.ItemDataRole.UserRole)
+                    item_suited = suited and item.suits(
+                        self._face.lateral, self._face.quarter
+                    )
+                    row.setDisabled(not item_suited)
+                    row.setToolTip(0, "" if item_suited else tip)
+        finally:
+            self._tree.blockSignals(False)
+
+    @staticmethod
+    def _measure_state(parent):
+        """A measure row's check state from its items' rows, the disabled ones
+        included: Checked when every one is ticked, PartiallyChecked when some
+        are, Unchecked when none are."""
+        ticked = sum(
+            parent.child(i).checkState(0) == Qt.CheckState.Checked
+            for i in range(parent.childCount())
+        )
+        if ticked == 0:
+            return Qt.CheckState.Unchecked
+        if ticked == parent.childCount():
+            return Qt.CheckState.Checked
+        return Qt.CheckState.PartiallyChecked
+
     def _update_item(self, item):
         if item is not None:
-            # Assuming the checkbox is in the first column
-            is_checked = item.checkState(0) == Qt.CheckState.Checked
+            # Assuming the checkbox is in the first column. A partly ticked
+            # measure row is on: some of its items are chosen.
+            is_checked = item.checkState(0) != Qt.CheckState.Unchecked
 
             # Accessing the first user data item
             user_data = item.data(0, Qt.ItemDataRole.UserRole)
@@ -475,6 +589,12 @@ gesture you wish to analyze."""
                 size=0.75 * self._spin_text_zoom.value(),
                 only=only,
             )
+            if not self._face.lateral:
+                # The cheek landmarks of a frontal or three-quarter face, with
+                # their codes; a profile has none.
+                self._face.draw_cheek_landmarks(
+                    size=0.75 * self._spin_text_zoom.value()
+                )
 
         self._face.draw_static()
 
@@ -505,12 +625,15 @@ gesture you wish to analyze."""
         utl_gfx.copy_image_to_clipboard(self._face.render_img)
 
     def check_all(self):
-        """Check all checkboxes in top-level tree items."""
+        """Check the top-level rows the current view allows (the enabled ones),
+        and so all of their items, a partly ticked row's included; a disabled
+        row keeps the choice it holds."""
 
         self._auto_update = False
         for i in range(self._tree.topLevelItemCount()):
             item = self._tree.topLevelItem(i)
-            item.setCheckState(0, Qt.CheckState.Checked)
+            if not item.isDisabled():
+                item.setCheckState(0, Qt.CheckState.Checked)
         self._auto_update = True
         self.update_items()
         self.update_face()
@@ -521,6 +644,7 @@ gesture you wish to analyze."""
             self.render_chart()
 
     def uncheck_all(self):
+        """Uncheck every top-level row, the disabled ones included."""
         self._auto_update = False
         for i in range(self._tree.topLevelItemCount()):
             item = self._tree.topLevelItem(i)
@@ -561,6 +685,7 @@ gesture you wish to analyze."""
 
     def update_load_progress(self, status):
         if len(status) > 0 and status[0] == "*":
+            closed = False
             if self.load_failure is not None:
                 message = utl_general.describe_analysis_error(self.load_failure)
                 if len(self._frames) > 0:
@@ -571,15 +696,24 @@ gesture you wish to analyze."""
                 self._window.display_message_box(f"Unable to load the video. {message}")
                 if len(self._frames) < 1:
                     self._window.close_action()
+                    closed = True
             elif len(self._frames) < 1:
                 self._window.display_message_box("No faces found in that video")
                 logger.info("No faces found in video")
                 self._window.close_action()
+                closed = True
+            if closed:
+                return
             # Loading complete
             if self._video_slider.value() == self._video_slider.maximum():
                 # If at the end, then move to beginning
                 self._video_slider.setValue(0)
             self.update_top_message("")
+            # The worker cleared loading before signaling the end, so the
+            # buttons an import disables (Pose, Eval, Jump To) come back now,
+            # after a stopped import too.
+            self.lbl_status.setText(self.status())
+            self._window.update_enabled()
         else:
             # self.lbl_status.setText(status)
             self.lbl_status.setText(self.status(status))
@@ -599,9 +733,18 @@ gesture you wish to analyze."""
 
             self._face.width = self._face.render_img.shape[1]
             self._face.height = self._face.render_img.shape[0]
-            logger.info(f"Set default measures for, lateral = {self._face.lateral}")
-            if not self._face.lateral:
-                logger.info("Enable FAI")
+            # The choices (a document's stored flags, or nothing yet) for the
+            # first frame's view, then, for a photo or video, the view's default
+            # measure; a document keeps the choices it stored.
+            self._apply_view()
+            view = utl_general.view_label(self._face.pose, self._face.far_left)
+            if self.filename is not None:
+                logger.info(f"Keep the document's measures on a {view} view")
+            elif self._face.quarter:
+                logger.info(f"Enable Cheek Measures for a {view} view")
+                self.enable_measure("Cheek Measures")
+            elif not self._face.lateral:
+                logger.info(f"Enable FAI for a {view} view")
                 self.enable_measure("FAI")
             self.update_face()
             logger.debug("Done, display first video frame on load")
@@ -658,7 +801,13 @@ gesture you wish to analyze."""
                 self.update_top_message("No face detected")
             else:
                 self.update_top_message("")
-            return f"({i+1:,} / {frame_count:,})"
+            text = f"({i+1:,} / {frame_count:,})"
+            if self._face.pose in (Pose.LATERAL, Pose.QUARTER):
+                # A turned or profile frame says so beside its number.
+                text += " " + utl_general.view_label(
+                    self._face.pose, self._face.far_left
+                )
+            return text
 
     def update_top_message(self, message):
         if self._view:
@@ -671,6 +820,8 @@ gesture you wish to analyze."""
             num = self._video_slider.sliderPosition()
         frame = self._frames[num]
         self._face.load_state(frame)
+        # The frame's view may differ from the last one's (a mixed-view video).
+        self._apply_view()
         self.update_face()
 
     def action_play_pause(self):
@@ -796,7 +947,11 @@ gesture you wish to analyze."""
         if not filename:
             return
 
-        if self._face.lateral:
+        # A video's CSV is the series of every kept frame, whichever frame the
+        # slider is on (a profile frame's lateral measures are in it); only a
+        # single profile photo writes its sagittal outline instead.
+        is_video = self._video_source or len(self._frames) > 1
+        if self._face.lateral and not is_video:
             self.save_csv_lateral(filename)
         else:
             self.save_csv_frontal(filename)
@@ -835,12 +990,17 @@ gesture you wish to analyze."""
             self._window.display_message_box("Unable to save file.")
 
     def collect_data(self, step_size=1):
-        """The enabled measures' outputs for every step_size-th kept frame. Frames
+        """The chosen measures' outputs for every step_size-th kept frame. Frames
         keep their numbers in the whole video, so a trimmed clip's start at its
-        first kept frame."""
+        first kept frame.
+
+        The series is built from the user's choices, not from the flags the
+        current frame's view allows, so the CSV and the chart hold the same columns
+        whichever frame the slider is on: a measure's outputs are NaN on the frames
+        whose view it doesn't suit (FrameSeries.from_states()), never dropped."""
         return FrameSeries.from_states(
             self._frames,
-            self._face.measures,
+            self._chosen_measures(),
             start=self._frame_begin,
             stop=self._frame_end,
             step=step_size,
@@ -893,13 +1053,17 @@ gesture you wish to analyze."""
         # The chart counts frames from the start of the kept range, like the red
         # current-frame bar below.
         x = [frame - self._frame_begin for frame in series.frames]
-        for name in series.names:
+        # Only the outputs the kept frames have: a measure's outputs are NaN on
+        # every frame whose view it doesn't suit, and an all-NaN line would only
+        # crowd the legend.
+        names = utl_general.named_series(series)
+        for name in names:
             ax.plot(x, series.values[name], label=name)
 
         ax.set_xlabel("Frame")
         ax.set_ylabel("Value")
-        # ax.legend()
-        ax.legend(loc="upper left", bbox_to_anchor=(1, 1.04))
+        if names:
+            ax.legend(loc="upper left", bbox_to_anchor=(1, 1.04))
 
         # Add the red vertical bar at current_frame
         current_frame = self._video_slider.value() - self._frame_begin
@@ -1118,8 +1282,13 @@ gesture you wish to analyze."""
         self.save_document(filename)
 
     def save_document(self, filename):
+        # Every kept frame goes in the document, so an import finishes first.
+        if not self.wait_load_complete():
+            return
         doc = dynaface_document.DynafaceDocument()
-        doc.measures = self._face.measures
+        # The document stores the user's choices, not what the current frame's
+        # view allows, so a frame of another view loads them whole.
+        doc.measures = self._chosen_measures()
         doc.frames = self._frames[self._frame_begin : self._frame_end]
         doc.fps = self.frame_rate
         doc.pose = self._face.pose
@@ -1141,6 +1310,11 @@ gesture you wish to analyze."""
         if dlg_modal.display_please_wait(window=self, f=f, message="Loading document"):
             tilt_threshold = app.tilt_threshold
             self._face = AnalyzeFace(doc.measures, tilt_threshold=tilt_threshold)
+            # A profile document saved by Dynaface 2.0.4 or earlier holds its
+            # lateral data in the header alone: give its frames the view, so
+            # the series, the Evaluation and the video export, which restore
+            # each frame on a face of their own, measure them as the profile.
+            doc.add_missing_views()
             self._frames = doc.frames
             self.filename = filename
             self.frame_count = len(self._frames)
@@ -1152,6 +1326,9 @@ gesture you wish to analyze."""
             self._face.sagittal_x = doc.sagittal_x
             self._face.sagittal_y = doc.sagittal_y
             self._face.pose = doc.pose
+            # The stored flags are the choices; the first frame's load_state()
+            # then applies its view (load_first_frame(), open_frame()).
+            self._selection = MeasureSelection.of(self._face.measures)
             return True
         else:
             self._window.close_action()
@@ -1205,7 +1382,6 @@ gesture you wish to analyze."""
             self._chk_graph.setEnabled(False)
             self._btn_eval.setEnabled(False)
             self._jump_to.setEnabled(False)
-            self._btn_pose.setEnabled(True)
         else:
             self._btn_backward.setEnabled(True)
             self._btn_play.setEnabled(True)
@@ -1213,7 +1389,11 @@ gesture you wish to analyze."""
             self._chk_graph.setEnabled(True)
             self._btn_eval.setEnabled(not self.loading)
             self._jump_to.setEnabled(not self.loading)
-            self._btn_pose.setEnabled(False)
+
+        # The pose can be forced on a photo or video file, which is analyzed
+        # again, but not on a document, whose frames are already analyzed.
+        is_document = self._path.lower().endswith(".dyfc")
+        self._btn_pose.setEnabled(not is_document and not self.loading)
 
     def load_image(self, path, force_pose=Pose.DETECT):
         app = QApplication.instance()
@@ -1320,9 +1500,11 @@ gesture you wish to analyze."""
 
     def _reload_with_pose(self, force_pose: Pose) -> None:
         """
-        Close this tab and reopen it forcing frontal (True) or side (False).
+        Close this tab and reopen its file analyzed as the given pose (frontal,
+        lateral or three-quarter).
         """
-        logger.info(f"Forced {force_pose} view")
+        label = utl_general.POSE_LABELS[force_pose]
+        logger.info(f"Forced {label} view")
 
         try:
             basename = os.path.basename(self._path)
@@ -1330,7 +1512,8 @@ gesture you wish to analyze."""
             new_tab = AnalyzeVideoTab(self._window, self._path, force_pose=force_pose)
             if new_tab.load_error:
                 self._window.display_message_box(
-                    f"Unable to force {force_pose} for {self._path}; invalid format."
+                    f"Unable to force the {label} view for {self._path}; "
+                    "invalid format."
                 )
                 return
 
@@ -1345,12 +1528,15 @@ gesture you wish to analyze."""
             self._window.display_message_box(f"Unable to open file: {e}")
 
     def action_pose(self):
-        # 1) Figure out whether we’re currently in profile (lateral) or frontal (includes 3/4)
-        default = "profile" if self._face.lateral else "frontal"
-        logger.info(f"Adjust pose, Current pose is {default!r}")
+        # 1) The current pose (frontal, lateral or three-quarter) is preselected
+        current = self._face.pose
+        logger.info(f"Adjust pose, current pose is {utl_general.POSE_LABELS[current]}")
 
-        # 2) Show dialog using that as the default
-        dialog = dlg_modal.SelectPoseDialog(self._window, default_pose=default)
+        # 2) Show the dialog; a video says it will be analyzed again
+        is_video = self._video_source or len(self._frames) > 1
+        dialog = dlg_modal.SelectPoseDialog(
+            self._window, default_pose=current, video=is_video
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
@@ -1358,6 +1544,12 @@ gesture you wish to analyze."""
         if chosen is None:
             return
 
-        # 3) If it’s already correct, bail out
-        if chosen != self._face.pose:
+        # 3) A video is analyzed again unless it was already forced to that
+        # pose: under detection its frames may hold several views, and the
+        # one under the slider says nothing about the rest. A photo whose pose
+        # is already the chosen one stays as it is.
+        if is_video:
+            if chosen != self.force_pose:
+                self._reload_with_pose(chosen)
+        elif chosen != current:
             self._reload_with_pose(chosen)
