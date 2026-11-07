@@ -36,7 +36,8 @@ internal sealed class RecordingCanvas : ICheekCanvas
 
     public int Width { get; }
 
-    public int TextWidth(string text) => 12 * text.Length;
+    // Python's MockFace.calc_text_size: ((12 * len(txt), 20), 5).
+    public (int Width, int Height, int Depth) TextSize(string text) => (12 * text.Length, 20, 5);
 
     public void Line((int X, int Y) a, (int X, int Y) b, Rgba32 color, int thickness) =>
         Calls.Add(new CheekDrawCall { Kind = "line", Points = new[] { a, b }, Color = color, Thickness = thickness });
@@ -619,15 +620,23 @@ public class MeasureCheekMeasuresTests
             Assert.All(rings, c => Assert.Equal((Orange, 7, 3), (c.Color, c.Radius, c.Thickness)));
             Assert.Equal(new[]
             {
-                "zygion", "zygion", "cheek reference point", "submalar reference point",
-                "cheek reference point", "submalar reference point",
+                "zygion", "zygion", "cheek ref", "submalar ref", "cheek ref", "submalar ref",
             }, _run.Labels());
             var texts = _run.Kinds("text");
             Assert.Equal(new[] { Blue, Blue, Orange, Orange, Orange, Orange }, texts.Select(t => t.Color));
-            // The right side's labels sit left of the point, the left side's right of it.
+            // The right side's labels sit left of the point, the left side's right of it: the
+            // zygion's above it, the reference points' beside their rings, centered on the
+            // ring's row (the recording canvas's text is 20 px tall).
             Assert.True(texts[0].P0.X < 240);
             Assert.Equal((778 + 14, 558 - 22), texts[1].P0);
             Assert.Equal((240 - 12 * "zygion".Length - 14, 558 - 22), texts[0].P0);
+            var outsideLeft = new[] { true, true, false, false };
+            for (int i = 0; i < 4; i++)
+            {
+                var (x, y) = rings[i].P0;
+                int width = 12 * texts[2 + i].Text!.Length;
+                Assert.Equal((outsideLeft[i] ? x - 14 - width : x + 14, y + 10), texts[2 + i].P0);
+            }
         }
 
         [Fact]
@@ -882,7 +891,7 @@ public class MeasureCheekMeasuresTests
             // and dot and the left side's two rings; three labels.
             Assert.Single(run.Kinds("line"));
             Assert.Equal(4, run.Kinds("circle").Count);
-            Assert.Equal(new[] { "zygion", "cheek reference point", "submalar reference point" }, run.Labels());
+            Assert.Equal(new[] { "zygion", "cheek ref", "submalar ref" }, run.Labels());
             Assert.Equal(3, run.Column.Count);
             Assert.Empty(runs[false].Calls);
         }
@@ -1030,7 +1039,8 @@ public class MeasureCheekMeasuresTests
             Assert.Equal(new[] { "malar apex (prior)" }, _run.Labels());
             var texts = _run.Kinds("text");
             Assert.Single(texts);
-            Assert.Equal((apex.X + 14, apex.Y - 22), texts[0].P0); // away from the face
+            // Away from the face, beside the dot and centered on its row.
+            Assert.Equal((apex.X + 14, apex.Y + 10), texts[0].P0);
             Assert.Equal(Red, texts[0].Color);
         }
 
@@ -1459,8 +1469,8 @@ public class MeasureCheekMeasuresTests
 
     // ------------------------------------------------------------ TestLabelsAtTheEdge
 
-    // A label whose outside would cross the image's edge is written on the point's other
-    // side; one that crosses on both sides is clamped inside the image.
+    // A label stays on its point's outside, never crossing the face: one that would cross
+    // the image's edge there is clamped to it and raised above its point.
     public class LabelsAtTheEdge
     {
         // Each point label as (x, y, width, text), in drawing order.
@@ -1470,14 +1480,16 @@ public class MeasureCheekMeasuresTests
         [Fact]
         public void FarLeftApexNearTheRightEdge()
         {
-            // The yaw45 render's far cheek is the subject's left, so its labels go right;
-            // with the image cut to 20 px past the apex they flip left and stay inside.
+            // The yaw45 render's far cheek is the subject's left, so its labels go right,
+            // beside the apex; with the image cut to 20 px past the apex the label is
+            // clamped to the right edge and raised above the apex, still off the face
+            // rather than across it.
             var wideCtx = CheekFaces.Quarter();
             var wide = new Run(wideCtx);
             var result = CheekFaces.Coords(wideCtx);
             var (apexX, apexY) = MeasureCheekMeasures.Pt(new Vec2d(result["apex.l.x"], result["apex.l.y"]));
             Assert.True(wideCtx.FarLeft);
-            Assert.Equal(apexX + 14, Labels(wide)[0].X); // fits at 800
+            Assert.Equal((apexX + 14, apexY + 10), (Labels(wide)[0].X, Labels(wide)[0].Y));
             var ctx = CheekFaces.Quarter();
             var run = new Run(ctx, width: apexX + 20);
             Assert.Equal(result["apex.l.x"], CheekFaces.Coords(ctx)["apex.l.x"]);
@@ -1486,11 +1498,10 @@ public class MeasureCheekMeasuresTests
             Assert.Single(labels); // the apex alone: no hollow, no label
             foreach (var (x, _, width, text) in labels)
             {
-                Assert.True(x + width < apexX, text);
                 Assert.True(x >= 0, text);
                 Assert.True(x + width <= apexX + 20, text);
             }
-            Assert.Equal((apexX - 12 * "malar apex (prior)".Length - 14, apexY - 22), (labels[0].X, labels[0].Y));
+            Assert.Equal((apexX + 20 - 12 * "malar apex (prior)".Length, apexY - 22), (labels[0].X, labels[0].Y));
         }
 
         [Fact]
@@ -1498,7 +1509,7 @@ public class MeasureCheekMeasuresTests
         {
             // The yaw-45 render's far cheek is the subject's right, so its labels go left;
             // with the landmarks and outline shifted so the apex sits 20 px from the left
-            // edge they flip right and stay inside.
+            // edge the label is clamped to x = 0 and raised above the apex.
             var wideCtx = CheekFaces.Quarter("yaw-45");
             var wide = new Run(wideCtx);
             var result = CheekFaces.Coords(wideCtx);
@@ -1518,43 +1529,101 @@ public class MeasureCheekMeasuresTests
             Assert.Single(labels);
             foreach (var (x, _, width, text) in labels)
             {
-                Assert.True(x > 20, text);
+                Assert.True(x >= 0, text);
                 Assert.True(x + width <= ctx.Width, text);
             }
-            Assert.Equal(20 + 14, labels[0].X);
+            int shiftedApexY = MeasureCheekMeasures.Pt(new Vec2d(0, shifted["apex.r.y"])).Y;
+            Assert.Equal((0, shiftedApexY - 22), (labels[0].X, labels[0].Y));
         }
 
         [Fact]
-        public void FrontalLabelsUnchanged()
+        public void FrontalLabelsFitBesideOrAbove()
         {
-            // The frontal labels fit on both sides at the image's width, so they keep their
-            // outside positions.
+            // The frontal labels fit on their outside at the image's width: the zygion's
+            // above the dot, the reference points' beside the ring; none comes within
+            // LabelGap of another or of a dot.
             var ctx = CheekFaces.Frontal();
-            var labels = Labels(new Run(ctx));
+            var run = new Run(ctx);
+            var labels = Labels(run);
             Assert.Equal((240 - 12 * "zygion".Length - 14, 558 - 22), (labels[0].X, labels[0].Y));
             Assert.Equal((778 + 14, 558 - 22), (labels[1].X, labels[1].Y));
+            var boxes = labels.Select(l => new MeasureCheekMeasures.Box(l.X, l.Y - 20, l.X + l.Width, l.Y + 5))
+                .Concat(run.Kinds("circle").Select(c =>
+                    MeasureCheekMeasures.DotBox(new Vec2d(c.P0.X, c.P0.Y), c.Radius)))
+                .ToList();
             foreach (var (x, _, width, text) in labels)
             {
                 Assert.True(x >= 0, text);
                 Assert.True(x + width <= ctx.Width, text);
             }
+            for (int i = 0; i < labels.Count; i++)
+                for (int j = i + 1; j < boxes.Count; j++)
+                    Assert.False(boxes[i].Near(boxes[j]), $"{labels[i].Text} near box {j}");
         }
 
         [Fact]
-        public void ClampedWhenNeitherSideFits()
+        public void ClampedOnItsOutside()
         {
-            // On an image narrower than the label plus its offsets, the label is clamped to
-            // the image's edge on its outside.
+            // On an image narrower than the label plus its offset, the label is clamped to
+            // the image's edge on its outside and raised above its point.
             var canvas = new RecordingCanvas(100);
             MeasureCheekMeasures.WriteLabel(canvas, new Vec2d(50, 40), "malar apex", Red, false);
             MeasureCheekMeasures.WriteLabel(canvas, new Vec2d(50, 40), "malar apex", Red, true);
             Assert.Equal(new[] { ((0, 18), "malar apex", Red), ((0, 18), "malar apex", Red) },
                 canvas.Kinds("text").Select(c => (c.P0, c.Text!, c.Color)));
-            // Wider than the text on the right but not the left: the right side takes it
-            // even for a label that belongs left.
+            // Room on the right but not the left: a label that belongs left stays left,
+            // clamped to x = 0, rather than crossing to the right (over the face).
             canvas = new RecordingCanvas(200);
             MeasureCheekMeasures.WriteLabel(canvas, new Vec2d(50, 40), "malar apex", Red, true);
-            Assert.Equal((64, 18), canvas.Kinds("text")[0].P0);
+            Assert.Equal((0, 18), canvas.Kinds("text")[0].P0);
+            // With room, beside the point, centered on its row.
+            canvas = new RecordingCanvas(200);
+            MeasureCheekMeasures.WriteLabel(canvas, new Vec2d(50, 40), "malar apex", Red, false);
+            Assert.Equal((64, 50), canvas.Kinds("text")[0].P0);
+        }
+    }
+
+    // ------------------------------------------------------------ TestPlaceLabel
+
+    // PlaceLabel: beside or above the point, and off what is drawn.
+    public class PlaceLabel
+    {
+        static readonly (int, int, int) Size = (120, 20, 5); // width, height above the baseline, depth below
+
+        static MeasureCheekMeasures.Box B(int l, int t, int r, int b) => new(l, t, r, b);
+
+        [Fact]
+        public void BesideAndAbove()
+        {
+            Assert.Equal((314, 210), MeasureCheekMeasures.PlaceLabel((300, 200), Size, false, 1024, new()));
+            Assert.Equal((166, 210), MeasureCheekMeasures.PlaceLabel((300, 200), Size, true, 1024, new()));
+            Assert.Equal((314, 178), MeasureCheekMeasures.PlaceLabel((300, 200), Size, false, 1024, new(), beside: false));
+        }
+
+        [Fact]
+        public void TakenRowsMoveTheLabel()
+        {
+            // Its own row taken (a label already in its box): one line down (20 + 5 +
+            // LabelGap = 29 px); that taken too: one line up; and the box is added to taken.
+            var own = B(314, 190, 434, 215);
+            var taken = new List<MeasureCheekMeasures.Box> { own };
+            Assert.Equal((314, 239), MeasureCheekMeasures.PlaceLabel((300, 200), Size, false, 1024, taken));
+            var last = taken[^1];
+            Assert.Equal((314, 219, 434, 244), (last.Left, last.Top, last.Right, last.Bottom));
+            taken = new() { own, B(314, 219, 434, 244) };
+            Assert.Equal((314, 181), MeasureCheekMeasures.PlaceLabel((300, 200), Size, false, 1024, taken));
+            // Every row taken: it stays on its own row.
+            taken = new() { B(0, 0, 1024, 1024) };
+            Assert.Equal((314, 210), MeasureCheekMeasures.PlaceLabel((300, 200), Size, false, 1024, taken));
+        }
+
+        [Fact]
+        public void ADotBesideItsLabelIsClear()
+        {
+            // A label beside its own dot (rim 9 px) keeps LabelGap from it.
+            var taken = new List<MeasureCheekMeasures.Box> { MeasureCheekMeasures.DotBox(new Vec2d(300, 200), MeasureCheekMeasures.DotRim) };
+            Assert.Equal((314, 210), MeasureCheekMeasures.PlaceLabel((300, 200), Size, false, 1024, taken));
+            Assert.Equal((166, 210), MeasureCheekMeasures.PlaceLabel((300, 200), Size, true, 1024, taken));
         }
     }
 

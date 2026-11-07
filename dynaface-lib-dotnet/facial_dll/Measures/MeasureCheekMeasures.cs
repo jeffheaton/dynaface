@@ -30,13 +30,13 @@ using System.Numerics;
 //     ClipTop or ClipBottom), zy.r.ok, zy.l.ok (that side unclipped and the yaw gate
 //     passes: |cheek.yaw| <= 5 with the agreement), zy.ok (both). Draws the orange zygion
 //     level line, a blue zygion dot with a white rim at each end (gray when that side's
-//     ok flag is 0), each labeled "zygion" (" (clipped)" appended), and the zygion line
-//     of the text.
+//     ok flag is 0), each labeled "zygion" above it (" (clipped)" appended), and the
+//     zygion line of the text.
 //  2. "Reference points" (frontal), NaN on a quarter face: cr.r.d, cr.l.d (each cheek
 //     reference point's depth below the lateral canthus, mm), cr.ok, sr.ok (the yaw
 //     gate). Draws an orange vertical from each lateral canthus to its foot and an open
-//     orange ring at each reference point (gray when cr.ok is 0), labeled "cheek
-//     reference point" and "submalar reference point", and the reference line.
+//     orange ring at each reference point (gray when cr.ok is 0), labeled "cheek ref"
+//     and "submalar ref" beside it, and the reference line.
 //  3. "Far cheek outline" (quarter), NaN on a frontal face: cheek.far (0 the subject's
 //     right, 1 the left, on every quarter face), cheek.mask, cheek.nose, cheek.nose.gap,
 //     cheek.scale (H, px). Draws the far outline as a 4 px polyline colored by each row's
@@ -68,9 +68,12 @@ using System.Numerics;
 // side; observed points that say otherwise are reported on the face's side, with a
 // Trace warning, as dynaface-lib logs one.
 //
-// Drawing: labels are written at the standard measure text size outside their point,
-// away from the face, or on its other side when the outside would cross the image's edge
-// (WriteLabel). The text, written to the sidebar like every .NET measure's (a header, one line
+// Drawing: labels are written at the standard measure text size on their point's outside,
+// away from the face, never across it: beside the point, centered on its row, except the
+// zygion's, which sit above it (its level line runs along the row), and one that would
+// cross the image's edge, which is clamped to it and raised above its point. A label that
+// would overlap a label or dot drawn before it moves a line at a time to the nearest free
+// row (PlaceLabel). The text, written to the sidebar like every .NET measure's (a header, one line
 // each, a spacer), holds Python's text-column lines: at most three headline lines for any
 // one face, each written by its item ("zy.w=130.6 mm (R 65.5 / L 65.1, ratio 0.99)",
 // "cheek ref depth R 28.8 / L 28.8 mm", "apex.l h=0.79 dev=0.012 (prior)",
@@ -142,8 +145,12 @@ public class MeasureCheekMeasures : FaceMeasureBase
     // The dots: a white rim of DotRim px under a filled dot of DotRadius px; a reference
     // point is an open ring of DotRadius px and RingThickness px.
     public const int DotRim = 9, DotRadius = 7, RingThickness = 3;
-    // A label sits LabelDx px outside its point, its baseline LabelDy px above it.
-    public const int LabelDx = 14, LabelDy = 22;
+    // A label sits LabelDx px outside its point, centered on its row, or with its baseline
+    // LabelDy px above it (the zygion's, and one clamped at the image's edge); labels and
+    // dots keep LabelGap px apart, a label moving by the lines in LabelNudges (down first)
+    // until it does. See PlaceLabel.
+    public const int LabelDx = 14, LabelDy = 22, LabelGap = 4;
+    internal static readonly int[] LabelNudges = { 0, 1, -1, 2, -2 };
     // The zygion level line runs this far past each zygion, in IPD units.
     public const double LevelOverhangIpd = 0.15;
     // Each oblique level is drawn from the outline inward by this fraction of H.
@@ -195,6 +202,7 @@ public class MeasureCheekMeasures : FaceMeasureBase
         bool agree = Math.Abs(yaw - yawModel) <= Cheek.YawAgreeDeg;
         var column = new List<string>();
         var reasons = new List<string>();
+        var taken = new List<Box>();   // the labels and dots drawn, which labels keep off
         double viewOk;
         if (ctx.IsQuarter)
         {
@@ -208,12 +216,12 @@ public class MeasureCheekMeasures : FaceMeasureBase
                 if (IsEnabled(ItemOutline)) DrawOutline(canvas, ob, farLeft);
                 if (IsEnabled(ItemApex))
                 {
-                    DrawApex(canvas, ob, outsideLeft, data);
+                    DrawApex(canvas, ob, outsideLeft, data, taken);
                     column.Add(ColumnApex(ob, farLeft));
                 }
                 if (IsEnabled(ItemSubmalar))
                 {
-                    DrawSubmalar(canvas, ob, outsideLeft);
+                    DrawSubmalar(canvas, ob, outsideLeft, taken);
                     column.AddRange(ColumnSubmalar(ob, farLeft, data));
                 }
             }
@@ -228,12 +236,12 @@ public class MeasureCheekMeasures : FaceMeasureBase
             {
                 if (IsEnabled(ItemZygion))
                 {
-                    DrawZygion(canvas, fc, data);
+                    DrawZygion(canvas, fc, data, taken);
                     column.Add(ColumnZygion(data));
                 }
                 if (IsEnabled(ItemReference))
                 {
-                    DrawReference(canvas, fc, data);
+                    DrawReference(canvas, fc, data, taken);
                     column.Add(ColumnReference(data));
                 }
             }
@@ -316,28 +324,85 @@ public class MeasureCheekMeasures : FaceMeasureBase
 
     // ------------------------------------------------------------------ drawing
 
-    // Writes a point's label outside it at the standard measure text size: its baseline
-    // LabelDy px above the point, and LabelDx px to its left (the text's right end there)
-    // or to its right. A label that would cross the image's edge on its outside (start
-    // before x = 0 or end past the canvas width) is written on the point's other side
-    // instead; if it crosses on both sides, its x is clamped so the text stays inside.
-    // outsideLeft: whether the label goes to the point's left (the subject's right side,
-    // whose outside is the image left).
-    internal static void WriteLabel(ICheekCanvas canvas, Vec2d point, string text, Rgba32 color, bool outsideLeft)
+    // A drawn label's or dot's extent, px.
+    internal readonly struct Box
     {
-        var (x, y) = Pt(point);
-        int width = canvas.TextWidth(text);
-        int left = x - width - LabelDx, right = x + LabelDx;
-        int first = outsideLeft ? left : right, second = outsideLeft ? right : left;
-        int textX;
-        if (first >= 0 && first + width <= canvas.Width) textX = first;
-        else if (second >= 0 && second + width <= canvas.Width) textX = second;
-        else textX = Math.Max(0, Math.Min(first, canvas.Width - width));
-        canvas.Text((textX, y - LabelDy), text, color);
+        public readonly int Left, Top, Right, Bottom;
+
+        public Box(int left, int top, int right, int bottom)
+        {
+            Left = left; Top = top; Right = right; Bottom = bottom;
+        }
+
+        // Whether two boxes come within LabelGap px of each other.
+        public bool Near(Box other) =>
+            Left < other.Right + LabelGap && other.Left < Right + LabelGap
+            && Top < other.Bottom + LabelGap && other.Top < Bottom + LabelGap;
     }
 
-    // The zygion level line and the two zygion dots with their labels.
-    static void DrawZygion(ICheekCanvas canvas, Cheek.FrontalCheek fc, Dictionary<string, double> data)
+    // The box of a dot or ring of the given outer radius.
+    internal static Box DotBox(Vec2d point, int radius)
+    {
+        var (x, y) = Pt(point);
+        return new Box(x - radius, y - radius, x + radius, y + radius);
+    }
+
+    // Where a point's label goes, as the text's bottom-left (ICheekCanvas.Text's origin).
+    // The label sits on the point's outside, LabelDx px from it: to its left for
+    // outsideLeft (the text's right end there), else to its right. It is beside the
+    // point, centered on its row, or with beside false above it, its baseline LabelDy px
+    // up. It never crosses to the point's other side, over the face: a label that would
+    // cross the image's edge is clamped to it, still on its outside, and raised above the
+    // point so it doesn't cover the dot. One that would come within LabelGap px of a box
+    // in taken (the labels and dots drawn before it) moves by the lines in LabelNudges
+    // (its height plus LabelGap each, down first) to the first free row, or stays where
+    // it was when none is. Its box is added to taken. size: the text's width, height above
+    // the baseline and depth below it, px. Mirrors dynaface-lib's place_label().
+    internal static (int X, int Y) PlaceLabel((int X, int Y) point, (int Width, int Height, int Depth) size,
+        bool outsideLeft, int imageWidth, List<Box> taken, bool beside = true)
+    {
+        var (x, y) = point;
+        var (width, height, depth) = size;
+        int textX = outsideLeft ? x - LabelDx - width : x + LabelDx;
+        int baseY = beside ? y + height / 2 : y - LabelDy;
+        if (textX < 0 || textX + width > imageWidth)
+        {
+            textX = Math.Max(0, Math.Min(textX, imageWidth - width));
+            baseY = y - LabelDy;
+        }
+        int step = height + depth + LabelGap;
+        int chosen = baseY;
+        foreach (int nudge in LabelNudges)
+        {
+            int row = baseY + nudge * step;
+            var box = new Box(textX, row - height, textX + width, row + depth);
+            if (!taken.Any(other => box.Near(other)))
+            {
+                chosen = row;
+                break;
+            }
+        }
+        taken.Add(new Box(textX, chosen - height, textX + width, chosen + depth));
+        return (textX, chosen);
+    }
+
+    // Writes a point's label on its outside at the standard measure text size, where
+    // PlaceLabel puts it. outsideLeft: whether the label goes to the point's left (the
+    // subject's right side, whose outside is the image left). taken: the labels and dots
+    // drawn so far, which the label keeps off (its box is appended), or null for none.
+    // beside: beside the point (true) or above it (false).
+    internal static void WriteLabel(ICheekCanvas canvas, Vec2d point, string text, Rgba32 color, bool outsideLeft,
+        List<Box>? taken = null, bool beside = true)
+    {
+        var origin = PlaceLabel(Pt(point), canvas.TextSize(text), outsideLeft, canvas.Width,
+            taken ?? new List<Box>(), beside);
+        canvas.Text(origin, text, color);
+    }
+
+    // The zygion level line and the two zygion dots with their labels, above the dots,
+    // since the level line runs along their row.
+    static void DrawZygion(ICheekCanvas canvas, Cheek.FrontalCheek fc, Dictionary<string, double> data,
+        List<Box> taken)
     {
         Cheek.Frame frame = fc.Frame;
         double overhang = LevelOverhangIpd * frame.Ipd;
@@ -353,29 +418,35 @@ public class MeasureCheekMeasures : FaceMeasureBase
             if (!Finite(point)) continue;
             canvas.Circle(Pt(point), White, DotRim, -1);
             canvas.Circle(Pt(point), ok == 1.0 ? Blue : Gray, DotRadius, -1);
+            taken.Add(DotBox(point, DotRim));
             string label = "zygion" + (clip != Cheek.ClipNone ? " (clipped)" : "");
-            WriteLabel(canvas, point, label, Blue, outsideLeft);
+            WriteLabel(canvas, point, label, Blue, outsideLeft, taken, beside: false);
         }
     }
 
-    // The canthus verticals and the open rings of the reference points with their labels.
-    static void DrawReference(ICheekCanvas canvas, Cheek.FrontalCheek fc, Dictionary<string, double> data)
+    // The canthus verticals and the open rings of the reference points with their labels
+    // beside them.
+    static void DrawReference(ICheekCanvas canvas, Cheek.FrontalCheek fc, Dictionary<string, double> data,
+        List<Box> taken)
     {
         Rgba32 color = data["cr.ok"] == 1.0 ? Orange : Gray;
         foreach (var (canthus, foot) in new[] { (fc.CanthusR, fc.FootR), (fc.CanthusL, fc.FootL) })
             if (Finite(canthus, foot)) canvas.Line(Pt(canthus), Pt(foot), Orange, 3);
-        foreach (var (point, text, outsideLeft) in new[]
+        var rings = new[]
         {
-            (fc.CheekRefR, "cheek reference point", true),
-            (fc.SubmalarRefR, "submalar reference point", true),
-            (fc.CheekRefL, "cheek reference point", false),
-            (fc.SubmalarRefL, "submalar reference point", false),
-        })
+            (fc.CheekRefR, "cheek ref", true),
+            (fc.SubmalarRefR, "submalar ref", true),
+            (fc.CheekRefL, "cheek ref", false),
+            (fc.SubmalarRefL, "submalar ref", false),
+        }.Where(r => Finite(r.Item1)).ToArray();
+        // Every ring before any label, so no label covers a ring drawn after it.
+        foreach (var (point, _, _) in rings)
         {
-            if (!Finite(point)) continue;
             canvas.Circle(Pt(point), color, DotRadius, RingThickness);
-            WriteLabel(canvas, point, text, Orange, outsideLeft);
+            taken.Add(DotBox(point, DotRadius + RingThickness / 2));
         }
+        foreach (var (point, text, outsideLeft) in rings)
+            WriteLabel(canvas, point, text, Orange, outsideLeft, taken);
     }
 
     // The far outline colored by source, the three level ticks and the chord. farLeft:
@@ -417,26 +488,29 @@ public class MeasureCheekMeasures : FaceMeasureBase
         if (Finite(a, b)) canvas.Line(Pt(a), Pt(b), Orange, 2);
     }
 
-    // The malar apex's dot and label. outsideLeft: whether the label goes to the point's
-    // left (the near side of a far-right cheek: not farLeft).
+    // The malar apex's dot and its label beside it, off the face. outsideLeft: whether the
+    // label goes to the point's left (the background beside a far-right cheek: not farLeft).
     static void DrawApex(ICheekCanvas canvas, CheekOutline.ObliqueCheek ob, bool outsideLeft,
-        Dictionary<string, double> data)
+        Dictionary<string, double> data, List<Box> taken)
     {
         if (!Finite(ob.Apex)) return;
         canvas.Circle(Pt(ob.Apex), White, DotRim, -1);
         canvas.Circle(Pt(ob.Apex), data["apex.ok"] == 1.0 ? Red : Gray, DotRadius, -1);
-        WriteLabel(canvas, ob.Apex, "malar apex" + ApexNote(ob), Red, outsideLeft);
+        taken.Add(DotBox(ob.Apex, DotRim));
+        WriteLabel(canvas, ob.Apex, "malar apex" + ApexNote(ob), Red, outsideLeft, taken);
     }
 
-    // The submalar point's dot and label, when a hollow is present. Only a present hollow
-    // is drawn: an absent point is wherever the outline comes nearest the chord, on a
-    // convex cheek a row beside one of the chord's ends, so a ring there marked nothing
-    // and overprinted the apex label.
-    static void DrawSubmalar(ICheekCanvas canvas, CheekOutline.ObliqueCheek ob, bool outsideLeft)
+    // The submalar point's dot and its label beside it, when a hollow is present. Only a
+    // present hollow is drawn: an absent point is wherever the outline comes nearest the
+    // chord, on a convex cheek a row beside one of the chord's ends, so a ring there marked
+    // nothing and overprinted the apex label.
+    static void DrawSubmalar(ICheekCanvas canvas, CheekOutline.ObliqueCheek ob, bool outsideLeft,
+        List<Box> taken)
     {
         if (ob.SubmalarPresent != 1.0 || !Finite(ob.Submalar)) return;
         canvas.Circle(Pt(ob.Submalar), Green, DotRadius, -1);
-        WriteLabel(canvas, ob.Submalar, "submalar point", Green, outsideLeft);
+        taken.Add(DotBox(ob.Submalar, DotRadius));
+        WriteLabel(canvas, ob.Submalar, "submalar point", Green, outsideLeft, taken);
     }
 
     // ------------------------------------------------------------------ the text
@@ -663,7 +737,12 @@ public class MeasureCheekMeasures : FaceMeasureBase
 
         public int Width => _ctx.Width;
 
-        public int TextWidth(string text) => FaceRenderer.GetTextSize(text, FaceRenderer.TEXT_SIZE_MEASURE).X;
+        // The pixel font has no descenders, so nothing is drawn below the baseline.
+        public (int Width, int Height, int Depth) TextSize(string text)
+        {
+            var size = FaceRenderer.GetTextSize(text, FaceRenderer.TEXT_SIZE_MEASURE);
+            return (size.X, size.Y, 0);
+        }
 
         public void Line((int X, int Y) a, (int X, int Y) b, Rgba32 color, int thickness) =>
             _ctx.DrawLine(new Vec2(a.X, a.Y), new Vec2(b.X, b.Y), color, thickness);
@@ -702,8 +781,9 @@ internal interface ICheekCanvas
     // The image's width, px, which the labels keep inside.
     int Width { get; }
 
-    // A label's width at the standard measure text size, px.
-    int TextWidth(string text);
+    // A label's size at the standard measure text size, px: its width, its height above
+    // the baseline and its depth below it (face.calc_text_size's size and baseline).
+    (int Width, int Height, int Depth) TextSize(string text);
 
     void Line((int X, int Y) a, (int X, int Y) b, Rgba32 color, int thickness);
 

@@ -630,19 +630,27 @@ class TestFrontal(unittest.TestCase):
             [
                 "zygion",
                 "zygion",
-                "cheek reference point",
-                "submalar reference point",
-                "cheek reference point",
-                "submalar reference point",
+                "cheek ref",
+                "submalar ref",
+                "cheek ref",
+                "submalar ref",
             ],
         )
         colors = [call[3] for call in face.kinds("text") if call[3] is not None]
         self.assertEqual(colors, [mc.BLUE] * 2 + [mc.ORANGE] * 4)
-        # The right side's labels sit left of the point, the left side's right of it.
+        # The right side's labels sit left of the point, the left side's right of
+        # it: the zygion's above it, the reference points' beside their rings,
+        # centered on the ring's row (the mock's text is 20 px tall).
         texts = [call for call in face.kinds("text") if call[3] is not None]
         self.assertLess(texts[0][1][0], 240)
         self.assertEqual(texts[1][1], (778 + 14, 558 - 22))
         self.assertEqual(texts[0][1], (240 - 12 * len("zygion") - 14, 558 - 22))
+        for ring, text, outside_left in zip(
+            rings, texts[2:], (True, True, False, False)
+        ):
+            (x, y), width = ring[1], 12 * len(text[2])
+            expected_x = x - 14 - width if outside_left else x + 14
+            self.assertEqual(text[1], (expected_x, y + 10), text[2])
 
     def test_text_column(self):
         self.assertEqual(
@@ -917,10 +925,7 @@ class TestFrontal(unittest.TestCase):
         # zygion's rim and dot and the left side's two rings; three labels.
         self.assertEqual(len(face.kinds("line")), 1)
         self.assertEqual(len(face.kinds("circle")), 4)
-        self.assertEqual(
-            face.labels(),
-            ["zygion", "cheek reference point", "submalar reference point"],
-        )
+        self.assertEqual(face.labels(), ["zygion", "cheek ref", "submalar ref"])
         for point in face.points:
             self.assertTrue(all(type(v) is int for v in point), point)
         self.assertEqual(len(face.column), 3)
@@ -1073,9 +1078,8 @@ class TestQuarter(unittest.TestCase):
         self.assertEqual(face.labels(), ["malar apex (prior)"])
         texts = [call for call in face.kinds("text") if call[3] is not None]
         self.assertEqual(len(texts), 1)
-        self.assertEqual(
-            texts[0][1], (apex[0] + 14, apex[1] - 22)
-        )  # away from the face
+        # Away from the face, beside the dot and centered on its row.
+        self.assertEqual(texts[0][1], (apex[0] + 14, apex[1] + 10))
         self.assertEqual(texts[0][3], mc.RED)
 
     def test_text_column(self):
@@ -1506,8 +1510,8 @@ class TestFlagReasons(unittest.TestCase):
 
 class TestLabelsAtTheEdge(unittest.TestCase):
     """
-    A label whose outside would cross the image's edge is written on the point's
-    other side; one that crosses on both sides is clamped inside the image.
+    A label stays on its point's outside, never crossing the face: one that would
+    cross the image's edge there is clamped to it and raised above its point.
     """
 
     @staticmethod
@@ -1521,14 +1525,15 @@ class TestLabelsAtTheEdge(unittest.TestCase):
 
     def test_far_left_apex_near_the_right_edge(self):
         # The yaw45 render's far cheek is the subject's left, so its labels go
-        # right; with the image cut to 20 px past the apex they flip left and
-        # stay inside.
+        # right, beside the apex; with the image cut to 20 px past the apex the
+        # label is clamped to the right edge and raised above the apex, still
+        # off the face rather than across it.
         wide = Fixtures.quarter()
         AnalyzeCheekMeasures().calc(wide, render=True)
         result = coords(wide)
         apex_x, apex_y = mc._pt((result["apex.l.x"], result["apex.l.y"]))
         self.assertTrue(wide.far_left)
-        self.assertEqual(self._labels(wide)[0][0], apex_x + 14)  # fits at 800
+        self.assertEqual(self._labels(wide)[0][:2], (apex_x + 14, apex_y + 10))
         face = Fixtures.quarter(width=apex_x + 20)
         AnalyzeCheekMeasures().calc(face, render=True)
         self.assertEqual(coords(face)["apex.l.x"], result["apex.l.x"])
@@ -1536,12 +1541,10 @@ class TestLabelsAtTheEdge(unittest.TestCase):
         self.assertEqual([t for _, _, _, t in labels], face.labels())
         self.assertEqual(len(labels), 1)  # the apex alone: no hollow, no label
         for x, y, width, text in labels:
-            self.assertLess(x + width, apex_x, text)
             self.assertGreaterEqual(x, 0, text)
             self.assertLessEqual(x + width, face.width, text)
-        self.assertEqual(
-            labels[0][:2], (apex_x - 12 * len("malar apex (prior)") - 14, apex_y - 22)
-        )
+        width = 12 * len("malar apex (prior)")
+        self.assertEqual(labels[0][:2], (face.width - width, apex_y - 22))
 
     def test_far_right_apex_near_the_left_edge(self):
         # The yaw-45 render's far cheek is the subject's right, so its labels go
@@ -1567,25 +1570,32 @@ class TestLabelsAtTheEdge(unittest.TestCase):
         labels = self._labels(face)
         self.assertEqual(len(labels), 1)
         for x, y, width, text in labels:
-            self.assertGreater(x, 20, text)
+            self.assertGreaterEqual(x, 0, text)
             self.assertLessEqual(x + width, face.width, text)
-        self.assertEqual(labels[0][0], 20 + 14)
+        apex_y = mc._pt((0, shifted["apex.r.y"]))[1]
+        self.assertEqual(labels[0][:2], (0, apex_y - 22))
 
-    def test_frontal_labels_unchanged(self):
-        # The frontal labels fit on both sides at the image's width, so they
-        # keep their outside positions.
+    def test_frontal_labels_fit_beside_or_above(self):
+        # The frontal labels fit on their outside at the image's width: the
+        # zygion's above the dot, the reference points' beside the ring; none
+        # comes within LABEL_GAP of another or of a dot.
         face = Fixtures.frontal()
         AnalyzeCheekMeasures().calc(face, render=True)
         labels = self._labels(face)
         self.assertEqual(labels[0][:2], (240 - 12 * len("zygion") - 14, 558 - 22))
         self.assertEqual(labels[1][:2], (778 + 14, 558 - 22))
+        boxes = [(x, y - 20, x + width, y + 5) for x, y, width, _ in labels]
+        boxes += [mc._dot_box(c[1], c[3]) for c in face.kinds("circle")]
         for x, y, width, text in labels:
             self.assertGreaterEqual(x, 0, text)
             self.assertLessEqual(x + width, face.width, text)
+        for i, a in enumerate(boxes[: len(labels)]):
+            for b in boxes[i + 1 :]:
+                self.assertFalse(mc._overlaps(a, b), (labels[i][3], b))
 
-    def test_clamped_when_neither_side_fits(self):
-        # On an image narrower than the label plus its offsets, the label is
-        # clamped to the image's edge on its outside.
+    def test_clamped_on_its_outside(self):
+        # On an image narrower than the label plus its offset, the label is
+        # clamped to the image's edge on its outside and raised above its point.
         face = MockFace([], width=100)
         AnalyzeCheekMeasures._label(face, (50, 40), "malar apex", mc.RED, False)
         AnalyzeCheekMeasures._label(face, (50, 40), "malar apex", mc.RED, True)
@@ -1596,11 +1606,64 @@ class TestLabelsAtTheEdge(unittest.TestCase):
                 ("text", (0, 18), "malar apex", mc.RED, 1, 1),
             ],
         )
-        # Wider than the text on the right but not the left: the right side
-        # takes it even for a label that belongs left.
+        # Room on the right but not the left: a label that belongs left stays
+        # left, clamped to x = 0, rather than crossing to the right (over the
+        # face).
         face = MockFace([], width=200)
         AnalyzeCheekMeasures._label(face, (50, 40), "malar apex", mc.RED, True)
-        self.assertEqual(face.kinds("text")[0][1], (64, 18))
+        self.assertEqual(face.kinds("text")[0][1], (0, 18))
+        # With room, beside the point, centered on its row.
+        face = MockFace([], width=200)
+        AnalyzeCheekMeasures._label(face, (50, 40), "malar apex", mc.RED, False)
+        self.assertEqual(face.kinds("text")[0][1], (64, 50))
+
+
+class TestPlaceLabel(unittest.TestCase):
+    """place_label(): beside or above the point, and off what is drawn."""
+
+    SIZE = (120, 20, 5)  # width, height above the baseline, depth below it
+
+    def test_beside_and_above(self):
+        self.assertEqual(
+            mc.place_label((300, 200), self.SIZE, False, 1024, []), (314, 210)
+        )
+        self.assertEqual(
+            mc.place_label((300, 200), self.SIZE, True, 1024, []), (166, 210)
+        )
+        self.assertEqual(
+            mc.place_label((300, 200), self.SIZE, False, 1024, [], beside=False),
+            (314, 178),
+        )
+
+    def test_taken_rows_move_the_label(self):
+        # Its own row taken (a label already in its box): one line down (20 + 5
+        # + LABEL_GAP = 29 px); that taken too: one line up; and the box is
+        # added to taken.
+        own = (314, 190, 434, 215)
+        taken = [own]
+        self.assertEqual(
+            mc.place_label((300, 200), self.SIZE, False, 1024, taken), (314, 239)
+        )
+        self.assertEqual(taken[-1], (314, 219, 434, 244))
+        taken = [own, (314, 219, 434, 244)]
+        self.assertEqual(
+            mc.place_label((300, 200), self.SIZE, False, 1024, taken), (314, 181)
+        )
+        # Every row taken: it stays on its own row.
+        taken = [(0, 0, 1024, 1024)]
+        self.assertEqual(
+            mc.place_label((300, 200), self.SIZE, False, 1024, taken), (314, 210)
+        )
+
+    def test_a_dot_beside_its_label_is_clear(self):
+        # A label beside its own dot (rim 9 px) keeps LABEL_GAP from it.
+        taken = [mc._dot_box((300, 200), mc.DOT_RIM)]
+        self.assertEqual(
+            mc.place_label((300, 200), self.SIZE, False, 1024, taken), (314, 210)
+        )
+        self.assertEqual(
+            mc.place_label((300, 200), self.SIZE, True, 1024, taken), (166, 210)
+        )
 
 
 class TestLateral(unittest.TestCase):

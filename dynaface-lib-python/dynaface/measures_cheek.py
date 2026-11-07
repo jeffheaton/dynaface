@@ -119,9 +119,12 @@ OUTLINE_COLORS: Dict[int, Tuple[int, int, int]] = {
 # The dots: a white rim of DOT_RIM px under a filled dot of DOT_RADIUS px; a
 # reference point is an open ring of DOT_RADIUS px and RING_THICKNESS px.
 DOT_RIM, DOT_RADIUS, RING_THICKNESS = 9, 7, 3
-# A label sits LABEL_DX px outside its point, LABEL_DY px above it (inside it,
-# or clamped, when the outside would cross the image's edge: see _label()).
-LABEL_DX, LABEL_DY = 14, 22
+# A label sits LABEL_DX px outside its point, centered on its row, or with its
+# baseline LABEL_DY px above it (the zygion's, and one clamped at the image's
+# edge); labels and dots keep LABEL_GAP px apart, a label moving by the lines in
+# LABEL_NUDGES (down first) until it does. See place_label().
+LABEL_DX, LABEL_DY, LABEL_GAP = 14, 22, 4
+LABEL_NUDGES: Tuple[int, ...] = (0, 1, -1, 2, -2)
 # The zygion level line runs this far past each zygion, in IPD units.
 LEVEL_OVERHANG_IPD = 0.15
 # Each oblique level is drawn from the outline inward by this fraction of H.
@@ -143,6 +146,80 @@ def _pt(p: ArrayLike) -> Tuple[int, int]:
     """
     q = np.asarray(p, dtype=np.float64).reshape(-1)
     return int(round(float(q[0]))), int(round(float(q[1])))
+
+
+#: A drawn label's or dot's extent: left, top, right, bottom, px.
+Box = Tuple[int, int, int, int]
+
+
+def _overlaps(a: Box, b: Box) -> bool:
+    """Whether two boxes come within LABEL_GAP px of each other."""
+    return (
+        a[0] < b[2] + LABEL_GAP
+        and b[0] < a[2] + LABEL_GAP
+        and a[1] < b[3] + LABEL_GAP
+        and b[1] < a[3] + LABEL_GAP
+    )
+
+
+def _dot_box(point: ArrayLike, radius: int) -> Box:
+    """The box of a dot or ring of the given outer radius."""
+    x, y = _pt(point)
+    return (x - radius, y - radius, x + radius, y + radius)
+
+
+def place_label(
+    point: Tuple[int, int],
+    size: Tuple[int, int, int],
+    outside_left: bool,
+    image_width: int,
+    taken: List[Box],
+    beside: bool = True,
+) -> Tuple[int, int]:
+    """
+    Where a point's label goes, as the text's bottom-left (write_text()'s pos).
+
+    The label sits on the point's outside, LABEL_DX px from it: to its left for
+    outside_left (the text's right end there), else to its right. It is beside
+    the point, centered on its row, or with beside False above it, its baseline
+    LABEL_DY px up. It never crosses to the point's other side, over the face: a
+    label that would cross the image's edge is clamped to it, still on its
+    outside, and raised above the point so it doesn't cover the dot. One that
+    would come within LABEL_GAP px of a box in taken (the labels and dots drawn
+    before it) moves by the lines in LABEL_NUDGES (its height plus LABEL_GAP
+    each, down first) to the first free row, or stays where it was when none is.
+    Its box is added to taken.
+
+    Args:
+        point (Tuple[int, int]): The labeled point, (x, y) px.
+        size (Tuple[int, int, int]): The text's width, height above the
+            baseline and depth below it, px.
+        outside_left (bool): Whether the label goes to the point's left (the
+            subject's right side, whose outside is the image left).
+        image_width (int): The image's width, px, which the label keeps inside.
+        taken (List[Box]): The boxes drawn so far; the label's is appended.
+        beside (bool): Beside the point (True) or above it (False).
+
+    Returns:
+        Tuple[int, int]: The text's x and baseline y, px.
+    """
+    x, y = point
+    width, height, depth = size
+    text_x = x - LABEL_DX - width if outside_left else x + LABEL_DX
+    base = y + height // 2 if beside else y - LABEL_DY
+    if text_x < 0 or text_x + width > image_width:
+        text_x = max(0, min(text_x, image_width - width))
+        base = y - LABEL_DY
+    step = height + depth + LABEL_GAP
+    chosen = base
+    for nudge in LABEL_NUDGES:
+        row = base + nudge * step
+        box = (text_x, row - height, text_x + width, row + depth)
+        if not any(_overlaps(box, other) for other in taken):
+            chosen = row
+            break
+    taken.append((text_x, chosen - height, text_x + width, chosen + depth))
+    return text_x, chosen
 
 
 def _flag(value: bool) -> float:
@@ -322,8 +399,8 @@ class AnalyzeCheekMeasures(MeasureBase):
           are, the gate of the width and the ratio.
 
         Draws the orange zygion level line, a blue zygion dot with a white rim at
-        each end (gray when that side's ok flag is 0), each labeled "zygion",
-        " (clipped)" appended, and the zygion line of the text column.
+        each end (gray when that side's ok flag is 0), each labeled "zygion" above
+        it, " (clipped)" appended, and the zygion line of the text column.
 
     2. "Reference points" (frontal), NaN on a quarter face:
         - `cr.r.d`, `cr.l.d`: The depth of each cheek reference point (Wilkinson's
@@ -334,8 +411,8 @@ class AnalyzeCheekMeasures(MeasureBase):
 
         Draws an orange vertical from each lateral canthus to its foot on the
         contour and an open orange ring for each reference point (gray when cr.ok
-        is 0), labeled "cheek reference point" and "submalar reference point", and
-        the reference line of the text column.
+        is 0), labeled "cheek ref" and "submalar ref" beside it, and the reference
+        line of the text column.
 
     3. "Far cheek outline" (quarter), NaN on a frontal face:
         - `cheek.far`: 0 when the far (measured) cheek is the subject's right, 1
@@ -421,9 +498,13 @@ class AnalyzeCheekMeasures(MeasureBase):
     `cheek.yaw`, measured from the landmarks, and each gate also needs it within
     YAW_AGREE_DEG of the model's calibrated yaw.
 
-    Labels are written at the standard measure text size outside their point,
-    away from the face, or on its other side when the outside would cross the
-    image's edge (_label()). The text column, written through
+    Labels are written at the standard measure text size on their point's
+    outside, away from the face, never across it: beside the point, centered on
+    its row, except the zygion's, which sit above it (its level line runs along
+    the row), and one that would cross the image's edge, which is clamped to it
+    and raised above its point. A label that would overlap a label or dot drawn
+    before it moves a line at a time to the nearest free row (place_label()).
+    The text column, written through
     face.analyze_next_pt(), holds at most three headline lines for any one
     face, never one line per output, of five kinds in all, each written by its
     item: on a frontal face "zy.w=130.6 mm (R 65.5 / L 65.1, ratio 0.99)"
@@ -512,6 +593,7 @@ class AnalyzeCheekMeasures(MeasureBase):
         agree = abs(yaw - yaw_model) <= cheek.YAW_AGREE_DEG
         column: List[str] = []
         reasons: List[str] = []
+        taken: List[Box] = []  # the labels and dots drawn, which labels keep off
         if getattr(face, "quarter", False):
             far_left = bool(getattr(face, "far_left", False))
             if hasattr(face, "oblique_cheek"):
@@ -534,10 +616,10 @@ class AnalyzeCheekMeasures(MeasureBase):
                 if self.is_enabled(ITEM_OUTLINE):
                     self._draw_outline(face, ob, far_left)
                 if self.is_enabled(ITEM_APEX):
-                    self._draw_apex(face, ob, outside_left, data)
+                    self._draw_apex(face, ob, outside_left, data, taken)
                     column.append(self._column_apex(ob, far_left))
                 if self.is_enabled(ITEM_SUBMALAR):
-                    self._draw_submalar(face, ob, outside_left)
+                    self._draw_submalar(face, ob, outside_left, taken)
                     column += self._column_submalar(ob, far_left, data)
             if render:
                 reasons = self._quarter_reasons(ob, data, yaw, yaw_model, agree)
@@ -551,10 +633,10 @@ class AnalyzeCheekMeasures(MeasureBase):
                 self._fill_frontal(data, fc, float(face.pix2mm), yaw, agree)
             if render and fc is not None:
                 if self.is_enabled(ITEM_ZYGION):
-                    self._draw_zygion(face, fc, data)
+                    self._draw_zygion(face, fc, data, taken)
                     column.append(self._column_zygion(data))
                 if self.is_enabled(ITEM_REFERENCE):
-                    self._draw_reference(face, fc, data)
+                    self._draw_reference(face, fc, data, taken)
                     column.append(self._column_reference(data))
             view_ok = data["zy.ok"]
         if render and self.is_enabled(ITEM_HEAD_TURN):
@@ -663,16 +745,12 @@ class AnalyzeCheekMeasures(MeasureBase):
         text: str,
         color: Tuple[int, int, int],
         outside_left: bool,
+        taken: Optional[List[Box]] = None,
+        beside: bool = True,
     ) -> None:
         """
-        Write a point's label outside it at the standard measure text size:
-        LABEL_DY px above the point, and LABEL_DX px to its left (the text's
-        right end there) or to its right.
-
-        A label that would cross the image's edge on its outside (start before
-        x = 0 or end past face.width) is written on the point's other side
-        instead; if it crosses on both sides, its x is clamped so the text stays
-        inside the image.
+        Write a point's label on its outside at the standard measure text size,
+        where place_label() puts it.
 
         Args:
             face (Any): The face to draw on.
@@ -681,28 +759,38 @@ class AnalyzeCheekMeasures(MeasureBase):
             color (Tuple[int, int, int]): Its color, RGB.
             outside_left (bool): Whether the label goes to the point's left (the
                 subject's right side, whose outside is the image left).
+            taken (Optional[List[Box]]): The labels and dots drawn so far, which
+                the label keeps off; its box is appended. None for none.
+            beside (bool): Beside the point (True) or above it (False).
         """
-        x, y = _pt(point)
-        width = int(face.calc_text_size(text)[0][0])
-        left, right = x - width - LABEL_DX, x + LABEL_DX
-        candidates = (left, right) if outside_left else (right, left)
-        for text_x in candidates:
-            if text_x >= 0 and text_x + width <= face.width:
-                break
-        else:
-            text_x = max(0, min(candidates[0], face.width - width))
-        face.write_text((text_x, y - LABEL_DY), text, color=color)
+        (width, height), depth = face.calc_text_size(text)
+        size = (int(width), int(height), int(depth))
+        pos = place_label(
+            _pt(point),
+            size,
+            outside_left,
+            int(face.width),
+            [] if taken is None else taken,
+            beside,
+        )
+        face.write_text(pos, text, color=color)
 
     def _draw_zygion(
-        self, face: Any, fc: cheek.FrontalCheek, data: Dict[str, Any]
+        self,
+        face: Any,
+        fc: cheek.FrontalCheek,
+        data: Dict[str, Any],
+        taken: List[Box],
     ) -> None:
         """
-        The zygion level line and the two zygion dots with their labels.
+        The zygion level line and the two zygion dots with their labels, above
+        the dots, since the level line runs along their row.
 
         Args:
             face (Any): The face to draw on.
             fc (cheek.FrontalCheek): The constructions.
             data (Dict[str, Any]): The outputs, for the per-side ok flags.
+            taken (List[Box]): The labels and dots drawn so far.
         """
         frame = fc.frame
         overhang = LEVEL_OVERHANG_IPD * frame.ipd
@@ -718,35 +806,47 @@ class AnalyzeCheekMeasures(MeasureBase):
                 continue
             face.circle(_pt(point), WHITE, DOT_RIM)
             face.circle(_pt(point), BLUE if ok == 1.0 else GRAY, DOT_RADIUS)
+            taken.append(_dot_box(point, DOT_RIM))
             label = "zygion" + (" (clipped)" if clip != cheek.CLIP_NONE else "")
-            self._label(face, point, label, BLUE, outside_left)
+            self._label(face, point, label, BLUE, outside_left, taken, beside=False)
 
     def _draw_reference(
-        self, face: Any, fc: cheek.FrontalCheek, data: Dict[str, Any]
+        self,
+        face: Any,
+        fc: cheek.FrontalCheek,
+        data: Dict[str, Any],
+        taken: List[Box],
     ) -> None:
         """
         The canthus verticals and the open rings of the reference points with
-        their labels.
+        their labels beside them.
 
         Args:
             face (Any): The face to draw on.
             fc (cheek.FrontalCheek): The constructions.
             data (Dict[str, Any]): The outputs, for cr.ok.
+            taken (List[Box]): The labels and dots drawn so far.
         """
         color = ORANGE if data["cr.ok"] == 1.0 else GRAY
         for canthus, foot in ((fc.canthus_r, fc.foot_r), (fc.canthus_l, fc.foot_l)):
             if _finite(canthus, foot):
                 face.line(_pt(canthus), _pt(foot), ORANGE, 3)
-        for point, text, outside_left in (
-            (fc.cheek_ref_r, "cheek reference point", True),
-            (fc.submalar_ref_r, "submalar reference point", True),
-            (fc.cheek_ref_l, "cheek reference point", False),
-            (fc.submalar_ref_l, "submalar reference point", False),
-        ):
-            if not _finite(point):
-                continue
+        rings = [
+            (point, text, outside_left)
+            for point, text, outside_left in (
+                (fc.cheek_ref_r, "cheek ref", True),
+                (fc.submalar_ref_r, "submalar ref", True),
+                (fc.cheek_ref_l, "cheek ref", False),
+                (fc.submalar_ref_l, "submalar ref", False),
+            )
+            if _finite(point)
+        ]
+        # Every ring before any label, so no label covers a ring drawn after it.
+        for point, _, _ in rings:
             face.circle(_pt(point), color, DOT_RADIUS, thickness=RING_THICKNESS)
-            self._label(face, point, text, ORANGE, outside_left)
+            taken.append(_dot_box(point, DOT_RADIUS + RING_THICKNESS // 2))
+        for point, text, outside_left in rings:
+            self._label(face, point, text, ORANGE, outside_left, taken)
 
     @staticmethod
     def _draw_outline(
@@ -796,31 +896,41 @@ class AnalyzeCheekMeasures(MeasureBase):
         ob: cheek_outline.ObliqueCheek,
         outside_left: bool,
         data: Dict[str, Any],
+        taken: List[Box],
     ) -> None:
         """
-        The malar apex's dot and label.
+        The malar apex's dot and its label beside it, off the face.
 
         Args:
             face (Any): The face to draw on.
             ob (cheek_outline.ObliqueCheek): The observed points.
             outside_left (bool): Whether the label goes to the point's left (the
-                near side of a far-right cheek: not far_left).
+                background beside a far-right cheek: not far_left).
             data (Dict[str, Any]): The outputs, for apex.ok.
+            taken (List[Box]): The labels and dots drawn so far.
         """
         face.circle(_pt(ob.apex), WHITE, DOT_RIM)
         face.circle(_pt(ob.apex), RED if data["apex.ok"] == 1.0 else GRAY, DOT_RADIUS)
-        self._label(face, ob.apex, "malar apex" + _apex_note(ob), RED, outside_left)
+        taken.append(_dot_box(ob.apex, DOT_RIM))
+        text = "malar apex" + _apex_note(ob)
+        self._label(face, ob.apex, text, RED, outside_left, taken)
 
     def _draw_submalar(
-        self, face: Any, ob: cheek_outline.ObliqueCheek, outside_left: bool
+        self,
+        face: Any,
+        ob: cheek_outline.ObliqueCheek,
+        outside_left: bool,
+        taken: List[Box],
     ) -> None:
         """
-        The submalar point's dot and label, when a hollow is present.
+        The submalar point's dot and its label beside it, when a hollow is
+        present.
 
         Args:
             face (Any): The face to draw on.
             ob (cheek_outline.ObliqueCheek): The observed points.
             outside_left (bool): Whether the label goes to the point's left.
+            taken (List[Box]): The labels and dots drawn so far.
         """
         # Only a present hollow is drawn: an absent point is wherever the
         # outline comes nearest the chord, on a convex cheek a row beside one of
@@ -829,7 +939,8 @@ class AnalyzeCheekMeasures(MeasureBase):
         # nothing and overprinted the apex label.
         if ob.submalar_present == 1.0:
             face.circle(_pt(ob.submalar), GREEN, DOT_RADIUS)
-            self._label(face, ob.submalar, "submalar point", GREEN, outside_left)
+            taken.append(_dot_box(ob.submalar, DOT_RADIUS))
+            self._label(face, ob.submalar, "submalar point", GREEN, outside_left, taken)
 
     def _quarter_reasons(
         self,
