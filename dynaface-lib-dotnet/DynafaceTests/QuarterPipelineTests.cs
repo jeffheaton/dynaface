@@ -435,8 +435,9 @@ public class QuarterPathTests
     [Fact]
     public void TheMaskThresholdIsLateralPys()
     {
-        // lateral.MASK_ALPHA, which cheek_outline.MASK_ALPHA names again for the tracer.
-        string source = File.ReadAllText(DataPath("python", "lateral.py"));
+        // lateral.MASK_ALPHA, which cheek_outline.MASK_ALPHA names again for the tracer. A
+        // Windows checkout may give the source CRLF endings, which the $ anchor won't take.
+        string source = File.ReadAllText(DataPath("python", "lateral.py")).Replace("\r\n", "\n");
         var match = System.Text.RegularExpressions.Regex.Match(source, @"^MASK_ALPHA: int = (\d+)$",
             System.Text.RegularExpressions.RegexOptions.Multiline);
         Assert.True(match.Success);
