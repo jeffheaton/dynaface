@@ -11,11 +11,12 @@ public class DynafaceMeasuresTests
         var measures = DynafaceMeasures.AllMeasures();
 
         // Same count and order as dynaface-lib's all_measures().
-        Assert.Equal(14, measures.Length);
+        Assert.Equal(15, measures.Length);
         Assert.IsType<MeasureFAI>(measures[0]);
         Assert.IsType<MeasureOCE>(measures[1]);
         Assert.IsType<MeasureLateral>(measures[9]);
         Assert.IsType<MeasureLandmarks>(measures[13]);
+        Assert.IsType<MeasureCheekMeasures>(measures[14]); // last, as in dynaface-lib
         Assert.All(measures, m => Assert.True(m.Enabled));
     }
 

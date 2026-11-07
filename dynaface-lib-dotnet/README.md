@@ -263,12 +263,12 @@ Dictionary<string, double> results = ctx.Analyze();
 
 // Or run only the measures a user chose that fit this face. A MeasureSelection keeps the
 // choices apart from the measures' Enabled flags (mirrors dynaface-lib's
-// measures.MeasureSelection), so applying it to frontal faces and profiles in turn never
-// loses one, as FaceMeasureBase.UpdateForType does. ToEntries/FromEntries save and load
-// it by the measures' labels and the items' names.
+// measures.MeasureSelection), so applying it to frontal, three-quarter and profile faces
+// in turn never loses one, as FaceMeasureBase.UpdateForType does. ToEntries/FromEntries
+// save and load it by the measures' labels and the items' names.
 var measures = DynafaceMeasures.AllMeasures();
 var selection = MeasureSelection.Of(measures);   // take it while the flags hold the choices
-selection.Apply(measures, result.Value.IsLateral);
+selection.Apply(measures, result.Value.IsLateral, quarter: result.Value.IsQuarter);
 Dictionary<string, double> chosenResults = ctx.Analyze(measures);
 
 // Annotated pixel buffer

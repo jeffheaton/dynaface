@@ -1,8 +1,9 @@
 // Persistence DTO mirroring dynaface-lib's AnalyzeFace.dump_state/load_state fields
 // exactly: post-crop image, raw headpose, landmarks, pupillary distance, pix2mm, face
-// rotation, and the view. A typed class (the .NET-idiomatic replacement for Python's
-// plain heterogeneous list) rather than a serialization format — this is an in-memory
-// round-trip, same as dynaface-lib's own test_persist.py.
+// rotation, and the view (with a quarter face's far side and far-cheek outline). A
+// typed class (the .NET-idiomatic replacement for Python's plain heterogeneous list)
+// rather than a serialization format — this is an in-memory round-trip, same as
+// dynaface-lib's own test_persist.py.
 public sealed class FaceAnalysisState
 {
     public FaceImage PostCropImage;
@@ -23,6 +24,22 @@ public sealed class FaceAnalysisState
     public Vec2[] LateralLandmarks;
     public float[] SagittalX;
     public float[] SagittalY;
+
+    // A three-quarter (quarter) face's view, as dynaface-lib's dump_state saves it: whether
+    // the far (measured) cheek is the subject's left, and that cheek's traced outline
+    // (FacePipelineResult.CheekOutlineX/Y/Src: x, rows and each row's source), so the
+    // cheek landmarks of a restored quarter face are found as the original's were. The
+    // quarter view follows the pose: a state is a quarter face when Pose is
+    // FacePose.Quarter and it has landmarks, as FaceMeasureContext.IsQuarter reads it.
+    // Null for any other face. A quarter state whose FarLeft is null (one saved before
+    // the quarter view was kept, such as a forced quarter state of an earlier 2.1 build)
+    // takes the far side from its landmarks, as load_state does for a state without
+    // far_left; one without an outline measures on the landmark contour. The mask the
+    // outline was traced from is never saved.
+    public bool? FarLeft;
+    public float[] CheekOutlineX;
+    public int[] CheekOutlineY;
+    public byte[] CheekOutlineSrc;
 
     // A copy of this state that shows another image; the arrays are shared.
     internal FaceAnalysisState WithImage(FaceImage image)
@@ -57,7 +74,8 @@ public static class FaceAnalysisPersistence
         return state;
     }
 
-    // Copies a result's view (pose, flip and a profile's lateral data) into a state.
+    // Copies a result's view (pose, flip, a profile's lateral data and a quarter face's
+    // far side and outline) into a state.
     internal static void CaptureView(FacePipelineResult result, FaceAnalysisState state)
     {
         state.Pose = result.Pose;
@@ -67,6 +85,11 @@ public static class FaceAnalysisPersistence
         state.LateralLandmarks = (Vec2[])lateral?.LateralLandmarks?.Clone();
         state.SagittalX = (float[])lateral?.SagittalX?.Clone();
         state.SagittalY = (float[])lateral?.SagittalY?.Clone();
+        bool quarter = result.IsQuarter;
+        state.FarLeft = quarter ? result.FarLeft : (bool?)null;
+        state.CheekOutlineX = quarter ? (float[])result.CheekOutlineX?.Clone() : null;
+        state.CheekOutlineY = quarter ? (int[])result.CheekOutlineY?.Clone() : null;
+        state.CheekOutlineSrc = quarter ? (byte[])result.CheekOutlineSrc?.Clone() : null;
     }
 
     // Rebuilds a FaceMeasureContext from saved state, ready for measures to run
@@ -82,6 +105,12 @@ public static class FaceAnalysisPersistence
     //
     // The context draws on a copy of the state's image, so measuring a restored state
     // with render on leaves the state as it was, as load_state() does.
+    //
+    // A quarter state (Pose Quarter, with landmarks) restores its far side and outline
+    // through SetQuarterView, so the context finds the cheek landmarks as the original
+    // did; its FarLeft, when null, comes from its landmarks (Cheek.FarLeftOf, with the
+    // saved yaw for the fallback), and a missing outline leaves the landmark contour to
+    // stand in. Mirrors dynaface-lib's _load_view().
     public static FaceMeasureContext Restore(FaceAnalysisState state) => Restore(state, copyImage: true);
 
     // copyImage: false lets the context use the state's own pixels, for callers that
@@ -96,12 +125,25 @@ public static class FaceAnalysisPersistence
         // comes back as 63. dynaface-lib rounds the same way.
         float savedPupilDistMm = (float)System.Math.Round((double)state.PupillaryDistance * state.Pix2mm, 4);
         bool havePupils = state.Landmarks != null && state.Landmarks.Length > DynafaceConstants.LmLeftPupil;
-        if (!state.IsLateral && havePupils && savedPupilDistMm > 0f && !float.IsInfinity(savedPupilDistMm))
-            return new FaceMeasureContext(
-                image, state.Landmarks, headPose: state.HeadPose,
-                pose: state.Pose, flipped: state.Flipped, pupilDistMm: savedPupilDistMm);
-        return FaceMeasureContext.WithFixedScale(
-            image, state.Landmarks, state.Pix2mm, state.IsLateral, state.LateralLandmarks,
-            state.HeadPose, state.Pose, state.Flipped);
+        FaceMeasureContext ctx =
+            !state.IsLateral && havePupils && savedPupilDistMm > 0f && !float.IsInfinity(savedPupilDistMm)
+                ? new FaceMeasureContext(
+                    image, state.Landmarks, headPose: state.HeadPose,
+                    pose: state.Pose, flipped: state.Flipped, pupilDistMm: savedPupilDistMm)
+                : FaceMeasureContext.WithFixedScale(
+                    image, state.Landmarks, state.Pix2mm, state.IsLateral, state.LateralLandmarks,
+                    state.HeadPose, state.Pose, state.Flipped);
+        if (ctx.IsQuarter)
+        {
+            // A state saved without its far side takes it from its landmarks, as
+            // _load_view() does; a saved head pose's yaw (0 without one, as Python's
+            // saved head pose pads it) is the fallback when they give no frame.
+            float yaw = state.HeadPose != null && state.HeadPose.Length > 0 ? state.HeadPose[0] : 0f;
+            bool farLeft = state.FarLeft ?? (havePupils && Cheek.FarLeftOf(state.Landmarks, yaw));
+            // Copies, so the context and the state don't share the outline.
+            ctx.SetQuarterView(farLeft, (float[])state.CheekOutlineX?.Clone(),
+                (int[])state.CheekOutlineY?.Clone(), (byte[])state.CheekOutlineSrc?.Clone());
+        }
+        return ctx;
     }
 }

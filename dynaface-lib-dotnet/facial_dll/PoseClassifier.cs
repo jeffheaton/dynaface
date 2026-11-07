@@ -1,4 +1,5 @@
-// Direct port of dynaface-lib's AnalyzeFace._is_lateral / _force_lateral.
+// Direct port of dynaface-lib's AnalyzeFace._is_lateral / _force_lateral / _is_quarter
+// and the forced Pose.QUARTER branch of load_image().
 // Operates on landmarks in top-left semantic pixel space (y=0 = visual top),
 // matching the coordinate contract SpigaLandmarkDetector returns.
 public static class PoseClassifier
@@ -36,6 +37,36 @@ public static class PoseClassifier
         float nd = NoseDistance(landmarks);
         return (true, nd < 0f);
     }
+
+    // Whether the face is a three-quarter (quarter) face, and whether its far
+    // (measured) cheek is the subject's left: Cheek.ClassifyQuarter on the raw
+    // landmarks and head pose, before any crop or flip. previousQuarter (a video's
+    // previous kept frame was a quarter face) holds the view a little past its yaw
+    // window; requireMargin false is for a face the profile test has declined.
+    // Always (false, false) when DynafaceConfig.AutoLateral (which turns all
+    // detection off) or DynafaceConfig.AutoQuarter is false, or there are no
+    // landmarks. Mirrors dynaface-lib's AnalyzeFace._is_quarter.
+    public static (bool isQuarter, bool farLeft) IsQuarter(
+        float[] headpose, Vec2[] landmarks, bool previousQuarter = false, bool requireMargin = true)
+    {
+        if (!DynafaceConfig.AutoLateral || !DynafaceConfig.AutoQuarter) return (false, false);
+        if (landmarks == null || landmarks.Length == 0) return (false, false);
+        return Cheek.ClassifyQuarter(landmarks, Yaw(headpose), previousQuarter, requireMargin);
+    }
+
+    // Forces the quarter view (the caller asked for FacePose.Quarter): a quarter face
+    // whenever there are landmarks, its far side always read from them
+    // (Cheek.FarLeftOf), the model's yaw only when they give no frame. Mirrors the
+    // forced Pose.QUARTER branch of dynaface-lib's load_image().
+    public static (bool isQuarter, bool farLeft) ForceQuarter(float[] headpose, Vec2[] landmarks)
+    {
+        if (landmarks == null || landmarks.Length == 0) return (false, false);
+        return (true, Cheek.FarLeftOf(landmarks, Yaw(headpose)));
+    }
+
+    // The model's raw yaw, degrees; NaN without a head pose.
+    static double Yaw(float[] headpose) =>
+        headpose != null && headpose.Length > 0 ? headpose[0] : double.NaN;
 
     static float NoseDistanceRatio(Vec2[] landmarks, int imageWidth) => NoseDistance(landmarks) / imageWidth;
 

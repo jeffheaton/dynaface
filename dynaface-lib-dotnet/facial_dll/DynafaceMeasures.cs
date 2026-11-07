@@ -23,11 +23,15 @@ public static class DynafaceMeasures
         new MeasurePose(),
         new MeasureSkinTone(),
         new MeasureLandmarks(),
+        // Last, as in dynaface-lib, so the outputs before it keep their order (CSV
+        // columns included) and its drawing lands over the landmark dots.
+        new MeasureCheekMeasures(),
     };
 
-    // Mirrors dynaface-lib's AnalyzeFace.get_all_items(): the names of every
-    // enabled output across every enabled measure (e.g. for CSV export headers).
-    // Display-only items are drawing switches, not outputs, so they're skipped.
+    // Mirrors dynaface-lib's measures.get_all_items(): the outputs to show or export
+    // (e.g. CSV columns), the output names (MeasureItemInfo.OutputNames()) of the
+    // enabled items of the enabled measures. A group's outputs are listed together in
+    // its place, never its label, and a display-only item lists none.
     public static List<string> GetAllItems(IEnumerable<FaceMeasureBase> measures)
     {
         var result = new List<string>();
@@ -35,8 +39,8 @@ public static class DynafaceMeasures
         {
             if (!measure.Enabled) continue;
             foreach (var item in measure.Items)
-                if (item.Enabled && !item.DisplayOnly)
-                    result.Add(item.Name);
+                if (item.Enabled)
+                    result.AddRange(item.OutputNames());
         }
         return result;
     }

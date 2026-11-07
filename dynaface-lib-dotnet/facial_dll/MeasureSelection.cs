@@ -2,15 +2,17 @@ using System;
 using System.Collections.Generic;
 
 // Which measures, and which of their items, a user has chosen, kept apart from the
-// measures themselves, so that switching between a frontal and a lateral face never
-// loses a choice. Mirrors dynaface-lib's measures.MeasureSelection.
+// measures themselves, so that switching between a frontal, a quarter (three-quarter)
+// and a lateral face never loses a choice. Mirrors dynaface-lib's
+// measures.MeasureSelection.
 //
-// FaceMeasureBase.UpdateForType overwrites every item's Enabled flag with whether its
-// measure suits the face. Apply instead enables what was chosen and suits the face, and
-// leaves the choices as they were. Save a selection with ToEntries, one Entry per
-// measure keyed by its Label and its items' names, and restore it with FromEntries. A
-// measure that a selection doesn't mention isn't chosen; an item it doesn't mention is,
-// so an item added to a measure later is shown.
+// FaceMeasureBase.UpdateForType overwrites every item's Enabled flag with whether the
+// item suits the face (MeasureItemInfo.Suits: its measure's view, narrowed to the item's
+// own Views). Apply instead enables what was chosen and suits the face, and leaves the
+// choices as they were. Save a selection with ToEntries, one Entry per measure keyed by
+// its Label and its items' names (a group item by its label), and restore it with
+// FromEntries. A measure that a selection doesn't mention isn't chosen; an item it
+// doesn't mention is, so an item added to a measure later is shown.
 public sealed class MeasureSelection
 {
     // One measure's choices, as ToEntries saves them. Public fields, so Unity's
@@ -78,18 +80,26 @@ public sealed class MeasureSelection
         SetItem(For(LabelOf(measure)), item, chosen);
     }
 
-    // Sets the measures' and items' Enabled flags for a frontal or a lateral face: on
-    // where chosen and the measure suits the face, off everywhere else. The choices stay
-    // as they were, so applying the other view later brings them back.
-    public void Apply(IEnumerable<FaceMeasureBase> measures, bool lateral)
+    // Sets the measures' and items' Enabled flags for a frontal, a quarter
+    // (three-quarter) or a lateral face: on where chosen and the measure suits the face
+    // (FaceMeasureBase.Suits), and for an item, where it suits the face too
+    // (MeasureItemInfo.Suits, which also honors an item's own Views), off everywhere
+    // else. It calls each measure's SyncItems first, so the items' flags follow the
+    // measure's as they are now. The choices stay as they were, so applying another view
+    // later brings them back. quarter: true for a quarter face
+    // (FaceMeasureContext.IsQuarter), ignored when lateral is true; false, the default,
+    // keeps the two-argument calls as they were.
+    public void Apply(IEnumerable<FaceMeasureBase> measures, bool lateral, bool quarter = false)
     {
         if (measures == null) throw new ArgumentNullException(nameof(measures));
         foreach (var measure in measures)
         {
-            bool suits = lateral ? measure.IsLateral : measure.IsFrontal;
-            measure.Enabled = suits && IsChosen(measure);
+            measure.SyncItems();
+            measure.Enabled = measure.Suits(lateral, quarter) && IsChosen(measure);
             foreach (var item in measure.Items)
-                item.Enabled = measure.Enabled && IsItemChosen(measure, item.Name);
+                item.Enabled = measure.Enabled
+                    && item.Suits(lateral, quarter)
+                    && IsItemChosen(measure, item.Name);
         }
     }
 

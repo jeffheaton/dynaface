@@ -6,15 +6,21 @@ using System.Collections.Generic;
 // frame with a face is analyzed and kept as a FaceAnalysisState; a frame without one is
 // skipped but still counted, so the kept frames keep their numbers in the video. With a
 // smoothing above 1, each frame's landmarks are averaged with those of the frames before
-// it (LandmarkSmoother), and the scale is measured again on the averaged landmarks. Only
-// the first maxFrames frames are analyzed.
+// it (LandmarkSmoother), the scale is measured again on the averaged landmarks, and a
+// three-quarter frame's far cheek is traced again on them
+// (FacePipelineResult.RetraceFarCheek, from the frame's own mask); the average starts
+// afresh whenever the view changes (the pose, which way a profile faces, or which cheek
+// of a three-quarter face is the far one), so landmarks of different crops never mix.
+// Each frame is analyzed with the previous kept frame's pose, which the quarter
+// classification's hysteresis reads. Only the first maxFrames frames are analyzed.
 //
 // .NET-only: keepImages: false keeps each frame's landmarks, head pose and scale but not
 // its crop, for apps that can't hold thousands of 1024x1024 images. Those frames are
 // analyzed uncropped and only their landmarks cropped (StyleGanCropper.CropLandmarks),
 // which gives the same landmarks without building the image, and FrameSeries.FromStates
-// measures such states on their landmarks alone. Thumbnail is the first kept frame's crop
-// either way.
+// measures such states on their landmarks alone. A profile or a three-quarter frame is
+// always cropped, image and all, as the pipeline crops it, and a three-quarter state keeps
+// its outline. Thumbnail is the first kept frame's crop either way.
 public sealed class VideoAnalyzer
 {
     // The most frames the Dynaface apps import from one video.
@@ -24,27 +30,40 @@ public sealed class VideoAnalyzer
     readonly List<int> _frames = new List<int>();
     readonly LandmarkSmoother _smoother;
     readonly float _tiltThreshold;
-    readonly Func<FaceImage, int, bool, bool, FacePipelineResult?> _run;
+    readonly Func<FaceImage, int, bool, bool, FacePose?, FacePipelineResult?> _run;
     int _seen;
-    bool? _lateral;
+    // The last kept frame's view, (pose, flipped, far side): the smoother is reset when
+    // it changes, and its pose is passed to the next frame's FacePipeline.Run.
+    (FacePose Pose, bool Flipped, bool FarLeft)? _view;
 
     // smoothing: how many frames' landmarks to average; 1, the default, turns it off.
-    // pose: FacePose.Detect to classify each frame as frontal or lateral, or the pose to
-    // use for all of them. The others are as for FacePipeline.Run.
+    // pose: FacePose.Detect to classify each frame as frontal, quarter or lateral (quarter
+    // only with DynafaceConfig.AutoQuarter on), or the pose to use for all of them. The
+    // others are as for FacePipeline.Run.
     public VideoAnalyzer(
         int smoothing = 1, int maxFrames = DefaultMaxFrames, FacePose pose = FacePose.Detect,
         bool keepImages = true, float tiltThreshold = DynafaceConstants.DefaultTiltThreshold)
         : this(smoothing, maxFrames, keepImages, tiltThreshold,
-            (frame, rotationAngle, flipHorizontal, crop) =>
-                FacePipeline.Run(frame, rotationAngle, flipHorizontal, pose, tiltThreshold, crop))
+            (frame, rotationAngle, flipHorizontal, crop, previousPose) =>
+                FacePipeline.Run(frame, rotationAngle, flipHorizontal, pose, tiltThreshold, crop, previousPose))
     {
     }
 
     // For tests: runs a stand-in for FacePipeline.Run(frame, rotationAngle, flipHorizontal,
-    // pose, tiltThreshold, crop).
+    // pose, tiltThreshold, crop) that ignores the previous frame's pose.
     internal VideoAnalyzer(
         int smoothing, int maxFrames, bool keepImages, float tiltThreshold,
         Func<FaceImage, int, bool, bool, FacePipelineResult?> run)
+        : this(smoothing, maxFrames, keepImages, tiltThreshold,
+            (frame, rotationAngle, flipHorizontal, crop, previousPose) => run(frame, rotationAngle, flipHorizontal, crop))
+    {
+    }
+
+    // For tests: runs a stand-in for FacePipeline.Run(frame, rotationAngle, flipHorizontal,
+    // pose, tiltThreshold, crop, previousPose).
+    internal VideoAnalyzer(
+        int smoothing, int maxFrames, bool keepImages, float tiltThreshold,
+        Func<FaceImage, int, bool, bool, FacePose?, FacePipelineResult?> run)
     {
         _smoother = new LandmarkSmoother(smoothing);
         MaxFrames = maxFrames;
@@ -80,7 +99,13 @@ public sealed class VideoAnalyzer
 
     // Analyzes the next frame. True if it had a face and was kept; false if it had none,
     // or the analyzer was already full. rotationAngle and flipHorizontal are as for
-    // FacePipeline.Run.
+    // FacePipeline.Run. The frame is analyzed with the previous kept frame's pose (null
+    // before the first), so the quarter classification's hysteresis keeps a video in one
+    // view at its yaw window's edge. When the view (the pose and, for a profile, which way
+    // it faces, or, for a three-quarter face, which cheek is the far one) differs from the
+    // previous kept frame's, the landmark smoothing starts afresh on this frame. A
+    // smoothed three-quarter frame's outline is traced again on its averaged landmarks,
+    // from the frame's own mask, so the saved outline belongs to the saved landmarks.
     public bool Add(FaceImage frame, int rotationAngle = 0, bool flipHorizontal = false)
     {
         if (IsFull) return false;
@@ -88,13 +113,13 @@ public sealed class VideoAnalyzer
 
         // Tilt straightening needs the image, so only crop later without it.
         bool cropLater = !KeepImages && _tiltThreshold < 0f;
-        FacePipelineResult? found = _run(frame, rotationAngle, flipHorizontal, !cropLater);
+        FacePipelineResult? found = _run(frame, rotationAngle, flipHorizontal, !cropLater, _view?.Pose);
         if (found == null) return false;
         FacePipelineResult result = found.Value;
 
         Vec2[] landmarks = result.Wflw98;
         FaceImage crop = result.AlignedCrop;
-        if (cropLater && !result.IsLateral) // a profile is always cropped
+        if (cropLater && !result.IsLateral && !result.IsQuarter) // a profile or a quarter face is always cropped
         {
             // AlignedCrop is the uncropped (working) image here.
             float yaw = result.HeadPose != null && result.HeadPose.Length > 0 ? result.HeadPose[0] : 0f;
@@ -104,11 +129,17 @@ public sealed class VideoAnalyzer
                 result.AlignedCrop.Width, result.AlignedCrop.Height, landmarks, yaw, _tiltThreshold);
         }
 
-        if (result.IsLateral != _lateral)
+        // FarLeft is false off a quarter face, so frontal and profile frames key on the
+        // pose and the flip alone.
+        var view = (result.Pose, result.Flipped, result.FarLeft);
+        if (view != _view)
         {
-            // A profile's landmarks don't average with a frontal face's.
+            // One view's landmarks don't average with another's: a profile's with a
+            // frontal face's, a quarter face's band crop with the frontal crop, a profile
+            // facing the other way, which is flipped, or a quarter face whose far cheek
+            // is the other one, whose band crop is mirrored.
             _smoother.Reset();
-            _lateral = result.IsLateral;
+            _view = view;
         }
         if (_smoother.Size > 1) landmarks = _smoother.Add(landmarks);
 
@@ -127,6 +158,14 @@ public sealed class VideoAnalyzer
             FaceRotationRad = result.FaceRotationRad,
         };
         FaceAnalysisPersistence.CaptureView(result, state);
+        if (_smoother.Size > 1 && result.IsQuarter)
+        {
+            // The outline's rows and nose rows follow the averaged landmarks too; the mask
+            // is the frame's, so no second model pass.
+            var retraced = result.RetraceFarCheek(landmarks);
+            if (retraced != null)
+                (state.CheekOutlineX, state.CheekOutlineY, state.CheekOutlineSrc) = retraced.Value;
+        }
         _states.Add(state);
         _frames.Add(number);
         if (Thumbnail == null) Thumbnail = crop;

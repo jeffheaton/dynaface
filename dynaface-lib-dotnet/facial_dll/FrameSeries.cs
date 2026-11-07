@@ -51,6 +51,14 @@ public sealed class FrameSeries
     // skipped, as VideoAnalyzer skips them, pass the kept frames' numbers in the video as
     // frameNumbers (VideoAnalyzer.Frames), so each row's time is right.
     //
+    // A measure's outputs are NaN on a frame whose view it doesn't suit
+    // (FaceMeasureBase.Suits: a frontal measure on a quarter or lateral frame, a lateral
+    // measure on a frontal one), and so are an item's on a frame whose view the item
+    // doesn't suit (MeasureItemInfo.Suits), so a mixed-view video never reports
+    // millimeters measured on a turned head; Evaluate and Peak therefore never pick a
+    // turned or profile frame. A state is a quarter face when its Pose is
+    // FacePose.Quarter and it has landmarks, and a profile when IsLateral.
+    //
     // A state saved without its image (PostCropImage not valid) is measured on its
     // landmarks alone: the measures that need the image (FaceMeasureBase.NeedsImage) are
     // left out for it, so their outputs are NaN. That suits consumers that keep only
@@ -75,26 +83,63 @@ public sealed class FrameSeries
         {
             FaceAnalysisState state = states[index];
             int frame = frameNumbers == null ? index : frameNumbers[index];
+            FaceMeasureContext ctx;
+            List<FaceMeasureBase> run;
             if (state.PostCropImage.IsValid)
             {
                 // With render: false nothing is drawn, so the state's image needs no copy.
-                series.Add(frame, FaceAnalysisPersistence.Restore(state, copyImage: false)
-                    .Analyze(all, render: false));
-                continue;
+                ctx = FaceAnalysisPersistence.Restore(state, copyImage: false);
+                run = all;
             }
-
-            if (landmarksOnly == null)
+            else
             {
-                landmarksOnly = all.FindAll(m => !m.NeedsImage);
-                int size = DynafaceConstants.StyleganWidth;
-                blank = new FaceImage(new Rgba32[size * size], size, size);
+                if (landmarksOnly == null)
+                {
+                    landmarksOnly = all.FindAll(m => !m.NeedsImage);
+                    int size = DynafaceConstants.StyleganWidth;
+                    blank = new FaceImage(new Rgba32[size * size], size, size);
+                }
+                // The measures left run on landmarks alone, and with render: false nothing
+                // is drawn, so one blank image stands in for every frame.
+                ctx = FaceAnalysisPersistence.Restore(state.WithImage(blank), copyImage: false);
+                run = landmarksOnly;
             }
-            // The measures left run on landmarks alone, and with render: false nothing is
-            // drawn, so one blank image stands in for every frame.
-            series.Add(frame, FaceAnalysisPersistence.Restore(state.WithImage(blank), copyImage: false)
-                .Analyze(landmarksOnly, render: false));
+            // The restored context's view is the state's: IsLateral as saved, and
+            // IsQuarter for a Quarter pose with landmarks.
+            series.Add(frame, ResultsInView(all, ctx.Analyze(run, render: false), ctx.IsLateral, ctx.IsQuarter));
         }
         return series;
+    }
+
+    // The results with NaN for every output (FaceMeasureBase.Outputs) of a measure that
+    // doesn't suit the view (FaceMeasureBase.Suits): a frontal measure's on a quarter or
+    // lateral face, and a lateral measure's on a frontal one; and for every output of an
+    // item that doesn't suit it (MeasureItemInfo.Suits, after SyncItems). Analyze runs
+    // every enabled measure whatever the view, so without this a millimeter measure's
+    // numbers from a turned head would be reported. Null stays null. Mirrors
+    // dynaface-lib's video._results_in_view.
+    internal static Dictionary<string, double> ResultsInView(
+        IEnumerable<FaceMeasureBase> measures, IReadOnlyDictionary<string, double> results,
+        bool lateral, bool quarter)
+    {
+        if (results == null) return null;
+        var inView = new Dictionary<string, double>();
+        foreach (var kv in results) inView[kv.Key] = kv.Value;
+        foreach (var measure in measures)
+        {
+            if (!measure.Suits(lateral, quarter))
+            {
+                foreach (string name in measure.Outputs()) inView[name] = double.NaN;
+                continue;
+            }
+            measure.SyncItems();   // the items' flags follow the measure's as they are
+            foreach (var item in measure.Items)
+            {
+                if (item.Suits(lateral, quarter)) continue;
+                foreach (string name in item.OutputNames()) inView[name] = double.NaN;
+            }
+        }
+        return inView;
     }
 
     // Adds a row: one frame's Analyze() results, or null for a frame without a face, whose

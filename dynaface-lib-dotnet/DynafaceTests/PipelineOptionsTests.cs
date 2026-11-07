@@ -4,7 +4,8 @@ namespace DynafaceTests;
 
 // The pipeline's options and guards on made-up landmarks, without the models:
 // straightening a tilted face, the turned-head correction, the croppers' edge
-// cases, forcing a profile and the image helpers they use. Mirrors
+// cases (the centered quarter crop's too), forcing a profile or a quarter face and the
+// image helpers they use. Mirrors
 // dynaface-lib-python's tests/test_pipeline_options.py, with the same expectations;
 // PipelineOptionsModelTests runs the options that need the models.
 public class PipelineOptionsTests
@@ -105,6 +106,49 @@ public class PipelineOptionsTests
     }
 
     [Fact]
+    public void QuarterCropEdges()
+    {
+        // The centered band crop of a quarter face: without landmarks, the image centered.
+        var (centered, none) = LateralCropper.Crop(Gray(400, 600), null!, center: true);
+        Assert.Equal((1024, 1024), (centered.Width, centered.Height));
+        Assert.Empty(none);
+
+        // The band and its pads fill the crop whatever the frame: the same landmarks in a
+        // frame and in one ten times as large crop to the same pixels, where a profile's
+        // crop never scales up past filling the frame.
+        var band = new Vec2[] { new(500, 200), new(900, 600), new(700, 1000) };
+        var (_, crop) = LateralCropper.Crop(Gray(1400, 1400), band, center: true);
+        var (_, large) = LateralCropper.Crop(Gray(14000, 14000), band, center: true);
+        Assert.Equal(crop, large);
+        int padTop = (int)Math.Round(1024 * DynafaceConstants.LateralPadTopRatio);
+        int padBottom = (int)Math.Round(1024 * DynafaceConstants.LateralPadBottomRatio);
+        Assert.InRange(crop.Min(p => p.Y) - padTop, -1f, 1f);
+        Assert.InRange(crop.Max(p => p.Y) - (1023 - padBottom), -1f, 1f);
+        // The landmarks' middle (as pixel centers) at the crop's middle.
+        Assert.InRange((crop.Min(p => p.X) + crop.Max(p => p.X) + 1) / 2 - 512f, -1f, 1f);
+        var (_, profile) = LateralCropper.Crop(Gray(14000, 14000), band);
+        Assert.True(profile.Max(p => p.Y) - profile.Min(p => p.Y) < crop.Max(p => p.Y) - crop.Min(p => p.Y));
+
+        // Mirrored landmarks in a mirrored frame crop to mirrored pixels.
+        var mirrored = band.Select(p => new Vec2(1400 - 1 - p.X, p.Y)).ToArray();
+        var (_, back) = LateralCropper.Crop(Gray(1400, 1400), mirrored, center: true);
+        for (int i = 0; i < band.Length; i++)
+        {
+            Assert.InRange(back[i].X - (1023 - crop[i].X), -2f, 2f);
+            Assert.Equal(crop[i].Y, back[i].Y);
+        }
+
+        // A frame narrower than the crop at the band's scale is padded with white at both
+        // sides, the face between the pads.
+        var narrow = new Vec2[] { new(200, 200), new(400, 600), new(300, 1000) };
+        var (padded, inside) = LateralCropper.Crop(Gray(600, 1400), narrow, center: true);
+        Assert.Equal(DynafaceConstants.FillColorWhite, padded.Pixels[0]);
+        Assert.Equal(DynafaceConstants.FillColorWhite, padded.Pixels[1023]);
+        Assert.Equal(new Rgba32(128, 128, 128, 255), padded.Pixels[512]);
+        Assert.InRange((inside.Min(p => p.X) + inside.Max(p => p.X) + 1) / 2 - 512f, -1f, 1f);
+    }
+
+    [Fact]
     public void ForcingAProfile()
     {
         Assert.Equal((true, false), PoseClassifier.ForceLateral(new[] { 0f, 0f, 0f }, Array.Empty<Vec2>(), 1024));
@@ -114,6 +158,20 @@ public class PipelineOptionsTests
         Assert.True(PoseClassifier.ForceLateral(new[] { float.NaN, 0f, 0f }, Face(), 1024).isLateral);
         // Detecting rather than forcing: no landmarks is no profile.
         Assert.Equal((false, false), PoseClassifier.IsLateral(new[] { 40f, 0f, 0f }, Array.Empty<Vec2>(), 1024));
+    }
+
+    [Fact]
+    public void ForcingAQuarterFace()
+    {
+        // A quarter face whenever there are landmarks, the far side from them, and the
+        // model's yaw only when they give no frame.
+        Assert.Equal((false, false), PoseClassifier.ForceQuarter(new[] { 30f, 0f, 0f }, Array.Empty<Vec2>()));
+        Assert.Equal((false, false), PoseClassifier.ForceQuarter(new[] { 30f, 0f, 0f }, null!));
+        Assert.Equal((true, true), PoseClassifier.ForceQuarter(new[] { 30f, 0f, 0f }, new Vec2[98]));
+        Assert.Equal((true, false), PoseClassifier.ForceQuarter(null!, new Vec2[98]));
+        var (resolved, isLateral, _, isQuarter, _) = FacePipeline.ResolvePose(
+            FacePose.Quarter, Face(), new[] { 0f, 0f, 0f }, 1024, previousPose: null);
+        Assert.Equal((FacePose.Quarter, false, true), (resolved, isLateral, isQuarter));
     }
 
     [Fact]
@@ -164,7 +222,29 @@ public class PipelineOptionsModelTests
         _fixture.RequireModels();
         Assert.False(FacePipeline.Run(Load("img2-1024-right-lateral.jpg"), 0, false, FacePose.Frontal)!.Value.IsLateral);
         Assert.True(FacePipeline.Run(Load("img4-1024-frontal.jpg"), 0, false, FacePose.Lateral)!.Value.IsLateral);
-        Assert.Equal(FacePose.Quarter, FacePipeline.Run(Load("img4-1024-frontal.jpg"), 0, false, FacePose.Quarter)!.Value.Pose);
+
+        // A forced quarter pose takes the quarter path, even on a frontal photo: the
+        // centered band crop, never flipped or straightened, the far side from the
+        // landmarks (img4's nose sits a hair to the subject's right of the canthi, so the
+        // far cheek is the right) and the far cheek traced from the background model.
+        var quarter = FacePipeline.Run(Load("img4-1024-frontal.jpg"), 0, false, FacePose.Quarter)!.Value;
+        Assert.Equal(FacePose.Quarter, quarter.Pose);
+        Assert.True(quarter.IsQuarter);
+        Assert.False(quarter.IsLateral || quarter.Flipped || quarter.FarLeft);
+        Assert.Null(quarter.LateralAnalysis);
+        Assert.Null(quarter.FaceRotationRad);
+        Assert.Equal((1024, 1024), (quarter.AlignedCrop.Width, quarter.AlignedCrop.Height));
+        Assert.NotNull(quarter.CheekOutlineX);
+        Assert.True(quarter.CheekOutlineY.Length > 0);
+        // The band crop's scale, not the frontal crop's 260 px between the pupils.
+        Assert.True(quarter.PupillaryDistance > 300f);
+        var (pd, pix2mm) = FaceMeasureContext.CalcPd(quarter.Wflw98, quarter.PupilDistMm);
+        Assert.Equal((pd, pix2mm), (quarter.PupillaryDistance, quarter.Pix2mm));
+        var ctx = FaceMeasureContext.FromResult(quarter);
+        Assert.True(ctx.IsQuarter);
+        Assert.Null(ctx.FrontalCheek());
+        Assert.NotNull(ctx.ObliqueCheek());
+        Assert.True(ctx.CheekLandmarks[Cheek.CheekLmApexR].IsFinite);
     }
 
     [SkippableFact]

@@ -194,4 +194,116 @@ public class FrameSeriesFromStatesTests
         Assert.Equal(series.Peak("dental_area"), evaluation!.WidestSmile.Frame);
         Assert.Equal(series.Peak("eye.left", "eye.right"), evaluation.WidestEyes.Frame);
     }
+
+    // A profile's lateral data, as SavedViewTests makes it up.
+    static readonly Vec2[] LateralLandmarks =
+    {
+        new(300, 200), new(290, 300), new(200, 450), new(260, 520), new(280, 640), new(270, 760),
+    };
+
+    // The frontal state with its view rewritten as a quarter or lateral one. Restore
+    // gives the view a state says, so neither needs a model: a quarter view, and a
+    // lateral one with made-up lateral landmarks and sagittal outline.
+    static FaceAnalysisState InView(FaceAnalysisState state, FacePose pose)
+    {
+        var turned = new FaceAnalysisState
+        {
+            PostCropImage = state.PostCropImage,
+            HeadPose = state.HeadPose,
+            Landmarks = state.Landmarks,
+            PupillaryDistance = state.PupillaryDistance,
+            Pix2mm = state.Pix2mm,
+            FaceRotationRad = state.FaceRotationRad,
+            Pose = pose,
+        };
+        if (pose == FacePose.Lateral)
+        {
+            turned.IsLateral = true;
+            turned.Pix2mm = DynafaceConstants.LateralPix2mm;
+            turned.LateralLandmarks = (Vec2[])LateralLandmarks.Clone();
+            turned.SagittalX = Enumerable.Range(0, 1024).Select(y => 300f + y % 50).ToArray();
+            turned.SagittalY = Enumerable.Range(0, 1024).Select(y => (float)y).ToArray();
+        }
+        return turned;
+    }
+
+    // A mixed-view video: the same three frames as quarter frames (0 to 2), profiles (3
+    // to 5) and frontal frames (6 to 8). A measure's outputs are NaN on the frames whose
+    // view it doesn't suit, so the frontal measures' numbers from a turned head (which
+    // Analyze computes all the same) are never reported, and the peaks and the
+    // evaluation come from the frontal frames, although the turned copies come first and
+    // would win a tie. Mirrors dynaface-lib's test_a_measure_is_nan_off_its_view.
+    [Fact]
+    public void AMeasureIsNaNOffItsView()
+    {
+        var quarter = States.Select(s => InView(s, FacePose.Quarter)).ToArray();
+        var lateral = States.Select(s => InView(s, FacePose.Lateral)).ToArray();
+        var series = FrameSeries.FromStates(quarter.Concat(lateral).Concat(States).ToArray());
+        Assert.Equal(Enumerable.Range(0, 9), series.Frames);
+        var measures = DynafaceMeasures.AllMeasures();
+        Assert.Equal(DynafaceMeasures.GetAllItems(measures), series.Names);
+
+        // Analyze itself still measures a turned head in millimeters.
+        var turned = FaceAnalysisPersistence.Restore(quarter[0]);
+        Assert.True(turned.IsQuarter);
+        Assert.True(double.IsFinite(turned.Analyze(render: false)!["dental_area"]));
+
+        var live = Results.Select(r => TestHelpers.ContextFor(r).Analyze(render: false)!).ToArray();
+        var rows = new[] { (pose: FacePose.Quarter, first: 0), (pose: FacePose.Lateral, first: 3) };
+        foreach (var measure in measures)
+        {
+            foreach (string name in DynafaceMeasures.GetAllItems(new[] { measure }))
+            {
+                var values = series[name];
+                foreach (var (pose, first) in rows)
+                {
+                    if (measure.Suits(pose == FacePose.Lateral, quarter: pose == FacePose.Quarter)) continue;
+                    for (int row = first; row < first + 3; row++)
+                        Assert.True(double.IsNaN(values[row]), $"{name} {row}");
+                }
+                for (int row = 6; row < 9; row++)
+                {
+                    if (measure.Suits(false))
+                    {
+                        double expected = live[row - 6].TryGetValue(name, out double value) ? value : double.NaN;
+                        Assert.True(Same(expected, values[row]), $"{name} {row}");
+                    }
+                    else
+                        Assert.True(double.IsNaN(values[row]), $"{name} {row}");
+                }
+            }
+        }
+        // The measures that suit a view keep their values there, except a quarter face's
+        // scale, which isn't defined.
+        foreach (string name in new[] { "yaw", "landmark-1-x", "pd", "tilt" })
+            Assert.All(series[name].Take(3), v => Assert.True(double.IsFinite(v), name));
+        Assert.All(series["px2mm"].Take(3), v => Assert.True(double.IsNaN(v)));
+        foreach (string name in new[] { "yaw", "nfa", "px2mm" })
+            Assert.All(series[name].Skip(3).Take(3), v => Assert.True(double.IsFinite(v), name));
+        Assert.All(series["nfa"].Take(3), v => Assert.True(double.IsNaN(v)));
+        Assert.All(series["fai"].Take(6), v => Assert.True(double.IsNaN(v)));
+
+        // The peaks and the evaluation skip the turned frames.
+        int smile = 6 + ArgMax(live.Select(r => r["dental_area"]));
+        int eyes = 6 + ArgMax(live.Select(r => r["eye.left"] + r["eye.right"]));
+        Assert.Equal(smile, series.Peak("dental_area"));
+        Assert.Equal(eyes, series.Peak("eye.left", "eye.right"));
+        var evaluation = series.Evaluate();
+        Assert.NotNull(evaluation);
+        Assert.Equal(smile, evaluation!.WidestSmile.Frame);
+        Assert.Equal(eyes, evaluation.WidestEyes.Frame);
+    }
+
+    // The first of the largest values' position, as Python's max() picks it.
+    static int ArgMax(IEnumerable<double> values)
+    {
+        int best = -1, index = 0;
+        double bestValue = double.NegativeInfinity;
+        foreach (double value in values)
+        {
+            if (value > bestValue) { best = index; bestValue = value; }
+            index++;
+        }
+        return best;
+    }
 }

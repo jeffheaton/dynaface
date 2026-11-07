@@ -32,12 +32,27 @@
          hold the one copy; see LateralProfileTests. -->
     <None Include="..\..\dynaface-lib-python\tests_data\lateral_profiles.json"
           Link="TestData\lateral_profiles.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The cheek fixtures shared with dynaface-lib-python's test_cheek.py and
+         test_cheek_outline.py: the far-cheek outlines and observed points
+         (scripts/make_cheek_outlines.py), the recorded landmarks and yaws, and the
+         synthetic-head renders with their oracles; see CheekOutlineTests and CheekTests. -->
+    <None Include="..\..\dynaface-lib-python\tests_data\cheek_outlines.json"
+          Link="TestData\cheek_outlines.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\dynaface-lib-python\tests_data\cheek_landmarks.json"
+          Link="TestData\cheek_landmarks.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\dynaface-lib-python\tests_data\cheek\*.*"
+          Link="TestData\cheek\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <!-- The Python library's own copies of values the .NET port also keeps, which
-         SharedConstantsTests checks the .NET copies against. -->
+         SharedConstantsTests (and, for cheek.py and cheek_outline.py,
+         CheekTests.SharedConstants) checks the .NET copies against. -->
     <None Include="..\..\dynaface-lib-python\dynaface\dynaface_onnx.py"
           Link="TestData\python\dynaface_onnx.py" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\dynaface-lib-python\dynaface\lateral.py"
           Link="TestData\python\lateral.py" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\dynaface-lib-python\dynaface\cheek.py"
+          Link="TestData\python\cheek.py" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\dynaface-lib-python\dynaface\cheek_outline.py"
+          Link="TestData\python\cheek_outline.py" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

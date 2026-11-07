@@ -118,6 +118,11 @@ public static class FaceRenderer
             [':'] = new byte[] { 0b00000, 0b00100, 0b00100, 0b00000, 0b00100, 0b00100, 0b00000 },
             ['-'] = new byte[] { 0b00000, 0b00000, 0b00000, 0b11111, 0b00000, 0b00000, 0b00000 },
             ['%'] = new byte[] { 0b11000, 0b11001, 0b00010, 0b00100, 0b01000, 0b10011, 0b00011 },
+            // For labels such as MeasureCheekMeasures' "malar apex (prior, nose?)".
+            ['('] = new byte[] { 0b00010, 0b00100, 0b01000, 0b01000, 0b01000, 0b00100, 0b00010 },
+            [')'] = new byte[] { 0b01000, 0b00100, 0b00010, 0b00010, 0b00010, 0b00100, 0b01000 },
+            [','] = new byte[] { 0b00000, 0b00000, 0b00000, 0b00000, 0b00110, 0b00100, 0b01000 },
+            ['?'] = new byte[] { 0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0b00000, 0b00100 },
         };
         return m;
     }
@@ -240,6 +245,30 @@ public static class FaceRenderer
             for (int dx = -radius; dx <= radius; dx++)
             {
                 if (dx * dx + dy * dy <= radius * radius)
+                    SetPixelSafe(pixels, width, height, cx + dx, cy + dy, color);
+            }
+    }
+
+    // An open ring, as OpenCV's circle draws one with a positive thickness: every pixel
+    // whose distance from the center is within thickness / 2 of radius. A thickness of 0
+    // or less draws a filled dot (DrawCircle).
+    public static void DrawRing(
+        Rgba32[] pixels, int width, int height,
+        int cx, int cy, Rgba32 color, int radius, int thickness)
+    {
+        if (thickness <= 0)
+        {
+            DrawCircle(pixels, width, height, cx, cy, color, radius);
+            return;
+        }
+        double inner = radius - thickness / 2.0, outer = radius + thickness / 2.0;
+        double inner2 = inner > 0.0 ? inner * inner : 0.0, outer2 = outer * outer;
+        int reach = (int)Math.Ceiling(outer);
+        for (int dy = -reach; dy <= reach; dy++)
+            for (int dx = -reach; dx <= reach; dx++)
+            {
+                int d2 = dx * dx + dy * dy;
+                if (d2 >= inner2 && d2 <= outer2)
                     SetPixelSafe(pixels, width, height, cx + dx, cy + dy, color);
             }
     }

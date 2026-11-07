@@ -59,6 +59,115 @@ public class FaceMeasureContext
     public FacePose Pose { get; }
     public bool Flipped { get; }
 
+    // True for a quarter (three-quarter) face: Pose is FacePose.Quarter and there are
+    // landmarks. Mirrors dynaface-lib's AnalyzeFace.quarter. No millimeter is defined on
+    // a turned head, so only the measures that suit it (FaceMeasureBase.IsQuarter) are
+    // meant to run, and MeasurePosition reports no scale there.
+    public bool IsQuarter => Pose == FacePose.Quarter && Landmarks != null && Landmarks.Length > 0;
+
+    // The quarter view, mirroring dynaface-lib's AnalyzeFace.far_left and
+    // cheek_outline_x/_y/_src: whether the far (measured) cheek is the subject's left,
+    // and that cheek's traced outline (x, row and each row's source,
+    // CheekOutline.OutlineSrc*), or null for the landmark contour fallback. Set by the
+    // pipeline or a restored state through SetQuarterView; false and null on any face
+    // that isn't a quarter face.
+    public bool FarLeft { get; private set; }
+    public float[] CheekOutlineX { get; private set; }
+    public int[] CheekOutlineY { get; private set; }
+    public byte[] CheekOutlineSrc { get; private set; }
+
+    Vec2d[] _cheekLandmarks;
+    Cheek.FrontalCheek _frontalCheek;
+    CheekOutline.ObliqueCheek _obliqueCheek;
+
+    // Sets the quarter view. A face that isn't a quarter face keeps FarLeft false and
+    // no outline, as dynaface-lib's quarter-view reset does. The cheek landmarks are
+    // found again from the new view the next time they're read.
+    public void SetQuarterView(bool farLeft, float[] outlineX, int[] outlineY, byte[] outlineSrc)
+    {
+        bool quarter = IsQuarter;
+        FarLeft = quarter && farLeft;
+        CheekOutlineX = quarter ? outlineX : null;
+        CheekOutlineY = quarter ? outlineY : null;
+        CheekOutlineSrc = quarter ? outlineSrc : null;
+        _cheekLandmarks = null;
+    }
+
+    // The ten cheek landmarks (Cheek.CheekLandmarkNames order, NaN where absent), found
+    // from the current landmarks and view by FindCheekLandmarks. Mirrors dynaface-lib's
+    // AnalyzeFace.cheek_landmarks.
+    public Vec2d[] CheekLandmarks
+    {
+        get
+        {
+            if (_cheekLandmarks == null) FindCheekLandmarks();
+            return _cheekLandmarks;
+        }
+    }
+
+    // Finds the cheek landmarks again from the current landmarks and view, the one rule
+    // (Cheek.Locate) every caller uses, and returns them. Analyze() calls it first, so a
+    // measure never pairs points found on other landmarks with these. Mirrors
+    // dynaface-lib's AnalyzeFace.find_cheek_landmarks().
+    public Vec2d[] FindCheekLandmarks()
+    {
+        var (frontal, observed) = Cheek.Locate(
+            Landmarks, IsQuarter, IsLateral, FarLeft, CheekOutlineX, CheekOutlineY, CheekOutlineSrc);
+        _frontalCheek = frontal;
+        _obliqueCheek = observed;
+        _cheekLandmarks = Cheek.LandmarkArray(frontal, observed, FarLeft);
+        return _cheekLandmarks;
+    }
+
+    // The frontal constructions of the last FindCheekLandmarks, or null on a face that
+    // isn't frontal or has no pupil frame. Mirrors dynaface-lib's frontal_cheek().
+    public Cheek.FrontalCheek FrontalCheek()
+    {
+        if (_cheekLandmarks == null) FindCheekLandmarks();
+        return _frontalCheek;
+    }
+
+    // The far cheek's observed points of the last FindCheekLandmarks, or null on a face
+    // that isn't a quarter face or couldn't be measured. Mirrors dynaface-lib's
+    // oblique_cheek().
+    public CheekOutline.ObliqueCheek ObliqueCheek()
+    {
+        if (_cheekLandmarks == null) FindCheekLandmarks();
+        return _obliqueCheek;
+    }
+
+    // Draws the cheek landmarks as dots of radius max(1, round(3 * size)) and, with
+    // names, each one's code (Cheek.CheekLandmarkCodes) beside it, at the renderer's
+    // integer text scale nearest 4 * size. Nothing for a NaN row, and on a quarter face
+    // nothing for the submalar point unless a hollow is present, since an absent point
+    // isn't a landmark. Mirrors dynaface-lib's AnalyzeFace.draw_cheek_landmarks().
+    public void DrawCheekLandmarks(float size = 0.25f, Rgba32 color = default, bool names = true)
+    {
+        if (Landmarks == null || Landmarks.Length == 0) return;
+        Vec2d[] points = CheekLandmarks;
+        if (points == null) return;
+        Rgba32 c = color.A == 0 ? new Rgba32(255, 128, 0, 255) : color;
+        int radius = Math.Max(1, (int)Math.Round(3.0 * size, MidpointRounding.ToEven));
+        int textScale = Math.Max(1, (int)Math.Round(4.0 * size, MidpointRounding.ToEven));
+        var observed = IsQuarter ? ObliqueCheek() : null;
+        bool submalarShown = observed != null && observed.SubmalarPresent == 1.0;
+        for (int i = 0; i < points.Length; i++)
+        {
+            if (!points[i].IsFinite) continue;
+            bool submalar = i == Cheek.CheekLmSubmalarR || i == Cheek.CheekLmSubmalarL;
+            if (IsQuarter && submalar && !submalarShown) continue;
+            var pt = new Vec2((float)Math.Round(points[i].X, MidpointRounding.ToEven),
+                (float)Math.Round(points[i].Y, MidpointRounding.ToEven));
+            DrawCircleAt(pt, c, radius);
+            if (!names) continue;
+            string code = Cheek.CheekLandmarkCodes[i];
+            var size2 = FaceRenderer.GetTextSize(code, textScale);
+            FaceRenderer.DrawText(Pixels, Width, Height,
+                MathHelpers.RoundToInt(pt.X) + radius + 1, BLY(pt.Y + size2.Y / 2f),
+                code, c, scale: textScale);
+        }
+    }
+
     public readonly List<string> TextLines = new();
 
     // Structured numeric output (mirrors dynaface-lib's calc() -> Dict[str, Any]
@@ -174,6 +283,9 @@ public class FaceMeasureContext
     {
         if (Landmarks == null || Landmarks.Length == 0) return null;
 
+        // As analyze() does, the cheek landmarks are found again on the current
+        // landmarks before any measure reads them.
+        FindCheekLandmarks();
         var result = new Dictionary<string, double>();
         foreach (var measure in measures ?? DynafaceMeasures.AllMeasures())
         {
@@ -358,14 +470,18 @@ public class FaceMeasureContext
     }
 
     // Mirrors dynaface-lib's AnalyzeFace.draw_static(): stamps the resolved pose
-    // caption near the bottom-left corner of the image.
+    // caption, such as "Frontal", "Quarter (left cheek)" or "Lateral (left)", near the
+    // bottom-left corner of the image. A quarter face's caption names the cheek
+    // measured, the far one.
     public void DrawStatic()
     {
         string text = Pose switch
         {
-            FacePose.Quarter => "Quarter",
+            FacePose.Frontal => "Frontal",
+            FacePose.Quarter => FarLeft ? "Quarter (left cheek)" : "Quarter (right cheek)",
             FacePose.Lateral => Flipped ? "Lateral (right)" : "Lateral (left)",
-            _ => "Frontal",
+            // A pose that isn't a view (Detect): the flags, as for a face restored without one.
+            _ => IsLateral ? (Flipped ? "Lateral (right)" : "Lateral (left)") : "Frontal",
         };
         var size = FaceRenderer.GetTextSize(text, FaceRenderer.TEXT_SIZE_MEASURE);
         DrawImageText(new Vec2(10, Height - 20 - size.Y), text, new Rgba32(255, 255, 255, 255));
@@ -468,4 +584,34 @@ public class FaceMeasureContext
     // -------------------------------------------------------------------------
 
     public FaceImage ToImage() => new FaceImage(Pixels, Width, Height);
+
+    // -------------------------------------------------------------------------
+    // From a pipeline result
+    // -------------------------------------------------------------------------
+
+    // The context for a FacePipeline.Run result, as dynaface-lib's AnalyzeFace is after
+    // load_image(): its crop, landmarks and head pose, its scale measured on those
+    // landmarks from the pupillary distance the run assumed, its view (pose, flip, a
+    // profile's lateral landmarks) and, for a quarter face, its far side and the far
+    // cheek's outline (SetQuarterView), so the cheek landmarks are found as the
+    // pipeline traced them. copyImage: false lets the context draw on the result's own
+    // pixels; by default it draws on a copy, leaving the result's crop as it was. A
+    // result that records no pupillary distance (one built by hand) is measured with
+    // DynafaceConfig.PupilDistMm.
+    public static FaceMeasureContext FromResult(FacePipelineResult result, bool copyImage = true)
+    {
+        FaceImage crop = result.AlignedCrop;
+        FaceImage image = copyImage && crop.IsValid
+            ? new FaceImage((Rgba32[])crop.Pixels.Clone(), crop.Width, crop.Height)
+            : crop;
+        float pupilDistMm = result.PupilDistMm;
+        var ctx = new FaceMeasureContext(
+            image, result.Wflw98, isLateral: result.IsLateral,
+            lateralLandmarks: result.IsLateral ? result.LateralAnalysis?.LateralLandmarks : null,
+            headPose: result.HeadPose, pose: result.Pose, flipped: result.Flipped,
+            pupilDistMm: pupilDistMm > 0f && !float.IsInfinity(pupilDistMm) ? pupilDistMm : (float?)null);
+        if (ctx.IsQuarter)
+            ctx.SetQuarterView(result.FarLeft, result.CheekOutlineX, result.CheekOutlineY, result.CheekOutlineSrc);
+        return ctx;
+    }
 }

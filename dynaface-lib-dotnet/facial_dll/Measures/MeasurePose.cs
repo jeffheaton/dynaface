@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 // Pose: reports SPIGA's raw headpose output (pitch/roll/yaw) for the aligned crop.
 // Pitch is nodding ("yes"), yaw is turning side to side ("no"), roll is tilting the
-// head toward a shoulder.
+// head toward a shoulder. Suits frontal, quarter and lateral faces.
 public class MeasurePose : FaceMeasureBase
 {
     public override string Label => "POSE";
@@ -14,6 +14,7 @@ public class MeasurePose : FaceMeasureBase
         Items.Add(new MeasureItemInfo("yaw"));
         IsFrontal = true;
         IsLateral = true;
+        IsQuarter = true;
         SyncItems();
     }
 

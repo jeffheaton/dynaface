@@ -1,10 +1,12 @@
 using System.Collections.Generic;
 
-// Direct port of dynaface-lib's lateral.py _process_image / _extract_sagittal_profile /
-// _shift_sagittal_profile. Runs U^2-Net background removal (the 3rd, independent
-// network), thresholds+morph-closes+inverts the resulting mask into a binary
-// silhouette, then extracts the sagittal (profile) line: for each image row, the x of
-// the first foreground pixel.
+// Direct port of dynaface-lib's lateral.py _foreground_alpha / _close_foreground /
+// _process_image / foreground_mask / _extract_sagittal_profile / _shift_sagittal_profile.
+// Runs U^2-Net background removal (the 3rd, independent network), thresholds+morph-
+// closes+inverts the resulting mask into a binary silhouette, then extracts the
+// sagittal (profile) line: for each image row, the x of the first foreground pixel.
+// ForegroundMask gives the same closed mask, with the alpha it was thresholded from,
+// to a three-quarter face's far-cheek tracer (CheekOutline.TraceFarCheek).
 //
 // Coordinate note: works in TOP-LEFT row order throughout (row 0 = visual top),
 // matching dynaface-lib's own numpy/cv2 convention and the top-left landmarks this
@@ -13,7 +15,12 @@ public static class SagittalProfile
 {
     const int U2NetSize = 320;
     const int MorphKernelSize = 10;
-    const int BinaryThreshold = 32;
+
+    // The background model's alpha above which a pixel is foreground: the threshold
+    // every profile's outline, and a quarter face's far-cheek outline, is traced at.
+    // Mirrors dynaface-lib's lateral.MASK_ALPHA; CheekOutline.MaskAlpha names the same
+    // number, so the tracer can interpolate an edge at this alpha.
+    public const int MaskAlpha = 32;
 
     static readonly float[] ImageNetMean = { 0.485f, 0.456f, 0.406f };
     static readonly float[] ImageNetStd = { 0.229f, 0.224f, 0.225f };
@@ -21,7 +28,40 @@ public static class SagittalProfile
     // photo: the lateral-cropped image (bottom-left FaceImage storage).
     // Returns the inverted, morph-closed binary silhouette (255=background,
     // 0=foreground) in top-left row order, width*height flat array.
-    public static byte[] ProcessImage(IDynafaceInference inference, FaceImage photo)
+    public static byte[] ProcessImage(IDynafaceInference inference, FaceImage photo) =>
+        CloseForeground(ForegroundAlpha(inference, photo), photo.Width, photo.Height);
+
+    // The background model's foreground of an image: the closed mask, [row, column]
+    // top-left, true where the face (or any foreground) is, and the raw alpha (0 to
+    // 255) it was thresholded from, [row, column] top-left. The same mask every
+    // profile is traced from (ProcessImage, which inverts it), for a three-quarter
+    // face's far-cheek outline (CheekOutline.TraceFarCheek): alpha > MaskAlpha,
+    // closed with the 10x10 kernel. Mirrors dynaface-lib's lateral.foreground_mask().
+    // Throws ModelOutputException when the model's output is one no working model gives.
+    public static (bool[,] Foreground, byte[,] Alpha) ForegroundMask(IDynafaceInference inference, FaceImage photo)
+    {
+        int width = photo.Width, height = photo.Height;
+        byte[] alpha = ForegroundAlpha(inference, photo);
+        byte[] closed = CloseForeground(alpha, width, height);
+        var foreground = new bool[height, width];
+        var alpha2d = new byte[height, width];
+        for (int y = 0; y < height; y++)
+        {
+            int rowBase = y * width;
+            for (int x = 0; x < width; x++)
+            {
+                foreground[y, x] = closed[rowBase + x] == 0;
+                alpha2d[y, x] = alpha[rowBase + x];
+            }
+        }
+        return (foreground, alpha2d);
+    }
+
+    // The background model's alpha of the image, 0 to 255, flat in top-left row order:
+    // its 320x320 saliency map resized to the image and truncated to bytes, as
+    // dynaface-lib's remove_background() makes its alpha channel
+    // ((np.clip(mask, 0, 1) * 255).astype(np.uint8)), in float32 like NumPy.
+    static byte[] ForegroundAlpha(IDynafaceInference inference, FaceImage photo)
     {
         int width = photo.Width, height = photo.Height;
         Rgba32[] topLeftPixels = ImageUtils.FlipVertical(photo.Pixels, width, height);
@@ -29,9 +69,20 @@ public static class SagittalProfile
         float[] mask320 = RunU2Net(inference, topLeftPixels, width, height);
         float[] maskFull = ResizeMaskBilinear(mask320, U2NetSize, U2NetSize, width, height);
 
+        var alpha = new byte[width * height];
+        for (int i = 0; i < alpha.Length; i++)
+            alpha[i] = (byte)(MathHelpers.Clamp(maskFull[i], 0f, 1f) * 255f);
+        return alpha;
+    }
+
+    // Thresholds the alpha at MaskAlpha (a byte above it is foreground), morph-closes
+    // and inverts: 0 where the foreground is, 255 elsewhere, flat in top-left row
+    // order. Mirrors dynaface-lib's lateral._close_foreground().
+    static byte[] CloseForeground(byte[] alpha, int width, int height)
+    {
         var binary = new byte[width * height];
         for (int i = 0; i < binary.Length; i++)
-            binary[i] = MathHelpers.Clamp(maskFull[i], 0f, 1f) * 255f > BinaryThreshold ? (byte)255 : (byte)0;
+            binary[i] = alpha[i] > MaskAlpha ? (byte)255 : (byte)0;
 
         binary = MorphClose(binary, width, height, MorphKernelSize);
 

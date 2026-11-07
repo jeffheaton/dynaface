@@ -2,6 +2,11 @@ using System.Collections.Generic;
 
 // Position: face tilt, pixel-to-mm conversion, and pupillary distance.
 // Also draws the vertical face midline (bisect) on the image.
+//
+// px2mm is NaN on a quarter (three-quarter) face (ctx.IsQuarter), where no millimeter is
+// defined: its pupil scale is foreshortened by the turn, and a scale column would put
+// that number back into the CSV. Its line isn't drawn there; tilt and the pixel pd are
+// reported and drawn as on a frontal face. Suits frontal, quarter and lateral faces.
 public class MeasurePosition : FaceMeasureBase
 {
     public override string Label => "POSITION";
@@ -15,6 +20,7 @@ public class MeasurePosition : FaceMeasureBase
         Items.Add(new MeasureItemInfo("pd"));
         IsFrontal = true;
         IsLateral = true;
+        IsQuarter = true;
         SyncItems();
     }
 
@@ -41,6 +47,10 @@ public class MeasurePosition : FaceMeasureBase
             pd = measuredPd;
             if (!ctx.IsLateral)
                 pix2mm = measuredPix2mm;
+            // No millimeter is defined on a turned head: the pupil scale is
+            // foreshortened, so report no scale (tilt and the pixel pd stay).
+            if (ctx.IsQuarter)
+                pix2mm = float.NaN;
         }
 
         if (render && render2Tilt)
@@ -49,12 +59,14 @@ public class MeasurePosition : FaceMeasureBase
             ctx.DrawLine(top, bottom, BisectColor, thickness: 1);
         }
 
-        if (render && (render2Tilt || render2Pd || render2Px2mm))
+        // Like dynaface-lib, a scale that isn't a number (a quarter face's) isn't drawn.
+        bool showPx2mm = render2Px2mm && !float.IsNaN(pix2mm);
+        if (render && (render2Tilt || render2Pd || showPx2mm))
         {
             ctx.AddHeader(Label);
             if (render2Tilt) ctx.AddValue($"tilt:   {tilt:F2}°");
             if (render2Pd) ctx.AddValue($"pd:     {pd:F0} px");
-            if (render2Px2mm) ctx.AddValue($"px2mm:  {pix2mm:F3}");
+            if (showPx2mm) ctx.AddValue($"px2mm:  {pix2mm:F3}");
             ctx.AddSpacer();
         }
 

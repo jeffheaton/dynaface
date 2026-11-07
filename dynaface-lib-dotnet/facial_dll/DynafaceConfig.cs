@@ -6,6 +6,22 @@ public static class DynafaceConfig
     // When false, pose classification never reports lateral, regardless of headpose.
     public static bool AutoLateral = true;
 
+    // Classify a 35 to 55 degree turn (Cheek.ClassifyQuarter) as a three-quarter
+    // (quarter) face, the view the cheek landmarks' oblique module measures: its far
+    // cheek is traced from the background model, and the millimeter measures don't
+    // suit it. Off, such a face is frontal or, with its nose past the far contour,
+    // lateral, as before, and only a forced FacePose.Quarter takes the quarter path; it
+    // also needs AutoLateral. Ships off so that a library default changes no
+    // caller's video imports: with it on, a frame whose yaw lands in the window
+    // takes the band crop instead of the frontal one, pays a background-model pass,
+    // and suits the cheek measure rather than the millimeter measures. A caller turns
+    // it on; the desktop app exposes it as the "Detect three-quarter view"
+    // preference. A caller that smooths landmarks across frames must reset its
+    // smoothing when the view changes, as VideoAnalyzer does, so one crop's
+    // landmarks never average with another's. Mirrors dynaface-lib's
+    // config.AUTO_QUARTER.
+    public static bool AutoQuarter = false;
+
     // Pupillary distance (mm) used to derive every px→mm conversion. Mirrors
     // dynaface-lib's mutable AnalyzeFace.pd class attribute — the desktop app sets
     // it from user preferences so measurements can be calibrated to the actual
