@@ -5,6 +5,7 @@ import unittest
 
 import cv2
 import numpy as np
+
 from dynaface.image import ImageAnalysis, load_image
 from dynaface.util import safe_clip
 
@@ -212,7 +213,7 @@ class TestImage(unittest.TestCase):
             temp_path = temp_file.name  # Store the name
         analysis.save(temp_path)
         assert os.path.exists(temp_path)
-        os.remove(temp_path)  
+        os.remove(temp_path)
 
     #
     # measure_polygon() Tests

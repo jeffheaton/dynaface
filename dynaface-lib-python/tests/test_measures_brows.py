@@ -5,7 +5,7 @@ import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from dynaface.measures_frontal import AnalyzeBrows
+from dynaface.measures_frontal import AnalyzeBrows  # noqa: E402
 
 PIX2MM = 0.25
 

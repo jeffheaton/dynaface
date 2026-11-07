@@ -3,13 +3,13 @@
 import logging
 import math
 from typing import Any, Dict
+
 import numpy as np
 
 from dynaface import lateral, util
+from dynaface.measures_base import MeasureBase, MeasureItem, select_outputs
 
 logger = logging.getLogger(__name__)
-
-from dynaface.measures_base import MeasureBase, MeasureItem, select_outputs
 
 
 class AnalyzeLateral(MeasureBase):
@@ -175,7 +175,6 @@ class AnalyzeLateral(MeasureBase):
             mid_txt_nt = ((pt_N[0] + pt_T[0]) // 2 + 5, (pt_N[1] + pt_T[1]) // 2)
             face.write_text(mid_txt_nt, f"NT={NT:.2f}")
 
-            mid_ratio = (pt_T[0] + 10, pt_T[1] + 10)
             ratio_txt = f"AT/NT={AT_NT_ratio:.2f}"
 
             pos = face.analyze_next_pt(ratio_txt)

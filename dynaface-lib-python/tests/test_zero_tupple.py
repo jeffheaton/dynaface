@@ -4,10 +4,7 @@ import unittest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from dynaface.util import is_zero_tuple
-
-
-import unittest
+from dynaface.util import is_zero_tuple  # noqa: E402
 
 
 class TestIsZeroTuple(unittest.TestCase):

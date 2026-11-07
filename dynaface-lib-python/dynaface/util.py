@@ -1,5 +1,5 @@
 import math
-from typing import Any, List, Optional, Tuple, Union, cast
+from typing import Any, Iterable, List, Optional, Tuple, Union, cast
 
 import cv2
 import numpy as np
@@ -460,12 +460,10 @@ def is_zero_tuple(p: Any, tol: float = 1e-9) -> bool:
     if not isinstance(p, tuple):
         return False
 
-    p_tuple = cast(Tuple[Any, ...], p)
-
-    if not all(isinstance(x, (int, float)) for x in p_tuple):
+    if not all(isinstance(x, (int, float)) for x in p):
         return False
 
-    return math.isclose(sum(p_tuple), 0.0, abs_tol=tol)
+    return math.isclose(sum(p), 0.0, abs_tol=tol)
 
 
 def to_degrees(r: float) -> float:
@@ -509,7 +507,16 @@ def correct_distance_2d_for_yaw(measured_distance: float, yaw_degrees: float) ->
     return corrected_distance
 
 
-def closest_to_zero(values):
+def closest_to_zero(values: Iterable[float]) -> float:
+    """
+    Pick the value nearest zero.
+
+    Args:
+        values (Iterable[float]): The values to choose from; at least one.
+
+    Returns:
+        float: The value with the smallest absolute value.
+    """
     return min(values, key=abs)
 
 

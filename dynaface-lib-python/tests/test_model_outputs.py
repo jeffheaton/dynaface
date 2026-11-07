@@ -124,6 +124,31 @@ class TestModelOutputs(unittest.TestCase):
         self.assertIs(models.ModelOutputError, ModelOutputError)
         self.assertTrue(issubclass(ModelOutputError, RuntimeError))
 
+    def test_images_must_be_8_bit(self):
+        # resample's uint8 guard reaches the public API: a float or 16-bit image
+        # raises instead of being cast to a wrong answer (a float image in [0, 1]
+        # would become an all-black tensor and look like an image without a face;
+        # a 16-bit one would keep only its low byte).
+        inference = backend()
+        for name, image in (
+            ("float32", IMAGE.astype(np.float32) / 255.0),
+            ("uint16", IMAGE.astype(np.uint16) * 257),
+        ):
+            with self.subTest(name):
+                with self.assertRaisesRegex(TypeError, "uint8"):
+                    inference.detect_face(image)
+                with self.assertRaisesRegex(TypeError, "uint8"):
+                    inference.find_landmarks(image, (64, 64, 128, 128))
+                with self.assertRaisesRegex(TypeError, "uint8"):
+                    inference.remove_background(image)
+        face = facial.AnalyzeFace(measures=[])
+        with mock.patch.object(models, "onnx_model", inference), mock.patch.object(
+            facial, "are_models_init", return_value=True
+        ):
+            with self.assertRaisesRegex(TypeError, "uint8"):
+                face.load_image(IMAGE.astype(np.float32) / 255.0, crop=True)
+        self.assertTrue(face.is_no_face())
+
 
 if __name__ == "__main__":
     unittest.main()

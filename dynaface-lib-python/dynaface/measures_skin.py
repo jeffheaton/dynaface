@@ -1,14 +1,14 @@
 """The skin tone measure."""
 
+import colorsys
 import logging
+import math
 from typing import Any, Dict
 
 import numpy as np
 from scipy.stats import mode
-import math
 
 from dynaface.measures_base import MeasureBase, MeasureItem, select_outputs
-import colorsys
 
 USE_MODE = False  # Set to False to use mean averaging instead
 

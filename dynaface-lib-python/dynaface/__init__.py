@@ -9,5 +9,5 @@ try:
     from importlib.metadata import version
 
     __version__ = version("dynaface")
-except:
+except Exception:
     __version__ = "unknown"

@@ -49,7 +49,7 @@ def _clamp_f32(
 def _round_away(x: NDArray[np.float32]) -> NDArray[np.float32]:
     # Round half away from zero, matching MathF.Round(f, MidpointRounding.AwayFromZero).
     # np.round is banker's rounding (half-to-even), so it cannot be used here.
-    return (np.sign(x) * np.floor(np.abs(x).astype(_F32) + _HALF)).astype(_F32)
+    return np.asarray(np.sign(x) * np.floor(np.abs(x).astype(_F32) + _HALF), dtype=_F32)
 
 
 def _lerp_trunc_u8(
@@ -143,7 +143,7 @@ def resize_mask_bilinear(
     v11 = src[np.ix_(y1, x1)]
     v0 = v00 + (v10 - v00) * tx
     v1 = v01 + (v11 - v01) * tx
-    return (v0 + (v1 - v0) * ty).astype(_F32)
+    return np.asarray(v0 + (v1 - v0) * ty, dtype=_F32)
 
 
 def invert_affine(m: NDArray[np.float32]) -> NDArray[np.float32]:

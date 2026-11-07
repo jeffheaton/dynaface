@@ -340,7 +340,9 @@ class DynafaceOnnxInference:
 
     @staticmethod
     def _preprocess_face(image_bgr: NDArray[np.uint8]) -> NDArray[np.float32]:
-        rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+        # A cast for the type checker only: resize_bilinear rejects an image
+        # that isn't uint8, so a wrong dtype never becomes a wrong answer.
+        rgb = cast(NDArray[np.uint8], cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB))
         rgb = resample.resize_bilinear(rgb, 128, 128)
         # BlazeFace expects pixels normalized to [-1, 1], not [0, 1].
         tensor = (rgb.astype(np.float32) / 127.5) - 1.0
@@ -483,7 +485,8 @@ class DynafaceOnnxInference:
         cls, image_bgr: NDArray[np.uint8], bbox: Tuple[float, float, float, float]
     ) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
         affine = cls._crop_affine(bbox)
-        rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+        # A cast for the type checker only: warp_affine rejects a non-uint8 image.
+        rgb = cast(NDArray[np.uint8], cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB))
         # Matches PIL's Image.transform(..., Image.AFFINE) default behavior
         # (nearest-neighbor resample, zero-fill outside the source image),
         # which is what SPIGA's own pretreatment pipeline uses at crop time.
@@ -530,8 +533,9 @@ class DynafaceOnnxInference:
 
     @staticmethod
     def _preprocess_background(image_bgr: NDArray[np.uint8]) -> NDArray[np.float32]:
-        rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
-        rgb = resample.resize_bilinear(rgb, 320, 320).astype(np.float32) / 255.0
+        # A cast for the type checker only: resize_bilinear rejects a non-uint8 image.
+        rgb_u8 = cast(NDArray[np.uint8], cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB))
+        rgb = resample.resize_bilinear(rgb_u8, 320, 320).astype(np.float32) / 255.0
         # U^2-Net was trained with ImageNet normalization stats.
         mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
         std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
