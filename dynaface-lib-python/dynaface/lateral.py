@@ -1,14 +1,9 @@
+import logging
+from enum import Enum, auto
 from typing import Any, Iterable, List, Optional, Tuple
 
 import cv2
 import matplotlib
-
-matplotlib.use("Agg")
-import logging
-from enum import Enum, auto
-from typing import Any, Optional
-
-import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
 from numpy.typing import NDArray
@@ -16,6 +11,11 @@ from PIL import Image
 from scipy.signal import find_peaks, savgol_filter  # <-- Savitzky–Golay
 
 from dynaface import models, util
+
+# The headless backend, chosen before pyplot is imported (which is why that
+# import sits below this call).
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,12 @@ DX2_OFFSET: float = 0.0
 X_PAD_RATIO: float = 0.1
 Y_PAD_RATIO: float = 0.3
 
+# The background model's alpha above which a pixel is foreground: the threshold
+# every profile's outline, and a quarter face's far-cheek outline, is traced at.
+# dynaface.cheek_outline.MASK_ALPHA names the same number (that module never
+# imports this one), so the cheek tracer can interpolate an edge at this alpha.
+MASK_ALPHA: int = 32
+
 # Landmark constants for lateral landmarks (landmark, x/y)
 LATERAL_LM_SOFT_TISSUE_GLABELLA = 0
 LATERAL_LM_SOFT_TISSUE_NASION = 1
@@ -52,32 +58,76 @@ LATERAL_LM_MENTO_LABIAL_POINT = 4
 LATERAL_LM_SOFT_TISSUE_POGONION = 5
 
 
-def _process_image(
-    input_image: Image.Image,
-) -> Tuple[Image.Image, NDArray[Any], int, int]:
+def _foreground_alpha(input_image: Image.Image) -> NDArray[np.uint8]:
     """
-    Remove background, threshold the foreground mask, morph-close, invert.
+    The background model's alpha channel of the image, 0 to 255: its foreground
+    (face) saliency, the mask every outline is traced from.
+
+    Raises:
+        ValueError: If the models aren't initialized.
     """
     if models.onnx_model is None:
         raise ValueError("Models not initialized, please call init_models()")
 
     image_bgr: NDArray[Any] = cv2.cvtColor(np.array(input_image), cv2.COLOR_RGB2BGR)
     rgba: NDArray[Any] = models.onnx_model.remove_background(image_bgr)
-    alpha: NDArray[Any] = rgba[:, :, 3]
+    return np.asarray(rgba[:, :, 3], dtype=np.uint8)
 
-    # Binary: alpha is the foreground (face) saliency mask.
-    binary_threshold: int = 32
-    binary_np: NDArray[Any] = np.where(alpha > binary_threshold, 255, 0).astype(
-        np.uint8
-    )
 
-    # Morph close + invert
+def _close_foreground(alpha: NDArray[np.uint8]) -> NDArray[np.uint8]:
+    """
+    Threshold the alpha at MASK_ALPHA, morph-close, invert: 0 where the foreground
+    is, 255 elsewhere.
+    """
+    binary_np: NDArray[Any] = np.where(alpha > MASK_ALPHA, 255, 0).astype(np.uint8)
     kernel: NDArray[Any] = np.ones((10, 10), np.uint8)
     binary_np = cv2.morphologyEx(binary_np, cv2.MORPH_CLOSE, kernel)
-    binary_np = 255 - binary_np
+    return np.asarray(255 - binary_np, dtype=np.uint8)
 
+
+def _process_image(
+    input_image: Image.Image,
+) -> Tuple[Image.Image, NDArray[Any], int, int]:
+    """
+    Remove background, threshold the foreground mask, morph-close, invert.
+    """
+    binary_np = _close_foreground(_foreground_alpha(input_image))
     height, width = binary_np.shape
     return input_image, binary_np, width, height
+
+
+def foreground_mask(
+    image: Image.Image,
+) -> Tuple[NDArray[np.bool_], NDArray[np.uint8]]:
+    """
+    The background model's foreground of an image: the closed binary mask and the
+    raw alpha it is thresholded from.
+
+    The same mask every profile is traced from (_process_image(), which inverts
+    it, so the foreground is where its binary image is 0), for callers outside
+    this module: the far-cheek outline of a three-quarter face
+    (AnalyzeFace._trace_far_cheek(), through cheek_outline.trace_far_cheek()).
+    The mask is alpha > MASK_ALPHA (32), morphologically closed;
+    cheek_outline.MASK_ALPHA names the same threshold, so the tracer can
+    interpolate an edge at this alpha between the mask's two bounding pixels.
+
+    Args:
+        image (Image.Image): The image, as a PIL RGB image, as analyze_lateral()
+            takes it.
+
+    Returns:
+        Tuple[NDArray[np.bool_], NDArray[np.uint8]]: The foreground mask, (height,
+            width), True where the face (or any foreground) is, and the alpha
+            channel, (height, width), 0 to 255.
+
+    Raises:
+        ValueError: If the models aren't initialized.
+        ModelOutputError: From the background model, as for a profile, when its
+            output is one no working model gives.
+    """
+    alpha = _foreground_alpha(image)
+    binary_np = _close_foreground(alpha)
+    return binary_np == 0, alpha
 
 
 def _shift_sagittal_profile(sagittal_x: NDArray[Any]) -> tuple[NDArray[Any], float]:
@@ -126,7 +176,7 @@ def _plot_sagittal_profile(
     dx_scaled: NDArray[Any],
     ddx_scaled: NDArray[Any],
 ) -> None:
-    ax.plot(  # type: ignore
+    ax.plot(
         sagittal_x,
         sagittal_y,
         color="black",
@@ -147,7 +197,7 @@ def _plot_quarter_lines(ax: Axes, sagittal_y: NDArray[Any]) -> None:
     start_y, end_y = sagittal_y[0], sagittal_y[-1]
     q1, q2, q3 = _calculate_quarter_lines(start_y, end_y)
     for q, label in zip((q1, q2, q3), ("25% Line", "50% Line", "75% Line")):
-        ax.axhline(q, color="green", linestyle="--", linewidth=1, label=label)  # type: ignore
+        ax.axhline(q, color="green", linestyle="--", linewidth=1, label=label)
 
 
 def _find_local_max_min(sagittal_x: NDArray[Any]) -> Tuple[NDArray[Any], NDArray[Any]]:
@@ -166,7 +216,7 @@ def _plot_sagittal_minmax(
     max_indices: NDArray[np.int64],
     min_indices: NDArray[np.int64],
 ) -> None:
-    ax.scatter(  # type: ignore
+    ax.scatter(
         sagittal_x[max_indices],
         sagittal_y[max_indices],
         color="green",
@@ -174,7 +224,7 @@ def _plot_sagittal_minmax(
         label="Local Maxima",
         zorder=3,
     )
-    ax.scatter(  # type: ignore
+    ax.scatter(
         sagittal_x[min_indices],
         sagittal_y[min_indices],
         color="red",
@@ -183,7 +233,7 @@ def _plot_sagittal_minmax(
         zorder=3,
     )
     for i, idx in enumerate(max_indices):
-        ax.annotate(  # type: ignore
+        ax.annotate(
             f"max-{i}",
             (float(sagittal_x[idx]), float(sagittal_y[idx])),
             textcoords="offset points",
@@ -193,7 +243,7 @@ def _plot_sagittal_minmax(
             color="green",
         )
     for i, idx in enumerate(min_indices):
-        ax.annotate(  # type: ignore
+        ax.annotate(
             f"min-{i}",
             (float(sagittal_x[idx]), float(sagittal_y[idx])),
             textcoords="offset points",
@@ -257,7 +307,8 @@ def _ensure_odd(k: int) -> int:
 
 def _turning_angle(dx: NDArray[np.floating]) -> NDArray[np.floating]:
     """θ = arctan(dx/dy); with dy=1 per row → θ = arctan(dx)."""
-    return np.arctan(dx)
+    theta: NDArray[np.floating] = np.arctan(dx)
+    return theta
 
 
 def _angle_change(theta: NDArray[np.floating], halfwin: int) -> NDArray[np.floating]:
@@ -313,10 +364,7 @@ def _find_monotonic_corners(
         if w >= n:
             continue
 
-        # Smooth & derivatives (Savitzky–Golay)
-        xs = savgol_filter(
-            x, window_length=w, polyorder=polyorder, deriv=0, mode="interp"
-        )
+        # Derivatives (Savitzky–Golay)
         dx = savgol_filter(
             x, window_length=w, polyorder=polyorder, deriv=1, mode="interp"
         )
@@ -426,7 +474,7 @@ def _plot_monotonic_corners(
 ) -> None:
     if len(corner_idxs) == 0:
         return
-    ax.scatter(  # type: ignore
+    ax.scatter(
         sagittal_x[corner_idxs],
         sagittal_y[corner_idxs],
         s=90,
@@ -436,7 +484,7 @@ def _plot_monotonic_corners(
         marker="D",
     )
     for i, idx in enumerate(corner_idxs):
-        ax.annotate(  # type: ignore
+        ax.annotate(
             f"corner-{i}",
             (float(sagittal_x[idx]), float(sagittal_y[idx])),
             textcoords="offset points",
@@ -455,8 +503,8 @@ def _plot_lateral_landmarks(ax: Axes, landmarks: NDArray[Any], shift_x: int) -> 
         x, y = landmarks[i]
         if x != -1 and y != -1:
             x -= shift_x
-            ax.scatter(x, y, color="green", s=80, zorder=3)  # type: ignore
-            ax.annotate(  # type: ignore
+            ax.scatter(x, y, color="green", s=80, zorder=3)
+            ax.annotate(
                 name,
                 (x, y),
                 textcoords="offset points",
@@ -487,7 +535,7 @@ def analyze_lateral(
 
     dx, ddx, dx_scaled, ddx_scaled = _compute_derivatives(sagittal_x)
 
-    fig, ax2 = plt.subplots(figsize=(6, 10))  # type: ignore
+    fig, ax2 = plt.subplots(figsize=(6, 10))
     _plot_sagittal_profile(ax2, sagittal_x, sagittal_y, dx_scaled, ddx_scaled)
 
     max_indices, min_indices, corner_idxs, landmarks_np = _find_profile_landmarks(
@@ -510,7 +558,7 @@ def analyze_lateral(
     ax2.axis("off")
     ax2.margins(0)
     fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
-    legend = ax2.legend(frameon=True, loc="upper left", bbox_to_anchor=(0.0, 1.0))  # type: ignore
+    legend = ax2.legend(frameon=True, loc="upper left", bbox_to_anchor=(0.0, 1.0))
     legend.get_frame().set_alpha(0.8)
 
     chart = util.convert_matplotlib_to_opencv(ax2)
@@ -610,27 +658,26 @@ def _find_lateral_landmark(
     """
 
     def _dir_filter(idxs: NDArray[Any]) -> NDArray[Any]:
+        kept: NDArray[Any]
         if y_forward is True:
-            mask = sagittal_y[idxs] >= y_coord
-            return idxs[mask]
+            kept = idxs[sagittal_y[idxs] >= y_coord]
         elif y_forward is False:
-            mask = sagittal_y[idxs] <= y_coord
-            return idxs[mask]
-        return idxs
+            kept = idxs[sagittal_y[idxs] <= y_coord]
+        else:
+            kept = idxs
+        return kept
 
-    # Choose candidate indices by mode
-    if mode == LateralSearchMode.MAX:
-        candidates = _dir_filter(max_indices)
-    elif mode == LateralSearchMode.MIN:
-        candidates = _dir_filter(min_indices)
-    elif mode == LateralSearchMode.CORNER:
-        candidates = _dir_filter(corner_idxs)
-    elif mode == LateralSearchMode.NEAREST:
-        # For NEAREST, we consider *all* points along the sagittal line
-        all_idxs = np.arange(len(sagittal_y), dtype=int)
-        candidates = _dir_filter(all_idxs)
-    else:
-        candidates = np.array([], dtype=int)
+    # Choose candidate indices by mode; anything that isn't a search mode (such
+    # as None) finds nothing.
+    sources = {
+        LateralSearchMode.MAX: max_indices,
+        LateralSearchMode.MIN: min_indices,
+        LateralSearchMode.CORNER: corner_idxs,
+        # NEAREST: every point along the sagittal line
+        LateralSearchMode.NEAREST: np.arange(len(sagittal_y), dtype=int),
+    }
+    source = sources.get(mode)
+    candidates = _dir_filter(source) if source is not None else np.array([], dtype=int)
 
     if candidates.size == 0:
         return np.array([-1.0, -1.0], dtype=float)

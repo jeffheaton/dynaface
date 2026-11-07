@@ -1,13 +1,19 @@
-import sys
+import math
 import os
+import sys
 import unittest
+
+import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from dynaface.measures_frontal import AnalyzeLandmarks
-from dynaface.measures_base import MeasureItem
+from dynaface import cheek  # noqa: E402
+from dynaface.const import Pose  # noqa: E402
+from dynaface.measures_base import MeasureItem  # noqa: E402
+from dynaface.measures_frontal import AnalyzeLandmarks  # noqa: E402
 
 NUM_LANDMARKS = AnalyzeLandmarks.NUM_LANDMARKS
+CHEEK_OUTPUTS = list(cheek.CHEEK_LANDMARK_OUTPUTS)
 
 
 class MockFace:
@@ -39,8 +45,31 @@ class TestAnalyzeLandmarksStructure(unittest.TestCase):
         self.assertTrue(self.measure.enabled)
 
     def test_item_count(self):
-        # 2 items (x and y) per landmark
-        self.assertEqual(len(self.measure.items), NUM_LANDMARKS * 2)
+        # 2 items (x and y) per landmark, then the Cheek Landmarks group
+        self.assertEqual(len(self.measure.items), NUM_LANDMARKS * 2 + 1)
+        self.assertEqual(len(self.measure.outputs()), NUM_LANDMARKS * 2 + 20)
+
+    def test_cheek_landmarks_item(self):
+        item = self.measure.items[-1]
+        self.assertEqual(item.name, "Cheek Landmarks")
+        self.assertFalse(item.display_only)
+        self.assertEqual(item.output_names(), CHEEK_OUTPUTS)
+        self.assertEqual(self.measure.outputs()[-20:], CHEEK_OUTPUTS)
+        self.assertTrue(item.is_frontal and item.is_quarter)
+        self.assertFalse(item.is_lateral)
+        self.assertTrue(item.enabled)
+
+    def test_cheek_landmark_outputs(self):
+        self.assertEqual(len(CHEEK_OUTPUTS), 20)
+        self.assertEqual(
+            CHEEK_OUTPUTS[:6],
+            ["zy.r.x", "zy.r.y", "zy.l.x", "zy.l.y", "cr.r.x", "cr.r.y"],
+        )
+        self.assertEqual(CHEEK_OUTPUTS[-2:], ["sub.l.x", "sub.l.y"])
+        for i, code in enumerate(cheek.CHEEK_LANDMARK_CODES):
+            self.assertEqual(
+                CHEEK_OUTPUTS[2 * i : 2 * i + 2], [f"{code}.x", f"{code}.y"]
+            )
 
     def test_item_names(self):
         names = [item.name for item in self.measure.items]
@@ -53,8 +82,9 @@ class TestAnalyzeLandmarksStructure(unittest.TestCase):
         names = [item.name for item in self.measure.items]
         self.assertEqual(names[0], "landmark-1-x")
         self.assertEqual(names[1], "landmark-1-y")
-        self.assertEqual(names[-2], f"landmark-{NUM_LANDMARKS}-x")
-        self.assertEqual(names[-1], f"landmark-{NUM_LANDMARKS}-y")
+        self.assertEqual(names[-3], f"landmark-{NUM_LANDMARKS}-x")
+        self.assertEqual(names[-2], f"landmark-{NUM_LANDMARKS}-y")
+        self.assertEqual(names[-1], "Cheek Landmarks")
 
     def test_all_items_are_measure_items(self):
         for item in self.measure.items:
@@ -67,6 +97,7 @@ class TestAnalyzeLandmarksStructure(unittest.TestCase):
     def test_all_items_frontal(self):
         for item in self.measure.items:
             self.assertTrue(item.is_frontal)
+            self.assertTrue(item.is_quarter)
             self.assertFalse(item.is_lateral)
 
 
@@ -117,7 +148,8 @@ class TestAnalyzeLandmarksCalc(unittest.TestCase):
 
     def test_calc_result_count(self):
         result = self.measure.calc(self.face, render=False)
-        self.assertEqual(len(result), NUM_LANDMARKS * 2)
+        self.assertEqual(len(result), NUM_LANDMARKS * 2 + 20)
+        self.assertEqual(list(result), self.measure.outputs())
 
     def test_set_item_enabled_affects_is_enabled(self):
         # set_item_enabled controls rendering gating via is_enabled(),
@@ -134,12 +166,81 @@ class TestAnalyzeLandmarksCalc(unittest.TestCase):
         self.assertFalse(self.measure.enabled)
 
 
+class CheekFace(MockFace):
+    """A mock face with its cheek landmarks and draw_cheek_landmarks() recorded."""
+
+    def __init__(self):
+        super().__init__()
+        self.cheek_landmarks = np.full((10, 2), math.nan)
+        self.cheek_landmarks[0] = (100.5, 200.25)
+        self.cheek_landmarks[5] = (300.0, 400.0)
+        self.draw_cheek_landmarks_calls = []
+
+    def draw_cheek_landmarks(self, **kwargs):
+        self.draw_cheek_landmarks_calls.append(kwargs)
+
+
+class TestCheekLandmarksItem(unittest.TestCase):
+    """The Cheek Landmarks item on mock faces (real faces: test_measures_cheek)."""
+
+    def test_values_are_the_faces_cheek_landmarks(self):
+        face = CheekFace()
+        result = AnalyzeLandmarks().calc(face, render=False)
+        values = [result[name] for name in CHEEK_OUTPUTS]
+        for value, expected in zip(values, face.cheek_landmarks.reshape(-1)):
+            self.assertIs(type(value), float)
+            if math.isnan(expected):
+                self.assertTrue(math.isnan(value))
+            else:
+                self.assertEqual(value, expected)
+        self.assertEqual((result["zy.r.x"], result["zy.r.y"]), (100.5, 200.25))
+        self.assertEqual((result["sr.l.x"], result["sr.l.y"]), (300.0, 400.0))
+
+    def test_values_without_the_attribute_follow_cheek_locate(self):
+        # MockFace has no cheek_landmarks: cheek.locate() on its landmarks.
+        face = MockFace()
+        result = AnalyzeLandmarks().calc(face, render=False)
+        expected = cheek.locate_all(
+            face.landmarks, Pose.FRONTAL, False, None, None, None
+        ).reshape(-1)
+        for name, value in zip(CHEEK_OUTPUTS, expected):
+            got = result[name]
+            self.assertTrue(
+                (math.isnan(got) and math.isnan(value)) or got == value, name
+            )
+
+    def test_drawing_gated_by_the_item(self):
+        face = CheekFace()
+        AnalyzeLandmarks().calc(face, render=True)
+        self.assertEqual(
+            face.draw_cheek_landmarks_calls,
+            [
+                {"size": 1.0, "color": (0, 0, 0), "names": False},
+                {"size": 0.5, "color": (255, 128, 0), "names": False},
+            ],
+        )
+        self.assertEqual(len(face.draw_landmarks_calls), 2)
+
+        face = CheekFace()
+        measure = AnalyzeLandmarks()
+        measure.set_item_enabled("Cheek Landmarks", False)
+        result = measure.calc(face, render=True)
+        self.assertEqual(face.draw_cheek_landmarks_calls, [])
+        self.assertEqual(len(face.draw_landmarks_calls), 2)  # the 98 still drawn
+        self.assertEqual(result["zy.r.x"], 100.5)  # still returned
+        self.assertNotIn("zy.r.x", measure.outputs()[: NUM_LANDMARKS * 2])
+
+        face = CheekFace()
+        AnalyzeLandmarks().calc(face, render=False)
+        self.assertEqual(face.draw_cheek_landmarks_calls, [])
+
+
 class TestAnalyzeLandmarksIntegration(unittest.TestCase):
     """Integration tests that load real models and a real image."""
 
     @classmethod
     def setUpClass(cls):
-        from dynaface import models, facial, measures
+        from dynaface import facial, measures, models
         from dynaface.image import load_image
 
         device = models.detect_device()
@@ -179,6 +280,21 @@ class TestAnalyzeLandmarksIntegration(unittest.TestCase):
         self.assertIn("landmark-1-y", items)
         self.assertIn(f"landmark-{NUM_LANDMARKS}-x", items)
         self.assertIn(f"landmark-{NUM_LANDMARKS}-y", items)
+        # The Cheek Landmarks group's outputs follow, never its label.
+        self.assertEqual(
+            items[items.index(f"landmark-{NUM_LANDMARKS}-y") + 1 :][:20], CHEEK_OUTPUTS
+        )
+        self.assertNotIn("Cheek Landmarks", items)
+
+    def test_cheek_landmarks_in_stats(self):
+        flat = self.face.cheek_landmarks.reshape(-1)
+        for name, value in zip(CHEEK_OUTPUTS, flat):
+            got = self.stats[name]
+            self.assertTrue(
+                (math.isnan(got) and math.isnan(value)) or got == value, name
+            )
+        self.assertTrue(np.isfinite(flat[:12]).all())  # the frontal six
+        self.assertTrue(np.isnan(flat[12:]).all())  # no oblique points
 
 
 if __name__ == "__main__":

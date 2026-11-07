@@ -54,6 +54,44 @@ def _ratio(a: float, b: float) -> float:
     return a / b if b else math.nan
 
 
+def _results_in_view(
+    face: AnalyzeFace, results: Optional[Dict[str, Any]]
+) -> Optional[Dict[str, Any]]:
+    """
+    The face's analyze() results with NaN for every output of a measure that
+    doesn't suit the face's view (MeasureBase.suits()): a frontal measure's on a
+    quarter or lateral face, and a lateral measure's on a frontal one; and for
+    every output of an item that doesn't suit it (MeasureItem.suits(), such as
+    the Cheek Measures' "Zygion width" on a quarter face). analyze() runs every
+    enabled measure whatever the view, so without this a millimeter measure's
+    numbers from a turned head would be reported.
+
+    Args:
+        face (AnalyzeFace): The face the results were measured on, with the view
+            its state restored.
+        results (Optional[Dict[str, Any]]): What analyze() returned; None stays
+            None.
+
+    Returns:
+        Optional[Dict[str, Any]]: A copy of the results with the unsuited
+            outputs NaN.
+    """
+    if results is None:
+        return None
+    in_view = dict(results)
+    for measure in face.measures:
+        if not measure.suits(face.lateral, quarter=face.quarter):
+            for name in measure.outputs():
+                in_view[name] = math.nan
+            continue
+        measure.sync_items()  # the items' flags follow the measure's as they are
+        for item in measure.items:
+            if not item.suits(face.lateral, quarter=face.quarter):
+                for name in item.output_names():
+                    in_view[name] = math.nan
+    return in_view
+
+
 def _csv_value(value: float) -> str:
     """A value for the CSV: at most 4 decimal places, without trailing zeros, and
     empty when it isn't a finite number."""
@@ -120,8 +158,9 @@ class FrameSeries:
     Measure outputs frame by frame: one row per frame, one column per output.
 
     Attributes:
-        names (List[str]): The outputs, in column order: the enabled items of the
-            enabled measures (see dynaface.measures.get_all_items()).
+        names (List[str]): The outputs, in column order: those of the enabled
+            items of the enabled measures, a group's listed together (see
+            dynaface.measures.get_all_items()).
         frames (List[int]): Each row's frame number.
         values (Dict[str, List[float]]): Each output's value in every row. A value
             is NaN where the frame had no face or it couldn't be determined.
@@ -164,6 +203,13 @@ class FrameSeries:
         without a face were skipped, as VideoAnalyzer skips them, pass the kept
         frames' numbers in the video as frame_numbers, so each row's time is right.
 
+        A measure's outputs are NaN on a frame whose view it doesn't suit
+        (MeasureBase.suits(): a frontal measure on a quarter or lateral frame, a
+        lateral measure on a frontal one), and so are an item's on a frame whose
+        view the item doesn't suit (MeasureItem.suits()), so a mixed-view video
+        never reports millimeters measured on a turned head; FrameSeries.evaluate()
+        and peak() therefore never pick a turned or profile frame.
+
         Args:
             states (Sequence[List[Any]]): States from AnalyzeFace.dump_state().
             measures (Optional[List[MeasureBase]]): The measures to run; all of
@@ -193,7 +239,8 @@ class FrameSeries:
         for index in range(start, end, step):
             face.load_state(states[index])
             frame = index if frame_numbers is None else frame_numbers[index]
-            series.add(frame, face.analyze(render=False))
+            results = face.analyze(render=False)
+            series.add(frame, _results_in_view(face, results))
         return series
 
     def __len__(self) -> int:
@@ -384,9 +431,14 @@ class VideoAnalyzer:
     is analyzed and kept as a saved state (AnalyzeFace.dump_state()); a frame
     without one is skipped but still counted, so the kept frames keep their numbers
     in the video. With a smoothing above 1, each frame's landmarks are averaged
-    with those of the frames before it (see LandmarkSmoother), and the scale is
-    measured again on the averaged landmarks. Only the first max_frames frames are
-    analyzed.
+    with those of the frames before it (see LandmarkSmoother), the scale is
+    measured again on the averaged landmarks, and a three-quarter frame's far
+    cheek is traced again on them (AnalyzeFace.retrace_far_cheek(), from the
+    frame's own mask); the average starts afresh whenever the view changes (the
+    pose, which way a profile faces, or which cheek of a three-quarter face is
+    the far one), so landmarks of different crops never mix. Each frame is
+    loaded with the previous kept frame's pose, which a classification with
+    hysteresis reads. Only the first max_frames frames are analyzed.
 
     Attributes:
         states (List[List[Any]]): The kept frames' states, in order.
@@ -405,8 +457,8 @@ class VideoAnalyzer:
             smoothing (int): How many frames' landmarks to average; 1, the
                 default, turns smoothing off.
             max_frames (int): How many frames to analyze at most.
-            force_pose (Pose): Pose.DETECT to classify each frame as frontal or
-                lateral, or the pose to use for all of them.
+            force_pose (Pose): Pose.DETECT to classify each frame, as
+                AnalyzeFace.load_image() does, or the pose to use for all of them.
             tilt_threshold (float): As for AnalyzeFace.
         """
         self.states: List[List[Any]] = []
@@ -416,7 +468,10 @@ class VideoAnalyzer:
         self.tilt_threshold = tilt_threshold
         self._smoother = LandmarkSmoother(smoothing)
         self._seen = 0
-        self._lateral: Optional[bool] = None
+        # The last kept frame's view, (pose, flipped, far_left): the smoother is
+        # reset when it changes, and its pose is passed to the next frame's
+        # load_image().
+        self._view: Optional[Tuple[Pose, bool, bool]] = None
 
     @property
     def full(self) -> bool:
@@ -432,6 +487,16 @@ class VideoAnalyzer:
         """
         Analyze the next frame.
 
+        The frame is loaded with the previous kept frame's pose (load_image's
+        previous_pose; None before the first), so a classification with
+        hysteresis keeps a video in one view at a yaw window's edge. When the view
+        (the pose and, for a profile, which way it faces, or, for a three-quarter
+        face, which cheek is the far one) differs from the previous kept frame's,
+        the landmark smoothing starts afresh on this frame. A smoothed
+        three-quarter frame's outline is traced again on its averaged landmarks,
+        from the frame's own mask, so the saved outline belongs to the saved
+        landmarks.
+
         Args:
             image (NDArray[Any]): The frame, upright and as an RGB image.
 
@@ -444,17 +509,33 @@ class VideoAnalyzer:
         frame = self._seen
         self._seen += 1
         face = AnalyzeFace([], tilt_threshold=self.tilt_threshold)
-        face.load_image(image, crop=True, force_pose=self.force_pose)
+        face.load_image(
+            image,
+            crop=True,
+            force_pose=self.force_pose,
+            previous_pose=self._view[0] if self._view is not None else None,
+        )
         if not face.landmarks:
             return False
-        if face.lateral != self._lateral:
-            # A profile's landmarks don't average with a frontal face's.
+        # far_left is False off a quarter face, so frontal and profile frames
+        # key on the pose and the flip alone.
+        view = (face.pose, face.flipped, face.far_left)
+        if view != self._view:
+            # One view's landmarks don't average with another's: a profile's with
+            # a frontal face's, a quarter face's band crop with the frontal crop,
+            # a profile facing the other way, which is flipped, or a quarter face
+            # whose far cheek is the other one, whose band crop is mirrored.
             self._smoother.reset()
-            self._lateral = face.lateral
+            self._view = view
         if self._smoother.size > 1:
             face.landmarks = self._smoother.add(face.landmarks)
             if not face.lateral:
                 face.calc_pd()  # saved with the averaged landmarks it fits
+            if face.quarter:
+                # The outline's rows and nose rows follow the averaged landmarks
+                # too; the mask is the frame's, so no second model pass.
+                face.retrace_far_cheek()
+            face.find_cheek_landmarks()
         self.states.append(face.dump_state())
         self.frames.append(frame)
         return True

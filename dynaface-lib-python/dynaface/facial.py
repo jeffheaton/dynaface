@@ -10,7 +10,7 @@ import copy
 import logging
 import math
 import time
-from typing import Any, Dict, Iterable, List, Optional, Tuple, cast
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, cast
 from urllib.parse import urlparse
 
 import cv2
@@ -21,7 +21,7 @@ from numpy.typing import NDArray
 import dynaface
 import dynaface.image
 import dynaface.measures
-from dynaface import config, measures, models, util
+from dynaface import cheek, cheek_outline, config, models, util
 from dynaface.const import (
     DEFAULT_TILT_THRESHOLD,
     FILL_COLOR,
@@ -154,6 +154,11 @@ def _copy_array(values: Any) -> Optional[NDArray[Any]]:
     return None if values is None else np.array(values)
 
 
+def _no_cheek_landmarks() -> NDArray[np.float64]:
+    """The cheek landmarks of a face with none found: (10, 2), all NaN."""
+    return cheek.landmark_array(None, None, False)
+
+
 def util_get_pupils(
     landmarks: List[Tuple[int, int]],
 ) -> Tuple[Tuple[int, int], Tuple[int, int]]:
@@ -191,16 +196,52 @@ class AnalyzeFace(ImageAnalysis):
             keeps the one it was loaded with, and a face restored with load_state()
             keeps the one it was analyzed with. Set it on a face, then call
             analyze(), to measure that face with another.
-        pix2mm (float): Millimeters per pixel. For a frontal face, analyze()
-            measures it again on the current landmarks before every run, so it
-            always matches them; a profile uses a fixed 0.24.
+        pix2mm (float): Millimeters per pixel. For a frontal or a quarter face,
+            analyze() measures it again on the current landmarks (the pupils)
+            before every run, so it always matches them; a profile uses a fixed
+            0.24. On a quarter face it is the pupil scale foreshortened by the
+            turn, and no millimeter is defined on a turned head (see the units
+            guide), so the millimeter measures don't suit that view.
         measures (List[MeasureBase]): The measures that analyze() runs.
         landmarks (List[Tuple[int, int]]): The 98 WFLW landmark positions, in
             pixels of the current image.
         headpose (List[float]): The head pose the landmark model found in the
             image as loaded: yaw, pitch and roll in degrees (also in yaw, pitch
             and roll), then its translation. dump_state() saves it.
-        pose (Pose): The pose that load_image() detected or was told to use.
+        pose (Pose): The pose that load_image() detected or was told to use:
+            Pose.FRONTAL, Pose.QUARTER (a three-quarter face) or Pose.LATERAL.
+        lateral (bool): Whether the face is a profile, with lateral_landmarks
+            and its sagittal outline (sagittal_x and sagittal_y).
+        quarter (bool): Whether the face is a three-quarter (quarter) face, the
+            counterpart of lateral: pose == Pose.QUARTER with a face (False for
+            an image with no face, whatever pose it was forced to, as lateral
+            is). Detected only with config.AUTO_QUARTER on (beside
+            config.AUTO_LATERAL), or forced with Pose.QUARTER.
+        far_left (bool): On a quarter face, whether the far (measured) cheek is
+            the subject's left: the photo taken from the subject's right. False
+            otherwise.
+        cheek_outline_x (Optional[NDArray[np.float32]]): On a quarter face, the
+            far cheek's traced edge: its sub-pixel x in each row of
+            cheek_outline_y, from the far outer eye corner's row or the far
+            contour's top row, whichever is higher, to the chin row, in pixels
+            of the standard image. None otherwise, and None for a forced quarter
+            state saved before the outline was kept (the contour stands in).
+            retrace_far_cheek() traces it again on the current landmarks.
+        cheek_outline_y (Optional[NDArray[np.int32]]): Those rows.
+        cheek_outline_src (Optional[NDArray[np.uint8]]): Each row's source:
+            cheek_outline.OUTLINE_SRC_CONTOUR (the WFLW contour stood in),
+            OUTLINE_SRC_MASK (the background model's silhouette),
+            OUTLINE_SRC_NOSE (a row the nose joins; the contour) or
+            OUTLINE_SRC_EDGE (the strongest intensity edge, where the mask had
+            none).
+        cheek_landmarks (NDArray[np.float64]): The ten cheek landmarks named by
+            cheek.CHEEK_LANDMARK_NAMES, (10, 2) pixels of the standard image,
+            NaN where a point doesn't exist in the view: the frontal
+            constructions on a frontal face, the far cheek's observed points on
+            a quarter face. Derived from the landmarks and the view by
+            find_cheek_landmarks(), never saved; the Landmarks measure's
+            "Cheek Landmarks" item reports them (cheek.CHEEK_LANDMARK_OUTPUTS)
+            and draws them (draw_cheek_landmarks()).
         render_img (NDArray[np.uint8]): The image the measures draw on.
     """
 
@@ -237,6 +278,27 @@ class AnalyzeFace(ImageAnalysis):
         # A profile's outline: the x of its edge in each row y, from analyze_lateral().
         self.sagittal_x: Optional[NDArray[Any]] = None
         self.sagittal_y: Optional[NDArray[Any]] = None
+        # A three-quarter (quarter) face, the counterpart of lateral: which cheek
+        # is the far (measured) one, and that cheek's outline, the edge's x in
+        # each row y with each row's source, from _trace_far_cheek().
+        self.quarter: bool = False
+        self.far_left: bool = False
+        self.cheek_outline_x: Optional[NDArray[np.float32]] = None
+        self.cheek_outline_y: Optional[NDArray[np.int32]] = None
+        self.cheek_outline_src: Optional[NDArray[np.uint8]] = None
+        # What that outline was traced from (the foreground mask, its alpha and
+        # the gray image of the cropped image), kept so retrace_far_cheek() can
+        # trace it again on other landmarks without a second background-model
+        # pass; None for a restored state or any other face.
+        self._far_cheek_mask: Optional[
+            Tuple[NDArray[np.bool_], NDArray[np.uint8], NDArray[np.uint8]]
+        ] = None
+        # The ten cheek landmarks (cheek.CHEEK_LANDMARK_NAMES), (10, 2) px, NaN
+        # where absent in the view, and what find_cheek_landmarks() computed them
+        # from (frontal_cheek() and oblique_cheek()).
+        self.cheek_landmarks: NDArray[np.float64] = _no_cheek_landmarks()
+        self._frontal_cheek: Optional[cheek.FrontalCheek] = None
+        self._oblique_cheek: Optional[cheek_outline.ObliqueCheek] = None
         self.pupillary_distance: float = 0.0
         self.tilt_threshold: float = tilt_threshold
         self.pix2mm: float = 1.0
@@ -252,8 +314,10 @@ class AnalyzeFace(ImageAnalysis):
 
     def get_all_items(self) -> List[str]:
         """
-        List the outputs to show or export: the enabled items of the enabled
-        measures, without display-only items.
+        List the outputs to show or export: the output names
+        (MeasureItem.output_names()) of the enabled items of the enabled measures,
+        a group's outputs listed together in its place and none for a display-only
+        item.
 
         analyze() returns every output whether or not its item is enabled, so use
         this list to choose which ones to show.
@@ -337,7 +401,6 @@ class AnalyzeFace(ImageAnalysis):
         # Fallback on landmark-based asymmetry
         # Use the same nose-distance logic as _is_lateral
         # landmarks[6] = left brow corner, [26] = right brow corner, [54] = nose tip
-        x = self.shape[1]
         nd1 = self.landmarks[54][0] - self.landmarks[6][0]
         nd2 = self.landmarks[26][0] - self.landmarks[54][0]
         nd = nd1 if abs(nd1) < abs(nd2) else nd2
@@ -374,18 +437,56 @@ class AnalyzeFace(ImageAnalysis):
         nose_distance = min(nose_distance1, nose_distance2, key=abs)
         nose_distance_ratio = nose_distance / self.shape[1]
 
+        is_lateral: bool
         if abs(yaw) > 20 and nose_distance_ratio < 0:
             # Lateral if yaw exceeds ±20 degrees and nose distance ratio is negative
-            is_lateral: bool = True
+            is_lateral = True
             logger.info(
                 f"Detected lateral head pose: yaw={yaw}>20, nose_distance_ratio={nose_distance_ratio}<0"
             )
         else:
-            is_lateral: bool = False
+            is_lateral = False
 
         is_facing_left: bool = yaw < 0  # True if facing left
 
         return is_lateral, is_facing_left
+
+    def _is_quarter(
+        self, previous_pose: Optional[Pose], require_margin: bool = True
+    ) -> Tuple[bool, bool]:
+        """
+        Determine whether the face is a three-quarter (quarter) face, and whether
+        its far cheek is the subject's left: cheek.classify_quarter() on the raw
+        landmarks and head pose, before any crop or flip, holding a video in the
+        view a little past its yaw window when the previous kept frame was a
+        quarter face.
+
+        Args:
+            previous_pose (Optional[Pose]): The pose of a video's previous kept
+                frame, or None for a still image or the first frame.
+            require_margin (bool): Whether the nose margin rule applies; False
+                for a face the profile test has declined.
+
+        Returns:
+            Tuple[bool, bool]: Whether the face is a quarter face, and whether its
+                far (measured) cheek is the subject's left. (False, False) when
+                config.AUTO_LATERAL (the one pose-detection switch users have
+                today, which turns all detection off) or config.AUTO_QUARTER is
+                off, or there is no face.
+        """
+        if not config.AUTO_LATERAL or not config.AUTO_QUARTER:
+            logger.debug("AUTO_QUARTER or AUTO_LATERAL is False, no quarter detection.")
+            return False, False
+
+        if self.is_no_face():
+            return False, False
+
+        return cheek.classify_quarter(
+            self.landmarks,
+            float(self._headpose[0]),
+            previous_quarter=previous_pose == Pose.QUARTER,
+            require_margin=require_margin,
+        )
 
     def _overlay_lateral_analysis(self, c: Optional[NDArray[np.uint8]]) -> None:
         """
@@ -427,23 +528,56 @@ class AnalyzeFace(ImageAnalysis):
         crop: Optional[bool] = True,
         pupils: Optional[Tuple[Tuple[int, int], Tuple[int, int]]] = None,
         force_pose: Optional[Pose] = Pose.DETECT,
+        previous_pose: Optional[Pose] = None,
     ) -> bool:
         """
         Load an RGB image, find the face, place its landmarks and crop it.
 
+        The pose decides the crop: a frontal face gets the pupil-anchored
+        StyleGAN crop (when crop is True); a three-quarter (quarter) face is
+        always cropped with the centered band crop (crop_lateral(center=True)),
+        never flipped or straightened, and its far cheek's outline is traced
+        from the background model (cheek_outline_x, _y and _src); a profile is
+        always cropped, flipped to face left, and its sagittal outline traced.
+        The scale (pix2mm) is then measured on the cropped pupils for a frontal
+        or a quarter face, and the cheek landmarks are located
+        (find_cheek_landmarks()). Only the frontal crop straightens a tilted
+        face (tilt_threshold), so face_rotation is None for every other face,
+        and for a frontal face within the threshold; dump_state() saves it so.
+        An image with no face leaves the face with no landmarks, no view and a
+        fresh face's scale (no pupillary distance, one millimeter per pixel).
+
         Args:
             img (NDArray[Any]): The image, as an RGB array.
             crop (bool): Whether to crop the face to the standard 1024 by 1024 size.
-                Lateral faces are always cropped.
+                Lateral and quarter faces are always cropped.
             pupils (Optional[Tuple[Tuple[int, int], Tuple[int, int]]]): Currently
                 unused; the crop is always placed using the pupils found in this
                 image.
             force_pose (Optional[Pose]): Pose.DETECT to classify the pose as
-                frontal or lateral, or a Pose to use instead.
+                frontal, quarter or lateral (quarter only with config.AUTO_QUARTER
+                on, beside config.AUTO_LATERAL; see cheek.classify_quarter()), or
+                a Pose to use instead. A forced Pose.QUARTER takes the quarter
+                path, with the far cheek read from the landmarks.
+            previous_pose (Optional[Pose]): The pose of a video's previous kept
+                frame, or None for a still image or the first frame; VideoAnalyzer
+                passes it. The quarter classification holds a frame in that view
+                a little past its yaw window (cheek.QUARTER_YAW_HOLD), so a turn
+                at the window's edge keeps one view instead of alternating crops
+                from frame to frame.
 
         Returns:
             bool: True once the image is loaded.
+
+        Raises:
+            ValueError: If AnalyzeFace.pd is outside 40 to 85 mm (checked first,
+                so the face is left as it was), or the models aren't initialized.
+            ModelOutputError: If a model's output is one no working model gives.
         """
+        # Measure this face with today's AnalyzeFace.pd, kept on the face so that a
+        # later change to the class doesn't rescale it. Checked before anything
+        # else, so a mistaken setting fails at once and leaves the face as it was.
+        self.pd = check_pupil_distance(type(self).pd)
         super().load_image(img)
         logger.debug("Low level-image loaded")
         # The view belongs to this image: nothing carries over from the last image a
@@ -453,10 +587,20 @@ class AnalyzeFace(ImageAnalysis):
         self.lateral_landmarks = np.empty((0, 2), dtype=int)
         self.sagittal_x = None
         self.sagittal_y = None
-        # Measure this face with today's AnalyzeFace.pd, kept on the face so that a
-        # later change to the class doesn't rescale it. Checked before the models
-        # run, so a mistaken setting fails at once.
-        self.pd = check_pupil_distance(type(self).pd)
+        self._clear_quarter_view()
+        self.cheek_landmarks = _no_cheek_landmarks()
+        self._frontal_cheek = None
+        self._oblique_cheek = None
+        # Only crop_stylegan() writes these two, so a quarter or lateral frame
+        # after a straightened frontal one would otherwise keep that frame's
+        # rotation, which AnalyzePosition reports and dump_state() saves.
+        self.face_rotation = None
+        self.orig_pupils = ((0, 0), (0, 0))
+        # The scale too: a frame without a face keeps a fresh face's values (no
+        # pupillary distance, one millimeter per pixel), not the last frame's,
+        # which dump_state() would otherwise save with it.
+        self.pupillary_distance = 0.0
+        self.pix2mm = 1.0
         self._scale_from_landmarks = False
         landmarks, self._headpose = self._find_landmarks(img)
         self.yaw, self.pitch, self.roll = self._headpose[:3]
@@ -466,22 +610,52 @@ class AnalyzeFace(ImageAnalysis):
         self.headpose = [float(v) for v in self._headpose]
         self.landmarks = [(int(x), int(y)) for x, y in landmarks]
 
+        quarter_pos: bool
+        far_left: bool
         if force_pose is None or force_pose == Pose.DETECT:
-            # If force_pose is None or DETECT, determine lateral position.
-            lateral_pos, facing_left = self._is_lateral()
-            if lateral_pos:
+            # The quarter classification reads the raw landmarks and head pose,
+            # before any crop or flip, and comes first: a 35 to 55 degree turn is
+            # a quarter face, and only a nose past the far contour is left to
+            # the profile logic. When that declines the face too, the turn is
+            # still a quarter face (its cheek.nose flags it), never a frontal
+            # one, whose millimeter measures would run on a turned head.
+            quarter_pos, far_left = self._is_quarter(previous_pose)
+            lateral_pos, facing_left = False, False
+            if not quarter_pos:
+                lateral_pos, facing_left = self._is_lateral()
+                if not lateral_pos:
+                    quarter_pos, far_left = self._is_quarter(
+                        previous_pose, require_margin=False
+                    )
+            if quarter_pos:
+                logger.debug("Detected quarter position")
+                self.pose = Pose.QUARTER
+            elif lateral_pos:
                 logger.debug("Detected lateral position")
                 self.pose = Pose.LATERAL
             else:
                 logger.debug("Detected frontal position")
                 self.pose = Pose.FRONTAL
-        elif force_pose == Pose.FRONTAL or force_pose == Pose.QUARTER:
-            lateral_pos = False
-            facing_left = False
+        elif force_pose == Pose.QUARTER:
+            logger.debug("Forced quarter position")
+            lateral_pos, facing_left = False, False
+            self.pose = Pose.QUARTER
+            # The far side always comes from the landmarks, never from the pose
+            # (the model's yaw only when they give no frame).
+            quarter_pos = bool(self.landmarks)
+            far_left = (
+                cheek.far_left_of(self.landmarks, yaw_reported=float(self._headpose[0]))
+                if quarter_pos
+                else False
+            )
+        elif force_pose == Pose.FRONTAL:
             logger.debug("Forced frontal position")
-            self.pose = force_pose
+            lateral_pos, facing_left = False, False
+            quarter_pos, far_left = False, False
+            self.pose = Pose.FRONTAL
         else:
             lateral_pos, facing_left = self._force_lateral()
+            quarter_pos, far_left = False, False
             self.pose = Pose.LATERAL
 
         if lateral_pos and self.landmarks:
@@ -508,14 +682,17 @@ class AnalyzeFace(ImageAnalysis):
             pad_right = total_pad - pad_left
 
             if total_pad > 0:
-                padded = cv2.copyMakeBorder(
-                    self.original_img,
-                    top=0,
-                    bottom=0,
-                    left=pad_left,
-                    right=pad_right,
-                    borderType=cv2.BORDER_CONSTANT,
-                    value=[0, 0, 0],  # black bars
+                padded = np.asarray(
+                    cv2.copyMakeBorder(
+                        self.original_img,
+                        top=0,
+                        bottom=0,
+                        left=pad_left,
+                        right=pad_right,
+                        borderType=cv2.BORDER_CONSTANT,
+                        value=[0, 0, 0],  # black bars
+                    ),
+                    dtype=np.uint8,
                 )
                 # Keep images in sync
                 self.original_img = padded
@@ -531,12 +708,24 @@ class AnalyzeFace(ImageAnalysis):
             logger.debug("Landmarks located")
             self.lateral = False
 
-            if crop:
+            if quarter_pos:
+                # Always cropped, like a profile, with the band crop that keeps
+                # the chin in frame and crops the two mirrored turns of one face
+                # alike; never flipped or straightened (roll is handled inside
+                # the cheek constructions), and without the profile's side-bar
+                # widening, which exists for the sagittal chart.
+                logger.debug("Cropping a quarter face")
+                self.quarter = True
+                self.far_left = far_left
+                self.crop_lateral(center=True)
+            elif crop:
                 logger.debug("Cropping")
                 self.crop_stylegan(pupils=pupils)
 
             # After the crop, so pix2mm matches the (rescaled) landmarks that
-            # every measure multiplies it by.
+            # every measure multiplies it by. A quarter face keeps the pupil scale
+            # too, foreshortened by its turn: no millimeter is defined on a turned
+            # head, so the millimeter measures don't suit that view.
             self.calc_pd()
 
         if self.lateral:  # a profile with a face; without one there's nothing to trace
@@ -552,6 +741,78 @@ class AnalyzeFace(ImageAnalysis):
             if c is not None:  # None when no outline could be traced
                 self._overlay_lateral_analysis(util.trim_sides(c))
 
+        if self.quarter and self.landmarks:
+            # The far cheek's outline, the one image-dependent step of the cheek
+            # landmarks: traced on the cropped image, as a profile's outline is.
+            self._trace_far_cheek()
+
+        self.find_cheek_landmarks()
+        return True
+
+    def _clear_quarter_view(self) -> None:
+        """No quarter view: not a quarter face, no far side, no outline and
+        nothing to trace one from."""
+        self.quarter = False
+        self.far_left = False
+        self.cheek_outline_x = None
+        self.cheek_outline_y = None
+        self.cheek_outline_src = None
+        self._far_cheek_mask = None
+
+    def _trace_far_cheek(self) -> None:
+        """
+        Trace the far cheek's outline of a quarter face on the cropped image and
+        keep it as cheek_outline_x, cheek_outline_y and cheek_outline_src:
+        cheek_outline.trace_far_cheek() on the background model's foreground
+        (lateral.foreground_mask(), the mask every profile is traced from). The
+        gray image goes along (cheek_outline.gray_image(), the library's own
+        conversion, so both ports read the same edge), so a row the mask has no
+        edge on (hair hanging beside the cheek is foreground too) takes the
+        strongest intensity edge beside the contour instead, marked
+        cheek_outline.OUTLINE_SRC_EDGE. The mask, its alpha and the gray image
+        are kept for retrace_far_cheek().
+
+        Raises:
+            ValueError: If the models aren't initialized.
+            ModelOutputError: From the background model, as for a profile.
+        """
+        from dynaface.lateral import foreground_mask
+
+        # self.render_img is RGB (dynaface's convention); cv2_to_pil expects a BGR
+        # (opencv-native) image, so convert before handing it off, as for a profile.
+        p = util.cv2_to_pil(cv2.cvtColor(self.render_img, cv2.COLOR_RGB2BGR))
+        foreground, alpha = foreground_mask(p)
+        gray = cheek_outline.gray_image(self.render_img)
+        self._far_cheek_mask = (foreground, alpha, gray)
+        self.retrace_far_cheek()
+
+    def retrace_far_cheek(self) -> bool:
+        """
+        Trace the far cheek's outline again on the current landmarks, from the
+        mask that load_image() ran the background model on for this image, so
+        the outline's rows, its seed and its nose rows belong to the landmarks
+        it will be measured with. The mask is kept with the face (about 3 MB for
+        the standard image) until the next load_image() or load_state(), so this
+        costs the trace alone, never a second background-model pass. A caller
+        that replaces the landmarks of a quarter face calls it before
+        find_cheek_landmarks(), as VideoAnalyzer.add() does after smoothing
+        them: an outline traced on other landmarks can start and end rows away
+        from the band the smoothed landmarks define, and its nose rows were read
+        against the other landmarks' contour.
+
+        Returns:
+            bool: True when the outline was traced again; False, leaving the
+                outline as it is, when there is no mask to trace it from (a
+                face restored by load_state(), a frontal face or a profile).
+        """
+        if self._far_cheek_mask is None or not self.quarter:
+            return False
+        foreground, alpha, gray = self._far_cheek_mask
+        self.cheek_outline_x, self.cheek_outline_y, self.cheek_outline_src = (
+            cheek_outline.trace_far_cheek(
+                foreground, alpha, self.landmarks, self.far_left, gray=gray
+            )
+        )
         return True
 
     def draw_landmarks(
@@ -601,6 +862,54 @@ class AnalyzeFace(ImageAnalysis):
             if self.right_eye is not None:
                 self.circle(self.right_eye, color=color)
 
+    def draw_cheek_landmarks(
+        self,
+        size: float = 0.25,
+        color: Tuple[int, int, int] = (255, 128, 0),
+        names: bool = True,
+    ) -> None:
+        """
+        Draw the cheek landmarks (and optionally their codes) on the image.
+
+        Each row of cheek_landmarks that exists in the view (every row is NaN
+        where it doesn't) gets a dot of the same size as draw_landmarks() draws,
+        and, with names, its code from cheek.CHEEK_LANDMARK_CODES beside it, the
+        way draw_landmarks() writes the landmark numbers: the six frontal
+        constructions on a frontal face, the far cheek's apex and submalar
+        point on a quarter face. The submalar point is drawn only when the
+        outline dips into a hollow there (oblique_cheek()'s submalar_present is
+        1.0), as the cheek measure draws it: an absent one is still in
+        cheek_landmarks, and exported, where its depth is known, but isn't drawn
+        as a cheek point. Nothing is drawn without a face, or on a profile, whose
+        cheek landmarks are all NaN.
+
+        Args:
+            size (float): Visual scale factor for the dots and the code labels.
+            color (Tuple[int,int,int]): BGR color for drawing.
+            names (bool): If True, draw each landmark's code next to its dot.
+        """
+        if self.is_no_face():
+            return
+        points = self.cheek_landmarks
+        if points is None or not np.isfinite(points).any():
+            return
+
+        oblique = self.oblique_cheek()
+        skip: Set[int] = set()
+        if oblique is None or oblique.submalar_present != 1.0:
+            skip = {cheek.CHEEK_LM_SUBMALAR_R, cheek.CHEEK_LM_SUBMALAR_L}
+
+        radius = max(1, int(round(3 * size)))
+        text_nudge = radius + 1
+
+        for row, (code, (x, y)) in enumerate(zip(cheek.CHEEK_LANDMARK_CODES, points)):
+            if row in skip or not (math.isfinite(x) and math.isfinite(y)):
+                continue
+            xi, yi = int(round(float(x))), int(round(float(y)))
+            self.circle((xi, yi), radius=radius, color=color)
+            if names:
+                self.write_text((xi + text_nudge, yi), code, size=size)
+
     def measure(
         self,
         pt1: Tuple[int, int],
@@ -647,6 +956,11 @@ class AnalyzeFace(ImageAnalysis):
         """
         Run the enabled measures on the face, drawing them on render_img.
 
+        First the scale is measured again on the current landmarks (calc_pd())
+        and the cheek landmarks are located again (find_cheek_landmarks()), so
+        both match the landmarks about to be measured, as after a video's
+        smoothing.
+
         Args:
             render (bool): Whether to draw the measures. The values are the same
                 either way, so turn it off when you only need the numbers.
@@ -666,6 +980,7 @@ class AnalyzeFace(ImageAnalysis):
             # Measure the scale on the landmarks about to be measured, so it can't
             # be one left over from before a crop, or from a saved state.
             self.calc_pd()
+        self.find_cheek_landmarks()
         self.width = self.render_img.shape[1]
         self.height = self.render_img.shape[0]
         m = self.calc_text_size("W")
@@ -689,18 +1004,33 @@ class AnalyzeFace(ImageAnalysis):
             )
         )
 
-    def crop_lateral(self) -> None:
+    def crop_lateral(self, center: bool = False) -> None:
         """
-        Crop to 1024×1024 for lateral analysis, guaranteeing that ALL landmarks
-        are visible vertically, plus configurable top/bottom padding.
+        Crop to 1024×1024 for lateral analysis (and, centered, for a quarter
+        face), guaranteeing that ALL landmarks are visible vertically, plus
+        configurable top/bottom padding.
 
         - Scale is chosen so (landmark_band + pads) fits within 1024 px height.
+          A profile never scales up past filling the frame, so its padding can
+          grow; a quarter face (center) always fills the crop with its band and
+          pads, whatever the frame's size, as the frontal crop fixes the pupils'
+          spacing: the chin-to-canthus distance H (cheek.scale) and every
+          pixel-sized rule of the cheek landmarks then follow the face, not the
+          frame it was photographed in, and the same face reads alike from a
+          phone frame and a 4K one.
         - Horizontally, the profile's leading edge (leftmost landmark; the face
         always faces left here) is placed LATERAL_LEFT_MARGIN_RATIO from the
         left, so the face uses the space at the left and the sagittal chart
         overlaid at the right cuts off near the front of the ear.
         - If the source is narrow, side padding is allowed (pillarbox) so that
         vertical padding is never silently squeezed away.
+
+        Args:
+            center (bool): Place the landmarks' horizontal middle at the middle of
+                the crop instead of the leading edge at LATERAL_LEFT_MARGIN_RATIO,
+                and scale the band to fill the crop, for a quarter face, which is
+                never flipped and gets no chart, so the two mirrored turns of one
+                face crop alike.
         """
         target = STYLEGAN_WIDTH
         width, height = self.render_img.shape[1], self.render_img.shape[0]
@@ -729,8 +1059,10 @@ class AnalyzeFace(ImageAnalysis):
         # Previous "fill both dims" scale (prevents top/bottom padding from ever growing)
         s_fill = max(target / float(width), target / float(height))
 
-        # Choose the smaller so the pads actually fit; allow side padding if needed.
-        scale = min(s_fill, s_vert)
+        # A profile takes the smaller so the pads fit without scaling up past the
+        # frame; a quarter face takes the band's own scale, whatever the frame,
+        # with the sides padded by safe_clip when the scaled frame is narrower.
+        scale = s_vert if center else min(s_fill, s_vert)
 
         new_width = max(1, int(round(width * scale)))
         new_height = max(1, int(round(height * scale)))
@@ -738,9 +1070,18 @@ class AnalyzeFace(ImageAnalysis):
         # Resize first
         img2 = cv2.resize(self.render_img, (new_width, new_height))
 
-        # --- Horizontal crop: leading edge (nose tip) at a fixed left margin ---
+        # --- Horizontal crop: leading edge (nose tip) at a fixed left margin, or
+        # the landmarks' middle at the crop's middle ---
         if not self.landmarks:
             crop_x = (new_width - target) // 2
+        elif center:
+            # The landmarks' middle at the crop's middle, both as pixel centers
+            # (the + 1.0 and the target / 2.0), so the two mirrored turns of one
+            # face, whose mirror maps column x to width - 1 - x, crop as mirror
+            # images of each other at any scale.
+            xs = [x for (x, _) in self.landmarks]
+            middle = (min(xs) + max(xs) + 1.0) / 2.0
+            crop_x = int(round(middle * scale - target / 2.0))
         else:
             min_x = int(min(x for (x, _) in self.landmarks if x is not None))
             min_x_s = int(round(min_x * scale))
@@ -877,6 +1218,71 @@ class AnalyzeFace(ImageAnalysis):
         """
         return util_get_pupils(self.landmarks)
 
+    def find_cheek_landmarks(self) -> NDArray[np.float64]:
+        """
+        Locate the ten cheek landmarks from the current landmarks and view, and
+        keep them as cheek_landmarks: cheek.locate() on the quarter and lateral
+        flags (the two the Cheek Measures measure reads, so a face whose pose
+        attribute isn't a Pose is measured as the measure measures it), the far side and
+        the stored outline (the contour stands in without one) gives the far
+        cheek's observed points on a quarter face or the frontal constructions
+        on any other face that isn't a profile, each computed once and kept for
+        frontal_cheek() and oblique_cheek(), and cheek.landmark_array() fills
+        the array from them, as cheek.locate_all() fills its own, so the two are
+        equal for this face's landmarks and view. A profile, no face, a landmark
+        that isn't finite or coincident pupils give all NaN.
+
+        load_image(), load_state() and analyze() call it, so the array exists
+        before any measure runs and follows a video's smoothed landmarks. A
+        caller that replaces face.landmarks calls it again, as it calls
+        calc_pd(), after retrace_far_cheek() on a quarter face, so the outline
+        it reads was traced on those landmarks.
+
+        Returns:
+            NDArray[np.float64]: cheek_landmarks, (10, 2) px, NaN where a point
+                doesn't exist in the view.
+        """
+        self._frontal_cheek, self._oblique_cheek = cheek.locate(
+            self.landmarks,
+            self.quarter,
+            self.lateral,
+            self.far_left,
+            self.cheek_outline_x,
+            self.cheek_outline_y,
+            self.cheek_outline_src,
+        )
+        self.cheek_landmarks = cheek.landmark_array(
+            self._frontal_cheek, self._oblique_cheek, self.far_left
+        )
+        return self.cheek_landmarks
+
+    def frontal_cheek(self) -> Optional[cheek.FrontalCheek]:
+        """
+        The frontal constructions that the last find_cheek_landmarks() computed
+        cheek_landmarks' rows 0 to 5 from: the pupil-axis frame, the zygion level,
+        the ends of the canthus verticals and the clip codes, for drawing them
+        yourself.
+
+        Returns:
+            Optional[cheek.FrontalCheek]: The constructions, or None on a quarter
+                face, a profile, with no face or with coincident pupils.
+        """
+        return self._frontal_cheek
+
+    def oblique_cheek(self) -> Optional[cheek_outline.ObliqueCheek]:
+        """
+        The far cheek's observed points that the last find_cheek_landmarks()
+        computed cheek_landmarks' rows 6 to 9 from: the apex and submalar point
+        with their heights, the chord, the levels and every flag the cheek
+        measure reports.
+
+        Returns:
+            Optional[cheek_outline.ObliqueCheek]: The observed points, or None on
+                a frontal face, a profile, with no face, or when the landmarks give
+                no frame or too short a band to search.
+        """
+        return self._oblique_cheek
+
     def dump_state(self) -> List[Any]:
         """
         Capture this frame's analysis, so a video's frames can be kept and
@@ -884,12 +1290,16 @@ class AnalyzeFace(ImageAnalysis):
 
         Returns:
             List[Any]: The original image, head pose, landmarks, pupillary
-                distance, millimeters per pixel and face rotation, then the view: a
+                distance, millimeters per pixel and face rotation (None unless the
+                frontal crop straightened this face), then the view: a
                 dict of the pose's value (such as "frontal"), whether a profile was
                 flipped, whether the face is lateral and, for a profile, its lateral
-                landmarks and sagittal outline (sagittal_x and sagittal_y). The
-                values are plain Python values and NumPy arrays, so the state can be
-                saved without pickle.
+                landmarks and sagittal outline (sagittal_x and sagittal_y); for a
+                quarter face, which cheek is the far one (far_left) and, when it
+                was traced, that cheek's outline (cheek_outline_x, cheek_outline_y
+                and cheek_outline_src). The values are bools, strings, None and
+                arrays of numbers, so the state can be saved without pickle. The
+                cheek landmarks aren't saved: load_state() locates them again.
         """
         view: Dict[str, Any] = {
             "pose": self.pose.value if isinstance(self.pose, Pose) else str(self.pose),
@@ -900,6 +1310,13 @@ class AnalyzeFace(ImageAnalysis):
             view["lateral_landmarks"] = np.array(self.lateral_landmarks)
             view["sagittal_x"] = _copy_array(self.sagittal_x)
             view["sagittal_y"] = _copy_array(self.sagittal_y)
+        if self.quarter:
+            view["far_left"] = bool(self.far_left)
+            # None for a restored forced-quarter state saved without a trace.
+            if self.cheek_outline_x is not None:
+                view["cheek_outline_x"] = _copy_array(self.cheek_outline_x)
+                view["cheek_outline_y"] = _copy_array(self.cheek_outline_y)
+                view["cheek_outline_src"] = _copy_array(self.cheek_outline_src)
         result: List[Any] = [
             self.original_img,
             list(self.headpose),
@@ -925,9 +1342,18 @@ class AnalyzeFace(ImageAnalysis):
 
         It restores the view too: the pose, whether a profile was flipped, and a
         profile's lateral landmarks and sagittal outline, so AnalyzeLateral measures
-        it as it did the original. States saved by Dynaface 2.0.4 and earlier hold
-        no view, and leave the face's own as it is, which a caller that kept a
-        profile's lateral data apart from its states can set before restoring them.
+        it as it did the original, and a quarter face's far side and outline, so
+        the Cheek Measures measure does. A quarter state saved by a development build
+        before the outline was kept (its view holds the pose "quarter" but no
+        far_left or cheek_outline_* keys) restores as a quarter face whose far
+        side comes from its landmarks and whose outline is None (the contour
+        stands in). States saved by Dynaface 2.0.4 and earlier hold no
+        view: the face keeps its own lateral data, which a caller that kept a
+        profile's lateral data apart from its states can set before restoring
+        them, but never a quarter view, since no such state was a quarter face
+        and an outline belongs to one image; its pose is frontal unless it is
+        lateral. The cheek landmarks are located again at the end
+        (find_cheek_landmarks()).
 
         Args:
             obj (List[Any]): The list dump_state() returned. A state saved without
@@ -949,6 +1375,13 @@ class AnalyzeFace(ImageAnalysis):
             self.face_rotation = 0
         if len(obj) > 6 and isinstance(obj[6], dict):
             self._load_view(obj[6])
+        else:
+            # No view (Dynaface 2.0.4 and earlier): the lateral data stays, as
+            # documented; a quarter view never does, since none of those states
+            # was a quarter face and the outline was traced on another image.
+            self._clear_quarter_view()
+            if not self.lateral:
+                self.pose = Pose.FRONTAL
         self._scale_from_landmarks = False
         saved_pd = _saved_pupil_distance(obj[3], obj[4])
         if (
@@ -958,12 +1391,23 @@ class AnalyzeFace(ImageAnalysis):
         ):
             self.pd = saved_pd
             self.calc_pd()
+        self.find_cheek_landmarks()
 
     def _load_view(self, view: Dict[str, Any]) -> None:
-        """Restore the view that dump_state() saved: pose, flip and lateral data."""
+        """
+        Restore the view that dump_state() saved: pose, flip, lateral data, and a
+        quarter face's far side and outline. quarter follows the pose, with a
+        face, as load_image() sets it (a forced quarter pose on an image with no
+        face saves pose "quarter" and quarter False, and restores so); a quarter
+        view without far_left (saved by a development build before the outline
+        was kept) takes it from the landmarks, and one without an outline
+        leaves None.
+        """
         self.pose = Pose(view.get("pose", Pose.FRONTAL.value))
         self.flipped = bool(view.get("flipped", False))
         self.lateral = bool(view.get("lateral", False))
+        # A state carries the outline, never what it was traced from.
+        self._far_cheek_mask = None
         if self.lateral:
             self.lateral_landmarks = np.array(view["lateral_landmarks"])
             self.sagittal_x = _copy_array(view.get("sagittal_x"))
@@ -972,6 +1416,23 @@ class AnalyzeFace(ImageAnalysis):
             self.lateral_landmarks = np.empty((0, 2), dtype=int)
             self.sagittal_x = None
             self.sagittal_y = None
+        self.quarter = self.pose == Pose.QUARTER and bool(self.landmarks)
+        if "far_left" in view:
+            self.far_left = bool(view["far_left"])
+        elif self.quarter and len(self.landmarks) > LM_LEFT_PUPIL:
+            self.far_left = cheek.far_left_of(
+                self.landmarks, yaw_reported=float(self.yaw)
+            )
+        else:
+            self.far_left = False
+        if self.quarter:
+            self.cheek_outline_x = _copy_array(view.get("cheek_outline_x"))
+            self.cheek_outline_y = _copy_array(view.get("cheek_outline_y"))
+            self.cheek_outline_src = _copy_array(view.get("cheek_outline_src"))
+        else:
+            self.cheek_outline_x = None
+            self.cheek_outline_y = None
+            self.cheek_outline_src = None
 
     def find_pupils(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
         """
@@ -999,14 +1460,20 @@ class AnalyzeFace(ImageAnalysis):
         return util.bisecting_line_coordinates(img_size=1024, pupils=pupils)
 
     def draw_static(self) -> None:
-        """Write the pose, such as "Frontal" or "Lateral (left)", at the bottom left
-        of render_img."""
+        """Write the pose, such as "Frontal", "Quarter (left cheek)" or "Lateral
+        (left)", at the bottom left of render_img. A quarter face's label names
+        the cheek measured, the far one."""
         if self.pose == Pose.FRONTAL:
             text = "Frontal"
         elif self.pose == Pose.QUARTER:
-            text = "Quarter"
+            text = "Quarter (left cheek)" if self.far_left else "Quarter (right cheek)"
         elif self.pose == Pose.LATERAL:
             text = "Lateral (right)" if self.flipped else "Lateral (left)"
+        elif self.lateral:
+            # A pose that isn't a Pose (a face restored without one): the flags.
+            text = "Lateral (right)" if self.flipped else "Lateral (left)"
+        else:
+            text = "Quarter" if self.quarter else "Frontal"
 
         self.write_text((10, self.height - 20), text, size=2)
 
@@ -1032,6 +1499,12 @@ def load_face_image(
 
     Returns:
         AnalyzeFace: The face, ready for analyze().
+
+    Raises:
+        FileNotFoundError: If filename is a path to a file that does not
+            exist.
+        cv2.error: If the file or the downloaded data cannot be decoded as an
+            image.
     """
     if measures is None:
         measures = dynaface.measures.all_measures()
@@ -1042,6 +1515,8 @@ def load_face_image(
         response.raise_for_status()
         img_array = np.asarray(bytearray(response.content), dtype=np.uint8)
         img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        if img is None:
+            raise cv2.error(f"Could not decode image from {filename}")
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     else:
         img = dynaface.image.load_image(filename)

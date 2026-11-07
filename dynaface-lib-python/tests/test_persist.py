@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import unittest
@@ -8,12 +9,17 @@ import numpy as np
 from dynaface import facial, measures, models
 from dynaface.const import Pose
 from dynaface.image import load_image
+from dynaface.measures_cheek import AnalyzeCheekMeasures
 from dynaface.measures_lateral import AnalyzeLateral
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
 LATERAL_OUTPUTS = ("nfa", "nla", "at", "nt", "at_nt")
+# The types a saved view may hold: bool, str, None and arrays of numbers, which
+# the desktop app's .dyfc files store as JSON and .npy files.
+PLAIN_TYPES = (str, bool, type(None))
+FRONTAL_VIEW = {"pose": "frontal", "flipped": False, "lateral": False}
 
 
 def _same(a, b):
@@ -223,21 +229,56 @@ class TestSavedView(unittest.TestCase):
     SAGITTAL_Y = np.arange(1024, dtype=np.int32)
     SAGITTAL_X = (300 + SAGITTAL_Y % 50).astype(np.int32)
 
-    def load(self, pose, face=None):
-        """A face loaded with made-up landmarks and lateral data instead of the models."""
+    def load(self, pose, face=None, lateral=None):
+        """A face loaded with made-up landmarks and lateral data instead of the models.
+
+        lateral is what analyze_lateral() returns: by default a chart, the lateral
+        landmarks and the sagittal outline."""
         face = face or facial.AnalyzeFace(
             measures=[AnalyzeLateral(), measures.AnalyzePose()]
         )
         img = np.full((1024, 1024, 3), 128, dtype=np.uint8)
         landmarks = [(400 + i, 300 + 4 * i) for i in range(96)]
         landmarks += [(450, 400), (550, 400)]  # the pupils
-        chart = np.full((1024, 600, 3), 255, dtype=np.uint8)
-        chart[:, 100:500] = 0
-        lateral = (chart, self.LATERAL_LANDMARKS, self.SAGITTAL_X, self.SAGITTAL_Y)
+        if lateral is None:
+            chart = np.full((1024, 600, 3), 255, dtype=np.uint8)
+            chart[:, 100:500] = 0
+            lateral = (chart, self.LATERAL_LANDMARKS, self.SAGITTAL_X, self.SAGITTAL_Y)
         with mock.patch.object(
             facial.AnalyzeFace, "_find_landmarks", return_value=(landmarks, self.POSE)
         ), mock.patch("dynaface.lateral.analyze_lateral", return_value=lateral):
             face.load_image(img, crop=True, force_pose=pose)
+        return face
+
+    def load_quarter(self):
+        """A three-quarter face loaded without the models: the 45 degree render
+        with the raw landmarks and head pose its fixture recorded in place of the
+        detector, and the mask from the render's background color in place of
+        the background model, as test_pose_quarter mocks them."""
+        with open("./tests_data/cheek_landmarks.json", encoding="utf-8") as f:
+            entry = json.load(f)["images"]["yaw45"]
+        with open("./tests_data/cheek/cheek_renders.json", encoding="utf-8") as f:
+            background = np.array(json.load(f)["background"], dtype=np.uint8)
+        raw = entry["raw"]
+        landmarks = [(int(x), int(y)) for x, y in raw["landmarks"]]
+        pose = np.array([raw["yaw"], raw["pitch"], raw["roll"], 0.0, 0.0, 0.0])
+
+        def foreground_mask(image):
+            pixels = np.asarray(image.convert("RGB"))
+            foreground = np.any(pixels != background, axis=2)
+            return foreground, np.where(foreground, 255, 0).astype(np.uint8)
+
+        face = facial.AnalyzeFace(
+            measures=[AnalyzeCheekMeasures(), measures.AnalyzePose()]
+        )
+        with mock.patch.object(
+            facial.AnalyzeFace, "_find_landmarks", return_value=(landmarks, pose)
+        ), mock.patch("dynaface.lateral.foreground_mask", side_effect=foreground_mask):
+            face.load_image(
+                load_image(os.path.join("./tests_data", entry["file"])),
+                crop=True,
+                force_pose=Pose.QUARTER,
+            )
         return face
 
     def restore(self, state, face=None):
@@ -307,13 +348,50 @@ class TestSavedView(unittest.TestCase):
 
     def test_view_needs_no_pickle(self):
         # Plain values and arrays of numbers, which the desktop app's .dyfc files
-        # store as JSON and .npy files.
-        view = self.load(Pose.LATERAL).dump_state()[6]
-        for key, value in view.items():
-            if isinstance(value, np.ndarray):
-                self.assertFalse(value.dtype.hasobject, key)
-            else:
-                self.assertIn(type(value), (str, bool), key)
+        # store as JSON and .npy files: bool, str, None (a profile whose outline
+        # couldn't be traced) and numeric arrays, in every view.
+        no_outline = (None, self.LATERAL_LANDMARKS, None, None)
+        views = {
+            "profile": self.load(Pose.LATERAL).dump_state()[6],
+            "profile without an outline": self.load(
+                Pose.LATERAL, lateral=no_outline
+            ).dump_state()[6],
+            "quarter": self.load_quarter().dump_state()[6],
+            "frontal": self.load(Pose.FRONTAL).dump_state()[6],
+        }
+        for name, view in views.items():
+            for key, value in view.items():
+                with self.subTest(view=name, key=key):
+                    if isinstance(value, np.ndarray):
+                        self.assertFalse(value.dtype.hasobject)
+                        self.assertIn(value.dtype.kind, "iuf")
+                    else:
+                        self.assertIn(type(value), PLAIN_TYPES)
+        # Each view holds what it says: the profile without an outline keeps
+        # None where its sagittal outline would be, and the quarter face its far
+        # side and three outline arrays, each a numeric array.
+        self.assertIsNone(views["profile without an outline"]["sagittal_x"])
+        self.assertIsNone(views["profile without an outline"]["sagittal_y"])
+        self.assertIsInstance(views["profile"]["sagittal_x"], np.ndarray)
+        quarter = views["quarter"]
+        self.assertEqual(quarter["pose"], "quarter")
+        self.assertIs(quarter["far_left"], True)
+        self.assertEqual(
+            set(quarter),
+            {
+                "pose",
+                "flipped",
+                "lateral",
+                "far_left",
+                "cheek_outline_x",
+                "cheek_outline_y",
+                "cheek_outline_src",
+            },
+        )
+        for key in ("cheek_outline_x", "cheek_outline_y", "cheek_outline_src"):
+            self.assertIsInstance(quarter[key], np.ndarray, key)
+            self.assertGreater(len(quarter[key]), 0, key)
+        self.assertEqual(views["frontal"], FRONTAL_VIEW)
 
     def test_state_saved_before_the_view_was_kept(self):
         # States saved by Dynaface 2.0.4 and earlier end with the face rotation. They

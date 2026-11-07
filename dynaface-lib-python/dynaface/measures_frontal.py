@@ -1,11 +1,12 @@
 """Measures of a frontal (face-on) view."""
 
 import logging
+import math
 from typing import Any, Dict, List
 
 import numpy as np
 
-from dynaface import util
+from dynaface import cheek, util
 from dynaface.measures_base import MeasureBase, MeasureItem, select_outputs
 
 logger = logging.getLogger(__name__)
@@ -478,8 +479,14 @@ class AnalyzePosition(MeasureBase):
           they're level.
         - `pd`: The distance between the pupils, in pixels.
         - `px2mm`: Millimeters per pixel: the face's pd (its pupillary distance in
-          millimeters) divided by this pd for a frontal face, and 0.24 for a
-          profile.
+          millimeters) divided by this pd for a frontal face, 0.24 for a profile,
+          and NaN for a quarter (three-quarter) face, where no millimeter is
+          defined: its pupil scale is foreshortened by about 1/cos(yaw), and a
+          scale column would put that number back into the CSV. The px2mm line
+          isn't drawn on a quarter face; tilt and the pixel pd are reported and
+          drawn as on a frontal face.
+
+    Suits frontal, quarter and lateral faces.
     """
 
     def __init__(self) -> None:
@@ -491,6 +498,7 @@ class AnalyzePosition(MeasureBase):
         self.items = [MeasureItem("tilt"), MeasureItem("px2mm"), MeasureItem("pd")]
         self.is_frontal = True
         self.is_lateral = True
+        self.is_quarter = True
         self.sync_items()
 
     def abbrev(self) -> str:
@@ -511,7 +519,8 @@ class AnalyzePosition(MeasureBase):
             render (bool): Whether to render the measurement visually.
 
         Returns:
-            Dict[str, Any]: Filtered measurement results.
+            Dict[str, Any]: tilt, px2mm and pd; px2mm is NaN on a quarter face
+                (face.quarter), where its line isn't drawn either.
         """
         from dynaface import facial  # not at the top; see AnalyzeBrows.calc()
 
@@ -544,13 +553,18 @@ class AnalyzePosition(MeasureBase):
                 )
             else:
                 pd, _ = facial.util_calc_pd(facial.util_get_pupils(landmarks))
+            if getattr(face, "quarter", False):
+                # No millimeter is defined on a turned head: the pupil scale is
+                # foreshortened, so report no scale (tilt and the pixel pd stay).
+                pix2mm = math.nan
 
             if render and render2_pd:
                 txt = f"pd={round(pd,2)} px"
                 pos = face.analyze_next_pt(txt)
                 face.write_text(pos, txt)
 
-            if render and render2_px2mm:
+            if render and render2_px2mm and not math.isnan(pix2mm):
+                # Nothing to show on a quarter face.
                 txt = f"px2mm={round(pix2mm,2)}"
                 pos = face.analyze_next_pt(txt)
                 face.write_text(pos, txt)
@@ -566,6 +580,8 @@ class AnalyzePose(MeasureBase):
         - `pitch`: Nodding up and down, as in saying "yes."
         - `roll`: Tilting toward a shoulder.
         - `yaw`: Turning left and right, as in saying "no."
+
+    Suits frontal, quarter and lateral faces.
     """
 
     def __init__(self) -> None:
@@ -577,6 +593,7 @@ class AnalyzePose(MeasureBase):
         self.items = [MeasureItem("pitch"), MeasureItem("roll"), MeasureItem("yaw")]
         self.is_frontal = True
         self.is_lateral = True
+        self.is_quarter = True
         self.sync_items()
 
     def abbrev(self) -> str:
@@ -646,6 +663,7 @@ class AnalyzeIntercanthalDistance(MeasureBase):
         self.items: List[MeasureItem] = [MeasureItem("id")]
         self.is_frontal: bool = True
         self.is_lateral: bool = False
+        self.is_quarter: bool = False
         self.sync_items()
 
     def abbrev(self) -> str:
@@ -692,6 +710,7 @@ class AnalyzeMouthLength(MeasureBase):
         self.items: List[MeasureItem] = [MeasureItem("ml")]
         self.is_frontal: bool = True
         self.is_lateral: bool = False
+        self.is_quarter: bool = False
         self.sync_items()
 
     def abbrev(self) -> str:
@@ -749,6 +768,7 @@ class AnalyzeNoseFrontal(MeasureBase):
         ]
         self.is_frontal: bool = True
         self.is_lateral: bool = False
+        self.is_quarter: bool = False
         self.sync_items()
 
     def abbrev(self) -> str:
@@ -815,6 +835,7 @@ class AnalyzeOuterEyeCorners(MeasureBase):
         self.items: List[MeasureItem] = [MeasureItem("oe")]
         self.is_frontal: bool = True
         self.is_lateral: bool = False
+        self.is_quarter: bool = False
         self.sync_items()
 
     def abbrev(self) -> str:
@@ -846,15 +867,41 @@ class AnalyzeOuterEyeCorners(MeasureBase):
 
 class AnalyzeLandmarks(MeasureBase):
     """
-    Landmarks: the position of each of the 98 landmarks, in pixels, for export.
+    Landmarks: the position of each of the 98 landmarks and of the ten cheek
+    landmarks, in pixels of the standard image, for export.
 
     Outputs:
         - `landmark-1-x` to `landmark-98-y`: The x and y of each landmark, numbered
-          from 1, so landmark-1 is face.landmarks[0].
+          from 1, so landmark-1 is face.landmarks[0]. One item each.
+        - The "Cheek Landmarks" item, last, a group of 20 outputs
+          (cheek.CHEEK_LANDMARK_OUTPUTS): `zy.r.x`, `zy.r.y`, `zy.l.x`, `zy.l.y`
+          (the zygia), `cr.r.x` to `cr.l.y` (the cheek reference points),
+          `sr.r.x` to `sr.l.y` (the submalar reference points), `apex.r.x` to
+          `apex.l.y` (the observed malar apex) and `sub.r.x` to `sub.l.y` (the
+          observed submalar point): face.cheek_landmarks, the six frontal
+          constructions on a frontal face and the far cheek's apex and submalar
+          point on a quarter face (the submalar point only where its depth is
+          known), NaN where a landmark doesn't exist in the view. A face without
+          cheek_landmarks gets cheek.locate() on its landmarks and view, the rule
+          AnalyzeFace.find_cheek_landmarks() follows.
+
+    Drawing, when render is True: every landmark as a black dot of size 1.0
+    under a white one of size 0.5 (face.draw_landmarks()); and, while the "Cheek
+    Landmarks" item is enabled, every cheek landmark that exists in the view the
+    same way in orange, (255, 128, 0), without labels
+    (face.draw_cheek_landmarks(), on a face that has it), except a quarter face's
+    submalar point where the outline shows no hollow (submalar_present 0), which
+    is reported but not drawn, as the cheek measure leaves it undrawn.
+
+    Suits frontal and quarter faces, and so does the "Cheek Landmarks" item.
     """
 
     # Number of SPIGA wflw landmarks
     NUM_LANDMARKS = 98
+    #: The item that stands for the cheek landmarks' coordinates.
+    CHEEK_ITEM = "Cheek Landmarks"
+    #: The cheek landmarks' dot color, RGB.
+    CHEEK_COLOR = (255, 128, 0)
 
     def __init__(self) -> None:
         super().__init__()
@@ -867,7 +914,11 @@ class AnalyzeLandmarks(MeasureBase):
                 MeasureItem(f"landmark-{i}-y"),
             )
         ]
+        self.items.append(
+            MeasureItem(self.CHEEK_ITEM, outputs=cheek.CHEEK_LANDMARK_OUTPUTS)
+        )
         self.is_frontal = True
+        self.is_quarter = True
         self.sync_items()
 
     def abbrev(self) -> str:
@@ -879,9 +930,40 @@ class AnalyzeLandmarks(MeasureBase):
         """
         return "Landmarks"
 
+    @staticmethod
+    def _cheek_points(face: Any) -> Any:
+        """
+        The face's ten cheek landmarks, (10, 2) px, NaN where absent: its
+        cheek_landmarks, or for a face without them, cheek.locate() on its
+        landmarks, view and outline, filled by cheek.landmark_array().
+
+        Args:
+            face (Any): The face.
+
+        Returns:
+            NDArray[np.float64]: The ten points in cheek.CHEEK_LANDMARK_NAMES
+                order.
+        """
+        points = getattr(face, "cheek_landmarks", None)
+        if points is not None:
+            return np.asarray(points, dtype=np.float64)
+        far_left = bool(getattr(face, "far_left", False))
+        frontal, observed = cheek.locate(
+            face.landmarks,
+            bool(getattr(face, "quarter", False)),
+            bool(getattr(face, "lateral", False)),
+            far_left,
+            getattr(face, "cheek_outline_x", None),
+            getattr(face, "cheek_outline_y", None),
+            getattr(face, "cheek_outline_src", None),
+        )
+        return cheek.landmark_array(frontal, observed, far_left)
+
     def calc(self, face: Any, render: bool = True) -> Dict[str, Any]:
         """
-        Return the position of all 98 landmarks, drawing them when render is True.
+        Return the position of all 98 landmarks and of the ten cheek landmarks,
+        drawing them when render is True (the cheek landmarks only while their
+        item is enabled).
 
         Args:
             face (Any): Face object containing landmarks and measurement methods.
@@ -889,18 +971,29 @@ class AnalyzeLandmarks(MeasureBase):
 
         Returns:
             Dict[str, Any]: landmark-1-x, landmark-1-y and so on through
-                landmark-98-y, in pixels, numbered from 1.
+                landmark-98-y, in pixels, numbered from 1, then the 20 cheek
+                landmark coordinates (cheek.CHEEK_LANDMARK_OUTPUTS), NaN where
+                absent in the view.
         """
         if render:
             # Draw black outline (radius 3) then white fill (radius 2) so dots
             # are visible against any background color.
             face.draw_landmarks(size=1.0, color=(0, 0, 0))
             face.draw_landmarks(size=0.5, color=(255, 255, 255))
+            if self.is_enabled(self.CHEEK_ITEM) and hasattr(
+                face, "draw_cheek_landmarks"
+            ):
+                face.draw_cheek_landmarks(size=1.0, color=(0, 0, 0), names=False)
+                face.draw_cheek_landmarks(size=0.5, color=self.CHEEK_COLOR, names=False)
 
         data: Dict[str, Any] = {}
         for i, (x, y) in enumerate(face.landmarks):
             n = i + 1  # 1-indexed
             data[f"landmark-{n}-x"] = x
             data[f"landmark-{n}-y"] = y
+        points = self._cheek_points(face)
+        for code, (x, y) in zip(cheek.CHEEK_LANDMARK_CODES, points):
+            data[f"{code}.x"] = float(x)
+            data[f"{code}.y"] = float(y)
 
         return select_outputs(data, self.items)

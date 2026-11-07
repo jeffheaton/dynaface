@@ -26,8 +26,10 @@ class Pose(Enum):
     """
     The pose of a face: which way it faces the camera.
 
-    Pass DETECT to AnalyzeFace.load_image() to have the pose classified as frontal
-    or lateral, or one of the others to force it.
+    Pass DETECT to AnalyzeFace.load_image() to have the pose classified as frontal,
+    lateral or, with config.AUTO_QUARTER on (it also needs config.AUTO_LATERAL,
+    the pose-detection switch), quarter (a three-quarter face), or one of the
+    others to force it.
     """
 
     FRONTAL = "frontal"

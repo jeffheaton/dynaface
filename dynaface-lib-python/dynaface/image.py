@@ -3,7 +3,7 @@
 import logging
 import math
 import os
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Sequence, Tuple
 
 import cv2
 import numpy as np
@@ -42,10 +42,13 @@ def load_image(filename: str) -> NDArray[Any]:
 
     Raises:
         FileNotFoundError: If the file does not exist.
+        cv2.error: If the file cannot be decoded as an image.
     """
     if not os.path.exists(filename):
         raise FileNotFoundError(os.path.abspath(filename))
     image = cv2.imread(filename)
+    if image is None:
+        raise cv2.error(f"Could not decode image: {filename}")
     return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
 
@@ -321,19 +324,24 @@ class ImageAnalysis:
         pt: Tuple[int, int],
         color: Tuple[int, int, int] = (0, 0, 255),
         radius: Optional[int] = None,
+        thickness: int = -1,
     ) -> None:
         """
-        Draw a circle on the image.
+        Draw a circle on the image: a filled dot by default, or a ring.
 
         Args:
-            pt (Tuple[int, int]): Center point.
+            pt (Tuple[int, int]): Center point, as an integer pixel tuple (OpenCV
+                rejects floats).
             color (Tuple[int, int, int]): Circle color.
-            radius (Optional[int]): Circle radius.
+            radius (Optional[int]): Circle radius; 1/200 of the image height if
+                None.
+            thickness (int): Passed to cv2.circle: the ring's line thickness in
+                pixels, or negative, the default, for a filled dot.
         """
         self._check_image()
         if radius is None:
             radius = int(self.render_img.shape[0] // 200)
-        cv2.circle(self.render_img, pt, radius, color, -1)
+        cv2.circle(self.render_img, pt, radius, color, thickness)
 
     def render_reset(self) -> None:
         """
@@ -447,6 +455,29 @@ class ImageAnalysis:
         """
         self._check_image()
         cv2.line(self.render_img, pt1, pt2, color, thickness)
+
+    def polyline(
+        self,
+        points: Sequence[Tuple[int, int]],
+        color: Tuple[int, int, int] = (255, 0, 0),
+        thickness: int = 3,
+    ) -> None:
+        """
+        Draw an open polyline through the points, in order (cv2.polylines, not
+        closed).
+
+        Args:
+            points (Sequence[Tuple[int, int]]): The vertices, as integer pixel
+                tuples (OpenCV rejects floats); nothing is drawn with fewer than
+                two.
+            color (Tuple[int, int, int]): Color of the line.
+            thickness (int): Thickness of the line.
+        """
+        self._check_image()
+        if len(points) < 2:
+            return
+        vertices = np.asarray(points, dtype=np.int32).reshape(-1, 1, 2)
+        cv2.polylines(self.render_img, [vertices], False, color, thickness)
 
     def arrow_head(
         self, pt1: Tuple[int, int], pt2: Tuple[int, int], par: int = 15

@@ -4,6 +4,7 @@ built from them; and VideoAnalyzer and LandmarkSmoother, which import a video.
 The .NET port's FrameSeriesTests and VideoAnalyzerTests check the same.
 """
 
+import copy
 import io
 import math
 import unittest
@@ -222,6 +223,104 @@ class TestFromStates(unittest.TestCase):
                 self.live[evaluation.widest_eyes.frame]["dental_area"],
             )
         )
+
+    # A profile's lateral data, as test_persist.TestSavedView makes it up.
+    LATERAL_LANDMARKS = np.array(
+        [[300, 200], [290, 300], [200, 450], [260, 520], [280, 640], [270, 760]]
+    )
+    SAGITTAL_Y = np.arange(1024, dtype=np.int32)
+    SAGITTAL_X = (300 + SAGITTAL_Y % 50).astype(np.int32)
+
+    @classmethod
+    def in_view(cls, state, pose):
+        """The frontal state with its view rewritten as a quarter or lateral one.
+        load_state() restores the view a state's dict says, so neither needs a
+        model: a quarter view without an outline (the contour stands in), and a
+        lateral one with made-up lateral landmarks and sagittal outline."""
+        turned = copy.copy(state)
+        if pose == Pose.QUARTER:
+            turned[6] = {
+                "pose": "quarter",
+                "flipped": False,
+                "lateral": False,
+                "far_left": True,
+            }
+        else:
+            turned[6] = {
+                "pose": "lateral",
+                "flipped": False,
+                "lateral": True,
+                "lateral_landmarks": cls.LATERAL_LANDMARKS,
+                "sagittal_x": cls.SAGITTAL_X,
+                "sagittal_y": cls.SAGITTAL_Y,
+            }
+        return turned
+
+    def test_a_measure_is_nan_off_its_view(self):
+        """
+        A mixed-view video: the same three frames as quarter frames (0 to 2),
+        profiles (3 to 5) and frontal frames (6 to 8). A measure's outputs are
+        NaN on the frames whose view it doesn't suit, so the frontal measures'
+        numbers from a turned head (which analyze() computes all the same) are
+        never reported, and the peaks and the evaluation come from the frontal
+        frames, although the turned copies come first and would win a tie.
+        """
+        quarter = [self.in_view(state, Pose.QUARTER) for state in self.states]
+        lateral = [self.in_view(state, Pose.LATERAL) for state in self.states]
+        series = FrameSeries.from_states(quarter + lateral + list(self.states))
+        self.assertEqual(series.frames, list(range(9)))
+        face = facial.AnalyzeFace()
+        self.assertEqual(series.names, face.get_all_items())
+
+        # analyze() itself still measures a turned head in millimeters.
+        face.load_state(quarter[0])
+        self.assertTrue(face.quarter)
+        results = face.analyze(render=False)
+        assert results is not None
+        self.assertTrue(math.isfinite(results["dental_area"]))
+
+        rows = {Pose.QUARTER: (0, 1, 2), Pose.LATERAL: (3, 4, 5)}
+        for measure in face.measures:
+            for name in measures.get_all_items([measure]):
+                values = series.values[name]
+                for pose, turned in rows.items():
+                    suits = measure.suits(
+                        pose == Pose.LATERAL, quarter=pose == Pose.QUARTER
+                    )
+                    for row in turned:
+                        if not suits:
+                            self.assertTrue(math.isnan(values[row]), f"{name} {row}")
+                for row in (6, 7, 8):
+                    if measure.suits(False):
+                        self.assertTrue(
+                            same(values[row], self.live[row - 6].get(name)),
+                            f"{name} {row}",
+                        )
+                    else:
+                        self.assertTrue(math.isnan(values[row]), f"{name} {row}")
+        # The measures that suit a view keep their values there.
+        for name in ("yaw", "cheek.far", "landmark-1-x"):
+            self.assertTrue(
+                all(math.isfinite(series.values[name][r]) for r in (0, 1, 2))
+            )
+        for name in ("yaw", "nfa", "px2mm"):
+            self.assertTrue(
+                all(math.isfinite(series.values[name][r]) for r in (3, 4, 5))
+            )
+        self.assertTrue(all(math.isnan(v) for v in series.values["nfa"][:3]))
+        self.assertTrue(all(math.isnan(v) for v in series.values["fai"][:6]))
+
+        # The peaks and the evaluation skip the turned frames.
+        smile = 6 + max(range(3), key=lambda i: self.live[i]["dental_area"])
+        eyes = 6 + max(
+            range(3), key=lambda i: self.live[i]["eye.left"] + self.live[i]["eye.right"]
+        )
+        self.assertEqual(series.peak("dental_area"), smile)
+        self.assertEqual(series.peak("eye.left", "eye.right"), eyes)
+        evaluation = series.evaluate()
+        assert evaluation is not None
+        self.assertEqual(evaluation.widest_smile.frame, smile)
+        self.assertEqual(evaluation.widest_eyes.frame, eyes)
 
 
 class TestLandmarkSmoother(unittest.TestCase):

@@ -8,13 +8,19 @@ models, whenever a measure's drawing changes:
 """
 
 import pathlib
+from typing import Type
 
 import cv2
 import matplotlib.patheffects as patheffects
 import numpy as np
 from matplotlib.figure import Figure
 
-from dynaface import facial, measures, models
+# const and measures_base come in through the package like the other modules:
+# from the repository root, isort takes the bare "dynaface" as first-party (the
+# root directory is named dynaface, so it is a src path) but places
+# "from dynaface.const import ..." as third-party, and the script must pass isort
+# from the root and from dynaface-lib-python alike.
+from dynaface import const, facial, image, measures, measures_base, models
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SAMPLES = ROOT / "dynaface-lib-python" / "tests_data"
@@ -23,22 +29,46 @@ OUT = ROOT / "docs" / "assets"
 FRONTAL = "img4-1024-frontal.jpg"
 SMILE = "img1-512.jpg"
 LATERAL = "img2-1024-right-lateral.jpg"
+# A synthetic head turned 45 degrees, one of the cheek-landmark test renders.
+QUARTER = "cheek/yaw45.png"
 
-# Figure name, sample image and the measure it shows.
+# Figure name, sample image, the measure it shows and the pose: DETECT lets Dynaface
+# decide, QUARTER forces the three-quarter path (its detection is off by default,
+# and the measure observes the malar apex only in that view).
 MEASURE_FIGURES = [
-    ("fai", FRONTAL, measures.AnalyzeFAI),
-    ("oral-ce", FRONTAL, measures.AnalyzeOralCommissureExcursion),
-    ("brow", FRONTAL, measures.AnalyzeBrows),
-    ("dental-display", SMILE, measures.AnalyzeDentalArea),
-    ("eye-area", FRONTAL, measures.AnalyzeEyeArea),
-    ("intercanthal-distance", FRONTAL, measures.AnalyzeIntercanthalDistance),
-    ("outer-eye-corners", FRONTAL, measures.AnalyzeOuterEyeCorners),
-    ("mouth-length", FRONTAL, measures.AnalyzeMouthLength),
-    ("nose-frontal", FRONTAL, measures.AnalyzeNoseFrontal),
-    ("position", FRONTAL, measures.AnalyzePosition),
-    ("skin-tone", FRONTAL, measures.AnalyzeSkinTone),
-    ("lateral", LATERAL, measures.AnalyzeLateral),
+    ("fai", FRONTAL, measures.AnalyzeFAI, const.Pose.DETECT),
+    ("oral-ce", FRONTAL, measures.AnalyzeOralCommissureExcursion, const.Pose.DETECT),
+    ("brow", FRONTAL, measures.AnalyzeBrows, const.Pose.DETECT),
+    ("dental-display", SMILE, measures.AnalyzeDentalArea, const.Pose.DETECT),
+    ("eye-area", FRONTAL, measures.AnalyzeEyeArea, const.Pose.DETECT),
+    (
+        "intercanthal-distance",
+        FRONTAL,
+        measures.AnalyzeIntercanthalDistance,
+        const.Pose.DETECT,
+    ),
+    ("outer-eye-corners", FRONTAL, measures.AnalyzeOuterEyeCorners, const.Pose.DETECT),
+    ("mouth-length", FRONTAL, measures.AnalyzeMouthLength, const.Pose.DETECT),
+    ("nose-frontal", FRONTAL, measures.AnalyzeNoseFrontal, const.Pose.DETECT),
+    ("position", FRONTAL, measures.AnalyzePosition, const.Pose.DETECT),
+    ("skin-tone", FRONTAL, measures.AnalyzeSkinTone, const.Pose.DETECT),
+    ("lateral", LATERAL, measures.AnalyzeLateral, const.Pose.DETECT),
+    ("cheek-frontal", FRONTAL, measures.AnalyzeCheekMeasures, const.Pose.DETECT),
+    ("cheek-quarter", QUARTER, measures.AnalyzeCheekMeasures, const.Pose.QUARTER),
 ]
+
+
+def load_sample(
+    sample: str, measure: Type[measures_base.MeasureBase], pose: const.Pose
+) -> facial.AnalyzeFace:
+    """Load a sample image with one measure, forcing the pose unless it's DETECT.
+
+    load_face_image() has no pose argument, so the face is built directly.
+    """
+    face = facial.AnalyzeFace([measure()])
+    if not face.load_image(image.load_image(str(SAMPLES / sample)), force_pose=pose):
+        raise RuntimeError(f"No face found in {sample}")
+    return face
 
 
 def save(image_rgb, path: pathlib.Path, width: int) -> None:
@@ -115,8 +145,8 @@ def save_landmark_figure(path: pathlib.Path) -> None:
 def main() -> None:
     models.init_models(models.download_models(), models.detect_device())
 
-    for name, sample, measure in MEASURE_FIGURES:
-        face = facial.load_face_image(str(SAMPLES / sample), measures=[measure()])
+    for name, sample, measure, pose in MEASURE_FIGURES:
+        face = load_sample(sample, measure, pose)
         face.analyze()
         save(face.render_img, OUT / "measures" / f"{name}.jpg", width=600)
 

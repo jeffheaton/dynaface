@@ -1,28 +1,26 @@
 """The registry of Dynaface's measures."""
 
 import logging
-import math
 from typing import Any, Dict, Iterable, List
 
-import numpy as np
-from dynaface.measures_skin import AnalyzeSkinTone
-
 from dynaface.measures_base import MeasureBase
+from dynaface.measures_cheek import AnalyzeCheekMeasures
 from dynaface.measures_frontal import (
-    AnalyzeFAI,
-    AnalyzeOralCommissureExcursion,
     AnalyzeBrows,
     AnalyzeDentalArea,
     AnalyzeEyeArea,
+    AnalyzeFAI,
     AnalyzeIntercanthalDistance,
+    AnalyzeLandmarks,
     AnalyzeMouthLength,
     AnalyzeNoseFrontal,
+    AnalyzeOralCommissureExcursion,
     AnalyzeOuterEyeCorners,
-    AnalyzePosition,
     AnalyzePose,
-    AnalyzeLandmarks,
+    AnalyzePosition,
 )
 from dynaface.measures_lateral import AnalyzeLateral
+from dynaface.measures_skin import AnalyzeSkinTone
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +28,10 @@ logger = logging.getLogger(__name__)
 def all_measures() -> List["MeasureBase"]:
     """
     Return a new instance of every Dynaface measure, in the order they run.
+
+    The cheek measures come last, after the landmarks, so the outputs before them
+    keep their order (CSV columns included) and their drawing lands over the
+    landmark dots.
 
     Returns:
         List[MeasureBase]: One instance of each measure, all enabled.
@@ -49,14 +51,17 @@ def all_measures() -> List["MeasureBase"]:
         AnalyzePose(),
         AnalyzeSkinTone(),
         AnalyzeLandmarks(),
+        AnalyzeCheekMeasures(),  # last: see the docstring
     ]
 
 
 def get_all_items(measures: List["MeasureBase"]) -> List[str]:
     """
-    List the outputs to show or export from these measures: the enabled items of
-    the enabled measures, without display-only items. AnalyzeFace.get_all_items()
-    gives the same list for a face's own measures.
+    List the outputs to show or export from these measures: the output names
+    (MeasureItem.output_names()) of the enabled items of the enabled measures, so
+    a group's outputs are listed together in its place, and a display-only item
+    lists none. AnalyzeFace.get_all_items() gives the same list for a face's own
+    measures.
 
     Args:
         measures (List[MeasureBase]): The measures, such as all_measures().
@@ -65,22 +70,24 @@ def get_all_items(measures: List["MeasureBase"]) -> List[str]:
         List[str]: Output names, such as "fai" and "oce.l".
     """
     return [
-        item.name
+        name
         for measure in measures
         if measure.enabled
         for item in measure.items
-        if item.enabled and not item.display_only
+        if item.enabled
+        for name in item.output_names()
     ]
 
 
 class MeasureSelection:
     """
     Which measures, and which of their items, a user has chosen, kept apart from
-    the measures themselves, so that switching between a frontal and a lateral face
-    never loses a choice.
+    the measures themselves, so that switching between a frontal, a quarter
+    (three-quarter) and a lateral face never loses a choice.
 
     MeasureBase.update_for_type() overwrites every item's enabled flag with whether
-    its measure suits the face. apply() instead enables what was chosen and suits
+    the item suits the face (MeasureItem.suits(): its measure's view, narrowed to
+    the item's own views). apply() instead enables what was chosen and suits
     the face, and leaves the choices as they were. Save a selection with to_dict(),
     a JSON-friendly dict keyed by each measure's abbrev() and its items' names, and
     restore it with from_dict(). A measure that a selection doesn't mention isn't
@@ -128,23 +135,35 @@ class MeasureSelection:
         """Choose one of a measure's items, or with chosen=False, unchoose it."""
         self._items.setdefault(measure.abbrev(), {})[item] = chosen
 
-    def apply(self, measures: Iterable[MeasureBase], lateral: bool) -> None:
+    def apply(
+        self, measures: Iterable[MeasureBase], lateral: bool, quarter: bool = False
+    ) -> None:
         """
-        Set the measures' and items' enabled flags for a frontal or a lateral face:
-        on where chosen and the measure suits the face, off everywhere else. The
-        choices stay as they were, so applying the other view later brings them
-        back.
+        Set the measures' and items' enabled flags for a frontal, a quarter
+        (three-quarter) or a lateral face: on where chosen and the measure suits
+        the face (MeasureBase.suits()), and for an item, where it suits the face
+        too (MeasureItem.suits(), which also honors an item's own views), off
+        everywhere else. It calls each measure's sync_items() first, so the items'
+        flags follow the measure's as they are now. The choices stay as they were,
+        so applying another view later brings them back.
 
         Args:
             measures (Iterable[MeasureBase]): The measures to set, such as a face's.
-            lateral (bool): True for a lateral face, False for a frontal one.
+            lateral (bool): True for a lateral face.
+            quarter (bool): True for a quarter face (face.quarter); ignored when
+                lateral is True. False, the default, keeps the two-argument calls
+                as they were.
         """
         for measure in measures:
-            suits = measure.is_lateral if lateral else measure.is_frontal
-            measure.enabled = suits and self.is_chosen(measure)
+            measure.sync_items()
+            measure.enabled = measure.suits(lateral, quarter) and self.is_chosen(
+                measure
+            )
             for item in measure.items:
-                item.enabled = measure.enabled and self.is_item_chosen(
-                    measure, item.name
+                item.enabled = (
+                    measure.enabled
+                    and item.suits(lateral, quarter)
+                    and self.is_item_chosen(measure, item.name)
                 )
 
     def to_dict(self) -> Dict[str, Any]:
