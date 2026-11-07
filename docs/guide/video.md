@@ -52,7 +52,7 @@ print(f"Widest eye opening: dental display {eyes.dental_area:.1f} mm²")
 
 ## Keeping the analysis
 
-Finding the face and its landmarks is the slow part. [`dump_state()`][dynaface.facial.AnalyzeFace.dump_state] captures a frame's analysis, including its standard image, landmarks, head pose and scale, and for a profile its lateral landmarks and outline, and [`load_state()`][dynaface.facial.AnalyzeFace.load_state] restores it without running the models again.
+Finding the face and its landmarks is the slow part. [`dump_state()`][dynaface.facial.AnalyzeFace.dump_state] captures a frame's analysis, including its standard image, landmarks, head pose and scale, for a profile its lateral landmarks and outline, and for a three-quarter face which cheek is the far one (`far_left`) and that cheek's traced outline, and [`load_state()`][dynaface.facial.AnalyzeFace.load_state] restores it without running the models again. The ten [cheek landmarks](landmarks.md#cheek-landmarks) aren't saved; `load_state()` recomputes them.
 
 A [`VideoAnalyzer`][dynaface.video.VideoAnalyzer] keeps every frame's state as it analyzes the video, the way the Dynaface apps import one:
 
@@ -71,7 +71,7 @@ video.release()
 series = analyzer.series([measures.AnalyzeEyeArea()], fps=30)
 ```
 
-It skips a frame without a face but still counts it, so `analyzer.frames` holds each kept frame's number in the video, and the series keeps those numbers, so each frame's time is right. `peak()` and `evaluate()` report frames by those numbers too, and once a frame is skipped they no longer match positions in `analyzer.states`: `analyzer.frames.index(frame)` finds a frame's state. `smoothing=2` averages each frame's landmarks with the frame before's, which steadies their jitter; the desktop app's data-smoothing setting does the same, and its default is 2. The averaging uses the landmarks of the cropped face, so the head moving within the frame doesn't blur them. Give the analyzer upright frames: unlike the desktop app, it doesn't try turning a sideways frame.
+It skips a frame without a face but still counts it, so `analyzer.frames` holds each kept frame's number in the video, and the series keeps those numbers, so each frame's time is right. `peak()` and `evaluate()` report frames by those numbers too, and once a frame is skipped they no longer match positions in `analyzer.states`: `analyzer.frames.index(frame)` finds a frame's state. `smoothing=2` averages each frame's landmarks with the frame before's, which steadies their jitter; the desktop app's data-smoothing setting does the same, and its default is 2. The averaging uses the landmarks of the cropped face, so the head moving within the frame doesn't blur them, and it starts afresh whenever the view changes, so a profile's landmarks never average with a frontal face's, nor a three-quarter face's with either, nor one three-quarter turn's with the mirrored turn's. A smoothed three-quarter frame's far-cheek outline is traced again on the averaged landmarks, from the frame's own background mask, so the outline a frame saves belongs to the landmarks it saves. Pass `force_pose` to analyze every frame in one view, as the mobile app does; with detection, each frame `VideoAnalyzer` adds is classified knowing the previous kept frame's pose, so a turn at the edge of the three-quarter window doesn't flip the view from frame to frame (the desktop app imports through its own loop, which passes the previous pose and restarts its smoothing on a view change the same way; its three-quarter detection is a preference, off unless turned on, and its Pose button forces a view for the whole video). Give the analyzer upright frames: unlike the desktop app, it doesn't try turning a sideways frame.
 
 You can calculate other measures later, for every frame at once or for a range of them, from the states (`analyzer.states`, or any list of `dump_state()` results):
 
@@ -79,7 +79,7 @@ You can calculate other measures later, for every frame at once or for a range o
 series = FrameSeries.from_states(states, [measures.AnalyzeEyeArea()], fps=30)
 ```
 
-Each row keeps its state's position in the list as its frame number, so measuring a range, such as `start=100, stop=200`, numbers its frames as they are in the whole video. To work with one frame, restore it yourself:
+Each row keeps its state's position in the list as its frame number, so measuring a range, such as `start=100, stop=200`, numbers its frames as they are in the whole video. A measure's outputs are NaN on a frame whose view it doesn't suit (its `suits()`: a frontal measure on a three-quarter or profile frame, the lateral measure on a frontal one), and so are an item's (the item's own `suits()`, such as the Cheek Measures' Zygion width on a three-quarter frame), so a mixed-view video never reports millimeters measured on a turned head, and `peak()` and `evaluate()` on such a series never pick a turned or profile frame. The loop at the top of this page has no such rule, since `analyze()` runs every measure it's given: apply a [selection](results.md#frontal-photos-three-quarter-photos-and-profiles) to each face there. To work with one frame, restore it yourself:
 
 ```python
 face = facial.AnalyzeFace(measures=[measures.AnalyzeEyeArea()])
@@ -89,9 +89,9 @@ results = face.analyze()
 
 `load_state()` restores the frame's image too, so `analyze()` draws on that frame. In Dynaface 2.0.3 and earlier it didn't, so call `face.render_reset()` after `load_state()` to draw on the restored frame.
 
-A restored frame is measured with the pupillary distance it was analyzed with, and its scale is measured again on its landmarks, so states saved by versions up to 2.0.2, which measured the scale before the crop, come out right. States saved by Dynaface 2.0.4 and earlier didn't keep the head pose, though: they restore with a yaw, pitch and roll of 0. Nor did they keep the view, so they restore a profile as a frontal face, and its lateral measures are missing, unless you set `face.lateral` and `face.lateral_landmarks` before restoring them, as the desktop app does from its project file.
+A restored frame is measured with the pupillary distance it was analyzed with, and its scale is measured again on its landmarks, so states saved by versions up to 2.0.2, which measured the scale before the crop, come out right. States saved by Dynaface 2.0.4 and earlier didn't keep the head pose, though: they restore with a yaw, pitch and roll of 0. Nor did they keep the view, so they restore a profile as a frontal face, and its lateral measures are missing, unless you set `face.lateral` and `face.lateral_landmarks` before restoring them. The desktop app instead gives each such state the view its project file's header holds (`DynafaceDocument.add_missing_views()`), so its series, Evaluation and video export restore the profile as the display does.
 
-Each state holds its frame's 1024 by 1024 image, about 3 MB, so the states of a long video take a lot of memory. The desktop app keeps them in its `.dyfc` project files.
+Each state holds its frame's 1024 by 1024 image, about 3 MB, so the states of a long video take a lot of memory. The desktop app keeps them in its `.dyfc` project files, each frame's view with them: a three-quarter frame's `far_left` and traced outline are saved and restored, so a project file measures as the import did.
 
 ## Speed
 

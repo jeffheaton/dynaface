@@ -11,3 +11,5 @@ For what each measure calculates, see the [measures catalog](../../measures.md).
 ::: dynaface.measures_lateral
 
 ::: dynaface.measures_skin
+
+::: dynaface.measures_cheek

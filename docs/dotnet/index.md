@@ -38,7 +38,7 @@ var ctx = new FaceMeasureContext(
 Dictionary<string, double> measurements = ctx.Analyze();
 ```
 
-`Analyze()` returns the same outputs, by the same names, as the Python library's `analyze()`; see [Measures](../measures.md).
+`Analyze()` returns the same outputs, by the same names, as the Python library's `analyze()`, the [Cheek Measures](../measures.md#cheek-measures) and the Landmarks measure's Cheek Landmarks item included; see [Measures](../measures.md). A three-quarter face takes the same path as in Python: set `DynafaceConfig.AutoQuarter` (off by default, like `config.AUTO_QUARTER`) to detect one, or pass `forcePose: FacePose.Quarter` to `FacePipeline.Run`, and build the context with `FaceMeasureContext.FromResult(result)` so it carries the far cheek's outline.
 
 For a video, `FrameSeries` measures every frame's saved analysis and gives the same CSV, peak frames and evaluation as the Python library's [`FrameSeries`](../guide/video.md).
 

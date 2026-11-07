@@ -95,6 +95,7 @@ nav:
           - Models: python/api/models.md
           - Measures: python/api/measures.md
           - Video: python/api/video.md
+          - Cheek landmarks: python/api/cheek.md
           - Images: python/api/image.md
           - Constants: python/api/const.md
   - .NET: dotnet/index.md
