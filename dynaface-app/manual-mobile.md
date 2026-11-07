@@ -105,7 +105,7 @@ Each photo opens fully zoomed out.
 Tapping the landmarks toggle switches between:
 
 - **OFF** — Just the photo and your selected measurements.
-- **LM** — The photo with the underlying reference points (used to calculate every measurement) drawn on top, so you can see exactly what the AI detected.
+- **LM** — The photo with the underlying reference points (used to calculate every measurement) drawn on top, so you can see exactly what the AI detected. On front and three-quarter views, the cheek landmarks are drawn too, in orange with their short codes (such as zy.r for the right zygion).
 
 The toggle starts at **OFF** each time you open a photo or video. Exported images and videos include the landmarks whenever they're showing.
 
@@ -130,16 +130,18 @@ The measurements, as they appear in the panel:
 - **Nose Frontal** (NOSE FRONTAL) — Measurements describing the nose as seen from the front.
 - **Skin Tone** (SKIN TONE) — Samples the color of both cheeks and shows the average hue, saturation, and brightness as a swatch in the corner of the photo.
 - **Lateral** (LATERAL) — Profile measurements for side-view photos (see [Side-View (Profile) Photos](#side-view-profile-photos)).
+- **Landmarks** (LANDMARKS) — The coordinates of the face's landmarks, for the spreadsheet export. Its **Cheek Landmarks** row adds the ten cheek landmarks' coordinates and draws them on the photo in orange.
+- **Cheek Measures** (CHEEK MEASURES) — Measurements of the cheeks. On a front view: the width between the zygions (the widest points of the cheekbones) and the cheek reference points. On a three-quarter view: the outline of the far cheek, the malar apex (the high point of the cheekbone) and the submalar point (the hollow below it), as fractions of the face's height rather than millimeters. Its **Head turn** row reports how far the head is turned. See [Three-Quarter Photos](#three-quarter-photos).
 
 For detailed definitions of each measurement, see [Dynaface Measurements](https://www.dynaface.org/measurements/).
 
-New photos and videos start with just **FAI** and **Eye Area** turned on (side-view photos also start with **Lateral**). Turn on any others you'd like to see.
+New photos and videos start with just **FAI** and **Eye Area** turned on (side-view photos also start with **Lateral**, and three-quarter photos with **Cheek Measures**). Turn on any others you'd like to see. A measurement that doesn't apply to the photo's view (front, three-quarter or side) is dimmed and can't be changed there, and your choice for it is kept.
 
 Some measurements are groups: turning a group on reveals indented rows beneath it, so you can pick exactly which of its values appear. Turning a measurement on adds it to both the photo overlay and the values panel; turning it off hides it. Changes apply immediately, and they're saved per entry, so returning to an earlier photo or video later shows the same selections you left it with.
 
 Two more sections live in the same panel:
 
-- **POSE** (photos only) — Dynaface automatically detects whether a photo is a front view or a side profile. If it guesses wrong, choose **Force Frontal** or **Force Lateral** here; **Auto Detect** restores the automatic choice. The current choice is highlighted. Picking a different option closes the panel and re-analyzes the photo; if no face can be found that way, the photo is left as it was. **Force Lateral** stays dimmed until the side-view model has finished loading.
+- **POSE** (photos only) — Dynaface automatically detects whether a photo is a front view or a side profile, and, with **Detect Three-Quarter View** turned on in Settings, a three-quarter view. The heading shows the view the photo is measured as. If it guesses wrong, choose **Force Frontal**, **Force Three-quarter** or **Force Lateral** here; **Auto Detect** restores the automatic choice. The current choice is highlighted. Picking a different option closes the panel and re-analyzes the photo; if no face can be found that way, the photo is left as it was. **Force Three-quarter** and **Force Lateral** stay dimmed until the side-view model has finished loading.
 - **TEXT SIZE** — A **−** / **+** stepper from 1 to 5 that makes the measurement labels drawn on the photo larger or smaller. You see the change right away. This setting applies to every photo and video, and to exported images and videos too.
 
 Tap **Done**, or tap outside the panel, to close it.
@@ -153,6 +155,14 @@ If you capture or import a photo taken from the side, Dynaface recognizes it as 
 If a profile is mistaken for a front view (or the other way around), use **Force Lateral** or **Force Frontal** in the measurements panel's POSE section.
 
 Profile analysis applies to photos only — videos are always measured as front views.
+
+## Three-Quarter Photos
+
+A three-quarter photo shows the head turned about 45 degrees, so the far cheek's outline stands out against the background. Dynaface traces that outline and finds the malar apex, the high point of the cheekbone, and the submalar point, the hollow below it, when there is one. **Cheek Measures** reports them and draws the far cheek's outline, the apex and the submalar point on the photo. Front-view measurements don't apply to a turned head, so they're dimmed in the measurements panel.
+
+Three-quarter detection is off by default. Turn on **Detect Three-Quarter View** in [Settings](#settings) to have new photos checked for it, or choose **Force Three-quarter** in a photo's POSE section. When a result can't be trusted, for example when the nose hides part of the far cheek, the values panel says why on a line that begins with "flagged:".
+
+Three-quarter analysis applies to photos only — videos are always measured as front views.
 
 ## Working with Videos
 
@@ -261,10 +271,11 @@ Rotate and Photo Tools are available for photos only.
 
 Open Settings from the **☰ menu** button in the top-right corner of the Photo Library screen, then tap **Settings**.
 
-<!-- SCREENSHOT 12 — Settings card on iPhone: Pupillary Distance (mm) field showing 63, the help text, and the Reset to Default and Done buttons. -->
+<!-- SCREENSHOT 12 — Settings card on iPhone: Pupillary Distance (mm) field showing 63, the help text, the Detect Three-Quarter View checkbox and its help, and the Reset to Default and Done buttons. -->
 
 - **Pupillary Distance (mm)** — The real-world distance between the subject's pupils, in millimeters (40–85; the population average of 63 is the default). Dynaface uses this to convert pixels into millimeters, so entering the subject's actual measured value makes the millimeter measurements more accurate. It applies to new photos and video imports; use **Recalculate** (in the Photo Tools menu) to apply a change to an existing photo. Videos keep the value from when they were imported. Values outside 40–85 are adjusted to the nearest limit.
-- **Reset to Default** — Returns the pupillary distance to 63.
+- **Detect Three-Quarter View** — When on, new photos are also checked for a three-quarter view, a head turned about 45 degrees, and measured on the far cheek with **Cheek Measures** (see [Three-Quarter Photos](#three-quarter-photos)). It's off by default. Use **Recalculate** to apply it to an existing photo, or force the view in the photo's POSE section. Videos are always measured as front views.
+- **Reset to Default** — Returns the pupillary distance to 63 and turns three-quarter detection off.
 
 Tap **Done**, or tap outside the card, to save and close.
 
@@ -286,6 +297,7 @@ Everything stays on your device: your library, the analysis, and your settings. 
 - **Face Not Found** — Use a clear, well-lit image with one face looking toward the camera. Very small faces, heavy blur, or extreme angles can prevent detection.
 - **The photo came in sideways** — Tap the green **Rotate** button until it's upright.
 - **A side view was measured as a front view (or the reverse)** — Open the measurements panel and choose **Force Lateral** or **Force Frontal** under POSE.
+- **A turned head was measured as a front view** — Choose **Force Three-quarter** under POSE, or turn on **Detect Three-Quarter View** in Settings for new photos.
 - **Millimeter values look off** — Set the subject's real pupillary distance in **Settings**, then use **Photo Tools > Recalculate** on the photo. For a video, re-import it after changing the setting.
 - **A long video only partly imported** — Dynaface analyzes at most the first 5,000 frames. Trim the recording to the section you need and import the trimmed copy.
 - **A video won't import** — Make sure it's an MP4, MOV, or M4V file. On Android, video import requires Android 9 or later.

@@ -72,7 +72,7 @@ Along the bottom are five buttons:
 
 - **Share/Export** — Opens export options for the photo and its measurements (see [Exporting, Saving, and Printing](#exporting-saving-and-printing)).
 - **Measurement Settings** (chart icon) — Opens the list of available measurements so you can turn individual ones on or off. Your choices are remembered for that photo.
-- **Landmarks Toggle** (labeled OFF/LM) — Shows or hides the facial reference points the AI used to calculate the measurements.
+- **Landmarks Toggle** (labeled OFF/LM) — Shows or hides the facial reference points the AI used to calculate the measurements. On front and three-quarter views, the cheek landmarks are drawn too, in orange with their short codes (such as zy.r for the right zygion).
 - **Recalculate** (circular arrows) — Re-runs the analysis on the photo from scratch, for example after changing the pupillary-distance setting.
 - **Delete** (trash icon) — Removes the entry from your library, after a confirmation prompt.
 
@@ -101,17 +101,31 @@ Click the measurement-settings button to see the full list of available measurem
 - **Eye Area** — Compares the visible eye-opening area between the left and right sides.
 - **Dental Display** — Compares how much of the teeth are visible on the left and right sides of a smile.
 - **Nose Frontal** — Measurements describing the nose as seen from the front.
+- **Skin Tone** — Samples the color of both cheeks and shows the average hue, saturation, and brightness as a swatch in the corner of the photo.
+- **Lateral** — Profile measurements for side-view photos (see [Side-View (Profile) Photos](#side-view-profile-photos)).
+- **Landmarks** — The coordinates of the face's landmarks, for the spreadsheet export. Its **Cheek Landmarks** row adds the ten cheek landmarks' coordinates and draws them on the photo in orange.
+- **Cheek Measures** — Measurements of the cheeks. On a front view: the width between the zygions (the widest points of the cheekbones) and the cheek reference points. On a three-quarter view: the outline of the far cheek, the malar apex (the high point of the cheekbone) and the submalar point (the hollow below it), as fractions of the face's height rather than millimeters. Its **Head turn** row reports how far the head is turned. See [Three-Quarter Photos](#three-quarter-photos).
+
+New photos and videos start with just **FAI** and **Eye Area** turned on (side-view photos also start with **Lateral**, and three-quarter photos with **Cheek Measures**). A measurement that doesn't apply to the photo's view (front, three-quarter or side) is dimmed and can't be changed there, and your choice for it is kept.
 
 Some measurements are groups: turning a group on reveals indented rows beneath it, so you can pick exactly which of its numbers appear. Turning a measurement on adds it to both the photo overlay and the values panel; turning it off hides it. These choices are saved per photo, so returning to an earlier photo later shows the same selections you left it with.
 
 Two more sections live in the same panel:
 
-- **POSE** — Dynaface automatically detects whether a photo is a front view or a side profile. If it guesses wrong, choose **Force Frontal** or **Force Lateral** here (**Auto Detect** restores the automatic choice).
+- **POSE** — Dynaface automatically detects whether a photo is a front view or a side profile, and, with **Detect Three-Quarter View** turned on in Settings, a three-quarter view. The heading shows the view the photo is measured as. If it guesses wrong, choose **Force Frontal**, **Force Three-quarter** or **Force Lateral** here (**Auto Detect** restores the automatic choice).
 - **TEXT SIZE** — A 1–5 stepper that makes the measurement labels drawn on the photo larger or smaller. Changes apply immediately, so you can see the effect as you adjust it.
 
 ## Side-View (Profile) Photos
 
 If you open a photo taken from the side, Dynaface recognizes it as a profile and switches to its profile measurements: it traces the outline of the face from forehead to chin and marks six anatomical points along it — Soft Tissue Glabella, Soft Tissue Nasion, Nasal Tip, Subnasal Point, Mento Labial Point, and Soft Tissue Pogonion. For profile photos, the CSV export contains this outline (see below).
+
+## Three-Quarter Photos
+
+A three-quarter photo shows the head turned about 45 degrees, so the far cheek's outline stands out against the background. Dynaface traces that outline and finds the malar apex, the high point of the cheekbone, and the submalar point, the hollow below it, when there is one. **Cheek Measures** reports them and draws the far cheek's outline, the apex and the submalar point on the photo. Front-view measurements don't apply to a turned head, so they're dimmed in the measurement-settings panel.
+
+Three-quarter detection is off by default. Turn on **Detect Three-Quarter View** in [Settings](#settings) to have new photos checked for it, or choose **Force Three-quarter** in a photo's POSE section. When a result can't be trusted, for example when the nose hides part of the far cheek, the values panel says why on a line that begins with "flagged:".
+
+Three-quarter analysis applies to photos only — videos are always measured as front views.
 
 ## Working with Videos
 
@@ -183,7 +197,10 @@ Open Settings from the **MENU** button on the Photo Library screen, or from the 
 
 <img src="https://s3.us-east-1.amazonaws.com/data.heatonresearch.com/dynaface/manual/app/2/dynaface_9_settings.jpg" width="1024">
 
-- **Pupillary Distance** — The real-world distance between the subject's pupils, in millimeters (40–85; the population average of 63 is the default). Dynaface uses this to convert pixels into millimeters, so entering the subject's actual measured value makes the millimeter measurements more accurate. It applies to new photos and video imports; use **Recalculate** to apply a change to an existing photo (videos keep the value from when they were imported). **Reset to Default** returns it to 63.
+- **Pupillary Distance** — The real-world distance between the subject's pupils, in millimeters (40–85; the population average of 63 is the default). Dynaface uses this to convert pixels into millimeters, so entering the subject's actual measured value makes the millimeter measurements more accurate. It applies to new photos and video imports; use **Recalculate** to apply a change to an existing photo (videos keep the value from when they were imported).
+- **Detect Three-Quarter View** — When on, new photos are also checked for a three-quarter view, a head turned about 45 degrees, and measured on the far cheek with **Cheek Measures** (see [Three-Quarter Photos](#three-quarter-photos)). It's off by default. Use **Recalculate** to apply it to an existing photo, or force the view in the photo's POSE section. Videos are always measured as front views.
+
+**Reset to Default** returns the pupillary distance to 63 and turns three-quarter detection off.
 
 The measurement **text size** setting lives in the measurement-settings panel instead (see above), so you can see the labels change as you adjust it.
 
@@ -202,6 +219,7 @@ Everything stays on your computer: your originals, the analysis, and your settin
 - **Face Not Found** — Use a clear, well-lit image with one face looking toward the camera. Very small faces, heavy blur, or extreme angles can prevent detection.
 - **HEIC photos won't open (Windows)** — Install Microsoft's free *HEVC/HEIF Image Extensions* from the Microsoft Store, then try again.
 - **Millimeter values look off** — Set the subject's real pupillary distance in Settings, then use **Recalculate** on the photo.
+- **A turned head was measured as a front view** — Choose **Force Three-quarter** under POSE in the measurement-settings panel, or turn on **Detect Three-Quarter View** in Settings for new photos.
 - **A long video only partly imported** — Dynaface analyzes at most the first 5,000 frames. Trim the recording to the section you need and open the trimmed copy.
 - **Getting help** — **Help > Dynaface Manual** opens this guide. **Help > Open Support Logs** opens the app's log folder — attach the latest log if you report a problem. **About Dynaface** (Help menu on Windows, Dynaface menu on a Mac) shows the version number to include in your report.
 
