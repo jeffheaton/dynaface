@@ -2,8 +2,8 @@ name: Test Library (.NET)
 
 # Runs the .NET library's test suite on Linux, macOS and Windows on every push and
 # pull request that touches it. The Linux run measures coverage for Codecov and the
-# README badges. Releases are still built by the manual Build Library (.NET)
-# workflow (build-lib-dotnet.yml).
+# README badges. Releases are built and published by hand (build-lib-dotnet.yml,
+# then deploy-lib-dotnet.yml); see RELEASING.md.
 on:
   push:
     paths:

@@ -14,9 +14,11 @@ Dynaface is a facial analysis tool for measuring facial symmetry and movement, p
 
 The three components are typically released in lockstep at the same version. When bumping a version, update every location for that component:
 
-- **dynaface-lib-python** — `setup.cfg` `[metadata] version` is the source of truth (the build workflow regenerates `dynaface/version.py` from it). Also bump the checked-in `dynaface/version.py` `VERSION` so local/editable installs report correctly.
-- **dynaface-lib-dotnet** — `facial_dll/FacialDll.csproj` `<Version>` is the source of truth (CI greps it, generates `facial_dll/Version.cs`, and packs both NuGet packages with it). Keep `FacialDll.Onnx/FacialDll.Onnx.csproj` `<Version>` in lockstep for local builds.
+- **dynaface-lib-python** — `setup.cfg` `[metadata] version` is the source of truth: Build Library (`build-lib.yml`) reads it, regenerates `dynaface/version.py` from it, and stages the wheel and sdist on S3 under it. Also bump the checked-in `dynaface/version.py` `VERSION` so local/editable installs report correctly.
+- **dynaface-lib-dotnet** — `facial_dll/FacialDll.csproj` `<Version>` is the source of truth: Build Library (.NET) (`build-lib-dotnet.yml`) greps it, generates `facial_dll/Version.cs`, and packs and stages both NuGet packages and their `.snupkg` symbols with it. Keep `FacialDll.Onnx/FacialDll.Onnx.csproj` `<Version>` in lockstep for local builds.
 - **dynaface-app** — `deploy/macos/build.sh` `DYNAFACE_VERSION`, and `deploy/windows/build.ps1` **both** `$script:DYNAFACE_VERSION` and `$currentVersion`. These stamp the app bundle version and regenerate the checked-in `version.py` at build time, and they also pin the PyPI `dynaface` lib version the app is built against — so the lib must be published to PyPI at that version before the app can build. Also bump the checked-in `version.py` `VERSION` for local runs.
+
+Each library is released in two manual steps: a build workflow that stages exactly what ships on S3 with a build record (`<name>-<version>-build.json`), rerunnable at the same version, and a deploy workflow that takes the version, publishes what was staged without rebuilding, and tags `v<version>` at the commit the build recorded. Python and .NET share the version and the tag. See `RELEASING.md`.
 
 ## Important: Always Use the venv
 
@@ -32,7 +34,7 @@ python3.11 -m venv venv && source venv/bin/activate
 pip install -e ".[dev]"
 
 # Run all tests
-python -m pytest tests --cov=. --cov-report=html
+python -m pytest tests --cov=dynaface --cov-branch --cov-report=html
 
 # Run a single test file
 python -m pytest tests/test_facial.py
@@ -48,8 +50,8 @@ mypy dynaface --install-types --non-interactive
 # Security scan
 bandit -r dynaface
 
-# Build wheel
-python -m build --wheel
+# Build the wheel and sdist into dist/ (pip install build first)
+python -m build
 ```
 
 ### dynaface-app (Desktop Application)

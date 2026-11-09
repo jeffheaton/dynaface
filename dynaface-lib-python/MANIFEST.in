@@ -1,2 +1,5 @@
 include README.md
 include LICENSE
+# The tests need tests_data/ (4.3 MB), which the sdist leaves out, so they
+# stay out too; setuptools would otherwise add tests/test*.py on its own.
+prune tests

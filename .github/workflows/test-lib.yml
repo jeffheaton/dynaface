@@ -3,7 +3,8 @@ name: Test Library
 # Runs the Python library's test suite on Linux, macOS and Windows, with every
 # Python version the library supports, on every push and pull request that touches
 # it. One of those runs measures coverage for Codecov and the README badges.
-# Releases are still built by the manual Build Library workflow (build-lib.yml).
+# Releases are built and published by hand (build-lib.yml, then deploy-lib.yml);
+# see RELEASING.md.
 on:
   push:
     paths:

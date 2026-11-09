@@ -50,30 +50,47 @@ dotnet pack facial_dll/FacialDll.csproj       -c Release -o ./nupkgs   # Dynafac
 dotnet pack FacialDll.Onnx/FacialDll.Onnx.csproj -c Release -o ./nupkgs # Dynaface.Onnx.<version>.nupkg
 ```
 
-Both take `<Version>` from their own `.csproj`; keep the two in lockstep.
+Both take `<Version>` from their own `.csproj`; keep the two in lockstep. Each also
+writes a `.snupkg` of symbols beside its `.nupkg`.
 
 ### Publishing to NuGet (maintainers)
 
 Releases take two manually dispatched (`workflow_dispatch`) workflows, the same way
-the Python library goes to PyPI:
+the Python library goes to PyPI. [RELEASING.md](../RELEASING.md) has the whole
+sequence for both languages.
 
-1. [Build Library (.NET)](../.github/workflows/build-lib-dotnet.yml) builds, runs the
-   full test suite (it downloads the ONNX models and requires the integration tests to
-   run), packs both packages, and uploads `Dynaface.<version>.nupkg` and
-   `Dynaface.Onnx.<version>.nupkg` to `s3://data.heatonresearch.com/library/`. It
-   does not publish.
+1. [Build Library (.NET)](../.github/workflows/build-lib-dotnet.yml) builds and runs
+   the full test suite (it downloads the ONNX models and requires the integration
+   tests to run). It then packs both packages, each `.nupkg` with a `.snupkg` of
+   symbols (Source Link points a debugger at the commit's sources on GitHub). It
+   stages `Dynaface.<version>.nupkg`, `Dynaface.Onnx.<version>.nupkg`, their
+   `.snupkg` files and a build record, `Dynaface-<version>-build.json` (the commit,
+   run and build number), on `s3://data.heatonresearch.com/library/`. It does not
+   publish, and rerunning it at the same version replaces what is staged.
 2. [Deploy Library to NuGet (.NET)](../.github/workflows/deploy-lib-dotnet.yml), given
-   that version, downloads both packages from S3 and pushes them to NuGet.org via
-   **Trusted Publishing** — GitHub's OIDC token is exchanged for a short-lived key by
-   the `NuGet/login` action, so there is **no long-lived API key stored in the repo**.
+   that version, downloads the staged files from S3, without rebuilding anything.
+   - It pushes both packages to NuGet.org, and each push carries its `.snupkg` to the
+     symbol server.
+   - It publishes via **Trusted Publishing**: the `NuGet/login` action exchanges
+     GitHub's OIDC token for a short-lived key, so there is **no long-lived API key
+     stored in the repo**.
+   - It then tags `v<version>` at the commit in the build record. The Python
+     library's deploy shares the tag. If the tag already stands at another commit,
+     the deploy refuses before pushing anything.
 
-One-time setup on NuGet.org (Account → **Trusted Publishing**): add a policy for
-each package ID (`Dynaface`, `Dynaface.Onnx`) bound to this repository
-(`jeffheaton/dynaface`) and the workflow file `deploy-lib-dotnet.yml`. A new policy is
-provisional and expires if it isn't used within about a week. To cut a release, bump
-`<Version>` in both `.csproj` files (kept in lockstep), run the build, then run the
-deploy with that version. Pushes use `--skip-duplicate`, so deploying an
-already-published version is a no-op rather than an error.
+One-time setup on NuGet.org (Account → **Trusted Publishing**): a policy bound to
+this repository (`jeffheaton/dynaface`) and the workflow file
+`deploy-lib-dotnet.yml`, which is already in place. A new policy is provisional and
+expires if it isn't used within about a week.
+
+To cut a release:
+1. Bump `<Version>` in both `.csproj` files, keeping them in lockstep with the
+   Python library's `setup.cfg`.
+2. Run the build.
+3. Run the deploy with that version.
+
+Pushes use `--skip-duplicate`, so deploying an already-published version is a no-op
+rather than an error.
 
 ## Test
 

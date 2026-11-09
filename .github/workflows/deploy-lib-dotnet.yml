@@ -1,16 +1,21 @@
 name: Deploy Library to NuGet (.NET)
 
-# Publishes the Dynaface and Dynaface.Onnx packages that a Build Library (.NET) run
-# uploaded to S3. Mirrors deploy-lib.yml (the Python wheel to PyPI).
+# Publishes the Dynaface and Dynaface.Onnx packages, with their symbols, that
+# a Build Library (.NET) run (build-lib-dotnet.yml) staged on S3, by version,
+# without rebuilding them, then tags v<version> at the commit the build
+# recorded. Mirrors deploy-lib.yml (the Python package to PyPI); the two share
+# one version and one tag, so whichever runs second finds the tag already at
+# its commit.
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Package version to deploy (e.g., 2.0.3); deploys Dynaface.<version>.nupkg and Dynaface.Onnx.<version>.nupkg'
+        description: 'Package version to deploy (e.g., 2.1.0); deploys Dynaface and Dynaface.Onnx <version>, each .nupkg with its .snupkg'
         required: true
 
 permissions:
-  contents: read
+  # Creates the release tag.
+  contents: write
   # Required for NuGet Trusted Publishing: lets the NuGet/login action request a
   # short-lived OIDC token from GitHub to exchange for a temporary NuGet API key.
   id-token: write
@@ -28,38 +33,112 @@ jobs:
           VERSION: ${{ github.event.inputs.version }}
         run: |
           if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-            echo "Error: '$VERSION' is not a package version (e.g., 2.0.3)."
+            echo "Error: '$VERSION' is not a package version (e.g., 2.1.0)."
             exit 1
           fi
           mkdir -p nupkgs
           for id in Dynaface Dynaface.Onnx; do
-            file="$id.$VERSION.nupkg"
-            echo "Downloading $file from S3..."
-            aws s3 cp "s3://data.heatonresearch.com/library/$file" nupkgs/ || {
-              echo "Error: File $file does not exist in S3. Run Build Library (.NET) at this version first."
-              exit 1
-            }
+            for ext in nupkg snupkg; do
+              file="$id.$VERSION.$ext"
+              echo "Downloading $file from S3..."
+              aws s3 cp "s3://data.heatonresearch.com/library/$file" nupkgs/ || {
+                echo "Error: File $file does not exist in S3. Run Build Library (.NET) at this version first."
+                exit 1
+              }
+            done
           done
           ls -l nupkgs
+          mkdir -p record
+          aws s3 cp "s3://data.heatonresearch.com/library/Dynaface-$VERSION-build.json" record/ || {
+            echo "Error: no build record for $VERSION in S3. Run Build Library (.NET) at this version first."
+            exit 1
+          }
+          cat "record/Dynaface-$VERSION-build.json"
+
+      # The tag records what was released: the commit these packages were
+      # built from, read from the build record. A tag already standing
+      # elsewhere is refused before anything is published. gh api prints a
+      # 404's body on stdout, so a missing tag is told by its exit status and
+      # the 404 on stderr, and any other failure stops the deploy.
+      - name: Check the tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ github.event.inputs.version }}
+          RECORD: record/Dynaface-${{ github.event.inputs.version }}-build.json
+        run: |
+          COMMIT=$(jq -er .commit "$RECORD")
+          if ! [[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::The build record names no commit: '$COMMIT'."
+            exit 1
+          fi
+          echo "COMMIT=$COMMIT" >> "$GITHUB_ENV"
+          if ref=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" \
+                     --jq '.object.type + " " + .object.sha' 2> gh-error.txt); then
+            sha=${ref#* }
+            if [ "${ref% *}" = tag ]; then
+              sha=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq .object.sha)
+            fi
+            if [ "$sha" != "$COMMIT" ]; then
+              echo "::error::v$VERSION already points at $sha, not $COMMIT, the commit this build came from."
+              exit 1
+            fi
+            echo "v$VERSION is already at $COMMIT"
+            echo "TAGGED=true" >> "$GITHUB_ENV"
+          elif grep -q "HTTP 404" gh-error.txt; then
+            echo "v$VERSION is not tagged yet; it will be, at $COMMIT"
+            echo "TAGGED=false" >> "$GITHUB_ENV"
+          else
+            cat gh-error.txt
+            echo "::error::Could not read the tag v$VERSION."
+            exit 1
+          fi
 
       - name: Set up .NET SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
       # Trusted Publishing: exchange GitHub's OIDC token for a short-lived NuGet
       # API key (no long-lived secret stored in the repo). Requires a matching
       # trusted-publishing policy on NuGet.org for both package IDs, bound to this
-      # workflow file — see dynaface-lib-dotnet/README.md.
+      # workflow file -- see RELEASING.md.
       - name: NuGet login (Trusted Publishing / OIDC)
         id: nuget-login
         uses: NuGet/login@v1
         with:
           user: jeffheaton
 
+      # Pushing each .nupkg pushes the .snupkg beside it to the symbol server.
       - name: Push to NuGet.org
         run: |
           dotnet nuget push "nupkgs/*.nupkg" \
             --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
             --source https://api.nuget.org/v3/index.json \
             --skip-duplicate
+
+      # Run beside the PyPI deploy, the other may tag the release first; a tag
+      # it made at the same commit is the one this would have made.
+      - name: Tag the release
+        if: env.TAGGED == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/v$VERSION" -f sha="$COMMIT" > /dev/null 2> gh-error.txt; then
+            echo "Tagged v$VERSION at $COMMIT"
+            exit 0
+          fi
+          ref=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" --jq '.object.type + " " + .object.sha') || {
+            cat gh-error.txt
+            exit 1
+          }
+          sha=${ref#* }
+          if [ "${ref% *}" = tag ]; then
+            sha=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq .object.sha)
+          fi
+          if [ "$sha" != "$COMMIT" ]; then
+            cat gh-error.txt
+            echo "::error::v$VERSION was tagged at $sha meanwhile, not $COMMIT."
+            exit 1
+          fi
+          echo "v$VERSION was tagged at $COMMIT meanwhile"

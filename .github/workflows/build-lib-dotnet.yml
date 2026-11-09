@@ -3,8 +3,17 @@ name: Build Library (.NET)
 on:
   workflow_dispatch:
 
-# Builds, tests and uploads to S3 only. Publishing to NuGet.org is a separate,
-# manual step: the Deploy Library to NuGet (.NET) workflow (deploy-lib-dotnet.yml).
+# Builds the C# library for a release, by hand: the suite without the models
+# (the model-gated tests must report Skipped), then the formatting check (a
+# gate), a vulnerable-packages report, a version file stamped with this
+# build's date and number, the Release build and the full suite over it with
+# the models required. It stages the DLL zip, both .nupkg packages and their
+# .snupkg symbols (Source Link pointing at this commit) as artifacts and on
+# S3, with a build record (Dynaface-<version>-build.json: the commit, run and
+# build number). Rerunning at the same version replaces what is staged.
+# Publishing to NuGet.org is a separate, manual step: the Deploy Library to
+# NuGet (.NET) workflow (deploy-lib-dotnet.yml), which takes what this staged.
+# RELEASING.md has the whole sequence.
 permissions:
   contents: read
   checks: write
@@ -19,12 +28,13 @@ jobs:
   # Skipped (not silently passed) and that everything else still passes without them.
   test-without-models:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v7
 
       - name: Set up .NET SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
@@ -51,7 +61,7 @@ jobs:
 
       - name: Publish test results
         if: always()
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@v3
         with:
           name: .NET Test Results (no models)
           path: dynaface-lib-dotnet/TestResults/*.trx
@@ -60,12 +70,13 @@ jobs:
   build:
     needs: test-without-models
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v7
 
       - name: Set up .NET SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
@@ -123,7 +134,7 @@ jobs:
 
       - name: Build (Release)
         working-directory: dynaface-lib-dotnet
-        run: dotnet build FacialDll.sln -c Release --no-restore -p:Version=$VERSION
+        run: dotnet build FacialDll.sln -c Release --no-restore -p:Version="$VERSION"
 
       - name: Download ONNX models
         run: |
@@ -147,7 +158,7 @@ jobs:
 
       - name: Publish test results
         if: always()
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@v3
         with:
           name: .NET Test Results
           path: dynaface-lib-dotnet/TestResults/*.trx
@@ -174,24 +185,49 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: |
-          aws s3 cp dynaface-lib-dotnet/dynaface-dotnet-${VERSION}.zip s3://data.heatonresearch.com/library/ --acl public-read
+          aws s3 cp "dynaface-lib-dotnet/dynaface-dotnet-${VERSION}.zip" s3://data.heatonresearch.com/library/ --acl public-read
 
+      # Each .nupkg comes with a .snupkg of symbols, Source Link pointing them
+      # at this commit on GitHub.
       - name: Pack NuGet packages (Dynaface + Dynaface.Onnx)
         working-directory: dynaface-lib-dotnet
         run: |
           dotnet pack facial_dll/FacialDll.csproj -c Release --no-build \
-            -p:Version=$VERSION -o nupkgs
+            -p:Version="$VERSION" -o nupkgs
           dotnet pack FacialDll.Onnx/FacialDll.Onnx.csproj -c Release --no-build \
-            -p:Version=$VERSION -o nupkgs
+            -p:Version="$VERSION" -o nupkgs
           ls -l nupkgs
+          for id in Dynaface Dynaface.Onnx; do
+            for ext in nupkg snupkg; do
+              test -f "nupkgs/$id.$VERSION.$ext" || { echo "::error::Missing nupkgs/$id.$VERSION.$ext"; exit 1; }
+            done
+          done
+
+      # What deploy-lib-dotnet.yml tags: the commit these packages were built
+      # from.
+      - name: Record the build
+        working-directory: dynaface-lib-dotnet
+        run: |
+          cat > "nupkgs/Dynaface-$VERSION-build.json" <<EOF
+          {
+            "name": "Dynaface",
+            "version": "$VERSION",
+            "commit": "$GITHUB_SHA",
+            "run_id": $GITHUB_RUN_ID,
+            "run_number": $GITHUB_RUN_NUMBER,
+            "built": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          jq . "nupkgs/Dynaface-$VERSION-build.json"
 
       - name: Upload NuGet packages artifact
         uses: actions/upload-artifact@v7
         with:
           name: dynaface-nupkgs
           retention-days: 7
-          path: dynaface-lib-dotnet/nupkgs/*.nupkg
+          path: dynaface-lib-dotnet/nupkgs/*
 
+      # Staged where Deploy Library to NuGet (.NET) looks for them, by version.
       - name: Upload NuGet packages to S3
         working-directory: dynaface-lib-dotnet
         env:
@@ -199,7 +235,9 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: |
-          for f in nupkgs/*.nupkg; do
+          for f in "nupkgs/Dynaface.$VERSION.nupkg" "nupkgs/Dynaface.$VERSION.snupkg" \
+                   "nupkgs/Dynaface.Onnx.$VERSION.nupkg" "nupkgs/Dynaface.Onnx.$VERSION.snupkg" \
+                   "nupkgs/Dynaface-$VERSION-build.json"; do
             aws s3 cp "$f" s3://data.heatonresearch.com/library/ --acl public-read
           done
 

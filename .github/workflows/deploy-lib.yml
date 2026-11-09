@@ -1,37 +1,125 @@
 name: Deploy Library to PyPI
 
+# Publishes the wheel and sdist that a Build Library run (build-lib.yml)
+# staged on S3, by version, without rebuilding them, then tags v<version> at
+# the commit the build recorded. Mirrors deploy-lib-dotnet.yml (the NuGet
+# packages to NuGet.org); the two share one version and one tag, so whichever
+# runs second finds the tag already at its commit.
+#
+# PyPI is reached by Trusted Publishing: GitHub's OIDC token is exchanged for
+# a short-lived upload token, so no PyPI credential is stored in the repo. It
+# needs a trusted publisher on PyPI bound to this workflow file -- see
+# RELEASING.md.
 on:
   workflow_dispatch:
     inputs:
-      whl_file:
-        description: 'Wheel file name to deploy (e.g., dynaface-0.2.0-py3-none-any.whl)'
+      version:
+        description: 'Package version to deploy (e.g., 2.1.0); deploys dynaface-<version>-py3-none-any.whl and dynaface-<version>.tar.gz'
         required: true
+
+permissions:
+  # Creates the release tag.
+  contents: write
+  # Trusted Publishing: PyPI accepts this workflow's OIDC token.
+  id-token: write
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download artifact from S3
+      - name: Download the distributions from S3
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+          VERSION: ${{ github.event.inputs.version }}
         run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?$ ]]; then
+            echo "Error: '$VERSION' is not a package version (e.g., 2.1.0)."
+            exit 1
+          fi
           mkdir -p dist
-
-          echo "Downloading ${{ github.event.inputs.whl_file }} from S3..."
-          aws s3 cp s3://data.heatonresearch.com/library/${{ github.event.inputs.whl_file }} dist/ || {
-            echo "Error: File ${{ github.event.inputs.whl_file }} does not exist in S3."
+          for file in "dynaface-$VERSION-py3-none-any.whl" "dynaface-$VERSION.tar.gz"; do
+            echo "Downloading $file from S3..."
+            aws s3 cp "s3://data.heatonresearch.com/library/$file" dist/ || {
+              echo "Error: File $file does not exist in S3. Run Build Library at this version first."
+              exit 1
+            }
+          done
+          ls -l dist
+          # The record stays out of dist/, which the publish action uploads whole.
+          mkdir -p record
+          aws s3 cp "s3://data.heatonresearch.com/library/dynaface-$VERSION-build.json" record/ || {
+            echo "Error: no build record for $VERSION in S3. Run Build Library at this version first."
             exit 1
           }
+          cat "record/dynaface-$VERSION-build.json"
 
-      - name: Deploy to PyPI
+      # The tag records what was released: the commit these files were built
+      # from, read from the build record. A tag already standing elsewhere is
+      # refused before anything is published. gh api prints a 404's body on
+      # stdout, so a missing tag is told by its exit status and the 404 on
+      # stderr, and any other failure stops the deploy.
+      - name: Check the tag
         env:
-          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ github.event.inputs.version }}
+          RECORD: record/dynaface-${{ github.event.inputs.version }}-build.json
         run: |
-          # Upgrade packaging too: the wheel uses Metadata-Version 2.4 (PEP 639
-          # License-File), which the runner's system packaging (24.0) doesn't
-          # recognize, causing twine to reject a valid field. packaging>=24.2 fixes it.
-          pip install --upgrade twine "packaging>=24.2"
-          twine upload --non-interactive -u __token__ -p "$PYPI_API_TOKEN" dist/*
+          COMMIT=$(jq -er .commit "$RECORD")
+          if ! [[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::The build record names no commit: '$COMMIT'."
+            exit 1
+          fi
+          echo "COMMIT=$COMMIT" >> "$GITHUB_ENV"
+          if ref=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" \
+                     --jq '.object.type + " " + .object.sha' 2> gh-error.txt); then
+            sha=${ref#* }
+            if [ "${ref% *}" = tag ]; then
+              sha=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq .object.sha)
+            fi
+            if [ "$sha" != "$COMMIT" ]; then
+              echo "::error::v$VERSION already points at $sha, not $COMMIT, the commit this build came from."
+              exit 1
+            fi
+            echo "v$VERSION is already at $COMMIT"
+            echo "TAGGED=true" >> "$GITHUB_ENV"
+          elif grep -q "HTTP 404" gh-error.txt; then
+            echo "v$VERSION is not tagged yet; it will be, at $COMMIT"
+            echo "TAGGED=false" >> "$GITHUB_ENV"
+          else
+            cat gh-error.txt
+            echo "::error::Could not read the tag v$VERSION."
+            exit 1
+          fi
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      # Run beside the .NET deploy, the other may tag the release first; a tag
+      # it made at the same commit is the one this would have made.
+      - name: Tag the release
+        if: env.TAGGED == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/v$VERSION" -f sha="$COMMIT" > /dev/null 2> gh-error.txt; then
+            echo "Tagged v$VERSION at $COMMIT"
+            exit 0
+          fi
+          ref=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" --jq '.object.type + " " + .object.sha') || {
+            cat gh-error.txt
+            exit 1
+          }
+          sha=${ref#* }
+          if [ "${ref% *}" = tag ]; then
+            sha=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq .object.sha)
+          fi
+          if [ "$sha" != "$COMMIT" ]; then
+            cat gh-error.txt
+            echo "::error::v$VERSION was tagged at $sha meanwhile, not $COMMIT."
+            exit 1
+          fi
+          echo "v$VERSION was tagged at $COMMIT meanwhile"
