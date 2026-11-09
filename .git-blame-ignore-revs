@@ -3,3 +3,6 @@
 
 # Apply dotnet format (whitespace only) — mechanical reformat of dynaface-lib-dotnet
 bd30d202a95c7c5587a8444f645b32373dff9959
+
+# Apply dotnet format to four test files (whitespace only)
+493e336570635892f0fc91e59681cf4550da8e6f

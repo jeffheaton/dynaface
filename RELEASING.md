@@ -55,7 +55,7 @@ it for you.
    who owns both package IDs. If a policy is ever re-created, it starts out
    provisional and expires unless it is used within about a week.
 4. **Codecov.** This is already in place. The test workflows upload with
-   OIDC under the flags `python` and `dotnet`. [`codecov.yml`](codecov.yml)
+   OIDC under the flags `python` and `dotnet`. [`.github/codecov.yml`](.github/codecov.yml)
    carries each flag forward and makes coverage informational.
 
 ## Making a release

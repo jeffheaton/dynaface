@@ -22,3 +22,6 @@ coverage:
     patch:
       default:
         informational: true
+
+# The badges are the report; no comment on pull requests.
+comment: false
