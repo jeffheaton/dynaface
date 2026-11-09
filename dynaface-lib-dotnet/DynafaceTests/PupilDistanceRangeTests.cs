@@ -50,7 +50,10 @@ public class PupilDistanceRangeTests
         var (pupils, _) = FaceMeasureContext.CalcPd(landmarks, 63f);
         var state = new FaceAnalysisState
         {
-            PostCropImage = Gray(), Landmarks = landmarks, PupillaryDistance = pupils, Pix2mm = 30f / pupils,
+            PostCropImage = Gray(),
+            Landmarks = landmarks,
+            PupillaryDistance = pupils,
+            Pix2mm = 30f / pupils,
         };
         var restored = FaceAnalysisPersistence.Restore(state);
         Assert.Equal(30f, restored.PupilDistMm);
@@ -66,7 +69,10 @@ public class PupilDistanceRangeTests
         var (pupils, pix2mm) = FaceMeasureContext.CalcPd(landmarks, 63f);
         var state = new FaceAnalysisState
         {
-            PostCropImage = Gray(), Landmarks = landmarks, PupillaryDistance = pupils, Pix2mm = pix2mm,
+            PostCropImage = Gray(),
+            Landmarks = landmarks,
+            PupillaryDistance = pupils,
+            Pix2mm = pix2mm,
         };
         Assert.Equal(63f, FaceAnalysisPersistence.Restore(state).PupilDistMm);
     }

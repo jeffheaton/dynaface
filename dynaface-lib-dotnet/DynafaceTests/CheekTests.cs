@@ -778,8 +778,14 @@ public class CheekTests
         {
             var expected = new Dictionary<string, double>
             {
-                ["yaw0"] = 0.47, ["yaw45"] = 0.05, ["yaw-45"] = 0.05, ["yaw50"] = 0.00,
-                ["yaw55"] = -0.06, ["yaw60"] = -0.09, ["img2"] = -0.15, ["img3"] = -0.13,
+                ["yaw0"] = 0.47,
+                ["yaw45"] = 0.05,
+                ["yaw-45"] = 0.05,
+                ["yaw50"] = 0.00,
+                ["yaw55"] = -0.06,
+                ["yaw60"] = -0.09,
+                ["img2"] = -0.15,
+                ["img3"] = -0.13,
             };
             foreach (var (name, margin) in expected)
             {

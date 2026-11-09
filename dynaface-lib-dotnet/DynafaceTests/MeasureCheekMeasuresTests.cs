@@ -45,7 +45,11 @@ internal sealed class RecordingCanvas : ICheekCanvas
     public void Circle((int X, int Y) center, Rgba32 color, int radius, int thickness) =>
         Calls.Add(new CheekDrawCall
         {
-            Kind = "circle", Points = new[] { center }, Color = color, Radius = radius, Thickness = thickness,
+            Kind = "circle",
+            Points = new[] { center },
+            Color = color,
+            Radius = radius,
+            Thickness = thickness,
         });
 
     public void Polyline((int X, int Y)[] points, Rgba32 color, int thickness) =>

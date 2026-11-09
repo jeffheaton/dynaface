@@ -202,7 +202,11 @@ public class MeasureGroupsTests
         Assert.Equal(
             new Dictionary<string, bool>
             {
-                ["plain"] = true, ["Width"] = false, ["Apex"] = true, ["Turn"] = true, ["switch"] = true,
+                ["plain"] = true,
+                ["Width"] = false,
+                ["Apex"] = true,
+                ["Turn"] = true,
+                ["switch"] = true,
             },
             measure.Items.ToDictionary(item => item.Name, item => item.Enabled));
         Assert.Equal(new[] { "plain", "a.h", "a.ok", "yaw", "pitch" }, AllItems(measure));
