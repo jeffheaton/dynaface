@@ -5,6 +5,7 @@ Run from dynaface-app with: python -m unittest discover -s tests -t .
 """
 
 import math
+import time
 import unittest
 
 import numpy as np
@@ -37,8 +38,16 @@ class AssertStandardPythonTest(unittest.TestCase):
         assert_standard_python(values)
 
     def test_rejects_other_objects(self):
-        with self.assertRaises(TypeError):
-            assert_standard_python({"frames": [[object()]]})
+        with self.assertRaises(TypeError) as raised:
+            assert_standard_python({"frames": [[1, {"k": object()}]]})
+        self.assertIn("at root['frames'][0][1]['k']!", str(raised.exception))
+
+    def test_names_the_way_to_a_value_only_to_report_it(self):
+        # The repr of a key was copied into the way to each value under it: a
+        # crafted document took a minute to save.
+        start = time.perf_counter()
+        assert_standard_python({"\x00" * 4_000_000: [None] * 10_000})
+        self.assertLess(time.perf_counter() - start, 2)
 
 
 class ViewLabelTest(unittest.TestCase):

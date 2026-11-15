@@ -38,3 +38,5 @@ Problems in third-party packages such as OpenCV, ONNX Runtime or PyQt belong wit
 Dynaface 2.0.3 and earlier save desktop-app projects (`.dyfc` files) with Python's `pickle` format, and opening a pickle file can run code stored in it. If you use one of those versions, only open `.dyfc` files that you created yourself or that come from someone you trust.
 
 Later versions save projects as a zip of JSON and numpy arrays, which can't run code when opened. They still open older project files, but they accept only the plain data those files hold and refuse anything else before it can run.
+
+These versions also limit the work that opening a project file can take and how deeply its contents can nest. A file made to crash Dynaface or keep it busy is refused within seconds, like any other file that isn't a project. Like any compressed file, though, a project can unpack to far more data than its size suggests, and Dynaface needs memory for all of it, just as it would for a genuine project that large.

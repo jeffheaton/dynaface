@@ -4,6 +4,7 @@ Run from dynaface-app with: python -m unittest discover -s tests -t .
 """
 
 import errno
+import faulthandler
 import gc
 import gzip
 import io
@@ -14,6 +15,8 @@ import pickle
 import struct
 import sys
 import tempfile
+import threading
+import time
 import tracemalloc
 import unittest
 import weakref
@@ -142,6 +145,109 @@ def _version_1(frames, **header):
     }
 
 
+# A memo index that pickle.dumps() never reaches, for opcodes put in its output.
+_SPARE = struct.pack("<I", 1 << 30)
+_PUT = pickle.LONG_BINPUT + _SPARE
+_GET = pickle.LONG_BINGET + _SPARE
+
+
+def _deep_tuple(levels):
+    """Opcodes for the empty tuple in a tuple, in a tuple, levels deep: a byte a
+    level, so that a million levels gzip to a kilobyte."""
+    return pickle.EMPTY_TUPLE + pickle.TUPLE1 * levels
+
+
+def _shared_tuple(levels):
+    """Opcodes for a tuple of the tuple below it twice, levels deep: 2**levels
+    tuples to hash or walk, in 12 bytes a level."""
+    each = _PUT + pickle.POP + _GET + _GET + pickle.TUPLE2
+    return pickle.EMPTY_TUPLE + each * levels
+
+
+def _shared_list(levels):
+    """Opcodes for a list of the list below it twice, levels deep."""
+    each = (
+        _PUT + pickle.POP + pickle.EMPTY_LIST + pickle.MARK + _GET + _GET
+    ) + pickle.APPENDS
+    return pickle.EMPTY_LIST + each * levels
+
+
+def _nested_object_arrays(levels):
+    """A pickle (protocol 2) of an object array holding an object array, holding
+    another, levels deep, as numpy pickles each of them."""
+    dtype = pickle.dumps(np.dtype("O"), protocol=2)[2:-1]
+    state = (
+        pickle.MARK
+        + pickle.BININT1
+        + b"\x01"
+        + pickle.BININT1
+        + b"\x01"
+        + pickle.TUPLE1
+        + dtype
+        + pickle.NEWFALSE
+        + pickle.EMPTY_LIST
+        + _GET
+        + pickle.APPEND
+        + pickle.TUPLE
+    )
+    each = _PLACEHOLDER + state + pickle.BUILD + _PUT + pickle.POP
+    start = b"\x80\x02" + pickle.NONE + _PUT + pickle.POP
+    return start + each * levels + _GET + pickle.STOP
+
+
+def _object_array_links(links, arrays, holder):
+    """A pickle (protocol 2) of links of object arrays, each link the given number
+    of arrays deep, the innermost holding the link before through holder (opcodes
+    that push a container of the spare memo slot's value), and the outermost
+    left in the spare memo slot."""
+    dtype = pickle.dumps(np.dtype("O"), protocol=2)[2:-1]
+
+    def holding(item):
+        state = (
+            pickle.MARK
+            + pickle.BININT1
+            + b"\x01"
+            + pickle.BININT1
+            + b"\x01"
+            + pickle.TUPLE1
+            + dtype
+            + pickle.NEWFALSE
+            + pickle.EMPTY_LIST
+            + item
+            + pickle.APPEND
+            + pickle.TUPLE
+        )
+        return _PLACEHOLDER + state + pickle.BUILD + _PUT + pickle.POP
+
+    stream = b"\x80\x02" + pickle.NONE + _PUT + pickle.POP
+    for _ in range(links):
+        stream += holding(holder) + holding(_GET) * (arrays - 1)
+    return stream
+
+
+def _crafted(doc, opcodes, marker="crafted"):
+    """The pickle (protocol 3) of doc, with the opcodes, which push one value,
+    where doc holds the string marker."""
+    stream = pickle.dumps(doc, protocol=3)
+    text = pickle.BINUNICODE + struct.pack("<I", len(marker)) + marker.encode()
+    assert stream.count(text) == 1
+    return stream.replace(text, opcodes)
+
+
+def _profile(pose="lateral", **body):
+    """A version 1 profile document, as Dynaface 1.2.0 to 2.0.4 saved one."""
+    doc = _version_1([], lateral=True, pose=pose)
+    doc[DOC_BODY].update(lateral_landmarks=None, sagittal_x=None, sagittal_y=None)
+    doc[DOC_BODY].update(body)
+    return doc
+
+
+def _json_nested(levels, opening, closing, inner="null"):
+    """JSON text of inner within levels of opening and closing, built as text:
+    json.dumps() recurses for each level."""
+    return opening * levels + inner + closing * levels
+
+
 class DynafaceDocumentTest(unittest.TestCase):
     def setUp(self):
         self._dir = tempfile.TemporaryDirectory()
@@ -169,7 +275,7 @@ class DynafaceDocumentTest(unittest.TestCase):
             change_json(doc)
             entries["document.json"] = json.dumps(doc).encode()
         entries.update(replace or {})
-        with zipfile.ZipFile(self.path, "w") as zf:
+        with zipfile.ZipFile(self.path, "w", zipfile.ZIP_DEFLATED) as zf:
             for name, data in entries.items():
                 zf.writestr(name, data)
 
@@ -821,6 +927,552 @@ class DynafaceDocumentTest(unittest.TestCase):
             f.write(b"not a document")
         with self.assertRaises(TypeError):
             self.load()
+
+    # Files made to crash Dynaface or keep it busy. Each is refused within a few
+    # seconds, as any file that isn't a document is, on a thread with the 512 KB
+    # stack of the thread the app loads documents on (Qt's default on macOS).
+    # Should a limit stop working, a file that overflows the stack crashes this
+    # test run, as it did the app, and one that hashes without end holds the GIL,
+    # so no thread can time it out: a watchdog of faulthandler's ends the run
+    # then, with every thread's traceback.
+
+    def assert_unreadable(self, seconds=10.0):
+        """Asserts that loading self.path fails as for any file that isn't a
+        document, within seconds, on a thread with a 512 KB stack. Returns the
+        error."""
+        error = self.load_on_small_stack(seconds)
+        self.assertIsInstance(error, DocumentError)
+        self.assertIn("does not appear to be a valid Dynaface document", str(error))
+        return error
+
+    def load_on_small_stack(self, seconds=10.0):
+        """Loads self.path within seconds on a thread with a 512 KB stack, and
+        returns the document, or the error loading it raised."""
+        outcome = []
+
+        def load():
+            try:
+                outcome.append(self.load())
+            except BaseException as e:
+                outcome.append(e)
+
+        faulthandler.dump_traceback_later(seconds + 20, exit=True)
+        try:
+            default = threading.stack_size(512 << 10)
+            try:
+                thread = threading.Thread(target=load, daemon=True)
+                thread.start()
+            finally:
+                threading.stack_size(default)
+            thread.join(seconds)
+        finally:
+            faulthandler.cancel_dump_traceback_later()
+        self.assertFalse(thread.is_alive(), f"still loading after {seconds} s")
+        return outcome[0]
+
+    def rewrite_text(self, old, new):
+        """Replaces the text old, which document.json holds once, with new."""
+        with zipfile.ZipFile(self.path) as zf:
+            text = zf.read("document.json").decode()
+        self.assertEqual(text.count(old), 1)
+        self.rewrite(replace={"document.json": text.replace(old, new).encode()})
+
+    def save_frames_json(self, text):
+        """Saves a version 2 document whose frames are the JSON text (values,
+        without the list's brackets)."""
+        doc = _sample_document()
+        doc.frames = ["crafted"]
+        doc.save(self.path)
+        self.rewrite_text('"crafted"', text)
+
+    def test_refuses_keys_nested_deep_enough_to_crash(self):
+        # Hashing a tuple recurses in C for each level, about 60 bytes of stack
+        # a level: a tuple nested 9,000 deep, 86 bytes of gzip, crashed the app
+        # with no message.
+        key = _deep_tuple(9_000)
+        streams = {
+            "SETITEM": pickle.EMPTY_DICT + key + pickle.NONE + pickle.SETITEM,
+            "SETITEMS": pickle.EMPTY_DICT
+            + pickle.MARK
+            + key
+            + pickle.NONE
+            + pickle.SETITEMS,
+            "DICT": pickle.MARK + key + pickle.NONE + pickle.DICT,
+            "ADDITEMS": pickle.EMPTY_SET + pickle.MARK + key + pickle.ADDITEMS,
+            "FROZENSET": pickle.MARK + key + pickle.FROZENSET,
+            "set()": pickle.GLOBAL
+            + b"builtins\nset\n"
+            + pickle.EMPTY_LIST
+            + key
+            + pickle.APPEND
+            + pickle.TUPLE1
+            + pickle.REDUCE,
+            "frozenset()": pickle.GLOBAL
+            + b"builtins\nfrozenset\n"
+            + pickle.EMPTY_LIST
+            + key
+            + pickle.APPEND
+            + pickle.TUPLE1
+            + pickle.REDUCE,
+        }
+        streams["a million deep"] = (
+            pickle.EMPTY_DICT + _deep_tuple(1_000_000) + pickle.NONE + pickle.SETITEM
+        )
+        for name, ops in streams.items():
+            with self.subTest(name):
+                self.write_gzip(b"\x80\x04" + ops + pickle.STOP)
+                self.assert_unreadable()
+        with self.subTest("version 2"):
+            tuples = _json_nested(450, '{"$type": "tuple", "items": [', "]}")
+            self.save_frames_json('{"$type": "set", "items": [%s]}' % tuples)
+            self.assert_unreadable()
+
+    def test_refuses_object_arrays_nested_deep_enough_to_crash(self):
+        # Freeing an object array frees what it holds, in C, about 1.6 KB of
+        # stack an array: a few hundred levels crashed the app as the document
+        # was dropped, even one that had been refused.
+        self.write_gzip(_nested_object_arrays(1000))
+        self.assert_unreadable()
+        self.save_frames_json(
+            _json_nested(450, '{"$type": "ndarray", "shape": [1], "items": [', "]}")
+        )
+        self.assert_unreadable()
+        # Three object arrays deep, held by a document.
+        document = _crafted(_version_1(["crafted"]), _GET)[2:]
+        self.write_gzip(_object_array_links(1, 3, _GET) + document)
+        self.assert_unreadable()
+
+    def test_frees_object_arrays_linked_through_containers(self):
+        # Python puts off freeing a container 50 deep, but not an array, so 50
+        # links of arrays free at once: links of 32, the most there were, freed
+        # as the load failed crashed the app. Links of two, the most there are
+        # now, free safely, whether the load then fails or goes on.
+        holders = {
+            "tuple": _GET + pickle.TUPLE1,
+            "list": pickle.EMPTY_LIST + _GET + pickle.APPEND,
+            "dict": pickle.EMPTY_DICT
+            + pickle.BININT1
+            + b"\x00"
+            + _GET
+            + pickle.SETITEM,
+        }
+        document = pickle.dumps(_version_1([]), protocol=2)[2:]
+        for name, holder in holders.items():
+            with self.subTest(name):
+                self.write_gzip(_object_array_links(60, 32, holder) + b"\xff")
+                self.assert_unreadable()
+                links = _object_array_links(60, 2, holder)
+                self.write_gzip(links + b"\xff")
+                self.assert_unreadable()
+                self.write_gzip(links + pickle.NONE + _PUT + pickle.POP + document)
+                self.assertIsInstance(self.load_on_small_stack(), DynafaceDocument)
+
+    def test_opens_an_object_array_held_by_another(self):
+        inner = np.empty(1, dtype=object)
+        inner[0] = (1, 2)
+        outer = np.empty(1, dtype=object)
+        outer[0] = inner
+        inner = outer
+        for protocol in (3, 5):
+            with self.subTest(protocol=protocol):
+                self.write_gzip(pickle.dumps(_version_1([[inner]]), protocol=protocol))
+                self.assert_same([[inner]], self.load().frames)
+        doc = _sample_document()
+        doc.frames = [[inner]]
+        doc.save(self.path)
+        self.assert_same([[inner]], self.load().frames)
+
+    def test_refuses_keys_that_share_their_members(self):
+        # A tuple of a tuple twice, itself of a tuple twice, 100 levels deep is
+        # 1,200 bytes and 2**100 tuples to hash: loading never ended.
+        key = _shared_tuple(100)
+        streams = {
+            "dict key": pickle.EMPTY_DICT + key + pickle.NONE + pickle.SETITEM,
+            "set member": pickle.EMPTY_SET + pickle.MARK + key + pickle.ADDITEMS,
+            "frozenset member": pickle.MARK + key + pickle.FROZENSET,
+        }
+        for name, ops in streams.items():
+            with self.subTest(name):
+                self.write_gzip(b"\x80\x04" + ops + pickle.STOP)
+                self.assert_unreadable()
+
+    def test_refuses_int_keys_chosen_to_hash_alike(self):
+        # An int hashes to itself modulo 2**61 - 1, so these all hash alike, and
+        # each one added to a dict is compared with all the others.
+        keys = [k * (2**61 - 1) for k in range(1, 6001)]
+        with self.subTest("version 1"):
+            self.write_gzip(pickle.dumps(_version_1([dict.fromkeys(keys)])))
+            self.assert_unreadable()
+        with self.subTest("version 2"):
+            items = json.dumps([[key, 0] for key in keys])
+            self.save_frames_json('{"$type": "dict", "items": %s}' % items)
+            self.assert_unreadable()
+        with self.subTest("memo"):
+            # Protocol 0's PUT names its memo index in digits, any int at all
+            # (and is refused, as protocol 0's text opcodes are).
+            puts = b"".join(b"p%d\n" % key for key in keys)
+            document = pickle.dumps(_version_1([]), protocol=0)
+            self.write_gzip(pickle.NONE + puts + pickle.POP + document)
+            self.assert_unreadable()
+
+    def test_refuses_crafted_poses(self):
+        # Pose() hashes the value and quotes it when it isn't a pose: a tuple
+        # 100,000 deep crashed the app, a shared one never finished hashing,
+        # and a list of a list twice, 26 levels deep, quoted to 2 GB of text.
+        poses = {
+            "deep tuple": _deep_tuple(100_000),
+            "shared tuple": _shared_tuple(100),
+            "shared list": _shared_list(40),
+            "tuple": pickle.BINUNICODE
+            + struct.pack("<I", 7)
+            + b"lateral"
+            + pickle.TUPLE1,
+            "unknown": pickle.BINUNICODE + struct.pack("<I", 8) + b"sideways",
+        }
+        for name, ops in poses.items():
+            with self.subTest(name):
+                self.write_gzip(_crafted(_profile(pose="crafted"), ops))
+                self.assert_unreadable()
+        with self.subTest("version 2"):
+            _sample_document().save(self.path)
+            self.rewrite_text(
+                '"pose": "lateral"', '"pose": ' + _json_nested(900, "[", "]")
+            )
+            self.assert_unreadable()
+            _sample_document().save(self.path)
+            self.rewrite_text(
+                '"pose": "lateral"', '"pose": {"$type": "tuple", "items": ["lateral"]}'
+            )
+            self.assert_unreadable()
+
+    def test_crafted_measure_names_name_no_measure(self):
+        # Looking a name up hashed it, so a shared tuple never finished; one
+        # this size is refused, and a name that isn't a str names nothing.
+        doc = _version_1([])
+        doc[DOC_BODY]["measures"] = [{"name": "crafted", "enabled": True, "items": []}]
+        self.write_gzip(_crafted(doc, _shared_tuple(100)))
+        self.assert_unreadable()
+        self.write_gzip(_crafted(doc, pickle.EMPTY_TUPLE))
+        self.assertEqual(len(self.load().measures), len(measures.all_measures()))
+        _sample_document().save(self.path)
+
+        def add_foreign_measure(saved):
+            name = {"$type": "tuple", "items": ["dynaface.measures_frontal"]}
+            foreign = {"name": name, "enabled": True, "items": []}
+            saved["body"]["measures"].append(foreign)
+
+        self.rewrite(change_json=add_foreign_measure)
+        self.assertEqual(len(self.load().measures), len(measures.all_measures()))
+
+    def test_refuses_values_a_pickle_shares_many_times_over(self):
+        # A profile's landmarks of a list of a list twice, 40 levels deep: to
+        # np.array() and saving, which the app runs on a document it opens,
+        # 2**40 lists.
+        self.write_gzip(
+            _crafted(_profile(lateral_landmarks="crafted"), _shared_list(40))
+        )
+        self.assert_unreadable()
+        with self.subTest("too deep"):
+            frames = _deep_tuple(100)
+            self.write_gzip(_crafted(_version_1(["crafted"]), frames))
+            self.assert_unreadable()
+
+    def test_refuses_builtins_called_with_what_pickle_never_passes(self):
+        # bytearray() of an int is that many zeros, made before anything else;
+        # complex() of a str and set() of one go through all of it.
+        text = pickle.BINUNICODE + struct.pack("<I", 3) + b"1+j"
+        calls = {
+            "bytearray": pickle.BININT + struct.pack("<i", 1 << 28),
+            "complex": text,
+            "set": text,
+        }
+        for name, argument in calls.items():
+            with self.subTest(name):
+                call = (
+                    pickle.GLOBAL
+                    + f"builtins\n{name}\n".encode()
+                    + argument
+                    + pickle.TUPLE1
+                    + pickle.REDUCE
+                )
+                self.write_gzip(_crafted(_version_1(["crafted"]), call))
+                tracemalloc.start()
+                try:
+                    self.assert_unreadable()
+                    peak = tracemalloc.get_traced_memory()[1]
+                finally:
+                    tracemalloc.stop()
+                self.assertLess(peak, 64 << 20)
+
+    def test_refuses_files_of_many_cheap_opcodes_quickly(self):
+        # 100 MB of opcodes that do almost nothing gzip to 100 KB; a file of a
+        # billion, 1 MB, took over three minutes to read.
+        chunk = (pickle.NONE + pickle.POP) * 1_000_000
+        with gzip.open(self.path, "wb") as f:
+            f.write(b"\x80\x02")
+            for _ in range(50):
+                f.write(chunk)
+            f.write(pickle.NONE + pickle.STOP)
+        start = time.perf_counter()
+        self.assert_unreadable()
+        self.assertLess(time.perf_counter() - start, 5)
+
+    def test_refuses_version_2_values_beyond_what_its_size_allows(self):
+        # json.loads() makes all of a file's values at once: 15 MB of "{}," make
+        # five million dicts, and the file is a few kilobytes.
+        self.save_frames_json("[" + "{}," * 5_000_000 + "{}]")
+        self.assert_unreadable()
+        with self.subTest("an array named again and again"):
+            array = '{"$type": "ndarray", "file": "arrays/0.npy"}'
+            self.save_frames_json("[" + ", ".join([array] * 1000) + "]")
+            self.assert_unreadable()
+
+    def test_refuses_version_2_arrays_of_elements_of_no_size(self):
+        # 2**62 elements of no size take no data, and copying them never ends.
+        _sample_document().save(self.path)
+        header = {"descr": "|V0", "fortran_order": False, "shape": (2**62,)}
+        crafted = io.BytesIO()
+        np.lib.format.write_array_header_1_0(crafted, header)
+        self.rewrite(replace={"arrays/0.npy": crafted.getvalue()})
+        self.assert_unreadable()
+
+    def test_opens_documents_of_5000_frames(self):
+        # The most frames an import keeps, 98 landmarks each, all alike, which
+        # compress best and so leave the least room under the limits. Each of
+        # the two loads took half a second here.
+        rng = np.random.default_rng(0)
+        landmarks = [(int(x), int(y)) for x, y in rng.integers(0, 1024, (98, 2))]
+        image = np.arange(8 * 8 * 3, dtype=np.uint8).reshape(8, 8, 3)
+
+        def frame(version):
+            if version == 1:
+                headpose = np.array([1.5, -2.0, 0.25])
+                return [image.copy(), headpose, list(landmarks), np.float64(63.0)]
+            view = {"pose": "frontal", "flipped": False, "lateral": False}
+            return [image.copy(), [1.5, -2.0, 0.25], list(landmarks), 63.0, view]
+
+        self.write_gzip(pickle.dumps(_version_1([frame(1) for _ in range(5000)])))
+        start = time.perf_counter()
+        self.assertEqual(len(self.load().frames), 5000)
+        self.assertLess(time.perf_counter() - start, 3)
+        doc = _sample_document()
+        doc.frames = [frame(2) for _ in range(5000)]
+        doc.save(self.path)
+        start = time.perf_counter()
+        self.assertEqual(len(self.load().frames), 5000)
+        self.assertLess(time.perf_counter() - start, 3)
+
+    def test_measures_named_again_are_made_once(self):
+        # Each measure has items, Landmarks 197 of them, and a file can name one
+        # over and over in a few hundred bytes: 100,000 times took 4.6 GB.
+        name = "dynaface.measures_frontal.AnalyzeLandmarks"
+        entry = {"name": name, "enabled": True, "items": [{"name": "x", "enabled": 1}]}
+        doc = _version_1([])
+        doc[DOC_BODY]["measures"] = [entry] * 100_000
+        self.write_gzip(pickle.dumps(doc, protocol=3))
+        tracemalloc.start()
+        try:
+            loaded = self.load_on_small_stack()
+            peak = tracemalloc.get_traced_memory()[1]
+        finally:
+            tracemalloc.stop()
+        self.assertEqual(len(loaded.measures), len(measures.all_measures()))
+        self.assertLess(peak, 64 << 20)
+        _sample_document().save(self.path)
+        entries = ", ".join([json.dumps(entry)] * 100_000)
+        self.rewrite_text('"measures": [', f'"measures": [{entries}, ')
+        loaded = self.load_on_small_stack()
+        self.assertEqual(len(loaded.measures), len(measures.all_measures()))
+
+    def test_refuses_flags_that_are_not_bools(self):
+        doc = _version_1([])
+        name = "dynaface.measures_frontal.AnalyzeFAI"
+        doc[DOC_BODY]["measures"] = [{"name": name, "enabled": [1], "items": []}]
+        self.write_gzip(pickle.dumps(doc))
+        self.assert_unreadable()
+
+    def test_refuses_strings_with_lone_surrogates(self):
+        # Decoding lets them through, a handler call each, so a megabyte of gzip
+        # took 23 seconds; no document holds one.
+        surrogate = b"\xed\xa0\x80"
+        text = pickle.BINUNICODE + struct.pack("<I", 3) + surrogate
+        self.write_gzip(_crafted(_version_1(["crafted"]), text))
+        self.assert_unreadable()
+        _sample_document().save(self.path)
+        with zipfile.ZipFile(self.path) as zf:
+            data = zf.read("document.json")
+        data = data.replace(b'"lateral"', b'"' + surrogate + b'"', 1)
+        self.rewrite(replace={"document.json": data})
+        self.assert_unreadable()
+
+    def test_refuses_protocol_0_text_opcodes(self):
+        # Pickle writes them from protocol 2 on only for GLOBAL, and documents
+        # were protocol 3 or 4: an int of 4,300 digits is a line that gzips to a
+        # few bytes and took 60 microseconds to read.
+        streams = {
+            "INT": pickle.INT + b"4" * 4300 + b"\n",
+            "LONG": pickle.LONG + b"4" * 4300 + b"L\n",
+            "FLOAT": pickle.FLOAT + b"1.5\n",
+            "STRING": pickle.STRING + b"'x'\n",
+            "UNICODE": pickle.UNICODE + b"x\n",
+            "PUT": pickle.NONE + pickle.PUT + b"0\n",
+            "GET": pickle.NONE + pickle.BINPUT + b"\x00" + pickle.GET + b"0\n",
+            "INST": pickle.MARK + pickle.INST + b"builtins\nset\n",
+            "OBJ": pickle.MARK + pickle.GLOBAL + b"builtins\nset\n" + pickle.OBJ,
+            "a long GLOBAL": pickle.GLOBAL + b"x" * 300 + b"\nset\n",
+        }
+        for name, ops in streams.items():
+            with self.subTest(name):
+                self.write_gzip(_crafted(_version_1(["crafted"]), ops))
+                self.assert_unreadable()
+        with self.subTest("version 2"):
+            self.save_frames_json("4" * 40)
+            self.assert_unreadable()
+            self.save_frames_json("4" * 39)
+            self.assertEqual(self.load().frames, [int("4" * 39)])
+
+    def test_refuses_more_frames_than_an_import_keeps(self):
+        # What the app does for each frame of a document it opens made millions
+        # of them, a few kilobytes of pickle, gigabytes.
+        for count, opens in ((5000, True), (5001, False)):
+            with self.subTest(count=count):
+                self.write_gzip(pickle.dumps(_version_1([[]] * count)))
+                if opens:
+                    self.assertEqual(len(self.load().frames), count)
+                else:
+                    self.assert_unreadable()
+                self.save_frames_json(", ".join(["[]"] * count))
+                if opens:
+                    self.assertEqual(len(self.load().frames), count)
+                else:
+                    self.assert_unreadable()
+
+    def test_refuses_a_profile_larger_than_a_crop(self):
+        # add_missing_views() gives each frame saved without a view the profile,
+        # and saving the document again stores it once a frame.
+        frames = [[np.zeros((4, 4, 3), dtype=np.uint8)] * 6] * 10
+        for size, opens in ((1024, True), (9000, False)):
+            with self.subTest(size=size):
+                doc = _profile(
+                    lateral_landmarks=np.arange(12).reshape(6, 2),
+                    sagittal_x=np.zeros(size),
+                    sagittal_y=np.zeros(size, dtype=np.int32),
+                )
+                doc[DOC_BODY][DOC_BODY_FRAMES] = frames
+                self.write_gzip(pickle.dumps(doc))
+                if opens:
+                    self.assertTrue(self.load().lateral)
+                else:
+                    self.assert_unreadable()
+
+    def test_frames_given_a_view_share_its_arrays(self):
+        # load_state() copies a view's arrays, so the frames share one copy: one
+        # each, for 5,000 frames of a crafted profile, was gigabytes.
+        doc = _sample_document()
+        doc.frames = doc.frames * 3
+        doc.save(self.path)
+        loaded = self.load()
+        loaded.add_missing_views()
+        views = [frame[6] for frame in loaded.frames]
+        self.assertIs(views[0]["sagittal_x"], views[2]["sagittal_x"])
+        self.assertIsNot(views[0], views[2])
+        face = facial.AnalyzeFace(measures=[AnalyzeLateral()])
+        face.load_state(loaded.frames[0])
+        self.assertIsNot(face.sagittal_x, views[0]["sagittal_x"])
+
+    def test_refuses_floods_of_containers_within_their_memory(self):
+        # An empty set is 216 bytes, and a file of EMPTY_SET opcodes gzips 1000
+        # to 1: eight million of them took 2 GB before they were refused. Each
+        # container takes steps for its memory, about 32 bytes a step; checked
+        # here on a budget of a tenth.
+        floods = {
+            "sets": pickle.EMPTY_SET,
+            "dicts": pickle.EMPTY_DICT,
+            "lists": pickle.EMPTY_LIST,
+            "marks": pickle.MARK,
+            "tuples": pickle.NONE + pickle.TUPLE1,
+        }
+        steps = 800_000
+        for name, op in floods.items():
+            with self.subTest(name):
+                self.write_gzip(b"\x80\x04" + op * 2_000_000 + pickle.STOP)
+                tracemalloc.start()
+                try:
+                    with mock.patch.object(dynaface_document, "_BASE_STEPS", steps):
+                        self.assert_unreadable()
+                    peak = tracemalloc.get_traced_memory()[1]
+                finally:
+                    tracemalloc.stop()
+                self.assertLess(peak, 48 * steps)
+        with self.subTest("version 2 strings"):
+            self.save_frames_json("[" + '"ab",' * 2_000_000 + '"ab"]')
+            tracemalloc.start()
+            try:
+                with mock.patch.object(dynaface_document, "_BASE_STEPS", steps):
+                    self.assert_unreadable()
+                peak = tracemalloc.get_traced_memory()[1]
+            finally:
+                tracemalloc.stop()
+            self.assertLess(peak, 48 * steps + (16 << 20))
+
+    def test_refuses_costly_opcodes_quickly(self):
+        # Each call of numpy's _frombuffer() with 64 dimensions and an axis
+        # order takes about 5 microseconds, and took a step: 233 KB of them took
+        # five seconds to refuse.
+        args = (b"\x00", np.dtype("u1"), (1,) * 64, "K", tuple(range(64)))
+        function = struct.pack("<I", (1 << 30) + 1)
+        # The arguments and the function memoized, then called again and again.
+        stream = (
+            pickle.dumps(args, protocol=3)[:-1]
+            + _PUT
+            + pickle.POP
+            + pickle.GLOBAL
+            + b"numpy._core.numeric\n_frombuffer\n"
+            + pickle.LONG_BINPUT
+            + function
+            + pickle.POP
+        )
+        again = pickle.LONG_BINGET + function + _GET + pickle.REDUCE + pickle.POP
+        self.write_gzip(stream + again * 1_000_000 + pickle.NONE + pickle.STOP)
+        start = time.perf_counter()
+        self.assert_unreadable()
+        self.assertLess(time.perf_counter() - start, 3)
+
+    def test_refuses_empty_arrays_of_shapes_numpy_refuses(self):
+        # numpy's setstate takes them; copying one fails.
+        placeholder = (np.ndarray, (0,), b"b")
+        state = (1, (0, 2**62, 4), np.dtype("u1"), False, b"")
+        self.assert_refused(_Reduce(_np_reconstruct, placeholder, state))
+
+    def test_a_failed_load_keeps_nothing_it_read(self):
+        # 64 MB of data, then an opcode pickle doesn't have: the error refers to
+        # the unpickler, which kept the data alive through its stack.
+        size = 64 << 20
+        with gzip.open(self.path, "wb") as f:
+            f.write(b"\x80\x04" + pickle.BINBYTES8 + struct.pack("<Q", size))
+            for _ in range(size >> 20):
+                f.write(bytes(1 << 20))
+            f.write(b"\xff")
+        tracemalloc.start()
+        try:
+            with self.assertRaises(DocumentError) as raised:
+                self.load()
+            held = tracemalloc.get_traced_memory()[0]
+        finally:
+            tracemalloc.stop()
+        self.assertIsNotNone(raised.exception.__cause__)
+        self.assertLess(held, 16 << 20)
+
+    def test_a_version_1_document_saved_again_opens_again(self):
+        # Its values nest as deeply in the version 2 file, counted the same way
+        # though they take more levels of JSON there.
+        value = None
+        for level in range(40):
+            value = {level: value}
+        self.write_gzip(pickle.dumps(_version_1([[value]])))
+        loaded = self.load()
+        loaded.save(self.path)
+        self.assert_same([[value]], self.load().frames)
 
 
 if __name__ == "__main__":

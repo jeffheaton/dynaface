@@ -35,7 +35,7 @@ def _full_typename(obj: Any) -> str:
 
 
 def assert_standard_python(
-    obj: Any, *, _path: str = "root", _seen: set[int] = None
+    obj: Any, *, _path: Any = None, _seen: set[int] = None
 ) -> None:
     """
     Recursively scans `obj`, raising TypeError if any part of it is
@@ -67,26 +67,28 @@ def assert_standard_python(
         except Exception:
             # fallback if .tolist() fails for some dtype
             nested = list(obj.flat)
-        assert_standard_python(nested, _path=f"{_path} (numpy.ndarray)", _seen=_seen)
+        assert_standard_python(
+            nested, _path=(_path, " (numpy.ndarray)", None), _seen=_seen
+        )
         return
 
     # 3) dict: check both keys and values
     if isinstance(obj, Mapping):
         for key, val in obj.items():
-            assert_standard_python(key, _path=f"{_path} (dict key)", _seen=_seen)
-            assert_standard_python(val, _path=f"{_path}[{key!r}]", _seen=_seen)
+            assert_standard_python(key, _path=(_path, " (dict key)", None), _seen=_seen)
+            assert_standard_python(val, _path=(_path, "[{!r}]", key), _seen=_seen)
         return
 
     # 4) Other containers: list, tuple, set, frozenset
     if isinstance(obj, (list, tuple, set, frozenset)):
         for idx, item in enumerate(obj):
-            assert_standard_python(item, _path=f"{_path}[{idx}]", _seen=_seen)
+            assert_standard_python(item, _path=(_path, "[{}]", idx), _seen=_seen)
         return
 
     # 5) Anything else is non-standard → error out
     found_type = _full_typename(obj)
     raise TypeError(
-        f"Unsupported object at {_path}!\n"
+        f"Unsupported object at {_describe_path(_path)}!\n"
         f"  • Found: {obj!r}\n"
         f"  • Type:  {found_type}\n"
         f"  • Allowed types are:\n"
@@ -95,6 +97,21 @@ def assert_standard_python(
         + "\n"
         "    – Containers: " + ", ".join(_full_typename(t) for t in _ALLOWED_CONTAINERS)
     )
+
+
+def _describe_path(path: Any) -> str:
+    """
+    The way assert_standard_python() took to a value, as text, such as
+    root['frames'][0]. Built only for its message: a key's repr can be any length,
+    and copying it into the path of each value under it took a minute to save a
+    crafted document.
+    """
+    parts = []
+    while path is not None:
+        path, form, value = path
+        parts.append(form.format(value))
+    parts.append("root")
+    return "".join(reversed(parts))
 
 
 def describe_analysis_error(error: Exception) -> str:
