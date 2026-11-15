@@ -116,6 +116,17 @@ def describe_analysis_error(error: Exception) -> str:
     return str(error)
 
 
+def describe_file_error(error: Exception) -> str:
+    """
+    The reason a file couldn't be read or written, for the user: the system's
+    own words for an operating system error ("No space left on device"), which
+    leave out the error number and the path, else the error's message.
+    """
+    if isinstance(error, OSError) and error.strerror:
+        return error.strerror
+    return str(error) or type(error).__name__
+
+
 # How the app names each pose wherever a person reads it: dialogs, messages,
 # tooltips and the status line. The enum's own values ("frontal", "lateral",
 # "quarter") are for saved documents and logs.

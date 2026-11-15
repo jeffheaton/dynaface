@@ -3,6 +3,7 @@ import csv
 import io
 import logging
 import os
+import sys
 
 import cmds
 import custom_control
@@ -13,6 +14,7 @@ import numpy as np
 import utl_general
 import utl_gfx
 import utl_print
+import utl_save
 import worker_threads
 from dynaface.const import Pose
 from dynaface.facial import AnalyzeFace
@@ -64,11 +66,30 @@ GRAPH_MAX = 100
 LATERAL_LANDMARKS = [13, 14, 15, 16, 51, 52, 53, 54, 57, 79, 85, 90, 94]
 
 
+def _kept_copy(filename: str, kept: str) -> str:
+    """Where a save that failed kept the new version (see
+    utl_save.MissingFileError), and how to open it: Dynaface opens no file of
+    the name the save gave it, and Finder hides it, as the name starts with a
+    dot."""
+    stem = os.path.splitext(os.path.basename(filename))[0]
+    hidden = (
+        " Finder hides it until you press Command-Shift-Period."
+        if sys.platform == "darwin"
+        else ""
+    )
+    return (
+        f"A copy of the new version was kept in {kept}.{hidden} To open it, "
+        f'rename it to end in .dyfc, for example "{stem} (recovered).dyfc".'
+    )
+
+
 class AnalyzeVideoTab(TabGraphic):
     def __init__(self, window, path, force_pose=Pose.DETECT):
         super().__init__(window)
         self.unsaved_changes = False
         self.load_error = False
+        # Why a document couldn't be loaded, for the user, when load_error is set.
+        self.load_error_message = None
         # An error that stopped the video import, set by WorkerLoad.
         self.load_failure = None
         self._auto_update = False
@@ -89,6 +110,8 @@ class AnalyzeVideoTab(TabGraphic):
 
         # Load the face
         self._frames = []
+        # The video frames an import has read, kept or not; set by WorkerLoad.
+        self.frames_read = 0
         self._frame_begin = 0
         self._frame_end = 0
         self.frame_rate = 30
@@ -297,9 +320,9 @@ gesture you wish to analyze."""
         self._spin_zoom_chart.setFixedWidth(60)  # Adjust the width as needed
         self._spin_zoom_chart.valueChanged.connect(self.action_zoom_chart)
 
-        btn_fit = QPushButton("Fit")
-        btn_fit.clicked.connect(self.fit)
-        toolbar.addWidget(btn_fit)
+        self._btn_fit = QPushButton("Fit")
+        self._btn_fit.clicked.connect(self.fit)
+        toolbar.addWidget(self._btn_fit)
         toolbar.addSeparator()
 
         self._btn_cut_left = QPushButton("Cut <")
@@ -578,6 +601,9 @@ gesture you wish to analyze."""
         self.update_face()
 
     def update_face(self):
+        if self._view is None:
+            # No frame with a face has been shown yet, so there is no image.
+            return
         self._face.render_reset()
         if self._chk_measures.isChecked():
             self._face.analyze()
@@ -621,6 +647,8 @@ gesture you wish to analyze."""
         pass
 
     def on_copy(self):
+        if self._view is None:
+            return
         logging.info(f"Copy image: {self._face.render_img.shape}")
         utl_gfx.copy_image_to_clipboard(self._face.render_img)
 
@@ -695,12 +723,12 @@ gesture you wish to analyze."""
                     )
                 self._window.display_message_box(f"Unable to load the video. {message}")
                 if len(self._frames) < 1:
-                    self._window.close_action()
+                    self._close_this_tab()
                     closed = True
             elif len(self._frames) < 1:
                 self._window.display_message_box("No faces found in that video")
                 logger.info("No faces found in video")
-                self._window.close_action()
+                self._close_this_tab()
                 closed = True
             if closed:
                 return
@@ -722,6 +750,17 @@ gesture you wish to analyze."""
                 self.load_first_frame()
 
             self._window.update_enabled()
+
+    def _close_this_tab(self):
+        """Close this tab, wherever it is: the user may have gone to another tab
+        while it imported, and the tab in front is theirs."""
+        if self.thread is not None:
+            # The import's end was its last signal, so this returns at once,
+            # and the thread is never destroyed while it runs.
+            self.thread.wait()
+        index = self._window._tab_widget.indexOf(self)
+        if index != -1:
+            self._window.close_tab(index)
 
     def load_first_frame(self):
         if len(self._frames) > 0:
@@ -785,7 +824,6 @@ gesture you wish to analyze."""
 
     def status(self, etc=None):
         i = self._video_slider.sliderPosition() - self._frame_begin
-        mx = self._video_slider.maximum()
         frame_count = self._frame_end - self._frame_begin
         if self.loading == False and len(self._frames) == 0:
             return "(0/0)"
@@ -795,7 +833,10 @@ gesture you wish to analyze."""
             else:
                 self._last_etc = etc
             self.update_top_message("Loading... " + etc)
-            return f"({mx:,} / {self.frame_count:,}, loading... time: {etc})"
+            # The frames read so far, kept or not, so the count moves through a
+            # stretch with no face, too.
+            read = self.frames_read
+            return f"({read:,} / {self.frame_count:,}, loading... time: {etc})"
         else:
             if self._face.landmarks is None:
                 self.update_top_message("No face detected")
@@ -860,6 +901,8 @@ gesture you wish to analyze."""
             )
 
     def action_zoom(self, value):
+        if self._view is None:
+            return
         z = value / 100
         self._view.resetTransform()
         self._view.scale(z, z)
@@ -872,6 +915,8 @@ gesture you wish to analyze."""
         self._chart_view.scale(z, z)
 
     def _fit_face(self):
+        if self._view is None:
+            return
         view_size = self._view.size()
         scene_rect = self._scene.sceneRect()
         x_scale = view_size.width() / scene_rect.width()
@@ -1209,6 +1254,8 @@ gesture you wish to analyze."""
         self.fit()
 
     def on_print(self):
+        if self._view is None:
+            return
         pixmap = QPixmap.fromImage(self._display_buffer)
         utl_print.print_pixmap(self._window, pixmap)
 
@@ -1299,15 +1346,53 @@ gesture you wish to analyze."""
             doc.sagittal_y = self._face.sagittal_y
 
         f = lambda: doc.save(filename)
-        dlg_modal.display_please_wait(window=self, f=f, message="Saving document")
+        error = dlg_modal.display_please_wait(
+            window=self, f=f, message="Saving document"
+        )
+        if error is not None:
+            reason = utl_general.describe_file_error(error)
+            if isinstance(error, utl_save.MissingFileError) and error.kept:
+                # A network volume can remove the file and then fail to put the
+                # new one in its place.
+                self._window.display_message_box(
+                    f"Unable to save {filename}: {reason}. The file may now be "
+                    "missing, so save the document again, or under another name. "
+                    f"{_kept_copy(filename, error.kept)}"
+                )
+            elif isinstance(error, utl_save.MissingFileError):
+                # Or report failing a replace that it did.
+                self._window.display_message_box(
+                    f"Unable to save {filename}: {reason}. The file may now be "
+                    "missing, or may hold the new version already, so save the "
+                    "document again, or under another name."
+                )
+            elif isinstance(error, utl_save.IncompleteSaveError):
+                # Only a save that couldn't replace the file writes over it.
+                self._window.display_message_box(
+                    f"Unable to save {filename}: {reason}. The file may now be "
+                    "incomplete, so save the document again, or under another name."
+                )
+            else:
+                # The save writes a new file and only then replaces the old
+                # one, so a failure leaves what was on disk.
+                self._window.display_message_box(
+                    f"Unable to save {filename}: {reason}. The file wasn't changed."
+                )
+            return
         self.unsaved_changes = False
 
     def load_document(self, filename):
+        """Load a document into this tab. On failure, return False with the
+        reason in load_error_message; the tab was never shown, so the caller
+        drops it."""
         app = QApplication.instance()
 
         doc = dynaface_document.DynafaceDocument()
         f = lambda: doc.load(filename)
-        if dlg_modal.display_please_wait(window=self, f=f, message="Loading document"):
+        error = dlg_modal.display_please_wait(
+            window=self, f=f, message="Loading document"
+        )
+        if error is None:
             tilt_threshold = app.tilt_threshold
             self._face = AnalyzeFace(doc.measures, tilt_threshold=tilt_threshold)
             # A profile document saved by Dynaface 2.0.4 or earlier holds its
@@ -1330,9 +1415,16 @@ gesture you wish to analyze."""
             # then applies its view (load_first_frame(), open_frame()).
             self._selection = MeasureSelection.of(self._face.measures)
             return True
+
+        if isinstance(error, dynaface_document.DocumentError):
+            # Its message says why, as the user should read it.
+            self.load_error_message = str(error)
         else:
-            self._window.close_action()
-            return False
+            self.load_error_message = (
+                f"Unable to open {filename}: "
+                f"{utl_general.describe_file_error(error)}."
+            )
+        return False
 
     def on_save(self):
         if self.filename is None:
@@ -1357,6 +1449,22 @@ gesture you wish to analyze."""
         return self._undo_stack.canRedo()
 
     def update_enabled(self) -> None:
+        # Until a video's first frame with a face shows, which can take a while
+        # when an import skips frames without one, there is no image for these
+        # to draw on or fit.
+        has_image = self._view is not None
+        for control in (
+            self._chk_landmarks,
+            self._chk_measures,
+            self._spin_zoom,
+            self._btn_fit,
+            self._spin_text_zoom,
+            self._tree,
+            self.all_button,
+            self.none_button,
+        ):
+            control.setEnabled(has_image)
+
         if (self._frame_begin == 0) and (self._frame_end == len(self._frames)):
             self._btn_restore.setEnabled(False)
         else:
@@ -1515,6 +1623,7 @@ gesture you wish to analyze."""
                     f"Unable to force the {label} view for {self._path}; "
                     "invalid format."
                 )
+                new_tab.deleteLater()
                 return
 
             self._window.add_tab(new_tab, tab_name)
@@ -1528,6 +1637,17 @@ gesture you wish to analyze."""
             self._window.display_message_box(f"Unable to open file: {e}")
 
     def action_pose(self):
+        app = QApplication.instance()
+        if not app.models_ready:
+            # The file is analyzed again, which needs the AI models; Settings
+            # may be loading them on another device, or they failed to start.
+            self._window.display_message_box(
+                app.MODELS_FAILED_MESSAGE
+                if app.models_failed
+                else "Dynaface is still loading its AI models. Try again in a moment."
+            )
+            return
+
         # 1) The current pose (frontal, lateral or three-quarter) is preselected
         current = self._face.pose
         logger.info(f"Adjust pose, current pose is {utl_general.POSE_LABELS[current]}")

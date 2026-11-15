@@ -151,6 +151,18 @@ class SettingsTab(QWidget):
                 "Wait for the video import to finish before changing pose " "detection."
             )
             return
+        accelerator = self._chk_accelerator.isChecked()
+        if (
+            self._window.app.would_reload_models(accelerator)
+            and self._video_importing()
+        ):
+            # The AI models are built again for the new device, and an import
+            # running meanwhile would find them gone.
+            self._window.display_message_box(
+                "Wait for the video import to finish before changing the "
+                "accelerator."
+            )
+            return
         self.save_values()
         if detection_changed:
             # Pose detection is read by each load, so open tabs keep their view.
@@ -236,9 +248,6 @@ class SettingsTab(QWidget):
         logging_level = getattr(logging, level)
         utl_log.change_log_level(logging_level)
         self._window.app.save_settings()
+        # Applies the settings; the AI models load again only when the
+        # accelerator switch changed the device they run on.
         self._window.app.load_dynaface_settings()
-
-        # if dynaface.models._device != settings[dynaface_app.SETTING_ACC]:
-        #    self._window.display_message_box(
-        #        "Changes to accelerator settings will be effective on application restart."
-        #    )

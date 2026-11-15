@@ -195,21 +195,42 @@ class PleaseWaitDialog(QDialog):
         self.setFixedSize(300, 100)  # You can adjust the size as needed
 
         # Thread
+        self._done = False
         self.thread = worker_threads.WorkerPleaseWait(f)
-        self.thread.finished.connect(self.close)  # Close dialog when thread finishes
-        self.thread.start()
+        self.thread.finished.connect(self.thread_done)
         self.thread.update_signal.connect(self.thread_done)
+        self.thread.start()
 
     def thread_done(self):
+        self._done = True
         self.accept()
 
+    def reject(self):
+        # Escape (Cmd+. on macOS) can't end the wait: f goes on until it
+        # finishes, and the caller acts on what it did.
+        if self._done:
+            super().reject()
 
-def display_please_wait(window: QWidget, f: Callable, message: str = "Waiting") -> None:
+    def closeEvent(self, event):
+        if self._done:
+            super().closeEvent(event)
+        else:
+            event.ignore()
+
+
+def display_please_wait(
+    window: QWidget, f: Callable, message: str = "Waiting"
+) -> Optional[Exception]:
+    """
+    Run f on a worker thread while a box says message. Returns the exception f
+    raised, or None when it finished.
+    """
     dlog = PleaseWaitDialog(window=window, f=f, message=message)
     dlog.exec()
-    if dlog.thread.aborted:
-        return False
-    return True
+    # The box closes on the worker's last signal; let the worker end before it
+    # can be destroyed.
+    dlog.thread.wait()
+    return dlog.thread.error
 
 
 def prompt_save_changes():

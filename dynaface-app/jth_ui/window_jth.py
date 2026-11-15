@@ -54,6 +54,8 @@ class MainWindowJTH(QMainWindow):
 
     def display_message_box(self, text):
         msg = QMessageBox(self)
+        # Plain text, never HTML: messages quote file names and text from files.
+        msg.setTextFormat(Qt.TextFormat.PlainText)
         msg.setText(str(text))
         msg.exec()
 

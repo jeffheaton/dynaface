@@ -123,6 +123,18 @@ class WorkerLoad(QThread):
         self._target = target
         self._total = self._target.frame_count
         self.running = True
+        # When progress was last sent to the tab (time.monotonic()).
+        self._progress_sent = float("-inf")
+
+    def _progress(self, kept: bool) -> None:
+        """Count a frame in the progress and send it to the tab. Frames without a
+        face go by quickly, and redrawing the status for each one slowed the
+        import, so those are sent at most ten times a second."""
+        status = self._loading_etc.cycle()
+        now = time.monotonic()
+        if kept or now - self._progress_sent >= 0.1:
+            self._progress_sent = now
+            self._update_signal.emit(status)
 
     def preprocess_frame(self, frame, previous_pose, color=True):
         """
@@ -199,6 +211,7 @@ class WorkerLoad(QThread):
                 # Make sure we did not get a request to stop during each of these:
                 if not self.running:
                     break
+                self._target.frames_read = i
 
                 # Handle frames where we fail to find a face
                 frame2 = frame
@@ -213,6 +226,8 @@ class WorkerLoad(QThread):
                         if frame is None:
                             self._target.base_rotation = None
                             logger.info(f"No face found on frame {i}")
+                            # Progress shows through frames without a face too.
+                            self._progress(kept=False)
                             continue
 
                 # See if we have a considerable tilt, and try to resolve
@@ -230,6 +245,7 @@ class WorkerLoad(QThread):
                         # face; skip the frame rather than go on without one.
                         self._target.base_rotation = None
                         logger.info(f"No face found on frame {i} after rotating it")
+                        self._progress(kept=False)
                         continue
 
                 # One view's landmarks don't average with another's: a profile's
@@ -275,7 +291,7 @@ class WorkerLoad(QThread):
                 self._target.add_frame(frame_state)
 
                 # Update UI
-                self._update_signal.emit(self._loading_etc.cycle())
+                self._progress(kept=True)
 
         except Exception as e:
             logger.error("Error loading video", exc_info=True)
@@ -314,13 +330,14 @@ class WorkerPleaseWait(QThread):
     def __init__(self, proc: Callable):
         super().__init__()
         self._proc = proc
-        self.aborted = False
+        # The exception proc raised, or None. Set before the end is signaled, so
+        # whoever the signal wakes sees it.
+        self.error = None
 
     def run(self):
         try:
             self._proc()
-            self.update_signal.emit()
         except Exception as e:
             logger.error("Error in worker thread", exc_info=True)
-            self.update_signal.emit()
-            self.aborted = True
+            self.error = e
+        self.update_signal.emit()

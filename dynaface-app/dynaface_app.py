@@ -102,7 +102,9 @@ class _ModelLoaderWorker(QObject):
         import dynaface.models
 
         try:
-            dynaface.models.init_models(model_path=self._model_path, device=self._device)
+            dynaface.models.init_models(
+                model_path=self._model_path, device=self._device
+            )
             self.finished.emit(self._device)
             return
         except Exception:
@@ -126,10 +128,27 @@ class _ModelLoaderWorker(QObject):
 
 
 class AppDynaface(AppJTH):
+    # What the user is told when the AI models couldn't start; saving Settings
+    # loads them again (load_dynaface_settings()).
+    MODELS_FAILED_MESSAGE = (
+        "Dynaface was unable to start its AI models, so it can't analyze photos "
+        "or videos. To try again, choose Settings and click Save."
+    )
+
     def __init__(self):
         try:
             super().__init__()
             self.models_ready = False
+            # Set when the last load failed, until another starts.
+            self.models_failed = False
+            # The device the AI models were last asked to load on, the device the
+            # running load is for (None when no load runs) and that load's thread.
+            self._models_device = None
+            self._loading_device = None
+            self._model_thread = None
+            self._model_worker = None
+            # The device the loaded models run on, once a load has finished.
+            self.device = None
             self.dynamic_adjust = DEFAULT_DYNAMIC_ADJUST
             self.data_smoothing = DEFAULT_SMOOTH
             self.tilt_threshold = DEFAULT_TILT_THRESHOLD
@@ -208,24 +227,35 @@ class AppDynaface(AppJTH):
 
         # accelerator device
         acc = utl_settings.get_bool(self.settings, key=SETTING_ACC, default=True)
+        device = self.device_for(acc)
 
-        if acc:
-            # Detect CUDA, MPS (CoreML), or failing that, CPU
-            self.device = dynaface.models.detect_device()
-            logger.info(f"ONNX Runtime Device: {self.device}")
-        else:
-            self.device = "cpu"
-
-        logging.info(f"Using device: {self.device}")
+        # The models are built again only for a device they aren't on, or
+        # loading on: a rebuild takes them away from anything that analyzes
+        # meanwhile, and Settings is saved for many other reasons.
+        if device == self._models_device:
+            return
+        self._models_device = device
+        logging.info(f"Using device: {device}")
         v = get_library_version("onnxruntime")
         logging.info(f"ONNX Runtime version: {v}")
+        self._start_model_loader()
 
-        # Initialize AI models on a worker thread so the GUI stays responsive.
-        # Building the ONNX Runtime sessions is ~20s of native work; doing it on
-        # the main thread froze the window right after the splash closed, which
-        # users mistook for a crash. models_ready is flipped in the completion
-        # slot on the main thread.
-        self._start_model_loader(self.device)
+    @staticmethod
+    def device_for(accelerator: bool) -> str:
+        """The device the AI models run on with the accelerator switch on or off:
+        CUDA, MPS (CoreML) or, failing those or with the switch off, the CPU."""
+        import dynaface.models
+
+        if not accelerator:
+            return "cpu"
+        device = dynaface.models.detect_device()
+        logger.info(f"ONNX Runtime Device: {device}")
+        return device
+
+    def would_reload_models(self, accelerator: bool) -> bool:
+        """Whether saving this accelerator switch would load the AI models again,
+        on another device."""
+        return self.device_for(accelerator) != self._models_device
 
     def _report_pd_reset(self, pd):
         if self.main_window is not None:
@@ -235,7 +265,27 @@ class AppDynaface(AppJTH):
                 f"has been reset to {STD_PUPIL_DIST} mm. You can change it in Settings."
             )
 
-    def _start_model_loader(self, device: str):
+    def _start_model_loader(self):
+        """
+        Load the AI models on _models_device on a worker thread, so the GUI stays
+        responsive: building the ONNX Runtime sessions is seconds of native work
+        (CoreML's about ten), and doing it on the main thread froze the window
+        right after the splash closed, which users mistook for a crash.
+
+        While a load runs, this starts nothing: that load starts the next one
+        when it ends (_on_models_loaded(), _on_models_failed()), so its thread is
+        never replaced while it runs, which made Qt abort the app. models_ready is
+        False until a load finishes, so files opened meanwhile wait for it
+        (DynafaceWindow.open_file()).
+        """
+        if self._model_thread is not None:
+            return
+        self.models_ready = False
+        self.models_failed = False
+        device = self._models_device
+        self._loading_device = device
+        if self.main_window is not None:
+            self.main_window.on_models_loading()
         self._model_thread = QThread()
         self._model_worker = _ModelLoaderWorker(model_path=self.DATA_DIR, device=device)
         self._model_worker.moveToThread(self._model_thread)
@@ -245,7 +295,7 @@ class AppDynaface(AppJTH):
         self._model_thread.start()
 
     def _stop_model_thread(self):
-        thread = getattr(self, "_model_thread", None)
+        thread = self._model_thread
         if thread is None:
             return
         thread.quit()
@@ -256,31 +306,48 @@ class AppDynaface(AppJTH):
         self._model_worker = None
 
     def _on_models_loaded(self, device: str):
-        try:
-            if device != self.device:
-                # A hardware accelerator failed and we fell back to CPU. Persist
-                # the choice so we don't retry the failing accelerator on the
-                # next launch.
-                logger.info(f"AI device fell back to {device}.")
-                self.device = device
-                self.settings[SETTING_ACC] = False
-            self.models_ready = True
-            logger.info("AI models ready.")
-            if self.main_window is not None:
-                self.main_window.on_models_ready()
-        finally:
-            self._stop_model_thread()
+        requested = self._loading_device
+        self._loading_device = None
+        self._stop_model_thread()
+        if device != requested:
+            # A hardware accelerator failed and we fell back to CPU. Persist
+            # the choice so we don't retry the failing accelerator on the
+            # next launch.
+            logger.info(f"AI device fell back to {device}.")
+            self.settings[SETTING_ACC] = False
+            if self._models_device == requested:
+                self._models_device = device
+        self.device = device
+        if self._models_device != device:
+            # Settings chose another device while these loaded.
+            self._start_model_loader()
+            return
+        self.models_ready = True
+        logger.info("AI models ready.")
+        if self.main_window is not None:
+            self.main_window.on_models_ready()
 
     def _on_models_failed(self, message: str):
         logger.error(f"AI models failed to initialize: {message}")
-        try:
-            # Drop any file the user queued while waiting; it can't be analyzed
-            # without models.
+        requested = self._loading_device
+        self._loading_device = None
+        self._stop_model_thread()
+        if self._models_device != requested:
+            # Settings chose another device while this load failed; try it.
+            self._start_model_loader()
+            return
+        # A later save of Settings tries again, whatever device it chooses.
+        self._models_device = None
+        # Opening a photo or video, or choosing a pose, now says so rather
+        # than wait for models no load will bring.
+        self.models_failed = True
+        # A document queued while waiting still opens (DynafaceWindow's
+        # background_timer passes it on); a photo or video can't be analyzed
+        # without the models, as the message below says.
+        if not (self.file_open_request or "").lower().endswith(".dyfc"):
             self.file_open_request = None
-            if self.main_window is not None:
-                self.main_window.on_models_error(message)
-        finally:
-            self._stop_model_thread()
+        if self.main_window is not None:
+            self.main_window.on_models_error(message)
 
     def shutdown(self):
         try:

@@ -4,11 +4,16 @@ import gzip
 import io
 import itertools
 import json
+import math
 import pickle
+import re
+import struct
+import weakref
 import zipfile
-from typing import Any, Callable, Dict
+from typing import Any, BinaryIO, Callable, Dict, Tuple
 
 import numpy as np
+import utl_save
 from dynaface.const import Pose
 from jth_ui import utl_classes
 from utl_general import assert_standard_python
@@ -43,36 +48,294 @@ _ARRAY_PREFIX = "arrays/"
 # Marks a JSON object that stands for a value JSON can't express directly.
 _TYPE_KEY = "$type"
 
-# The only globals a version 1 pickle needs: numpy array and scalar reconstruction,
-# under both the numpy 1 and numpy 2 module names, and the builtins that pickle
-# can't write with its own opcodes. Anything else is refused before it can run.
-_LEGACY_GLOBALS = {
-    ("builtins", "bytearray"),
-    ("builtins", "complex"),
-    ("builtins", "frozenset"),
-    ("builtins", "set"),
-    ("numpy", "dtype"),
-    ("numpy", "ndarray"),
-    ("numpy._core.multiarray", "_reconstruct"),
-    ("numpy._core.multiarray", "scalar"),
-    ("numpy._core.numeric", "_frombuffer"),
-    ("numpy.core.multiarray", "_reconstruct"),
-    ("numpy.core.multiarray", "scalar"),
-    ("numpy.core.numeric", "_frombuffer"),
-}
-
 
 class _RefusedGlobalError(pickle.UnpicklingError):
     pass
 
 
-class _LegacyUnpickler(pickle.Unpickler):
-    """Loads version 1 documents without running anything they reference."""
+class _UncheckedDataError(pickle.UnpicklingError):
+    pass
+
+
+class _ArrayClass:
+    """Stands for numpy.ndarray in a version 1 file, where it is only ever the
+    class _reconstruct() is told to build: the real class could be called with a
+    buffer and strides from the file."""
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        raise _UncheckedDataError("an array made by calling numpy.ndarray")
+
+
+_ARRAY_CLASS = _ArrayClass()
+
+# A dtype as numpy pickles one: a type code such as "f8", "u1", "U5" or "O8". A
+# structured or subarray dtype ("i4,O", "(2,3)f8") is refused: numpy pickles
+# those as void with fields in the state, which _LegacyUnpickler never trusts.
+_DTYPE_CODE = re.compile(r"[A-Za-z][0-9]*")
+
+
+def _brief(value: Any, depth: int = 2) -> str:
+    """
+    A value from a file in a few words, for a refusal to quote: containers are cut
+    to a few items and levels before anything is formatted, since one that holds
+    itself many times over (a list of the same list twice, 64 levels deep, is a few
+    hundred bytes of pickle) would format to more text than memory holds.
+    """
+    kind = type(value)
+    if value is None or kind in (bool, float, complex):
+        return repr(value)
+    if kind is int:
+        bits = value.bit_length()
+        return repr(value) if bits <= 64 else f"an int of {bits} bits"
+    if kind in (str, bytes, bytearray):
+        text = repr(value[:40])
+        return text if len(value) <= 40 else f"{text}…"
+    if isinstance(value, np.dtype):
+        return f"dtype({value.str!r})"
+    if kind is np.ndarray:
+        return f"an array of {_brief(value.shape)} {value.dtype.str}"
+    if kind not in (tuple, list, dict, set, frozenset):
+        return f"a {kind.__name__}"
+    if not value:
+        return repr(value)
+    if depth == 0:
+        return f"a {kind.__name__} of {len(value)}"
+    if kind is dict:
+        items = itertools.islice(value.items(), 4)
+        parts = [f"{_brief(k, depth - 1)}: {_brief(v, depth - 1)}" for k, v in items]
+    else:
+        parts = [_brief(item, depth - 1) for item in itertools.islice(value, 4)]
+    if len(value) > 4:
+        parts.append("…")
+    inner = ", ".join(parts)
+    if kind is tuple:
+        return f"({inner},)" if len(value) == 1 else f"({inner})"
+    if kind is list:
+        return f"[{inner}]"
+    if kind is frozenset:
+        return f"frozenset({{{inner}}})"
+    return f"{{{inner}}}"
+
+
+def _check_shape(shape: Any) -> int:
+    """Return the number of elements in shape, or raise unless it is a tuple of
+    sizes within numpy's limits (64 dimensions, each smaller than 2**63)."""
+    if (
+        type(shape) is not tuple
+        or len(shape) > 64
+        or not all(type(size) is int and 0 <= size < 2**63 for size in shape)
+    ):
+        raise _UncheckedDataError(f"an array shape of {_brief(shape)}")
+    return math.prod(shape)
+
+
+def _check_raw(data: Any, dtype: Any, count: int) -> None:
+    """Raise unless data holds exactly count elements of a dtype with no Python
+    objects in it."""
+    if not isinstance(dtype, np.dtype) or dtype.hasobject:
+        raise _UncheckedDataError(f"raw bytes for an array of {_brief(dtype)}")
+    if type(data) not in (bytes, bytearray):
+        raise _UncheckedDataError(f"array data of type {type(data).__name__}")
+    if dtype.itemsize == 0 and count:
+        # No bytes stand for any number of elements of no size, and copying an
+        # array of 2**63 of them never ends.
+        raise _UncheckedDataError(f"{count} {dtype} elements of no size")
+    if len(data) != count * dtype.itemsize:
+        raise _UncheckedDataError(f"{count} {dtype} elements in {len(data)} bytes")
+
+
+def _dtype(code: Any, align: Any = False, copy: Any = False) -> np.dtype:
+    """numpy.dtype() for the type codes numpy pickles, always a new dtype, so the
+    BUILD that follows can never reach a dtype numpy shares (dtype("f8") is one
+    object in the whole process)."""
+    if (
+        type(code) is not str
+        or not _DTYPE_CODE.fullmatch(code)
+        or type(align) is not bool
+        or type(copy) is not bool
+    ):
+        raise _UncheckedDataError(f"a dtype of {_brief(code)}")
+    return np.dtype(code, align, True)
+
+
+def _reconstruct(cls: Any, shape: Any, typecode: Any) -> np.ndarray:
+    """numpy's placeholder for an array that a BUILD then fills in."""
+    if cls is not _ARRAY_CLASS:
+        raise _UncheckedDataError(f"an array of class {_brief(cls)}")
+    return np.ndarray((0,), dtype=np.int8)
+
+
+def _frombuffer(
+    data: Any, dtype: Any, shape: Any, order: Any, axis_order: Any = None
+) -> np.ndarray:
+    """An array pickled with protocol 5, as numpy's own _frombuffer builds it."""
+    _check_raw(data, dtype, _check_shape(shape))
+    array = np.frombuffer(data, dtype=dtype)
+    if order == "K" and axis_order is not None:
+        # The axes' types first: comparing what the file put there could take
+        # any amount of time.
+        if (
+            type(axis_order) is not tuple
+            or len(axis_order) != len(shape)
+            or not all(type(axis) is int for axis in axis_order)
+            or sorted(axis_order) != list(range(len(shape)))
+        ):
+            raise _UncheckedDataError(f"an axis order of {_brief(axis_order)}")
+        return array.reshape(shape, order="C").transpose(axis_order)
+    if order not in ("C", "F"):
+        raise _UncheckedDataError(f"an array order of {_brief(order)}")
+    return array.reshape(shape, order=order)
+
+
+def _scalar(dtype: Any, data: Any) -> np.generic:
+    """A numpy scalar, such as numpy.float64(0.25)."""
+    _check_raw(data, dtype, 1)
+    return np.frombuffer(data, dtype=dtype)[0]
+
+
+def _check_array_state(state: Any) -> None:
+    """Raise unless state is the state numpy pickles an array with: (version,
+    shape, dtype, Fortran order, data), the data being raw bytes for exactly that
+    many elements, or for an object array, a list of them."""
+    if type(state) is not tuple or len(state) != 5:
+        raise _UncheckedDataError("an array state that numpy doesn't write")
+    version, shape, dtype, fortran, data = state
+    if version != 1 or type(fortran) is not bool:
+        raise _UncheckedDataError("an array state that numpy doesn't write")
+    count = _check_shape(shape)
+    if isinstance(dtype, np.dtype) and dtype.hasobject:
+        # Only a plain object array: its elements are the file's own values,
+        # which this unpickler made.
+        if dtype.kind != "O" or type(data) is not list or len(data) != count:
+            raise _UncheckedDataError(f"an object array of {_brief(dtype)}")
+    else:
+        _check_raw(data, dtype, count)
+
+
+# The only globals a version 1 pickle needs: numpy array and scalar reconstruction,
+# under both the numpy 1 and numpy 2 module names, and the builtins that pickle
+# can't write with its own opcodes. Each is resolved to the function or class
+# here, never to whatever the file names, and anything else is refused before it
+# can run.
+_LEGACY_GLOBALS: Dict[Tuple[str, str], Any] = {
+    ("builtins", "bytearray"): bytearray,
+    ("builtins", "complex"): complex,
+    ("builtins", "frozenset"): frozenset,
+    ("builtins", "set"): set,
+    ("numpy", "dtype"): _dtype,
+    ("numpy", "ndarray"): _ARRAY_CLASS,
+}
+for _numpy_core in ("numpy.core", "numpy._core"):
+    _LEGACY_GLOBALS[(f"{_numpy_core}.multiarray", "_reconstruct")] = _reconstruct
+    _LEGACY_GLOBALS[(f"{_numpy_core}.multiarray", "scalar")] = _scalar
+    _LEGACY_GLOBALS[(f"{_numpy_core}.numeric", "_frombuffer")] = _frombuffer
+
+
+class _LegacyUnpickler(pickle._Unpickler):
+    """Loads version 1 documents without running anything they reference.
+
+    Checking the names a file refers to isn't enough on its own: pickle's BUILD
+    hands a dtype or array the state stored in the file, and numpy trusts the flags
+    in a dtype's state. A dtype that wrongly says it holds no Python objects turns
+    raw bytes from the file into object pointers, which a crafted file can use to
+    crash Dynaface or run code. So this unpickler, written in Python rather than
+    pickle's C one so that BUILD can be replaced, accepts a dtype's state only when
+    it is exactly the state numpy gave the dtype it built, and an array's only when
+    its data matches its shape and dtype; it sets the state of nothing else.
+
+    An array takes a state only once, and only the empty placeholder that
+    _reconstruct() made: a state frees the data an array had, and a view of that
+    data would go on reading the freed memory. Pickle's out-of-band buffer
+    opcodes, which can make such a view, are refused; pickle writes them only for
+    a caller that asks to keep buffers out of the pickle, which Dynaface never
+    did.
+    """
+
+    dispatch = dict(pickle._Unpickler.dispatch)
+
+    def __init__(self, file: BinaryIO) -> None:
+        super().__init__(file)
+        # The placeholders waiting for their state, by id. An entry goes with
+        # its placeholder, before another object can take the id, so a file
+        # that drops placeholders doesn't keep them all alive.
+        self._unbuilt: "weakref.WeakValueDictionary[int, np.ndarray]" = (
+            weakref.WeakValueDictionary()
+        )
+
+    def load(self) -> Any:
+        try:
+            return super().load()
+        finally:
+            # The memo holds what find_class() handed out, this unpickler's own
+            # _reconstruct among it, and so this unpickler: cleared, the memo
+            # and every array in it go when the document does, not when the
+            # garbage collector next runs. A failed load's partial values go too.
+            self.memo.clear()
+            self.stack = []
+            self.metastack = []
 
     def find_class(self, module: str, name: str) -> Any:
-        if (module, name) not in _LEGACY_GLOBALS:
-            raise _RefusedGlobalError(f"{module}.{name}")
-        return super().find_class(module, name)
+        try:
+            found = _LEGACY_GLOBALS[(module, name)]
+        except KeyError:
+            raise _RefusedGlobalError(f"{module}.{name}") from None
+        return self._reconstruct if found is _reconstruct else found
+
+    def _reconstruct(self, cls: Any, shape: Any, typecode: Any) -> np.ndarray:
+        array = _reconstruct(cls, shape, typecode)
+        self._unbuilt[id(array)] = array
+        return array
+
+    def load_build(self) -> None:
+        state = self.stack.pop()
+        target = self.stack[-1]
+        if type(target) is np.ndarray:
+            if self._unbuilt.pop(id(target), None) is not target:
+                raise _UncheckedDataError(
+                    "a state for an array that already has its data"
+                )
+            _check_array_state(state)
+            target.__setstate__(state)
+        elif isinstance(target, np.dtype):
+            built = target.__reduce__()[2]
+            # The state numpy built a type code's dtype with holds only None,
+            # numbers and strings; compare their types too, so nothing in the
+            # file decides what the comparison runs.
+            same = (
+                type(state) is tuple
+                and len(state) == len(built)
+                and all(type(a) is type(b) and a == b for a, b in zip(state, built))
+            )
+            if not same:
+                raise _UncheckedDataError(
+                    f"{_brief(target)} with a state numpy didn't give it"
+                )
+            # Equal to the dtype's own state, so there is nothing to set.
+        else:
+            raise _UncheckedDataError(f"a state for a {type(target).__name__}")
+
+    def load_buffer(self) -> None:
+        raise _UncheckedDataError("an out-of-band buffer")
+
+    def load_bytearray8(self) -> None:
+        # Pickle's own makes a bytearray of the length the file gives and zeroes
+        # it before reading any data, so a damaged length (one flipped bit can
+        # make terabytes) filled memory; read the data first, as pickle's C
+        # unpickler does, and refuse it when the file ends sooner.
+        (size,) = struct.unpack("<Q", self.read(8))
+        data = bytearray()
+        while len(data) < size:
+            wanted = min(size - len(data), 1 << 20)
+            chunk = self.read(wanted)
+            if len(chunk) < wanted:
+                raise pickle.UnpicklingError("pickle data was truncated")
+            data += chunk
+        self.append(data)
+
+    dispatch[pickle.BUILD[0]] = load_build
+    dispatch[pickle.NEXT_BUFFER[0]] = load_buffer
+    dispatch[pickle.READONLY_BUFFER[0]] = load_buffer
+    dispatch[pickle.BYTEARRAY8[0]] = load_bytearray8
 
 
 def _encode(obj: Any, store_array: Callable[[np.ndarray], str]) -> Any:
@@ -159,6 +422,24 @@ def _read_zip(filename: str) -> Any:
         return _decode(json.loads(zf.read(_DOC_JSON)), read_array)
 
 
+class DocumentError(TypeError):
+    """A file that can't be opened as a Dynaface document. The message says why,
+    in words for the user."""
+
+
+def _not_a_document(filename: str) -> DocumentError:
+    return DocumentError(
+        f"The file '{filename}' does not appear to be a valid Dynaface document."
+    )
+
+
+def _shorten(text: str, limit: int = 80) -> str:
+    """Text a refusal quotes from the file, fit for a message: a crafted file can
+    put any text there, at any length."""
+    short = "".join(c if c.isprintable() else "?" for c in text[:limit])
+    return short if len(text) <= limit else short[:-1] + "…"
+
+
 def _read_document(filename: str) -> Dict[str, Any]:
     with open(filename, "rb") as f:
         magic = f.read(2)
@@ -172,21 +453,26 @@ def _read_document(filename: str) -> Dict[str, Any]:
         else:
             doc = None
     except _RefusedGlobalError as e:
-        raise TypeError(
-            f"The file '{filename}' was not opened because it contains code ({e}) "
-            "that would run when it's loaded."
+        raise DocumentError(
+            f"The file '{filename}' was not opened because it contains code "
+            f"({_shorten(str(e))}) that would run when it's loaded."
+        ) from e
+    except _UncheckedDataError as e:
+        raise DocumentError(
+            f"The file '{filename}' was not opened because it contains data "
+            f"({_shorten(str(e))}) that Dynaface documents never hold, which could "
+            "run code when it's loaded."
         ) from e
     except Exception as e:
-        raise TypeError(
-            f"The file '{filename}' does not appear to be a valid Dynaface document."
-        ) from e
+        raise _not_a_document(filename) from e
 
     if not isinstance(doc, dict) or not isinstance(doc.get(DOC_HEADER), dict):
-        raise TypeError(
-            f"The file '{filename}' does not appear to be a valid Dynaface document."
-        )
-    if doc[DOC_HEADER].get(DOC_HEADER_VERSION, 1) > DOC_FORMAT_VERSION:
-        raise TypeError(
+        raise _not_a_document(filename)
+    version = doc[DOC_HEADER].get(DOC_HEADER_VERSION, 1)
+    if not isinstance(version, int):
+        raise _not_a_document(filename)
+    if version > DOC_FORMAT_VERSION:
+        raise DocumentError(
             f"The file '{filename}' was saved by a newer version of Dynaface."
         )
     return doc
@@ -227,8 +513,13 @@ class DynafaceDocument:
             },
         }
         assert_standard_python(doc)
+        # A save that fails part way (a full disk, say) leaves the document as it
+        # was (see save_file()).
+        utl_save.save_file(filename, lambda file: self._write_zip(file, doc))
 
-        with zipfile.ZipFile(filename, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+    @staticmethod
+    def _write_zip(file: BinaryIO, doc: Dict[str, Any]) -> None:
+        with zipfile.ZipFile(file, "w", compression=zipfile.ZIP_DEFLATED) as zf:
             counter = itertools.count()
 
             def store_array(array: np.ndarray) -> str:
@@ -240,9 +531,18 @@ class DynafaceDocument:
             zf.writestr(_DOC_JSON, json.dumps(_encode(doc, store_array)))
 
     def load(self, filename: str):
+        """
+        Open a document. Raises DocumentError, whose message says why, when the
+        file isn't a Dynaface document that can be opened, and OSError when it
+        can't be read.
+        """
         doc = _read_document(filename)
+        try:
+            self._load_contents(doc)
+        except Exception as e:
+            raise _not_a_document(filename) from e
 
-        # load
+    def _load_contents(self, doc: Dict[str, Any]) -> None:
         measures = self._load_measures(doc[DOC_BODY][DOC_BODY_MEASURES])
         self._add_missing_measures(measures, dynaface.measures.all_measures())
 

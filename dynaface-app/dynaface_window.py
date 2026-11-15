@@ -194,7 +194,13 @@ class DynafaceWindow(MainWindowJTH):
             if self._tab_widget.count() == 0:
                 self.add_tab(tab_splash.SplashTab(self), "Welcome to Dynaface")
 
-            if self.app.file_open_request and self.app.models_ready:
+            # A file queued while the models load, by open_file() or by macOS
+            # (a double-click in Finder, a drop on the Dock icon), opens once they
+            # are ready; once they have failed, open_file() opens a document,
+            # which needs no models, and says why a photo or video can't open.
+            if self.app.file_open_request and (
+                self.app.models_ready or self.app.models_failed
+            ):
                 filename = self.app.file_open_request
                 self.app.file_open_request = None
                 self.open_file(filename)
@@ -234,9 +240,13 @@ class DynafaceWindow(MainWindowJTH):
             tab_name = f"Analyze: {basename}"
             tab = AnalyzeVideoTab(self, filename)
             if tab.load_error:
+                # The tab was never added, so no tab closes: the one in front
+                # is the user's.
                 self.display_message_box(
-                    f"Unable to load video file {filename}. Not valid format."
+                    tab.load_error_message
+                    or f"Unable to load {filename}. Not valid format."
                 )
+                tab.deleteLater()
                 return
             self.add_tab(tab, tab_name)
         except Exception as e:
@@ -279,6 +289,11 @@ class DynafaceWindow(MainWindowJTH):
             "https://github.com/jeffheaton/dynaface/blob/main/dynaface-app/manual.md"
         )
 
+    def on_models_loading(self):
+        """Called on the main thread when the AI models start loading: at startup,
+        and when Settings changes the device they run on."""
+        self.setWindowTitle(f"{self._base_title} — Loading AI models…")
+
     def on_models_ready(self):
         """Called on the main thread once the AI models finish loading."""
         self.setWindowTitle(self._base_title)
@@ -288,14 +303,17 @@ class DynafaceWindow(MainWindowJTH):
     def on_models_error(self, message):
         """Called on the main thread if the AI models failed to initialize."""
         self.setWindowTitle(self._base_title)
-        self.display_message_box(
-            "Dynaface was unable to start its AI models, so analysis features "
-            f"are unavailable.\n\n{message}"
-        )
+        self.display_message_box(f"{self.app.MODELS_FAILED_MESSAGE}\n\n{message}")
 
     def open_file(self, file_path):
         try:
-            if not self.app.models_ready:
+            if self.app.models_failed:
+                if not file_path.lower().endswith(".dyfc"):
+                    # A document opens without the models, since its frames
+                    # hold what they found; a photo or video needs them.
+                    self.display_message_box(self.app.MODELS_FAILED_MESSAGE)
+                    return
+            elif not self.app.models_ready:
                 # Models are still loading on a background thread. Queue the
                 # request; background_timer opens it once app.models_ready is
                 # set. This guards every open path (Open dialog, drag-drop,
