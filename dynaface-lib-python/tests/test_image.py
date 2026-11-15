@@ -2,9 +2,11 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 import cv2
 import numpy as np
+from PIL import Image
 
 from dynaface.image import ImageAnalysis, load_image
 from dynaface.util import safe_clip
@@ -26,12 +28,54 @@ class TestImage(unittest.TestCase):
             load_image("./tests_data/non_existent.jpg")
 
     def test_load_image_invalid_format(self):
-        with tempfile.NamedTemporaryFile(suffix=".txt") as temp_file:
-            temp_file.write(b"This is not an image")  # Write as bytes
-            temp_file.flush()  # Ensure content is written to disk
-
+        # Closed before it's read: Windows can't open a NamedTemporaryFile again
+        # while it is open.
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "not_an_image.txt")
+            with open(path, "wb") as f:
+                f.write(b"This is not an image")
             with self.assertRaises(cv2.error):
-                load_image(temp_file.name)
+                load_image(path)
+
+    def test_load_image_empty_file(self):
+        # cv2.imdecode raises its own assertion on no bytes; load_image says why.
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "empty.jpg")
+            open(path, "wb").close()
+            with self.assertRaisesRegex(cv2.error, "Could not decode image"):
+                load_image(path)
+
+    def test_load_image_non_ascii_path(self):
+        # cv2.imread can't open a path with a character outside Windows' ANSI code
+        # page, so load_image() reads the file itself; with imread failing, as it
+        # does there, the photo still opens, the same pixels as from its own name.
+        expected = load_image("./tests_data/img1-512.jpg")
+        with tempfile.TemporaryDirectory(suffix="_José") as folder:
+            path = os.path.join(folder, "Universität 測試.jpg")
+            with open("./tests_data/img1-512.jpg", "rb") as src, open(path, "wb") as f:
+                f.write(src.read())
+            with mock.patch("cv2.imread", return_value=None):
+                np.testing.assert_array_equal(load_image(path), expected)
+
+    def test_load_image_applies_exif_orientation(self):
+        # As cv2.imread does: a photo whose EXIF says "rotate 90 degrees clockwise"
+        # loads turned, so a phone's portrait photo comes out upright.
+        pixels = np.zeros((40, 80, 3), dtype=np.uint8)
+        pixels[:, :40] = (255, 0, 0)  # red on the left half
+        photo = Image.fromarray(pixels)
+        exif = photo.getexif()
+        exif[0x0112] = 6  # Orientation: rotate 90 CW to display
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "portrait.jpg")
+            photo.save(path, exif=exif.tobytes(), quality=95)
+            img = load_image(path)
+            self.assertEqual(img.shape, (80, 40, 3))
+            # The left half turned to the top: red there, black below.
+            self.assertGreater(img[10, 20, 0], 200)
+            self.assertLess(img[70, 20, 0], 50)
+            np.testing.assert_array_equal(
+                img, cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
+            )
 
     #
     # ImageAnalysis.load_image() Tests
@@ -214,6 +258,44 @@ class TestImage(unittest.TestCase):
         analysis.save(temp_path)
         assert os.path.exists(temp_path)
         os.remove(temp_path)
+
+    def test_save_image_non_ascii_path(self):
+        # As for load_image(): cv2.imwrite can't open such a path on Windows, and
+        # returned False, so the image wasn't written and nothing said so.
+        analysis = ImageAnalysis()
+        test_img = np.zeros((100, 100, 3), dtype=np.uint8)
+        test_img[20:60, 10:50] = (10, 200, 30)
+        analysis.load_image(test_img)
+        with tempfile.TemporaryDirectory(suffix="_José") as folder:
+            path = os.path.join(folder, "Universität 測試.png")
+            with mock.patch("cv2.imwrite", return_value=False):
+                analysis.save(path)
+            # PNG is lossless, so the file holds exactly the rendered image.
+            np.testing.assert_array_equal(load_image(path), analysis.render_img)
+
+    def test_save_image_writes_what_imwrite_did(self):
+        analysis = ImageAnalysis()
+        test_img = np.zeros((100, 100, 3), dtype=np.uint8)
+        test_img[20:60, 10:50] = (10, 200, 30)
+        analysis.load_image(test_img)
+        bgr = cv2.cvtColor(analysis.render_img, cv2.COLOR_RGB2BGR)
+        with tempfile.TemporaryDirectory() as folder:
+            for name in ("a.jpg", "b.JPEG", "c.png"):
+                path = os.path.join(folder, name)
+                reference = os.path.join(folder, "imwrite_" + name)
+                analysis.save(path)
+                cv2.imwrite(reference, bgr)
+                with open(path, "rb") as f, open(reference, "rb") as g:
+                    self.assertEqual(f.read(), g.read(), name)
+
+    def test_save_image_failure_raises(self):
+        analysis = ImageAnalysis()
+        analysis.load_image(np.zeros((100, 100, 3), dtype=np.uint8))
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaises(OSError):
+                analysis.save(os.path.join(folder, "missing", "out.png"))
+            with self.assertRaises(cv2.error):
+                analysis.save(os.path.join(folder, "out.not_an_image_type"))
 
     #
     # measure_polygon() Tests

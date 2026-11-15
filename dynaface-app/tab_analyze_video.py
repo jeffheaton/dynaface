@@ -110,6 +110,12 @@ class AnalyzeVideoTab(TabGraphic):
 
         # Load the face
         self._frames = []
+        # Each kept frame's number in the video, counting from 0, in step with
+        # _frames: an import skips frames without a face, so a frame's position
+        # in _frames can be short of its number. None where the numbers aren't
+        # known (a photo, or a document saved before they were kept), and the
+        # frames are numbered by position.
+        self._frame_numbers = None
         # The video frames an import has read, kept or not; set by WorkerLoad.
         self.frames_read = 0
         self._frame_begin = 0
@@ -192,6 +198,8 @@ class AnalyzeVideoTab(TabGraphic):
         # WorkerLoad analyzes every frame as this pose; set before it starts.
         self.force_pose = force_pose
         self._video_source = True
+        # WorkerLoad gives every frame it keeps its number (add_frame()).
+        self._frame_numbers = []
 
         # Open the video file
         self.base_rotation = None
@@ -790,11 +798,16 @@ gesture you wish to analyze."""
             # Auto fit
             QTimer.singleShot(1, self.fit)
 
-    def add_frame(self, state):
+    def add_frame(self, state, frame_number):
+        """Keep a frame WorkerLoad imported: its state and its number in the
+        video."""
         if self._video_slider.value() == self._video_slider.maximum():
             at_end = True
         else:
             at_end = False
+        # The number goes in before the state, so whatever reads the frames
+        # meanwhile (numbered_states()) finds a number for every state it sees.
+        self._frame_numbers.append(int(frame_number))
         self._frames.append(state)
         self._video_slider.setRange(0, len(self._frames) - 1)
         self._frame_end = len(self._frames)
@@ -1034,22 +1047,45 @@ gesture you wish to analyze."""
             logger.error("Error during save", exc_info=True)
             self._window.display_message_box("Unable to save file.")
 
-    def collect_data(self, step_size=1):
-        """The chosen measures' outputs for every step_size-th kept frame. Frames
-        keep their numbers in the whole video, so a trimmed clip's start at its
-        first kept frame.
+    def numbered_states(self):
+        """
+        The kept frames' states, a copy of the list, with their numbers in the
+        video (None to number them by position) and where the kept range stops,
+        all three taken together, so they agree while an import adds frames:
+        add_frame() adds each number before its state, and the range stops at
+        the frames there are.
+        """
+        stop = self._frame_end  # read first: the frames only grow meanwhile
+        states = list(self._frames)
+        numbers = self._frame_numbers
+        return (
+            states,
+            None if numbers is None else numbers[: len(states)],
+            min(stop, len(states)),
+        )
+
+    def collect_data(self, step_size=1, by_position=False):
+        """The chosen measures' outputs for every step_size-th kept frame.
+
+        Each row is numbered as in the video, and timed from that number: the
+        import skips frames without a face, so a frame's number can be past its
+        position among the kept frames. With by_position, rows are numbered by
+        position, as the slider and the chart count frames. Either way, the
+        frames of a trimmed clip keep their numbers.
 
         The series is built from the user's choices, not from the flags the
         current frame's view allows, so the CSV and the chart hold the same columns
         whichever frame the slider is on: a measure's outputs are NaN on the frames
         whose view it doesn't suit (FrameSeries.from_states()), never dropped."""
+        states, numbers, stop = self.numbered_states()
         return FrameSeries.from_states(
-            self._frames,
+            states,
             self._chosen_measures(),
             start=self._frame_begin,
-            stop=self._frame_end,
+            stop=stop,
             step=step_size,
             fps=self.frame_rate,
+            frame_numbers=None if by_position else numbers,
         )
 
     def save_csv_frontal(self, filename):
@@ -1094,9 +1130,9 @@ gesture you wish to analyze."""
         ax = self.chart_fig.add_subplot(111)
         self.chart_fig.subplots_adjust(right=0.75)  # Adjust this value as needed
 
-        series = self.collect_data(self._frame_step)
-        # The chart counts frames from the start of the kept range, like the red
-        # current-frame bar below.
+        series = self.collect_data(self._frame_step, by_position=True)
+        # The chart counts kept frames from the start of the kept range, like the
+        # slider and the red current-frame bar below.
         x = [frame - self._frame_begin for frame in series.frames]
         # Only the outputs the kept frames have: a measure's outputs are NaN on
         # every frame whose view it doesn't suit, and an all-NaN line would only
@@ -1337,6 +1373,8 @@ gesture you wish to analyze."""
         # view allows, so a frame of another view loads them whole.
         doc.measures = self._chosen_measures()
         doc.frames = self._frames[self._frame_begin : self._frame_end]
+        if self._frame_numbers is not None:
+            doc.frame_numbers = self._frame_numbers[self._frame_begin : self._frame_end]
         doc.fps = self.frame_rate
         doc.pose = self._face.pose
         doc.lateral = self._face.lateral
@@ -1401,6 +1439,7 @@ gesture you wish to analyze."""
             # each frame on a face of their own, measure them as the profile.
             doc.add_missing_views()
             self._frames = doc.frames
+            self._frame_numbers = doc.frame_numbers
             self.filename = filename
             self.frame_count = len(self._frames)
             self._frame_begin = 0

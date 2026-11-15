@@ -1,4 +1,5 @@
 import json
+import math
 import os
 import sys
 import unittest
@@ -187,12 +188,70 @@ class TestSavedHeadPose(unittest.TestCase):
         self.assertEqual(restored.headpose, list(self.POSE))
 
     def test_state_saved_before_the_pose_was_kept(self):
-        # Dynaface 2.0.4 and earlier saved [0, 0, 0] in its place, and such a state
-        # restores a level head, as it always did.
-        state = self.load().dump_state()
+        # Dynaface 2.0.4 and earlier saved a [0, 0, 0] placeholder in its place, and
+        # no view. That was never a reading, so the pose is unknown: NaN, not a level
+        # head, in the face and the Pose measure, and still NaN once saved again.
+        state = self.load().dump_state()[:6]
         state[1] = [0, 0, 0]
         restored = self.restore(state)
+        self.assertTrue(all(math.isnan(v) for v in restored.headpose))
+        stats = restored.analyze()  # drawing "nan" doesn't raise
+        for name in ("yaw", "pitch", "roll"):
+            self.assertTrue(math.isnan(getattr(restored, name)), name)
+            self.assertTrue(math.isnan(stats[name]), name)
+
+        saved_again = restored.dump_state()
+        self.assertIsInstance(saved_again[6], dict)
+        again = self.restore(saved_again)
+        for name in ("yaw", "pitch", "roll"):
+            self.assertTrue(math.isnan(getattr(again, name)), name)
+
+    def test_a_level_reading_saved_with_a_view(self):
+        # Only the missing view marks the placeholder: a state with a view holds the
+        # model's reading, even one of exactly 0.
+        state = self.load().dump_state()
+        state[1] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        restored = self.restore(state)
         self.assertEqual((restored.yaw, restored.pitch, restored.roll), (0.0, 0.0, 0.0))
+
+    def test_cheek_gates_on_a_state_saved_before_the_pose_was_kept(self):
+        # The Cheek Measures read the model's yaw as a reading: the placeholder came
+        # back as cheek.yaw.model = calibrate_yaw(0), about -3.1 degrees, with a
+        # pitch of 0 that passed cheek.pitch.ok, none of it measured, so the yaw
+        # gates were checked against a turn nobody saw. Unknown, the model's values
+        # are NaN and every yaw gate and cheek.pitch.ok fail, as for any unknown
+        # yaw, while the values measured from the landmarks stay as they were.
+        with open("./tests_data/cheek_landmarks.json", encoding="utf-8") as f:
+            entry = json.load(f)["images"]["yaw0"]
+        raw = entry["raw"]
+        landmarks = [(int(x), int(y)) for x, y in raw["landmarks"]]
+        pose = np.array([raw["yaw"], raw["pitch"], raw["roll"], 0.0, 0.0, 0.0])
+        face = facial.AnalyzeFace(measures=[AnalyzeCheekMeasures()])
+        with mock.patch.object(
+            facial.AnalyzeFace, "_find_landmarks", return_value=(landmarks, pose)
+        ):
+            face.load_image(
+                load_image(os.path.join("./tests_data", entry["file"])),
+                crop=True,
+                force_pose=Pose.FRONTAL,
+            )
+        live = face.analyze(render=False)
+        self.assertFalse(math.isnan(live["cheek.yaw.model"]))
+
+        state = face.dump_state()[:6]
+        state[1] = [0, 0, 0]
+        restored = facial.AnalyzeFace(measures=[AnalyzeCheekMeasures()])
+        restored.load_state(state)
+        old = restored.analyze(render=False)
+        self.assertTrue(math.isnan(old["cheek.yaw.model"]))
+        self.assertTrue(math.isnan(old["cheek.pitch"]))
+        self.assertEqual(old["cheek.pitch.ok"], 0.0)
+        for name in ("zy.r.ok", "zy.l.ok", "zy.ok", "zy.ratio.ok", "cr.ok", "sr.ok"):
+            self.assertEqual(old[name], 0.0, name)
+        for name in ("cheek.yaw", "zy.r", "zy.l", "zy.w", "cr.r.d", "cr.l.d"):
+            self.assertAlmostEqual(old[name], live[name], msg=name)
+        # And drawing them, "nan" in the pose line, doesn't raise.
+        self.assertTrue(_same(restored.analyze()["zy.w"], old["zy.w"]))
 
     def test_flipped_profile(self):
         # A profile facing right is flipped and found again, but it reports, and

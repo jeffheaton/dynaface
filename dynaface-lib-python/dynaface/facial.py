@@ -135,13 +135,19 @@ def _saved_pupil_distance(pupillary_distance: Any, pix2mm: Any) -> Optional[floa
     return pd_mm if math.isfinite(pd_mm) and pd_mm > 0 else None
 
 
-def _saved_head_pose(saved: Any) -> List[float]:
+def _saved_head_pose(saved: Any, has_view: bool) -> List[float]:
     """
     The head pose a saved state holds, as floats, with at least yaw, pitch and roll.
 
-    States saved by Dynaface 2.0.4 and earlier hold [0, 0, 0] (dump_state() saved a
-    placeholder), so they restore a level head, as they always did.
+    Only a state with a view (dump_state() has saved both since Dynaface 2.1) holds
+    the pose its face was analyzed with. States saved by 2.0.4 and earlier hold no
+    view and a [0, 0, 0] placeholder in the pose's place, so their pose is unknown:
+    NaN, never a level head. The Cheek Measures read the model's yaw as a real
+    reading (cheek.yaw.model), so a placeholder there would gate them on a turn
+    that was never measured; NaN fails the yaw gates, as any unknown yaw does.
     """
+    if not has_view:
+        return [math.nan] * 3
     try:
         pose = [float(v) for v in saved]
     except (TypeError, ValueError):
@@ -1338,7 +1344,8 @@ class AnalyzeFace(ImageAnalysis):
         landmarks, which also corrects states saved when the scale was measured
         before the crop. A state with a fixed scale (a profile) keeps its saved one.
         It also reports the head pose the face was analyzed with; states saved by
-        Dynaface 2.0.4 and earlier hold none, and restore a level head.
+        Dynaface 2.0.4 and earlier hold none (only a placeholder), so their yaw,
+        pitch and roll are NaN, unknown, and stay so when the face is saved again.
 
         It restores the view too: the pose, whether a profile was flipped, and a
         profile's lateral landmarks and sagittal outline, so AnalyzeLateral measures
@@ -1363,7 +1370,8 @@ class AnalyzeFace(ImageAnalysis):
         # placeholder image, so drawing would otherwise land on that, or on the
         # previous frame's drawing.
         self.init_image(obj[0])
-        self.headpose = _saved_head_pose(obj[1])
+        has_view = len(obj) > 6 and isinstance(obj[6], dict)
+        self.headpose = _saved_head_pose(obj[1], has_view)
         self._headpose = np.array(self.headpose, dtype=np.float64)
         self.yaw, self.pitch, self.roll = self.headpose[:3]
         self.landmarks = copy.copy(obj[2])
@@ -1373,7 +1381,7 @@ class AnalyzeFace(ImageAnalysis):
             self.face_rotation = obj[5]
         except (IndexError, TypeError):
             self.face_rotation = 0
-        if len(obj) > 6 and isinstance(obj[6], dict):
+        if has_view:
             self._load_view(obj[6])
         else:
             # No view (Dynaface 2.0.4 and earlier): the lateral data stays, as
@@ -1503,6 +1511,7 @@ def load_face_image(
     Raises:
         FileNotFoundError: If filename is a path to a file that does not
             exist.
+        OSError: If the file can't be read.
         cv2.error: If the file or the downloaded data cannot be decoded as an
             image.
     """

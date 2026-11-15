@@ -32,6 +32,7 @@ DOC_BODY_MEASURES = "measures"
 DOC_BODY_MEASURE = "measure"
 DOC_BODY_MEASURE_ITEMS = "items"
 DOC_BODY_FRAMES = "frames"
+DOC_BODY_FRAME_NUMBERS = "frame_numbers"
 DOC_BODY_LATERAL_LANDMARKS = "lateral_landmarks"
 DOC_BODY_SAGITTAL_X = "sagittal_x"
 DOC_BODY_SAGITTAL_Y = "sagittal_y"
@@ -478,11 +479,46 @@ def _read_document(filename: str) -> Dict[str, Any]:
     return doc
 
 
+def _frame_numbers(value: Any, count: int) -> Any:
+    """
+    The frame numbers a document holds: each frame's number in the video, a whole
+    number from 0, rising, one per frame (count). None when it holds none, as a
+    document saved before they were kept, or holds anything else, so its frames
+    are numbered by position.
+    """
+    if (
+        isinstance(value, list)
+        and len(value) == count
+        and all(type(n) is int and 0 <= n < 2**31 for n in value)
+        and all(a < b for a, b in zip(value, value[1:]))
+    ):
+        return value
+    return None
+
+
+def _with_view(frame: Any, view: Dict[str, Any]) -> list:
+    """
+    A frame state saved without a view given this one, with an unknown head pose
+    (NaN). Such a state holds a [0, 0, 0] placeholder where states with a view
+    hold the pose the face was analyzed with, and load_state() takes a state's
+    pose as real once it has a view, so the placeholder would come back as a
+    level head.
+    """
+    state = list(frame)
+    if len(state) > 1:
+        state[1] = [math.nan] * 3
+    return state + [copy.deepcopy(view)]
+
+
 class DynafaceDocument:
     def __init__(self):
         self._version = DOC_FORMAT_VERSION
         self.face = None
         self.frames = []
+        # Each frame's number in the video, counting from 0, as the import kept
+        # it (it skips frames without a face), or None to number the frames by
+        # position, as documents saved before the numbers were kept do.
+        self.frame_numbers = None
         self.measures = []
         self.fps = 0
         self.lateral = False
@@ -512,6 +548,8 @@ class DynafaceDocument:
                 DOC_BODY_SAGITTAL_Y: self.sagittal_y,
             },
         }
+        if self.frame_numbers is not None:
+            doc[DOC_BODY][DOC_BODY_FRAME_NUMBERS] = [int(n) for n in self.frame_numbers]
         assert_standard_python(doc)
         # A save that fails part way (a full disk, say) leaves the document as it
         # was (see save_file()).
@@ -548,6 +586,9 @@ class DynafaceDocument:
 
         self.fps = doc[DOC_HEADER][DOC_HEADER_FPS]
         self.frames = doc[DOC_BODY][DOC_BODY_FRAMES]
+        self.frame_numbers = _frame_numbers(
+            doc[DOC_BODY].get(DOC_BODY_FRAME_NUMBERS), len(self.frames)
+        )
         self.measures = measures
         if DOC_HEADER_LATERAL not in doc[DOC_HEADER]:
             # A document without a lateral key was saved before 1.2.0, when every
@@ -580,7 +621,9 @@ class DynafaceDocument:
         the document's view. A profile document kept its lateral landmarks and
         sagittal outline in the header alone, which only the face that is told
         about them restored; a frontal document's frames restore as frontal either
-        way, so they are left as they are.
+        way, so they are left as they are. Those versions kept no head pose, only
+        a placeholder, so a state given a view gets an unknown one (NaN), as
+        load_state() gives a state without a view.
         """
         if not self.lateral:
             return
@@ -594,7 +637,7 @@ class DynafaceDocument:
             value = getattr(self, name)
             view[name] = None if value is None else np.array(value)
         self.frames = [
-            list(frame) + [copy.deepcopy(view)] if len(frame) <= 6 else frame
+            _with_view(frame, view) if len(frame) <= 6 else frame
             for frame in self.frames
         ]
 

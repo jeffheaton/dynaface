@@ -34,6 +34,11 @@ def load_image(filename: str) -> NDArray[Any]:
     """
     Load an image from a file and convert it to RGB format.
 
+    numpy reads the file and OpenCV decodes it in memory (cv2.imdecode), with the
+    same result as cv2.imread, EXIF orientation included. cv2.imread itself can't
+    open a path on Windows with a character outside the system's ANSI code page,
+    such as C:\\Users\\José\\photo.jpg, while numpy opens any path Python can.
+
     Args:
         filename (str): Path to the image file.
 
@@ -42,11 +47,14 @@ def load_image(filename: str) -> NDArray[Any]:
 
     Raises:
         FileNotFoundError: If the file does not exist.
-        cv2.error: If the file cannot be decoded as an image.
+        OSError: If the file can't be read.
+        cv2.error: If the file is empty or cannot be decoded as an image.
     """
     if not os.path.exists(filename):
         raise FileNotFoundError(os.path.abspath(filename))
-    image = cv2.imread(filename)
+    data = np.fromfile(filename, dtype=np.uint8)
+    # imdecode raises on an empty buffer rather than returning None.
+    image = cv2.imdecode(data, cv2.IMREAD_COLOR) if data.size else None
     if image is None:
         raise cv2.error(f"Could not decode image: {filename}")
     return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -394,13 +402,28 @@ class ImageAnalysis:
 
     def save(self, filename: str) -> None:
         """
-        Saves the rendered image to a file.
+        Saves the rendered image to a file, in the format its extension names
+        (such as .png or .jpg).
 
-        :param filename: The path where the image should be saved.
+        OpenCV encodes the image in memory (cv2.imencode), with the same bytes as
+        cv2.imwrite, and numpy writes them, so a path cv2.imwrite can't open on
+        Windows (a character outside the ANSI code page) saves too. Unlike
+        cv2.imwrite, which returns False, a failure raises.
+
+        Args:
+            filename (str): The path where the image should be saved.
+
+        Raises:
+            ValueError: If no image is loaded.
+            cv2.error: If OpenCV has no encoder for the extension.
+            OSError: If the file can't be written.
         """
         self._check_image()
         image = cv2.cvtColor(self.render_img, cv2.COLOR_RGB2BGR)
-        cv2.imwrite(filename, image)
+        ok, encoded = cv2.imencode(os.path.splitext(filename)[1], image)
+        if not ok:
+            raise cv2.error(f"Could not encode image: {filename}")
+        encoded.tofile(filename)
 
     def measure_polygon(
         self,

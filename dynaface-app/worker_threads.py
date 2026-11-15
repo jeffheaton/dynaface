@@ -110,6 +110,19 @@ def mean_landmarks(data):
     return averages
 
 
+def face_with_pupil_distance(pd, tilt_threshold):
+    """
+    An AnalyzeFace without measures that measures every image it loads with this
+    pupillary distance (mm), whatever AnalyzeFace.pd is set to meanwhile.
+
+    load_image() reads the pd of the face's class, the setting Settings saves to
+    AnalyzeFace.pd, so the face is made from a subclass of its own that holds this
+    one.
+    """
+    pinned = type("PinnedPupilDistanceFace", (facial.AnalyzeFace,), {"pd": pd})
+    return pinned([], tilt_threshold=tilt_threshold)
+
+
 class WorkerLoad(QThread):
     """Load a video in the background."""
 
@@ -122,6 +135,12 @@ class WorkerLoad(QThread):
         self.setStackSize(16 * 1024 * 1024)  # 16 MB
         self._target = target
         self._total = self._target.frame_count
+        # The pupillary distance every frame is measured with, read once, on the
+        # main thread as the import starts, as run() reads its other settings
+        # once. load_image() reads the class's pd on every frame, and saving
+        # Settings sets AnalyzeFace.pd at once, so the frames imported after a
+        # change used to get another scale than the frames before it, for good.
+        self._pupil_distance = facial.AnalyzeFace.pd
         self.running = True
         # When progress was last sent to the tab (time.monotonic()).
         self._progress_sent = float("-inf")
@@ -179,7 +198,7 @@ class WorkerLoad(QThread):
         # disabled from the first frame on; set here as well for completeness.
         self._target.loading = True
         self._loading_etc = utl_etc.CalcETC(self._total)
-        self._face = facial.AnalyzeFace([], tilt_threshold=tilt_threshold)
+        self._face = face_with_pupil_distance(self._pupil_distance, tilt_threshold)
         # The pose the tab asked for, read once: Pose.DETECT classifies each
         # frame; a pose chosen with the Pose button is used for all of them.
         self._force_pose = self._target.force_pose
@@ -286,9 +305,12 @@ class WorkerLoad(QThread):
                         self._face.retrace_far_cheek()
                     self._face.find_cheek_landmarks()
 
-                # Build frame-state data
+                # Build frame-state data, kept with the frame's number in the
+                # video, counting from 0 as VideoAnalyzer does: frames without a
+                # face were skipped, so the CSV's and Evaluation's frame numbers
+                # and times come from it, not from the frame's position.
                 frame_state = self._face.dump_state()
-                self._target.add_frame(frame_state)
+                self._target.add_frame(frame_state, i - 1)
 
                 # Update UI
                 self._progress(kept=True)

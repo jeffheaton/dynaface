@@ -144,7 +144,10 @@ class SettingsTab(QWidget):
         if not self.check_values():
             return
         detection_changed = self.detection_changed()
-        if detection_changed and self._video_importing():
+        importing = self._video_importing()
+        pd = utl_settings.parse_int(self._text_pd.text(), default=STD_PUPIL_DIST)
+        pd_changed = pd != dynaface.facial.AnalyzeFace.pd
+        if detection_changed and importing:
             # The library reads the detection switches on every frame, so a
             # change now would reclassify the rest of a video still importing.
             self._window.display_message_box(
@@ -152,10 +155,7 @@ class SettingsTab(QWidget):
             )
             return
         accelerator = self._chk_accelerator.isChecked()
-        if (
-            self._window.app.would_reload_models(accelerator)
-            and self._video_importing()
-        ):
+        if self._window.app.would_reload_models(accelerator) and importing:
             # The AI models are built again for the new device, and an import
             # running meanwhile would find them gone.
             self._window.display_message_box(
@@ -168,6 +168,13 @@ class SettingsTab(QWidget):
             # Pose detection is read by each load, so open tabs keep their view.
             self._window.display_message_box(
                 "Pose detection changes apply to photos and videos opened from now on."
+            )
+        elif pd_changed and importing:
+            # The import measures every frame with the distance it started with
+            # (WorkerLoad), so one video never mixes two scales.
+            self._window.display_message_box(
+                "The video still importing keeps the pupillary distance it started "
+                "with. The new one applies to photos and videos opened from now on."
             )
         self._window.close_current_tab()
 

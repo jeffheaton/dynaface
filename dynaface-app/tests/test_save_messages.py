@@ -25,6 +25,7 @@ def _tab():
         wait_load_complete=lambda: True,
         _chosen_measures=lambda: [],
         _frames=[],
+        _frame_numbers=None,
         _frame_begin=0,
         _frame_end=0,
         frame_rate=30,

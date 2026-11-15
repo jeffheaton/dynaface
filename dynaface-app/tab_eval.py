@@ -79,12 +79,16 @@ class TabEval(QWidget):
         pass
 
     def exec_eval(self, analyze):
+        # Each moment's frame and time are its number in the video: an import
+        # skips frames without a face, so a frame's position can be short of it.
+        states, numbers, stop = analyze.numbered_states()
         series = FrameSeries.from_states(
-            analyze._frames,
+            states,
             [AnalyzeEyeArea(), AnalyzeDentalArea()],
             start=analyze._frame_begin,
-            stop=analyze._frame_end,
+            stop=stop,
             fps=analyze.frame_rate,
+            frame_numbers=numbers,
         )
         html = evaluation_html(series.evaluate())
         self._window._background_queue.append(lambda: self.text_edit.setHtml(html))
