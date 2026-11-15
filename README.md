@@ -53,6 +53,8 @@ If you use Dynaface in academic work, please also cite their original authors:
 
 - Berges, A. J., Renne, A., Heaton, J., Leung, D. G., & Boahene, K. D. O. (2026). Facial weakness in facioscapulohumeral muscular dystrophy: Objective and patient-reported measures to guide reconstructive interventions. _Facial Plastic Surgery & Aesthetic Medicine_. Advance online publication. https://doi.org/10.1177/26893614251407675
 
+- Wei, O., Lopez, D., Lina, I., & Boahene, K. (2025). Automated assessment of facial nerve function using multimodal machine learning [Abstract 361]. _Journal of Clinical and Translational Science, 9_(s1), 111. https://doi.org/10.1017/cts.2024.987
+
 # License
 
 This application and Python library are licensed under the [Apache License Version 2.0](https://github.com/jeffheaton/dynaface/blob/main/LICENSE).
