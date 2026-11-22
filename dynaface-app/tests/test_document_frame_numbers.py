@@ -115,7 +115,9 @@ class FrameNumbersTest(_InAFolder):
             _frame_end=3,
             frame_rate=30,
             _face=SimpleNamespace(pose=Pose.FRONTAL, lateral=False),
-            _window=SimpleNamespace(display_message_box=mock.Mock()),
+            _window=SimpleNamespace(
+                display_message_box=mock.Mock(), set_tab_title=mock.Mock()
+            ),
             unsaved_changes=True,
         )
 

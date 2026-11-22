@@ -1,7 +1,8 @@
 """
 Tests for what AnalyzeVideoTab.save_document() tells the user when saving a
 document fails, by how it failed (see utl_save.save_file()), and that the
-document stays unsaved then.
+document stays unsaved then; and that once a save succeeds, a later Save writes
+the file it saved.
 
 Run from dynaface-app with: python -m unittest discover -s tests -t .
 """
@@ -16,6 +17,8 @@ import tab_analyze_video
 import utl_save
 
 _DOCUMENT = "/Volumes/Share/Patient 07.dyfc"
+# The file the tab was opened from, or last saved.
+_OPENED = "/Volumes/Share/Patient 07 (first visit).dyfc"
 _KEPT = "/Volumes/Share/.dynaface-b94443eb88b6.tmp"
 
 
@@ -30,8 +33,11 @@ def _tab():
         _frame_end=0,
         frame_rate=30,
         _face=SimpleNamespace(pose=None, lateral=False),
-        _window=SimpleNamespace(display_message_box=mock.Mock()),
+        _window=SimpleNamespace(
+            display_message_box=mock.Mock(), set_tab_title=mock.Mock()
+        ),
         unsaved_changes=True,
+        filename=_OPENED,
     )
 
 
@@ -59,6 +65,9 @@ class SaveMessageTest(unittest.TestCase):
     def assert_told(self, tab, message):
         tab._window.display_message_box.assert_called_once_with(message)
         self.assertTrue(tab.unsaved_changes)
+        # Save still writes the file it wrote before.
+        self.assertEqual(tab.filename, _OPENED)
+        tab._window.set_tab_title.assert_not_called()
 
     def test_names_the_copy_kept_and_how_to_open_it(self):
         # Dynaface opens no file of the staged file's name, and Finder hides it.
@@ -108,6 +117,17 @@ class SaveMessageTest(unittest.TestCase):
         tab = self.save(None)
         tab._window.display_message_box.assert_not_called()
         self.assertFalse(tab.unsaved_changes)
+
+    def test_saves_later_to_the_file_it_saved(self):
+        # After Save As, Save wrote over the file the tab was opened from.
+        tab = self.save(None)
+        self.assertEqual(tab.filename, _DOCUMENT)
+        tab._window.set_tab_title.assert_called_once_with(
+            tab, "Analyze: Patient 07.dyfc"
+        )
+        tab.save_document = mock.Mock()
+        tab_analyze_video.AnalyzeVideoTab.on_save(tab)
+        tab.save_document.assert_called_once_with(_DOCUMENT)
 
 
 if __name__ == "__main__":

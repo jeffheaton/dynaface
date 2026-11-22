@@ -1418,6 +1418,10 @@ gesture you wish to analyze."""
                 )
             return
         self.unsaved_changes = False
+        # After Save As, Save writes the file just saved, not the one the tab was
+        # opened from, and the tab is named for it.
+        self.filename = filename
+        self._window.set_tab_title(self, f"Analyze: {os.path.basename(filename)}")
 
     def load_document(self, filename):
         """Load a document into this tab. On failure, return False with the

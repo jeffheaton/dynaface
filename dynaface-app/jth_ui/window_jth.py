@@ -70,6 +70,12 @@ class MainWindowJTH(QMainWindow):
         self._tab_widget.addTab(widget, title)
         self._tab_widget.setCurrentIndex(self._tab_widget.count() - 1)
 
+    def set_tab_title(self, widget, title):
+        """Retitle widget's tab, if it has one."""
+        index = self._tab_widget.indexOf(widget)
+        if index != -1:
+            self._tab_widget.setTabText(index, title)
+
     def close_current_tab(self):
         # Close the tab
         index = self._tab_widget.indexOf(self._tab_widget.currentWidget())
