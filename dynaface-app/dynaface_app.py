@@ -53,7 +53,7 @@ from dynaface.const import (
     STD_PUPIL_DIST,
 )
 from dynaface_window import DynafaceWindow
-from jth_ui import app_const, utl_log
+from jth_ui import app_const, utl_errors, utl_log
 from jth_ui.app_jth import AppJTH, get_library_version
 from pillow_heif import register_heif_opener
 from PyQt6.QtCore import QObject, QThread, QTimer, pyqtSignal
@@ -138,6 +138,9 @@ class AppDynaface(AppJTH):
     def __init__(self):
         try:
             super().__init__()
+            # An exception nothing caught is logged and reported, and Dynaface
+            # goes on, instead of PyQt6 ending it with the user's work unsaved.
+            utl_errors.install(self._report_unexpected_error)
             self.models_ready = False
             # Set when the last load failed, until another starts.
             self.models_failed = False
@@ -348,6 +351,17 @@ class AppDynaface(AppJTH):
             self.file_open_request = None
         if self.main_window is not None:
             self.main_window.on_models_error(message)
+
+    def _report_unexpected_error(self, summary: str) -> None:
+        """Tell the user about an exception nothing caught (see utl_errors)."""
+        window = getattr(self, "main_window", None)
+        if window is not None:
+            window.display_message_box(
+                "Dynaface ran into an unexpected error, so something may not work "
+                f"as it should: {summary}\n\nSave your work under a new name, then "
+                "restart Dynaface. The details are in the support logs (Help > "
+                "Open Support Logs...)."
+            )
 
     def shutdown(self):
         try:
