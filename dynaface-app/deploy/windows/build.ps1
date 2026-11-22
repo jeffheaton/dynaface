@@ -48,6 +48,17 @@ BUILD = $buildNum
     & $venvPip install -r requirements.txt
     & $venvPip install --upgrade "dynaface==$script:DYNAFACE_VERSION"
 
+    # The app's tests, in the environment about to be packaged, with the library
+    # from PyPI. RUN_TESTS=false skips them.
+    if ($env:RUN_TESTS -ne "false") {
+        Write-Host "** Running the app's tests **"
+        $env:QT_QPA_PLATFORM = "offscreen"
+        & $venvPython -m unittest discover -s tests -t .
+        $testsExit = $LASTEXITCODE
+        Remove-Item Env:QT_QPA_PLATFORM
+        if ($testsExit -ne 0) { throw "The app's tests failed." }
+    }
+
     # onnxruntime loads onnxruntime_providers_shared.dll at import time.
     # PyInstaller's isolated analysis subprocess doesn't have this DLL in PATH,
     # which crashes the build during analysis.

@@ -20,6 +20,8 @@ The three components are typically released in lockstep at the same version. Whe
 
 Each library is released in two manual steps: a build workflow that stages exactly what ships on S3 with a build record (`<name>-<version>-build.json`), rerunnable at the same version, and a deploy workflow that takes the version, publishes what was staged without rebuilding, and tags `v<version>` at the commit the build recorded. Python and .NET share the version and the tag. See `RELEASING.md`.
 
+The desktop app follows the same two steps, after the library: Build macOS App and Build Windows App (`build-app-macos.yml`, `build-app-windows.yml`) run the app's tests and stage the signed zips with build records on S3 (`app/`), and Deploy Desktop App (`deploy-app.yml`) adds them to the version's GitHub Release, creating it as a draft. It shares the library's tag: where `v<version>` stands, it checks the builds' commit is at or after it instead of tagging. The draft is finished and published by hand, with the Unity app's downloads, since one release page holds every download of a version.
+
 ## Important: Always Use the venv
 
 The two Python components use Python virtual environments. **Never install packages or run tests using the system/base Python.** Always activate the venv first. If `venv/` doesn't exist in the component directory, create it before proceeding.
@@ -65,7 +67,7 @@ pip install -r requirements.txt && pip install dynaface
 python dynaface_app.py
 ```
 
-(The app's only automated tests cover `.dyfc` project files: `python -m unittest discover -s tests -t .` from `dynaface-app`, in its venv. Otherwise, verify changes by running the app.)
+(The app's tests, `python -m unittest discover -s tests -t .` from `dynaface-app` in its venv, cover documents, saving, model failures, video import and the exception hook. CI doesn't run them; the app's release builds do. Otherwise, verify changes by running the app.)
 
 ### dynaface-lib-dotnet (C#/.NET Library)
 

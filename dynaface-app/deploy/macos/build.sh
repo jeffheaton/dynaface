@@ -45,6 +45,13 @@ echo "** Using Python: ${PYTHON} **"
 source venv/bin/activate
 pip install -r requirements.txt
 pip install --upgrade "dynaface==${DYNAFACE_VERSION}"
+
+# The app's tests, in the environment about to be packaged, with the library
+# from PyPI. RUN_TESTS=false skips them.
+if [ "${RUN_TESTS:-true}" != "false" ]; then
+    echo "** Running the app's tests **"
+    QT_QPA_PLATFORM=offscreen python -m unittest discover -s tests -t .
+fi
 cd deploy/macos
 
 # Build it

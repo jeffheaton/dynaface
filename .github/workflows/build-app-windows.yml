@@ -1,7 +1,28 @@
 name: Build Windows App
 
+# Build step for the desktop app (Dynaface Classic, dynaface-app/) on Windows,
+# in the release convention's two steps (~/.claude/CLAUDE.md; RELEASING.md has
+# the sequence). deploy/windows/build.ps1 stamps version.py with the build date
+# and this run's number, installs the app's requirements and the dynaface
+# library from PyPI at the version it pins, runs the app's tests in that
+# environment and builds Dynaface.exe with PyInstaller, which SSL.com eSigner
+# then signs. This stages dynaface-app-win-<version>.zip and a build record
+# naming the commit (dynaface-app-win-<version>-build.json) on S3 under the
+# version. Run it by hand, as often as needed at the same version; each run
+# replaces what is staged. Nothing is released until deploy-app.yml runs.
+#
+# Repository secrets:
+#   SSL_COM_USERNAME, SSL_COM_PASSWORD,   the SSL.com eSigner login (the check
+#   SSL_COM_TOTP_SECRET,                  below says what the TOTP secret must
+#   SSL_COM_CREDENTIAL_ID                 be)
+#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION   S3 staging
 on:
   workflow_dispatch:
+    inputs:
+      tests:
+        description: Run the app's tests before building (turn off only to get past a problem in a test, not in the app)
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -9,12 +30,14 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v7
 
-      # eSigner reports every credential problem as "The OTP is invalid", so
-      # check the secrets are present and un-padded before the 5-minute build.
+      # First, before anything is installed: a build that can't be signed and
+      # staged isn't worth making. eSigner reports every credential problem as
+      # "The OTP is invalid", so check the secrets are un-padded, too.
       - name: Check signing secrets
         shell: pwsh
         env:
@@ -22,6 +45,9 @@ jobs:
           SSL_COM_PASSWORD: ${{ secrets.SSL_COM_PASSWORD }}
           SSL_COM_TOTP_SECRET: ${{ secrets.SSL_COM_TOTP_SECRET }}
           SSL_COM_CREDENTIAL_ID: ${{ secrets.SSL_COM_CREDENTIAL_ID }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: |
           $bad = @()
           foreach ($n in 'SSL_COM_USERNAME','SSL_COM_PASSWORD','SSL_COM_TOTP_SECRET','SSL_COM_CREDENTIAL_ID') {
@@ -29,24 +55,27 @@ jobs:
             if ([string]::IsNullOrEmpty($v)) { $bad += "$n is not set"; continue }
             if ($v -ne $v.Trim()) { $bad += "$n has leading/trailing whitespace" }
           }
-          $totp = ($env:SSL_COM_TOTP_SECRET).Trim()
+          foreach ($n in 'AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','AWS_DEFAULT_REGION') {
+            if ([string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable($n))) { $bad += "$n is not set" }
+          }
+          $totp = "$env:SSL_COM_TOTP_SECRET".Trim()
           Write-Host "TOTP secret length: $($totp.Length)"
           if ($totp.Length -lt 20) {
             $bad += "SSL_COM_TOTP_SECRET looks too short - it must be the base64 TOTP secret from eSigner, not a 6-digit code"
           }
           if ($bad) { throw ($bad -join "`n") }
-          Write-Host "Signing secrets look well-formed."
+          Write-Host "Signing and staging secrets look well-formed."
 
       - name: Set up Python 3.11
         id: py
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
 
       - name: Install UPX
         run: choco install upx -y --no-progress
 
-      - name: Build Windows exe
+      - name: Test and build Windows exe
         working-directory: dynaface-app/deploy/windows
         shell: pwsh
         env:
@@ -54,6 +83,7 @@ jobs:
           # point it at the interpreter actions/setup-python installed.
           PYTHON_EXE: ${{ steps.py.outputs.python-path }}
           BUILD_NUMBER: ${{ github.run_number }}
+          RUN_TESTS: ${{ inputs.tests }}
         run: ./build.ps1
 
       - name: Sign Windows exe (SSL.com eSigner)
@@ -79,18 +109,45 @@ jobs:
           if (-not $signtool) { throw "signtool.exe not found" }
           Write-Host "Using $($signtool.FullName)"
           & $signtool.FullName verify /pa /v working/dist/Dynaface.exe
+          if ($LASTEXITCODE -ne 0) { throw "Dynaface.exe isn't validly signed." }
 
-      - name: Package and publish to S3
+      # The zip, and what deploy-app.yml checks: the commit it was built from.
+      - name: Package and record the build
         working-directory: dynaface-app/deploy/windows
+        shell: pwsh
+        run: |
+          # build.ps1 stamped version.py with the version the zip is named for.
+          $ver = (Select-String -Path ../../version.py -Pattern 'VERSION\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          if ($ver -notmatch '^\d+\.\d+\.\d+$') { throw "Could not read the version from version.py: '$ver'." }
+          "VERSION=$ver" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          Compress-Archive -Path working/dist/Dynaface.exe -DestinationPath "release/dynaface-app-win-$ver.zip" -Force
+          $record = [ordered]@{
+            name         = "dynaface-app"
+            version      = $ver
+            platform     = "windows"
+            commit       = $env:GITHUB_SHA
+            run_id       = [long]$env:GITHUB_RUN_ID
+            run_number   = [long]$env:GITHUB_RUN_NUMBER
+            build_number = $env:GITHUB_RUN_NUMBER
+            built        = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          }
+          $record | ConvertTo-Json | Set-Content -Path "release/dynaface-app-win-$ver-build.json" -Encoding utf8NoBOM
+          Get-Content "release/dynaface-app-win-$ver-build.json"
+
+      # Staged, not released: nothing is published until deploy-app.yml runs.
+      # The bucket grants public read itself, through CloudFront and at S3's own
+      # URL, so a staged build is unlisted but downloadable by anyone with its
+      # URL; never treat one as secret.
+      - name: Stage on S3
+        working-directory: dynaface-app/deploy/windows/release
         shell: pwsh
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: |
-          $ver = (Select-String -Path ../../version.py -Pattern 'VERSION\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
-          $zip = "dynaface-app-win-$ver.zip"
-          Compress-Archive -Path working/dist/Dynaface.exe -DestinationPath $zip -Force
-          $dest = "s3://data.heatonresearch.com/app/$zip"
-          Write-Host "Uploading $zip -> $dest"
-          aws s3 cp $zip $dest --acl public-read
+          foreach ($f in "dynaface-app-win-$env:VERSION.zip", "dynaface-app-win-$env:VERSION-build.json") {
+            aws s3 cp $f s3://data.heatonresearch.com/app/ --acl public-read
+            if ($LASTEXITCODE -ne 0) { throw "Staging $f failed." }
+          }

@@ -1,22 +1,73 @@
 name: Build macOS App
 
+# Build step for the desktop app (Dynaface Classic, dynaface-app/) on macOS, in
+# the release convention's two steps (~/.claude/CLAUDE.md; RELEASING.md has the
+# sequence). deploy/macos/build.sh stamps version.py with the build date and
+# this run's number, installs the app's requirements and the dynaface library
+# from PyPI at the version it pins, and runs the app's tests in that
+# environment. It then builds Dynaface.app with PyInstaller, signs it with the
+# Developer ID certificate, and notarizes and staples it. This stages
+# dynaface-app-mac-<version>.zip and a build record naming the commit
+# (dynaface-app-mac-<version>-build.json) on S3 under the version. Run it by
+# hand, as often as needed at the same version; each run replaces what is
+# staged. Nothing is released until deploy-app.yml runs.
+#
+# Apple silicon only: macos-15 is arm64, and Intel Macs use the Unity app.
+#
+# Repository secrets:
+#   MACOS_CERT_P12 (base64), MACOS_CERT_PASSWORD,   the Developer ID
+#   MACOS_SIGN_IDENTITY                             certificate and its name
+#   AC_API_KEY_P8 (base64), AC_API_KEY_ID,          the App Store Connect API
+#   AC_API_ISSUER_ID                                key that notarizes
+#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION   S3 staging
 on:
   workflow_dispatch:
+    inputs:
+      tests:
+        description: Run the app's tests before building (turn off only to get past a problem in a test, not in the app)
+        type: boolean
+        default: true
 
 permissions:
   contents: read
 
 jobs:
   build:
-    # Apple Silicon only. macos-15 is arm64; Intel users get the Unity build.
     runs-on: macos-15
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v7
 
+      # First, before anything is installed: a build that can't be signed,
+      # notarized and staged isn't worth making.
+      - name: Are the signing secrets present?
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+          AC_API_KEY_P8: ${{ secrets.AC_API_KEY_P8 }}
+          AC_API_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
+          AC_API_ISSUER_ID: ${{ secrets.AC_API_ISSUER_ID }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+        run: |
+          missing=()
+          for name in MACOS_CERT_P12 MACOS_CERT_PASSWORD MACOS_SIGN_IDENTITY \
+                      AC_API_KEY_P8 AC_API_KEY_ID AC_API_ISSUER_ID \
+                      AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION; do
+            if [ -z "${!name:-}" ]; then missing+=("$name"); fi
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing secrets: ${missing[*]}"
+            exit 1
+          fi
+          echo "Signing and staging secrets present."
+
       - name: Set up Python 3.11
         id: py
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
 
@@ -52,34 +103,63 @@ jobs:
           set -euo pipefail
           echo "$AC_API_KEY_P8" | base64 --decode > "$RUNNER_TEMP/ac_api_key.p8"
 
-      - name: Build, sign and notarize
+      - name: Test, build, sign and notarize
         working-directory: dynaface-app/deploy/macos
         env:
           # build.sh defaults to `python3.11`, which the runner doesn't expose;
           # point it at the interpreter actions/setup-python installed.
           PYTHON_EXE: ${{ steps.py.outputs.python-path }}
           BUILD_NUMBER: ${{ github.run_number }}
+          RUN_TESTS: ${{ inputs.tests }}
           app_certificate: ${{ secrets.MACOS_SIGN_IDENTITY }}
           AC_API_KEY_PATH: ${{ runner.temp }}/ac_api_key.p8
           AC_API_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
           AC_API_ISSUER_ID: ${{ secrets.AC_API_ISSUER_ID }}
         run: ./build.sh
 
-      - name: Publish to S3
-        working-directory: dynaface-app/deploy/macos
+      # What deploy-app.yml checks: the commit these files were built from.
+      - name: Record the build
+        working-directory: dynaface-app/deploy/macos/working/dist
+        run: |
+          set -euo pipefail
+          # build.sh stamped version.py with the version the zip is named for.
+          # Unanchored so a UTF-8 BOM on version.py doesn't defeat the match.
+          VERSION=$(sed -n 's/.*VERSION = "\([^"]*\)".*/\1/p' "$GITHUB_WORKSPACE/dynaface-app/version.py" | head -1)
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Could not read the version from version.py: '$VERSION'."
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          test -f "dynaface-app-mac-$VERSION.zip"
+          cat > "dynaface-app-mac-$VERSION-build.json" <<EOF
+          {
+            "name": "dynaface-app",
+            "version": "$VERSION",
+            "platform": "macos",
+            "commit": "$GITHUB_SHA",
+            "run_id": $GITHUB_RUN_ID,
+            "run_number": $GITHUB_RUN_NUMBER,
+            "build_number": "$GITHUB_RUN_NUMBER",
+            "built": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          cat "dynaface-app-mac-$VERSION-build.json"
+
+      # Staged, not released: nothing is published until deploy-app.yml runs.
+      # The bucket grants public read itself, through CloudFront and at S3's own
+      # URL, so a staged build is unlisted but downloadable by anyone with its
+      # URL; never treat one as secret.
+      - name: Stage on S3
+        working-directory: dynaface-app/deploy/macos/working/dist
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: |
           set -euo pipefail
-          # Unanchored so a UTF-8 BOM on version.py doesn't defeat the match.
-          ver=$(sed -n 's/.*VERSION = "\([^"]*\)".*/\1/p' ../../version.py | head -1)
-          if [ -z "$ver" ]; then echo "could not parse VERSION"; exit 1; fi
-          zip="dynaface-app-mac-$ver.zip"
-          dest="s3://data.heatonresearch.com/app/$zip"
-          echo "Uploading $zip -> $dest"
-          aws s3 cp "working/dist/$zip" "$dest" --acl public-read
+          for f in "dynaface-app-mac-$VERSION.zip" "dynaface-app-mac-$VERSION-build.json"; do
+            aws s3 cp "$f" s3://data.heatonresearch.com/app/ --acl public-read
+          done
 
       - name: Clean up keychain
         if: always()

@@ -22,8 +22,9 @@ one.
 | build and stage | **Build Library** ([`build-lib.yml`](.github/workflows/build-lib.yml)) | **Build Library (.NET)** ([`build-lib-dotnet.yml`](.github/workflows/build-lib-dotnet.yml)) |
 | publish and tag | **Deploy Library to PyPI** ([`deploy-lib.yml`](.github/workflows/deploy-lib.yml)) | **Deploy Library to NuGet (.NET)** ([`deploy-lib-dotnet.yml`](.github/workflows/deploy-lib-dotnet.yml)) |
 
-The desktop app (`build-app-macos.yml`, `build-app-windows.yml`) installs the
-library from PyPI at the version it pins, so release the library first.
+The desktop app, Dynaface Classic, takes the same two steps after the library,
+since it installs the library from PyPI at the version it pins: see
+[Releasing the desktop app](#releasing-the-desktop-app).
 
 ## One-time setup
 
@@ -115,6 +116,51 @@ of that version. Never bump a version just to rebuild. Builds staged before
 2026-11-08 (2.0.x, and the first 2.1.0) have no sdist and no build record, so
 a deploy refuses them; rebuild before deploying.
 
+## Releasing the desktop app
+
+The desktop app, Dynaface Classic (`dynaface-app/`), shares the library's
+version and tag, and its release page: one GitHub Release, `v<version>`, holds
+every download of a version, the Unity app's too. Release the library first.
+
+1. Set the version in `dynaface-app/deploy/macos/build.sh` (`DYNAFACE_VERSION`)
+   and `dynaface-app/deploy/windows/build.ps1` (both `$script:DYNAFACE_VERSION`
+   and `$currentVersion`), and in `dynaface-app/version.py` for local runs. The
+   builds install the library from PyPI at this version too.
+2. Commit and push to `main`.
+3. Run **Build macOS App** ([`build-app-macos.yml`](.github/workflows/build-app-macos.yml))
+   and **Build Windows App** ([`build-app-windows.yml`](.github/workflows/build-app-windows.yml))
+   from the Actions tab, on the same commit. Each:
+   - checks first that its signing and staging secrets are there;
+   - stamps `version.py` with the date and run number, and installs the app's
+     requirements and the library from PyPI;
+   - runs the app's tests in that environment (the `tests` input, on by
+     default, can turn them off to get past a problem in a test, never one in
+     the app);
+   - builds with PyInstaller and signs: Developer ID, notarized and stapled on
+     macOS (Apple silicon only); SSL.com eSigner on Windows;
+   - stages the zip and its build record on S3.
+4. Run **Deploy Desktop App** ([`deploy-app.yml`](.github/workflows/deploy-app.yml))
+   with the version (e.g. `2.1.0`). It:
+   1. downloads both zips and their build records for that version from S3;
+   2. checks that both builds came from one commit, and that `v<version>` is
+      on that commit or an earlier one, where the library's deploy usually put
+      it; with no tag yet, it tags that commit;
+   3. adds both zips to the `v<version>` release, creating it as a draft when
+      there is none. It refuses when the release already holds either zip:
+      delete that zip from the release first to replace it.
+5. Finish the release on GitHub: write the notes (the deploy's run summary
+   lists the zips' SHA-256 sums), add the Unity app's downloads, then publish
+   it and mark it latest, which moves the README's "Download Latest Version"
+   link to it:
+
+   ```bash
+   gh release edit v2.1.0 -R jeffheaton/dynaface --draft=false --latest
+   ```
+
+The builds can be rerun at the same version as often as needed, and the deploy
+takes the latest of each. Builds staged before 2026-11-22 (2.0.x) have no
+build record, so the deploy refuses them.
+
 ## What is staged
 
 Everything goes under `s3://data.heatonresearch.com/library/`, as public
@@ -129,3 +175,11 @@ objects:
 | `Dynaface.Onnx.<version>.nupkg`, `Dynaface.Onnx.<version>.snupkg` | Build Library (.NET) |
 | `Dynaface-<version>-build.json` | Build Library (.NET) |
 | `dynaface-dotnet-<version>.zip` (the DLL and PDB, for prebuilt-DLL users) | Build Library (.NET) |
+
+The desktop app's builds go under `s3://data.heatonresearch.com/app/`, beside
+the Unity app's, also as public objects:
+
+| file | from |
+| --- | --- |
+| `dynaface-app-mac-<version>.zip`, `dynaface-app-mac-<version>-build.json` | Build macOS App |
+| `dynaface-app-win-<version>.zip`, `dynaface-app-win-<version>-build.json` | Build Windows App |

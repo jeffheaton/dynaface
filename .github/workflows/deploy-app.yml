@@ -1,0 +1,171 @@
+name: Deploy Desktop App
+
+# Deploy step for the desktop app (Dynaface Classic, dynaface-app/), in the
+# release convention's two steps (~/.claude/CLAUDE.md; RELEASING.md has the
+# sequence): puts the macOS and Windows zips that build-app-macos.yml and
+# build-app-windows.yml staged on S3 for a version on that version's GitHub
+# Release. Nothing is rebuilt: what is released is exactly what was built and
+# tested.
+#
+# The library and the desktop app share the version and its tag, v<version>,
+# and the library is released first, since the app installs it from PyPI, so the
+# tag usually stands already, at the commit the library was built from. The
+# app's builds may come from a later commit, with app fixes the library didn't
+# need, so where the tag stands this checks that the builds' commit is the
+# tagged one or comes after it, rather than tagging it. Where no tag stands
+# yet, this tags v<version> at the builds' commit, as the library's deploys do.
+#
+# One release page holds every download of a version, the Unity app's too, so
+# this adds the two zips to the release when there is one, and otherwise
+# creates it as a draft. A draft is published by hand, once its notes and every
+# download are on it (RELEASING.md). This refuses when either build is missing,
+# when the two came from different commits, when that commit doesn't contain
+# v<version>, or when the release already holds either zip.
+#
+# Repository secrets: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and
+# AWS_DEFAULT_REGION, to read the staged builds.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (e.g., 2.1.0); adds dynaface-app-mac-<version>.zip and dynaface-app-win-<version>.zip to its release'
+        required: true
+        type: string
+
+permissions:
+  # Creates the tag and the release, and uploads the zips.
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+
+    steps:
+      - name: Download the staged builds from S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$VERSION' is not an app version (e.g., 2.1.0)."
+            exit 1
+          fi
+          mkdir -p release record
+          fetch() { # $1 = file, $2 = destination folder, $3 = the build that stages it
+            aws s3 cp "s3://data.heatonresearch.com/app/$1" "$2/" || {
+              echo "::error::$1 is not staged. Run $3 at $VERSION first."
+              exit 1
+            }
+          }
+          fetch "dynaface-app-mac-$VERSION.zip" release "Build macOS App"
+          fetch "dynaface-app-mac-$VERSION-build.json" record "Build macOS App"
+          fetch "dynaface-app-win-$VERSION.zip" release "Build Windows App"
+          fetch "dynaface-app-win-$VERSION-build.json" record "Build Windows App"
+          ls -l release record
+
+      # Both builds from one commit, at or after v<version>, and a release that
+      # doesn't hold them yet. gh api prints a 404's body on stdout, so a missing
+      # tag is told by its exit status and the 404 on stderr, and any other
+      # failure stops the deploy.
+      - name: Check the builds, the tag and the release
+        run: |
+          set -euo pipefail
+          for platform in mac win; do
+            record="record/dynaface-app-$platform-$VERSION-build.json"
+            cat "$record"
+            recorded=$(jq -er .version "$record")
+            if [ "$recorded" != "$VERSION" ]; then
+              echo "::error::$record is the record of $recorded, not $VERSION."
+              exit 1
+            fi
+          done
+          MAC=$(jq -er .commit "record/dynaface-app-mac-$VERSION-build.json")
+          WIN=$(jq -er .commit "record/dynaface-app-win-$VERSION-build.json")
+          echo "macOS build from $MAC, Windows build from $WIN"
+          if ! [[ "$MAC" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::The macOS build record names no commit: '$MAC'."
+            exit 1
+          fi
+          if [ "$MAC" != "$WIN" ]; then
+            echo "::error::The two builds of $VERSION came from different commits. Rebuild the older one at the newer commit."
+            exit 1
+          fi
+          COMMIT=$MAC
+          echo "COMMIT=$COMMIT" >> "$GITHUB_ENV"
+
+          if ref=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" \
+                     --jq '.object.type + " " + .object.sha' 2> gh-error.txt); then
+            sha=${ref#* }
+            if [ "${ref% *}" = tag ]; then
+              sha=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq .object.sha)
+            fi
+            # identical: the tagged commit; ahead: a commit that comes after it.
+            status=$(gh api "repos/$GITHUB_REPOSITORY/compare/$sha...$COMMIT" --jq .status)
+            case "$status" in
+              identical) echo "v$VERSION is at $COMMIT, the commit these builds came from." ;;
+              ahead) echo "These builds came from $COMMIT, after v$VERSION at $sha." ;;
+              *)
+                echo "::error::These builds came from $COMMIT, which doesn't contain v$VERSION at $sha (it is $status). Rebuild both at a commit after the tag."
+                exit 1
+                ;;
+            esac
+            echo "TAGGED=true" >> "$GITHUB_ENV"
+          elif grep -q "HTTP 404" gh-error.txt; then
+            echo "v$VERSION is not tagged yet; it will be, at $COMMIT."
+            echo "TAGGED=false" >> "$GITHUB_ENV"
+          else
+            cat gh-error.txt
+            echo "::error::Could not read the tag v$VERSION."
+            exit 1
+          fi
+
+          # gh release view finds a draft by its tag, too.
+          if assets=$(gh release view "v$VERSION" --json assets --jq '.assets[].name' 2> gh-error.txt); then
+            for zip in release/*.zip; do
+              name=$(basename "$zip")
+              if grep -qxF "$name" <<< "$assets"; then
+                echo "::error::The v$VERSION release already holds $name. Delete it from the release first to replace it."
+                exit 1
+              fi
+            done
+            echo "v$VERSION has a release; the desktop app will be added to it."
+            echo "RELEASED=true" >> "$GITHUB_ENV"
+          elif grep -q "release not found" gh-error.txt; then
+            echo "v$VERSION has no release yet; it will be created as a draft."
+            echo "RELEASED=false" >> "$GITHUB_ENV"
+          else
+            cat gh-error.txt
+            echo "::error::Could not read the v$VERSION release."
+            exit 1
+          fi
+
+      - name: Tag, and add the zips to the release
+        run: |
+          set -euo pipefail
+          if [ "$TAGGED" != true ]; then
+            gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/v$VERSION" -f sha="$COMMIT" > /dev/null
+            echo "Tagged v$VERSION at $COMMIT"
+          fi
+          if [ "$RELEASED" = true ]; then
+            gh release upload "v$VERSION" release/*.zip
+            echo "Added the desktop app to the v$VERSION release."
+          else
+            gh release create "v$VERSION" release/*.zip --draft --verify-tag \
+              --title "Dynaface $VERSION" \
+              --notes "Draft: the notes and the other downloads are still to come (RELEASING.md)."
+            echo "Created the v$VERSION release as a draft, with the desktop app."
+          fi
+          {
+            echo "### Desktop app $VERSION, built from $COMMIT"
+            echo
+            echo '```'
+            (cd release && sha256sum -- *.zip)
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
