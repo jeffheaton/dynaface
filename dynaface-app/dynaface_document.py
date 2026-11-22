@@ -79,6 +79,26 @@ _READ_BUFFER = 1 << 20
 # How many opcodes run between charges for them.
 _CHUNK = 1 << 16
 
+# What a frame state holds, as AnalyzeFace.dump_state() writes it and as every
+# earlier version wrote one: the image, the head pose, the landmarks, the pupillary
+# distance in pixels and the millimeters per pixel (all a document of December
+# 2023 holds), then the face rotation (from July 2024), then the view (from 2.1).
+# Anything a later version might add after the view is left alone, as
+# load_state() leaves it.
+_STATE_ENTRIES = 5
+# A face's landmarks, SPIGA's 98 (WFLW's); a photo without a face has none.
+_LANDMARKS = 98
+# The largest coordinate, either way, a point may have, in pixels: sixteen times
+# the 1024-pixel crop that frames are cut to, and far enough inside OpenCV's
+# 32-bit ints that the measures' arithmetic on a point stays inside them too (a
+# measure drew a line to a point of 2**31, and OpenCV raised).
+_MAX_COORDINATE = 1 << 14
+# The largest number, either way, other than NaN or infinity, that a frame or the
+# header may hold where it holds a float: far past any frame rate, head pose,
+# pupillary distance, scale or face rotation, and far inside what float arithmetic
+# and the chart take (a head pose of 1e308 left the chart's axis no ticks to draw).
+_MAX_NUMBER = 1e9
+
 # Keys whose hashing and comparing a file can't make slow: str and bytes hashes are
 # randomized, so keys can't be chosen to collide.
 _QUICK_KEYS = frozenset({str, bytes, type(None), bool})
@@ -1055,9 +1075,10 @@ def _read_document(filename: str) -> Dict[str, Any]:
 
 
 def _flag(value: Any) -> bool:
-    """A measure's or an item's enabled flag, which a document stores as a bool."""
+    """A flag, which a document stores as a bool: a measure's or an item's enabled
+    flag, the lateral flag, or one of a view's."""
     if type(value) not in (bool, int) and not isinstance(value, np.bool_):
-        raise ValueError(f"An enabled flag of {_brief(value)}.")
+        raise ValueError(f"A flag of {_brief(value)}.")
     return bool(value)
 
 
@@ -1078,18 +1099,191 @@ def _frame_numbers(value: Any, count: int) -> Any:
     return None
 
 
+# The checks below hold a document's values to the types, and the ranges, that
+# genuine documents hold them in, as it opens: the app reads most of them later,
+# drawing a frame, in a chart or a video export, where a value of another type
+# raises, and PyQt6 ends Dynaface on an exception that leaves a slot or a thread.
+
+
+def _is_number(value: Any) -> bool:
+    """Whether value is a number where a document holds a float or an int: a
+    Python one or a numpy scalar (version 1 files pickled some), within
+    _MAX_NUMBER, NaN or infinite. A bool isn't one."""
+    kind = type(value)
+    if kind is int:
+        return -_MAX_NUMBER <= value <= _MAX_NUMBER
+    if kind is float or isinstance(value, (np.integer, np.floating)):
+        if isinstance(value, np.floating) and value.dtype.itemsize > 8:
+            return False
+        return not _MAX_NUMBER < abs(float(value)) < math.inf
+    return False
+
+
+def _number(value: Any, what: str) -> None:
+    if not _is_number(value):
+        raise ValueError(f"{what} of {_brief(value)}.")
+
+
+def _check_image(image: Any, shape: Any) -> Any:
+    """
+    Raise unless image is a frame's image: color, a byte a channel, height by
+    width by 3, as OpenCV reads a photo or a video frame, and the same size as
+    the frames' before it (shape, None for the first), since the tab draws each
+    frame into a buffer the size of the first. Every frame of a video is the
+    same 1024-pixel crop; only a photo without a face keeps its own size, and
+    it is a document's only frame. Returns its shape.
+    """
+    if (
+        type(image) is not np.ndarray
+        or image.dtype != np.uint8
+        or image.ndim != 3
+        or image.shape[2] != 3
+        or image.size == 0
+        or (shape is not None and image.shape != shape)
+    ):
+        raise ValueError(f"A frame image of {_brief(image)}.")
+    return image.shape
+
+
+def _check_head_pose(pose: Any) -> None:
+    """Raise unless pose is a frame's head pose: numbers, in a list (a [0, 0, 0]
+    placeholder until 2.1), or in an array, which load_state() reads as floats."""
+    if type(pose) is np.ndarray:
+        valid = (
+            pose.ndim == 1
+            and pose.dtype.kind in "iuf"
+            and pose.dtype.itemsize <= 8
+            and all(map(_is_number, pose.tolist()))
+        )
+    else:
+        valid = type(pose) in (list, tuple) and all(map(_is_number, pose))
+    if not valid:
+        raise ValueError(f"A head pose of {_brief(pose)}.")
+
+
+def _check_landmarks(landmarks: Any) -> None:
+    """
+    Raise unless landmarks are a frame's: a list of a face's _LANDMARKS points,
+    each a pair of whole numbers (ints, as every version kept them, or numpy
+    ints) within _MAX_COORDINATE, as the measures draw them with OpenCV, or an
+    empty list for a photo without a face. Each test is one pass in C over the
+    frame's points, as a document holds up to half a million of them.
+    """
+    if type(landmarks) is not list or len(landmarks) not in (0, _LANDMARKS):
+        raise ValueError(f"Landmarks of {_brief(landmarks)}.")
+    if not landmarks:
+        return
+    pairs = set(map(type, landmarks)) <= {tuple, list}
+    if not pairs or set(map(len, landmarks)) != {2}:
+        raise ValueError(f"Landmarks of {_brief(landmarks)}.")
+    values = list(itertools.chain.from_iterable(landmarks))
+    kinds = set(map(type, values))
+    if not all(kind is int or issubclass(kind, np.integer) for kind in kinds):
+        raise ValueError(f"Landmarks of {_brief(landmarks)}.")
+    if min(values) < -_MAX_COORDINATE or max(values) > _MAX_COORDINATE:
+        raise ValueError(f"Landmarks of {_brief(landmarks)}.")
+
+
+def _check_points(values: Any, what: str, ndim: int, ints: bool = False) -> Any:
+    """
+    Raise unless values are the points a profile or a view holds: an array of
+    numbers of ndim dimensions (pairs, for 2), whole numbers when ints, each
+    within _MAX_COORDINATE or NaN (a point not found). A profile's lateral
+    landmarks are ints in every version, and the lateral measure draws them as
+    they are, which OpenCV refuses for floats. Returns values.
+    """
+    if (
+        type(values) is not np.ndarray
+        or values.dtype.kind not in ("iu" if ints else "iuf")
+        or values.dtype.itemsize > 8
+        or values.ndim != ndim
+        or (ndim == 2 and values.shape[1] != 2)
+        or (np.abs(values.astype(np.float64)) > _MAX_COORDINATE).any()
+    ):
+        raise ValueError(f"{what} of {_brief(values)}.")
+    return values
+
+
+_VIEW_FLAGS = ("flipped", "lateral", "far_left")
+_SAGITTAL = ("sagittal_x", "sagittal_y")
+_CHEEK_OUTLINE = ("cheek_outline_x", "cheek_outline_y", "cheek_outline_src")
+
+
+def _check_view(view: Any) -> None:
+    """
+    Raise unless view is a frame's view, of what load_state() restores from one:
+    a pose's value, bools for its flags, a profile's lateral landmarks, which a
+    lateral view must hold, and sagittal outline, and a quarter face's far-cheek
+    outline, a value a row in each of its three arrays. Keys it doesn't read are
+    left alone, as it leaves them.
+    """
+    if type(view) is not dict:
+        raise ValueError(f"A view of {_brief(view)}.")
+    pose = view.get("pose", Pose.FRONTAL.value)
+    # Pose() hashes what it's given, so a crafted value goes no further than its
+    # type, as for the header's pose.
+    if type(pose) is not str or pose not in _POSES:
+        raise ValueError(f"A view's pose of {_brief(pose)}.")
+    for key in _VIEW_FLAGS:
+        if key in view:
+            _flag(view[key])
+    if view.get("lateral", False):
+        if "lateral_landmarks" not in view:
+            raise ValueError("A profile's view without its lateral landmarks.")
+        _check_points(view["lateral_landmarks"], "Lateral landmarks", 2, ints=True)
+    for key in _SAGITTAL:
+        if view.get(key) is not None:
+            _check_points(view[key], "A sagittal outline", 1)
+    outline = [view.get(key) for key in _CHEEK_OUTLINE]
+    for part in outline:
+        if part is not None:
+            _check_points(part, "A cheek outline", 1)
+    x, y, source = outline
+    if x is not None and (
+        y is None or source is None or not len(x) == len(y) == len(source)
+    ):
+        raise ValueError("A cheek outline whose arrays don't match.")
+
+
+def _check_frame(frame: Any, shape: Any) -> Any:
+    """Raise unless frame is a frame state (see _STATE_ENTRIES) of the types, and
+    the ranges, that the app reads from it. shape is the image size of the
+    frames before it (None for the first); returns this one's."""
+    if type(frame) is not list or len(frame) < _STATE_ENTRIES:
+        raise ValueError(f"A frame of {_brief(frame)}.")
+    shape = _check_image(frame[0], shape)
+    _check_head_pose(frame[1])
+    _check_landmarks(frame[2])
+    _number(frame[3], "A pupillary distance")
+    _number(frame[4], "A scale")
+    if len(frame) > 5 and frame[5] is not None:
+        _number(frame[5], "A face rotation")
+    if len(frame) > 6:
+        _check_view(frame[6])
+    return shape
+
+
+def _profile_part(value: Any, what: str, ndim: int, ints: bool = False) -> Any:
+    """A profile's lateral landmarks or sagittal outline, as a document's header
+    holds them: None, or points (see _check_points)."""
+    return None if value is None else _check_points(value, what, ndim, ints)
+
+
 def _with_view(frame: Any, view: Dict[str, Any]) -> list:
     """
     A frame state saved without a view given this one, with an unknown head pose
     (NaN). Such a state holds a [0, 0, 0] placeholder where states with a view
     hold the pose the face was analyzed with, and load_state() takes a state's
     pose as real once it has a view, so the placeholder would come back as a
-    level head. The frames share the view's arrays, which load_state() copies:
-    a copy for each of 5,000 frames was gigabytes for a crafted profile.
+    level head. A state saved before the face rotation was kept gets none, so
+    the view lands where load_state() reads it, not in the rotation's place. The
+    frames share the view's arrays, which load_state() copies: a copy for each of
+    5,000 frames was gigabytes for a crafted profile.
     """
     state = list(frame)
     if len(state) > 1:
         state[1] = [math.nan] * 3
+    state += [None] * (_STATE_ENTRIES + 1 - len(state))
     return state + [dict(view)]
 
 
@@ -1167,13 +1361,23 @@ class DynafaceDocument:
         measures = self._load_measures(doc[DOC_BODY][DOC_BODY_MEASURES])
         self._add_missing_measures(measures, dynaface.measures.all_measures())
 
-        self.fps = doc[DOC_HEADER][DOC_HEADER_FPS]
-        self.frames = doc[DOC_BODY][DOC_BODY_FRAMES]
+        fps = doc[DOC_HEADER][DOC_HEADER_FPS]
+        _number(fps, "A frame rate")
+        frames = doc[DOC_BODY][DOC_BODY_FRAMES]
+        if type(frames) is not list:
+            raise ValueError(f"Frames of {_brief(frames)}.")
         # No import keeps more, and what the app does for each frame of a
         # document it opens (add_missing_views(), each frame's view saved again)
         # made millions of frames, a few kilobytes of pickle, gigabytes.
-        if len(self.frames) > MAX_FRAMES:
-            raise ValueError(f"A document of {len(self.frames)} frames.")
+        if len(frames) > MAX_FRAMES:
+            raise ValueError(f"A document of {len(frames)} frames.")
+        # Each frame of the types the app reads it as (see _check_frame()), so a
+        # crafted one is refused now, not when a chart or an export reads it.
+        shape = None
+        for frame in frames:
+            shape = _check_frame(frame, shape)
+        self.fps = fps
+        self.frames = frames
         self.frame_numbers = _frame_numbers(
             doc[DOC_BODY].get(DOC_BODY_FRAME_NUMBERS), len(self.frames)
         )
@@ -1190,10 +1394,17 @@ class DynafaceDocument:
             # If the key is present, set it to the value in the document
             # This allows for backward compatibility with older documents
             # that do not have this key.
-            self.lateral = doc[DOC_HEADER][DOC_HEADER_LATERAL]
-            self.lateral_landmarks = doc[DOC_BODY][DOC_BODY_LATERAL_LANDMARKS]
-            self.sagittal_x = doc[DOC_BODY][DOC_BODY_SAGITTAL_X]
-            self.sagittal_y = doc[DOC_BODY][DOC_BODY_SAGITTAL_Y]
+            body = doc[DOC_BODY]
+            self.lateral = _flag(doc[DOC_HEADER][DOC_HEADER_LATERAL])
+            self.lateral_landmarks = _profile_part(
+                body[DOC_BODY_LATERAL_LANDMARKS], "Lateral landmarks", 2, ints=True
+            )
+            self.sagittal_x = _profile_part(
+                body[DOC_BODY_SAGITTAL_X], "A sagittal outline", 1
+            )
+            self.sagittal_y = _profile_part(
+                body[DOC_BODY_SAGITTAL_Y], "A sagittal outline", 1
+            )
             profile = (self.lateral_landmarks, self.sagittal_x, self.sagittal_y)
             values = sum(np.size(part) for part in profile if part is not None)
             if values > _MAX_PROFILE_VALUES:
@@ -1220,15 +1431,22 @@ class DynafaceDocument:
         about them restored; a frontal document's frames restore as frontal either
         way, so they are left as they are. Those versions kept no head pose, only
         a placeholder, so a state given a view gets an unknown one (NaN), as
-        load_state() gives a state without a view.
+        load_state() gives a state without a view. A profile saved without its
+        lateral landmarks gives none, as a profile whose outline couldn't be
+        traced has none, so the lateral measure doesn't run on it.
         """
         if not self.lateral:
             return
+        landmarks = self.lateral_landmarks
         view: Dict[str, Any] = {
             "pose": (self.pose or Pose.LATERAL).value,
             "flipped": False,
             "lateral": True,
-            "lateral_landmarks": np.array(self.lateral_landmarks),
+            "lateral_landmarks": (
+                np.empty((0, 2), dtype=int)
+                if landmarks is None
+                else np.array(landmarks)
+            ),
         }
         for name in ("sagittal_x", "sagittal_y"):
             value = getattr(self, name)

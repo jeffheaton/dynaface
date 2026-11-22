@@ -21,6 +21,7 @@ import tracemalloc
 import unittest
 import weakref
 import zipfile
+from types import SimpleNamespace
 from unittest import mock
 
 import numpy as np
@@ -32,6 +33,7 @@ from dynaface.const import Pose
 from dynaface.measures_cheek import AnalyzeCheekMeasures
 from dynaface.measures_lateral import AnalyzeLateral
 
+import dlg_modal
 import dynaface_document
 from dynaface_document import (
     DOC_BODY,
@@ -40,6 +42,7 @@ from dynaface_document import (
     DocumentError,
     DynafaceDocument,
 )
+from tab_analyze_video import AnalyzeVideoTab
 
 _calls = []
 
@@ -120,6 +123,49 @@ _PLACEHOLDER = (
 )
 
 
+# A face's 98 landmarks, as every version saved them: pairs of Python ints, the
+# pupils (the last two) level and 20 px apart.
+_LANDMARKS = [(10, 20)] * 96 + [(30, 40), (50, 40)]
+
+# A frame's view, as Dynaface 2.1 saves a frontal face's.
+_FRONTAL = {"pose": "frontal", "flipped": False, "lateral": False}
+
+
+def _frame(view=None, image=None):
+    """A frame state as Dynaface 1.2 to 2.0.4 saved one: the image, a [0, 0, 0]
+    placeholder for the head pose, the landmarks, the pupillary distance, the
+    scale and no face rotation; with a view, as 2.1 saves one, which holds the
+    head pose."""
+    if image is None:
+        image = np.arange(4 * 4 * 3, dtype=np.uint8).reshape(4, 4, 3)
+    frame = [image, [0, 0, 0], list(_LANDMARKS), 20.0, 3.15, None]
+    if view is not None:
+        frame[1] = [1.5, -2.0, 0.25]
+        frame.append(view)
+    return frame
+
+
+def _document(frames, version=2, **header):
+    """A document, before it is written, as Dynaface saves one holding these
+    frames: a frontal one, unless header says otherwise."""
+    return {
+        DOC_HEADER: {
+            "version": version,
+            "fps": 30,
+            "lateral": False,
+            "pose": "frontal",
+            **header,
+        },
+        DOC_BODY: {
+            "measures": [],
+            DOC_BODY_FRAMES: frames,
+            "lateral_landmarks": None,
+            "sagittal_x": None,
+            "sagittal_y": None,
+        },
+    }
+
+
 def _sample_document():
     doc = DynafaceDocument()
     doc.measures = measures.all_measures()
@@ -127,7 +173,7 @@ def _sample_document():
     doc.measures[1].set_item_enabled(doc.measures[1].items[0].name, False)
     image = np.arange(4 * 4 * 3, dtype=np.uint8).reshape(4, 4, 3)
     headpose = np.array([1.5, -2.0, 0.25])
-    doc.frames = [[image, headpose, [(10, 20), (30, 40)], 63.0, 0.25, 1.5]]
+    doc.frames = [[image, headpose, list(_LANDMARKS), 63.0, 0.25, 1.5]]
     doc.fps = 30
     doc.pose = Pose.LATERAL
     doc.lateral = True
@@ -248,6 +294,151 @@ def _json_nested(levels, opening, closing, inner="null"):
     return opening * levels + inner + closing * levels
 
 
+# Changes to a document from _document() that put a value of a type, or a size, no
+# document holds where it holds a genuine one: in its header, or in its second
+# frame, as the tab opens on the first and reads the others when a frame is drawn,
+# in a chart or in a video export.
+
+
+def _header(**values):
+    return lambda doc: doc[DOC_HEADER].update(values)
+
+
+def _frames(value):
+    return lambda doc: doc[DOC_BODY].update({DOC_BODY_FRAMES: value})
+
+
+def _second_frame(entry, value):
+    def change(doc):
+        doc[DOC_BODY][DOC_BODY_FRAMES][1][entry] = value
+
+    return change
+
+
+def _second_view(**values):
+    return lambda doc: doc[DOC_BODY][DOC_BODY_FRAMES][1][6].update(values)
+
+
+def _profile_header(**body):
+    """A profile document's header, with these values for its profile."""
+
+    def change(doc):
+        doc[DOC_HEADER].update(lateral=True, pose="lateral")
+        doc[DOC_BODY].update(body)
+
+    return change
+
+
+_PROFILE_VIEW = {
+    "pose": "lateral",
+    "lateral": True,
+    "lateral_landmarks": np.arange(12).reshape(6, 2) + 100,
+}
+_QUARTER_VIEW = {
+    "pose": "quarter",
+    "far_left": True,
+    "cheek_outline_x": np.array([12.5, 13.0, 13.5], dtype=np.float32),
+    "cheek_outline_y": np.array([20, 21, 22], dtype=np.int32),
+    "cheek_outline_src": np.array([0, 1, 2], dtype=np.uint8),
+}
+
+# Most of these opened before, and then drawing that frame, a chart or a video
+# export raised, which ended Dynaface: PyQt6 ends the app on an exception that
+# leaves a slot or a thread.
+_WRONG = {
+    "a frame rate of text": _header(fps="30"),
+    "a frame rate in a list": _header(fps=[30]),
+    "no frame rate": _header(fps=None),
+    "a frame rate of True": _header(fps=True),
+    "a lateral flag of text": _header(lateral="no"),
+    "a lateral flag in an array": _header(lateral=np.array([True, False])),
+    "frames of text": _frames("frames"),
+    "frames in a dict": _frames({"0": 0}),
+    "a frame of text": lambda doc: doc[DOC_BODY][DOC_BODY_FRAMES].append("frame"),
+    "a frame of four entries": lambda doc: doc[DOC_BODY][DOC_BODY_FRAMES].append(
+        _frame()[:4]
+    ),
+    "an image of text": _second_frame(0, "image"),
+    "no image": _second_frame(0, None),
+    "an image of floats": _second_frame(0, np.zeros((4, 4, 3))),
+    "a gray image": _second_frame(0, np.zeros((4, 4), dtype=np.uint8)),
+    "an image with alpha": _second_frame(0, np.zeros((4, 4, 4), dtype=np.uint8)),
+    "an image of 16 bits": _second_frame(0, np.zeros((4, 4, 3), dtype=np.uint16)),
+    "an image of no pixels": _second_frame(0, np.zeros((0, 4, 3), dtype=np.uint8)),
+    "an image of another size": _second_frame(0, np.zeros((8, 4, 3), dtype=np.uint8)),
+    "a head pose of text": _second_frame(1, "level"),
+    "a head pose of 1e308": _second_frame(1, [1e308, 0.0, 0.0]),
+    "landmarks of text": _second_frame(2, "landmarks"),
+    "no landmarks": _second_frame(2, None),
+    "landmarks of floats": _second_frame(2, [(x + 0.5, y) for x, y in _LANDMARKS]),
+    "landmarks of text pairs": _second_frame(2, [("x", "y")] * 98),
+    "landmarks of bools": _second_frame(2, [(True, False)] * 98),
+    "landmarks of three numbers": _second_frame(2, [(1, 2, 3)] * 98),
+    "landmarks in pairs of pairs": _second_frame(2, [((1, 2), (3, 4))] * 98),
+    "five landmarks": _second_frame(2, _LANDMARKS[:5]),
+    "landmarks in an array": _second_frame(2, np.array(_LANDMARKS)),
+    "landmarks past OpenCV's ints": _second_frame(
+        2, [(x + 2**31, y) for x, y in _LANDMARKS]
+    ),
+    "a pupillary distance of text": _second_frame(3, "20"),
+    "a scale of text": _second_frame(4, "3.15"),
+    "no scale": _second_frame(4, None),
+    "a face rotation in a list": _second_frame(5, [0.1]),
+    "a view of text": _second_frame(6, "frontal"),
+    "a view's pose unknown": _second_view(pose="sideways"),
+    "a view's pose in a list": _second_view(pose=["frontal"]),
+    "a view's flag in an array": _second_view(flipped=np.array([True, False])),
+    "a view's lateral flag of text": _second_view(lateral="no"),
+    "a profile's view without lateral landmarks": _second_view(
+        pose="lateral", lateral=True
+    ),
+    "a view's lateral landmarks of floats": _second_view(
+        **dict(_PROFILE_VIEW, lateral_landmarks=np.arange(12.0).reshape(6, 2))
+    ),
+    "a view's lateral landmarks of one number each": _second_view(
+        **dict(_PROFILE_VIEW, lateral_landmarks=np.arange(12))
+    ),
+    "a view's sagittal outline of text": _second_view(
+        **dict(_PROFILE_VIEW, sagittal_x="outline")
+    ),
+    "a cheek outline of text": _second_view(
+        **dict(_QUARTER_VIEW, cheek_outline_x="outline")
+    ),
+    "a cheek outline without its rows": _second_view(
+        **dict(_QUARTER_VIEW, cheek_outline_y=None)
+    ),
+    "a cheek outline with rows it lacks": _second_view(
+        **dict(_QUARTER_VIEW, cheek_outline_y=np.arange(5, dtype=np.int32))
+    ),
+    "a cheek outline past OpenCV's ints": _second_view(
+        **dict(_QUARTER_VIEW, cheek_outline_x=np.full(3, 1e12))
+    ),
+    "a profile's lateral landmarks of text": _profile_header(lateral_landmarks="x"),
+    "a profile's lateral landmarks in a list": _profile_header(
+        lateral_landmarks=[[1, 2]] * 6
+    ),
+    "a profile's sagittal outline of text": _profile_header(sagittal_y="outline"),
+}
+
+# Values a version 2 file can't hold: ints past what JSON numbers it reads.
+_WRONG_IN_VERSION_1 = {
+    "a frame rate past a float": _header(fps=10**400),
+    "a head pose past a float": _second_frame(1, [2**2000, 0, 0]),
+    "landmarks past 64 bits": _second_frame(2, [(2**70, 0)] * 98),
+    "a face rotation past a float": _second_frame(5, 10**400),
+}
+
+
+def _run_and_wait(window, f, message):
+    """display_please_wait(), without the dialog: runs f and returns its error,
+    or None."""
+    try:
+        f()
+    except Exception as e:  # noqa: BLE001 - the dialog returns any error
+        return e
+    return None
+
+
 class DynafaceDocumentTest(unittest.TestCase):
     def setUp(self):
         self._dir = tempfile.TemporaryDirectory()
@@ -262,9 +453,26 @@ class DynafaceDocumentTest(unittest.TestCase):
         doc.load(self.path)
         return doc
 
+    def read_frames(self):
+        """The frames the file holds, as read before load() checks that they are
+        frames: what the tests of the reader itself read, which put values of
+        every type a file can hold where a document holds its frames."""
+        return dynaface_document._read_document(self.path)[DOC_BODY][DOC_BODY_FRAMES]
+
     def write_gzip(self, data):
         with gzip.open(self.path, "wb") as f:
             f.write(data)
+
+    def write(self, doc, version):
+        """Writes doc, made by _document(), as a version 1 file (a gzip pickle)
+        or a version 2 one (a zip of JSON and arrays), whatever it holds, as
+        someone crafting a file could."""
+        if version == 1:
+            doc = dict(doc, **{DOC_HEADER: dict(doc[DOC_HEADER], version=1)})
+            self.write_gzip(pickle.dumps(doc, protocol=4))
+        else:
+            with open(self.path, "wb") as f:
+                DynafaceDocument._write_zip(f, doc)
 
     def rewrite(self, change_json=None, replace=None):
         """Edits a saved document the way someone crafting a file could."""
@@ -400,7 +608,8 @@ class DynafaceDocumentTest(unittest.TestCase):
             "sagittal_x": np.arange(5, dtype=np.int32),
             "sagittal_y": np.arange(5, 10, dtype=np.int32),
         }
-        doc.frames = [[image, [10.0, -2.0, 1.0], [(10, 20)], 0.0, 0.24, None, view]]
+        landmarks = list(_LANDMARKS)
+        doc.frames = [[image, [10.0, -2.0, 1.0], landmarks, 0.0, 0.24, None, view]]
         doc.save(self.path)
         loaded = self.load()
         self.assert_same(doc.frames, loaded.frames)
@@ -430,7 +639,8 @@ class DynafaceDocumentTest(unittest.TestCase):
             "cheek_outline_y": np.array([20, 21, 22], dtype=np.int32),
             "cheek_outline_src": np.array([0, 1, 2], dtype=np.uint8),
         }
-        doc.frames = [[image, [45.0, -2.0, 1.0], [(10, 20)], 0.0, 0.24, None, view]]
+        landmarks = list(_LANDMARKS)
+        doc.frames = [[image, [45.0, -2.0, 1.0], landmarks, 0.0, 0.24, None, view]]
         doc.save(self.path)
         loaded = self.load()
         self.assertEqual(loaded.pose, Pose.QUARTER)
@@ -451,7 +661,7 @@ class DynafaceDocumentTest(unittest.TestCase):
         # scalar in such a frame comes back as a Python float from the version 2
         # file, so the frames hold none.)
         image = np.arange(48, dtype=np.uint8).reshape(4, 4, 3)
-        frames = [[image, np.array([1.5, -2.0]), [(10, 20)], 63.0, 0.25]]
+        frames = [[image, np.array([1.5, -2.0]), list(_LANDMARKS), 63.0, 0.25]]
         self.write_gzip(pickle.dumps(_version_1(frames)))
         loaded = self.load()
         self.assertEqual(loaded.pose, Pose.FRONTAL)
@@ -469,7 +679,7 @@ class DynafaceDocumentTest(unittest.TestCase):
         # Dynaface 1.2.0 wrote the lateral key but not the pose: the lateral flag
         # says which view the document had, so its labels and a re-save are right.
         image = np.arange(48, dtype=np.uint8).reshape(4, 4, 3)
-        frames = [[image, np.array([1.5, -2.0]), [(10, 20)], 63.0, 0.25]]
+        frames = [[image, np.array([1.5, -2.0]), list(_LANDMARKS), 63.0, 0.25]]
         doc = _version_1(frames, lateral=True)
         doc[DOC_BODY]["lateral_landmarks"] = np.arange(4, dtype=np.int32).reshape(2, 2)
         doc[DOC_BODY]["sagittal_x"] = np.arange(3, dtype=np.int32)
@@ -491,7 +701,12 @@ class DynafaceDocumentTest(unittest.TestCase):
         # the frame on its own (the series, the Evaluation, the video export)
         # measures it as the profile, and a re-save keeps the view.
         saved = _sample_document()
-        saved.frames.append(saved.frames[0] + [{"pose": "lateral", "lateral": True}])
+        kept = {
+            "pose": "lateral",
+            "lateral": True,
+            "lateral_landmarks": np.arange(12).reshape(6, 2) + 100,
+        }
+        saved.frames.append(saved.frames[0] + [kept])
         saved.save(self.path)
         loaded = self.load()
         loaded.add_missing_views()
@@ -504,7 +719,7 @@ class DynafaceDocumentTest(unittest.TestCase):
         self.assert_same(saved.sagittal_x, view["sagittal_x"])
         self.assert_same(saved.sagittal_y, view["sagittal_y"])
         # the frame that had a view keeps it
-        self.assertEqual(loaded.frames[1][6], {"pose": "lateral", "lateral": True})
+        self.assert_same(kept, loaded.frames[1][6])
         face = facial.AnalyzeFace(measures=[AnalyzeLateral()])
         face.load_state(loaded.frames[0])
         self.assertTrue(face.lateral)
@@ -563,11 +778,12 @@ class DynafaceDocumentTest(unittest.TestCase):
         doc = _sample_document()
         doc.frames = [values]
         doc.save(self.path)
-        self.assert_same([values], self.load().frames)
+        self.assert_same([values], self.read_frames())
 
     def test_opens_version_1_files(self):
         image = np.arange(48, dtype=np.uint8).reshape(4, 4, 3)
-        frames = [[image, np.array([1.5, -2.0]), [(10, 20)], 63.0, np.float64(0.25)]]
+        scale = np.float64(0.25)
+        frames = [[image, np.array([1.5, -2.0]), list(_LANDMARKS), 63.0, scale]]
         # Documents saved before May 2025 had no lateral data in them.
         self.write_gzip(pickle.dumps(_version_1(frames)))
         loaded = self.load()
@@ -576,7 +792,7 @@ class DynafaceDocumentTest(unittest.TestCase):
         self.assert_same(frames, loaded.frames)
 
     def test_opens_version_1_files_written_with_numpy_1(self):
-        frames = [[np.arange(6, dtype=np.int32).reshape(2, 3)]]
+        frames = [_frame()]
         # Protocol 3 spells module names out as text, so the numpy 2 names can be
         # swapped for the ones numpy 1 wrote.
         data = pickle.dumps(_version_1(frames), protocol=3)
@@ -613,7 +829,7 @@ class DynafaceDocumentTest(unittest.TestCase):
         for protocol in (3, 4, 5):
             with self.subTest(protocol=protocol):
                 self.write_gzip(pickle.dumps(_version_1(frames), protocol=protocol))
-                self.assert_same(frames, self.load().frames)
+                self.assert_same(frames, self.read_frames())
 
     def test_refuses_version_1_files_that_run_code(self):
         self.write_gzip(pickle.dumps(_version_1([_RunsCode()])))
@@ -866,7 +1082,7 @@ class DynafaceDocumentTest(unittest.TestCase):
         # Every protocol 2-4 file memoizes numpy's _reconstruct, which the
         # unpickler hands out as its own method: the memo held the unpickler, and
         # with it every array the file memoized, until the garbage collector ran.
-        frames = [[np.arange(12.0)]]
+        frames = [_frame()]
         self.write_gzip(pickle.dumps(_version_1(frames), protocol=4))
         gc.disable()
         try:
@@ -878,8 +1094,10 @@ class DynafaceDocumentTest(unittest.TestCase):
             gc.enable()
 
     def test_opens_version_1_arrays_too_big_to_read_at_once(self):
-        # Protocol 5 writes an array's data as one bytearray, read in parts.
-        frames = [[np.arange(300_000, dtype=np.float64)]]
+        # Protocol 5 writes an array's data as one bytearray, read in parts: a
+        # 1024-pixel crop is 3 MB.
+        crop = (np.arange(1024 * 1024 * 3) % 251).astype(np.uint8)
+        frames = [_frame(image=crop.reshape(1024, 1024, 3))]
         data = pickle.dumps(_version_1(frames), protocol=5)
         self.assertIn(pickle.BYTEARRAY8, data)
         self.write_gzip(data)
@@ -1076,11 +1294,11 @@ class DynafaceDocumentTest(unittest.TestCase):
         for protocol in (3, 5):
             with self.subTest(protocol=protocol):
                 self.write_gzip(pickle.dumps(_version_1([[inner]]), protocol=protocol))
-                self.assert_same([[inner]], self.load().frames)
+                self.assert_same([[inner]], self.read_frames())
         doc = _sample_document()
         doc.frames = [[inner]]
         doc.save(self.path)
-        self.assert_same([[inner]], self.load().frames)
+        self.assert_same([[inner]], self.read_frames())
 
     def test_refuses_keys_that_share_their_members(self):
         # A tuple of a tuple twice, itself of a tuple twice, 100 levels deep is
@@ -1245,11 +1463,12 @@ class DynafaceDocumentTest(unittest.TestCase):
         image = np.arange(8 * 8 * 3, dtype=np.uint8).reshape(8, 8, 3)
 
         def frame(version):
+            # As Dynaface 2.0.4 saved a frame, then as 2.1 saves one.
             if version == 1:
-                headpose = np.array([1.5, -2.0, 0.25])
-                return [image.copy(), headpose, list(landmarks), np.float64(63.0)]
+                return [image.copy(), [0, 0, 0], list(landmarks), 63.0, 0.25, None]
             view = {"pose": "frontal", "flipped": False, "lateral": False}
-            return [image.copy(), [1.5, -2.0, 0.25], list(landmarks), 63.0, view]
+            pose = [1.5, -2.0, 0.25]
+            return [image.copy(), pose, list(landmarks), 63.0, 0.25, None, view]
 
         self.write_gzip(pickle.dumps(_version_1([frame(1) for _ in range(5000)])))
         start = time.perf_counter()
@@ -1329,19 +1548,23 @@ class DynafaceDocumentTest(unittest.TestCase):
             self.save_frames_json("4" * 40)
             self.assert_unreadable()
             self.save_frames_json("4" * 39)
-            self.assertEqual(self.load().frames, [int("4" * 39)])
+            self.assertEqual(self.read_frames(), [int("4" * 39)])
 
     def test_refuses_more_frames_than_an_import_keeps(self):
         # What the app does for each frame of a document it opens made millions
         # of them, a few kilobytes of pickle, gigabytes.
         for count, opens in ((5000, True), (5001, False)):
             with self.subTest(count=count):
-                self.write_gzip(pickle.dumps(_version_1([[]] * count)))
+                # One frame over and over, which a pickle holds once; a version
+                # 2 file stores each frame's image apart.
+                self.write_gzip(pickle.dumps(_version_1([_frame()] * count)))
                 if opens:
                     self.assertEqual(len(self.load().frames), count)
                 else:
                     self.assert_unreadable()
-                self.save_frames_json(", ".join(["[]"] * count))
+                image = np.zeros((1, 1, 3), dtype=np.uint8)
+                frames = [_frame(_FRONTAL, image.copy()) for _ in range(count)]
+                self.write(_document(frames), 2)
                 if opens:
                     self.assertEqual(len(self.load().frames), count)
                 else:
@@ -1350,7 +1573,7 @@ class DynafaceDocumentTest(unittest.TestCase):
     def test_refuses_a_profile_larger_than_a_crop(self):
         # add_missing_views() gives each frame saved without a view the profile,
         # and saving the document again stores it once a frame.
-        frames = [[np.zeros((4, 4, 3), dtype=np.uint8)] * 6] * 10
+        frames = [_frame()] * 10
         for size, opens in ((1024, True), (9000, False)):
             with self.subTest(size=size):
                 doc = _profile(
@@ -1465,14 +1688,136 @@ class DynafaceDocumentTest(unittest.TestCase):
 
     def test_a_version_1_document_saved_again_opens_again(self):
         # Its values nest as deeply in the version 2 file, counted the same way
-        # though they take more levels of JSON there.
+        # though they take more levels of JSON there: here, in a key of a frame's
+        # view that Dynaface doesn't read, as a later version might add one,
+        # which is kept.
         value = None
         for level in range(40):
             value = {level: value}
-        self.write_gzip(pickle.dumps(_version_1([[value]])))
+        frame = _frame(dict(_FRONTAL, later=value))
+        self.write_gzip(pickle.dumps(_version_1([frame])))
         loaded = self.load()
         loaded.save(self.path)
-        self.assert_same([[value]], self.load().frames)
+        self.assert_same(value, self.load().frames[0][6]["later"])
+
+    # Documents that open, holding values of the wrong type for what the app then
+    # does with them. Each is refused as it opens, as a file that isn't a
+    # document, in either kind of file.
+
+    def assert_refused_as_no_document(self):
+        with self.assertRaisesRegex(DocumentError, "not appear to be a valid Dynaface"):
+            self.load()
+
+    def test_refuses_values_of_types_no_document_holds(self):
+        for version in (1, 2):
+            # unchanged, the document opens
+            self.write(_document([_frame(dict(_FRONTAL)) for _ in range(3)]), version)
+            self.assertEqual(len(self.load().frames), 3)
+        cases = [(name, change, (1, 2)) for name, change in _WRONG.items()]
+        cases += [(name, change, (1,)) for name, change in _WRONG_IN_VERSION_1.items()]
+        for name, change, versions in cases:
+            for version in versions:
+                with self.subTest(name, version=version):
+                    doc = _document([_frame(dict(_FRONTAL)) for _ in range(3)])
+                    change(doc)
+                    self.write(doc, version)
+                    self.assert_refused_as_no_document()
+
+    def test_opens_every_kind_of_frame_documents_hold(self):
+        # What AnalyzeFace.dump_state() writes now and what each earlier version
+        # wrote, which restore as they did.
+        photo = np.zeros((30, 40, 3), dtype=np.uint8)
+        profile = dict(
+            _PROFILE_VIEW,
+            flipped=True,
+            sagittal_x=np.arange(5, dtype=np.int32) + 300,
+            sagittal_y=np.arange(5, dtype=np.int32),
+        )
+        outline_with_a_gap = dict(
+            _QUARTER_VIEW, cheek_outline_x=np.array([12.5, math.nan, 13.5])
+        )
+        unknown = _frame(dict(_FRONTAL))
+        # Saved again from a frame saved without a view, and with the pupils in
+        # one place, which left no scale.
+        unknown[1], unknown[4] = [math.nan] * 3, math.inf
+        six = _frame(dict(_FRONTAL))
+        # The model's whole head pose, a face the crop straightened, landmarks
+        # past the crop's edge, and a profile's fixed scale.
+        six[1], six[5] = [1.5, -2.0, 0.25, 10.0, -4.0, 900.0], 0.12
+        six[2] = [(x - 300, y + 1100) for x, y in _LANDMARKS]
+        cases = {
+            "Dynaface 2.1": [_frame(dict(_FRONTAL)) for _ in range(2)],
+            "Dynaface 1.2 to 2.0.4": [_frame() for _ in range(2)],
+            "December 2023, before the face rotation": [_frame()[:5]],
+            "a photo without a face, at its own size": [
+                [photo, [0, 0, 0], [], 0, 1, None]
+            ],
+            "a profile": [_frame(profile)],
+            "a three-quarter face": [_frame(outline_with_a_gap)],
+            "a three-quarter face saved before its outline was kept": [
+                _frame({"pose": "quarter", "flipped": False, "lateral": False})
+            ],
+            "a head pose and a scale not known": [unknown],
+            "more of the head pose": [six],
+            "a view with keys Dynaface doesn't read": [
+                _frame(dict(_FRONTAL, later=[1, "two"]))
+            ],
+        }
+        numpy_scalars = [
+            np.arange(48, dtype=np.uint8).reshape(4, 4, 3),
+            np.array([1.5, -2.0, 0.25]),
+            [(np.int64(x), np.int64(y)) for x, y in _LANDMARKS],
+            np.float64(20.0),
+            np.float64(3.15),
+            np.float64(0.1),
+        ]
+        in_version_1 = {"numpy scalars": [numpy_scalars]}
+        for versions, kinds in (((1, 2), cases), ((1,), in_version_1)):
+            for name, frames in kinds.items():
+                for version in versions:
+                    with self.subTest(name, version=version):
+                        self.write(_document(frames, fps=29.97), version)
+                        loaded = self.load()
+                        self.assert_same(frames, loaded.frames)
+                        self.assertEqual(loaded.fps, 29.97)
+                        for state in loaded.frames:
+                            facial.AnalyzeFace([]).load_state(state)
+
+    def test_frames_saved_before_the_rotation_get_a_view_where_it_is_read(self):
+        # add_missing_views() gave a profile's frame of five entries its view in
+        # the face rotation's place, where load_state() took it for one. A
+        # profile saved without its lateral landmarks gets none, as one whose
+        # outline couldn't be traced, and the lateral measure skips it.
+        doc = _document([_frame()[:5] for _ in range(2)], lateral=True, pose="lateral")
+        self.write(doc, 1)
+        loaded = self.load()
+        loaded.add_missing_views()
+        for state in loaded.frames:
+            self.assertEqual(len(state), 7)
+            self.assertIsNone(state[5])
+            self.assertEqual(state[6]["lateral_landmarks"].shape, (0, 2))
+        face = facial.AnalyzeFace(measures=[AnalyzeLateral()])
+        face.load_state(loaded.frames[0])
+        self.assertTrue(face.lateral)
+        self.assertIsNone(face.face_rotation)
+        AnalyzeLateral().calc(face)
+
+    def test_the_tab_says_a_crafted_document_is_not_one(self):
+        # The tab is never shown: the window says why, and Dynaface goes on.
+        doc = _document([_frame(dict(_FRONTAL)) for _ in range(2)])
+        doc[DOC_BODY][DOC_BODY_FRAMES][1][0] = "image"
+        self.write(doc, 2)
+        tab = SimpleNamespace()
+        app = SimpleNamespace(tilt_threshold=-1)
+        with mock.patch(
+            "tab_analyze_video.QApplication", **{"instance.return_value": app}
+        ), mock.patch.object(
+            dlg_modal, "display_please_wait", side_effect=_run_and_wait
+        ):
+            self.assertFalse(AnalyzeVideoTab.load_document(tab, self.path))
+        self.assertIn(
+            "does not appear to be a valid Dynaface document", tab.load_error_message
+        )
 
 
 if __name__ == "__main__":
