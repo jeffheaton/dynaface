@@ -189,6 +189,10 @@ jobs:
           path: dynaface-lib-python/dist/*
 
       # Staged where Deploy Library to PyPI looks for them, by version.
+      # no-cache: a rerun at the same version replaces these files under the same
+      # names, and CloudFront (data.heatonresearch.com) would otherwise keep serving
+      # the earlier run's copy for up to a day. With it, CloudFront asks S3 whether
+      # its copy is current on every request and serves the newest.
       - name: Upload to S3
         working-directory: dynaface-lib-python
         env:
@@ -197,7 +201,7 @@ jobs:
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: |
           for f in "dist/dynaface-$VERSION-py3-none-any.whl" "dist/dynaface-$VERSION.tar.gz" "dist/dynaface-$VERSION-build.json"; do
-            aws s3 cp "$f" s3://data.heatonresearch.com/library/ --acl public-read
+            aws s3 cp "$f" s3://data.heatonresearch.com/library/ --acl public-read --cache-control no-cache
           done
 
       - name: Clean up build artifacts

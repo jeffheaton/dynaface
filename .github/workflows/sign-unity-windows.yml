@@ -102,6 +102,10 @@ jobs:
           compression-level: 0
           retention-days: 14
 
+      # no-cache: a rerun with the same output_name replaces the file under the
+      # same name, and CloudFront (data.heatonresearch.com) would otherwise keep
+      # serving the earlier run's copy for up to a day. With it, CloudFront asks
+      # S3 whether its copy is current on every request and serves the newest.
       - name: Copy to S3 (app/ folder)
         if: ${{ env.AWS_ACCESS_KEY_ID != '' }}
         shell: pwsh
@@ -112,4 +116,4 @@ jobs:
         run: |
           $dest = "s3://data.heatonresearch.com/app/${{ inputs.output_name }}"
           Write-Host "Uploading -> $dest"
-          aws s3 cp "${{ inputs.output_name }}" $dest --acl public-read
+          aws s3 cp "${{ inputs.output_name }}" $dest --acl public-read --cache-control no-cache

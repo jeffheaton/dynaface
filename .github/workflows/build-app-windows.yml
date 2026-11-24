@@ -139,6 +139,11 @@ jobs:
       # The bucket grants public read itself, through CloudFront and at S3's own
       # URL, so a staged build is unlisted but downloadable by anyone with its
       # URL; never treat one as secret.
+      # no-cache: a rerun at the same version replaces these files under the same
+      # names, and CloudFront (data.heatonresearch.com) would otherwise keep serving
+      # the earlier run's copy for up to a day (it served Heaton Life 1.2.0's first
+      # Windows zip a day after the final build replaced it). With it, CloudFront
+      # asks S3 whether its copy is current on every request and serves the newest.
       - name: Stage on S3
         working-directory: dynaface-app/deploy/windows/release
         shell: pwsh
@@ -148,6 +153,6 @@ jobs:
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: |
           foreach ($f in "dynaface-app-win-$env:VERSION.zip", "dynaface-app-win-$env:VERSION-build.json") {
-            aws s3 cp $f s3://data.heatonresearch.com/app/ --acl public-read
+            aws s3 cp $f s3://data.heatonresearch.com/app/ --acl public-read --cache-control no-cache
             if ($LASTEXITCODE -ne 0) { throw "Staging $f failed." }
           }

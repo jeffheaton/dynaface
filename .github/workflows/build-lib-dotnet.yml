@@ -179,13 +179,18 @@ jobs:
           retention-days: 7
           path: dynaface-lib-dotnet/dynaface-dotnet-*.zip
 
+      # no-cache: dynaface-lib-dotnet/README.md links this zip through CloudFront
+      # (data.heatonresearch.com), which would otherwise keep serving an earlier
+      # run's zip for up to a day after a rerun at the same version replaced it.
+      # With it, CloudFront asks S3 whether its copy is current on every request
+      # and serves the newest.
       - name: Upload to S3
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: |
-          aws s3 cp "dynaface-lib-dotnet/dynaface-dotnet-${VERSION}.zip" s3://data.heatonresearch.com/library/ --acl public-read
+          aws s3 cp "dynaface-lib-dotnet/dynaface-dotnet-${VERSION}.zip" s3://data.heatonresearch.com/library/ --acl public-read --cache-control no-cache
 
       # Each .nupkg comes with a .snupkg of symbols, Source Link pointing them
       # at this commit on GitHub.
@@ -227,7 +232,8 @@ jobs:
           retention-days: 7
           path: dynaface-lib-dotnet/nupkgs/*
 
-      # Staged where Deploy Library to NuGet (.NET) looks for them, by version.
+      # Staged where Deploy Library to NuGet (.NET) looks for them, by version
+      # (no-cache for the same reason as the zip above).
       - name: Upload NuGet packages to S3
         working-directory: dynaface-lib-dotnet
         env:
@@ -238,7 +244,7 @@ jobs:
           for f in "nupkgs/Dynaface.$VERSION.nupkg" "nupkgs/Dynaface.$VERSION.snupkg" \
                    "nupkgs/Dynaface.Onnx.$VERSION.nupkg" "nupkgs/Dynaface.Onnx.$VERSION.snupkg" \
                    "nupkgs/Dynaface-$VERSION-build.json"; do
-            aws s3 cp "$f" s3://data.heatonresearch.com/library/ --acl public-read
+            aws s3 cp "$f" s3://data.heatonresearch.com/library/ --acl public-read --cache-control no-cache
           done
 
       - name: Clean up build artifacts
